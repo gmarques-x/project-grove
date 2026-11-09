@@ -29,6 +29,7 @@ style = "fg:#859289"
 
 [status]
 disabled = false
+symbol = "✗ "
 style = "fg:#E67E80"
 
 [character]

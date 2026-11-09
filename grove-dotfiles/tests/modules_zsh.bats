@@ -69,11 +69,27 @@ setup() {
   load_module 70-zsh
   ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply
-  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -lic 'echo $ZDOTDIR; echo $HISTFILE'
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -lic 'echo $ZDOTDIR; echo $HISTFILE; print -l $path'
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "$HOME/.config/zsh" ]
   [ "${lines[1]}" = "$HOME/.local/state/zsh/history" ]
+  # nothing else printed at startup, and ~/.local/bin is first, exactly once
+  [ "${lines[2]}" = "$HOME/.local/bin" ]
+  local n=0 l
+  for l in "${lines[@]:2}"; do
+    [ "$l" = "$HOME/.local/bin" ] && n=$((n + 1))
+  done
+  [ "$n" -eq 1 ]
   [ -d "$HOME/.local/state/zsh" ]
+}
+
+@test "a login shell prints nothing at startup" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -lic 'echo $ZDOTDIR; echo $HISTFILE'
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 2 ]
 }
 
 @test "zshenv is silent and adds .local/bin to PATH once" {
