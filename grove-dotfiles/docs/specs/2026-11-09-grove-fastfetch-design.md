@@ -20,9 +20,9 @@ The summary shown in every new terminal window keeps its look (a boxed "Grove" p
 | --- | --- | --- |
 | Tool | **fastfetch** replaces macchina | It can show images in Ghostty and color its bars; macchina can do neither. |
 | Image | The banner reframed: logo to the landscape's rock, features row removed, made taller (aspect 1.61), rounded corners, 1004 × 624 PNG | Approved by the user after the spike. |
-| Image tones | **Everforest night**: light and dark swapped, the paper shifted onto bg0 `#2D353B`, the darkest ink onto fg `#D3C6AA`; other colors keep their tint relative to the paper (so the sun becomes a dark disc) | Chosen by the user over a plain negative and an unshifted swap. It blends into the terminal. |
+| Image tones | **Everforest night**, recolored from the theme: lightness picks a color on a palette ramp (paper bg0 → bg_green → fill → aqua → green → darkest ink fg), and the sun is the theme's yellow, drawn as a full disc behind the peak | Chosen by the user: first the swapped version, then "more green, following the theme colors". It blends into the terminal. |
 | Image source | The PNG itself is committed (`config/fastfetch/grove.png`, ~1 MB) | It's derived from the banner the user made for the public README. The tool that made it stays private, like the other dev tools (see the private-files rule). |
-| Image colors | The image is derived from the banner's paint, so it is **exempt** from the palette rule (its paper is bg0, but the paint keeps its own shades) | The palette rule covers config colors. Every color in the fastfetch config still comes from the palette (tested). |
+| Image colors | The image is derived from the banner's paint, so it is **exempt** from the palette rule (made only of palette colors, but blended between them, so its pixels aren't exact palette hexes) | The palette rule covers config colors. Every color in the fastfetch config still comes from the palette (tested). |
 | Size | Image 76 columns × 22 rows (the box's height); the whole summary needs ~140 columns | It matches the box; the width follows from the image's shape. |
 | Narrow windows | ≥ 140 columns: image (1 + 76 + 3 + the 58-column box = 138). 125–139: today's text art (1 + 61 + 3 + 58 = 123). < 125: box only | Never wraps or overlaps. |
 | Terminal.app | Text art (it can't show images) | Same as today. |
