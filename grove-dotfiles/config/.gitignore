@@ -1,0 +1,9 @@
+/*
+!/.gitignore
+!/git/
+!/ssh/
+!/zsh/
+!/starship.toml
+
+/git/local
+/git/allowed_signers

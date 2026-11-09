@@ -1,0 +1,6 @@
+brew "git"
+brew "python"
+brew "gh"
+brew "starship"
+brew "bats-core"
+brew "shellcheck"
