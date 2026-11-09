@@ -1,0 +1,5 @@
+# grove test fixture
+com.grove.test greeting string hello
+com.grove.test enabled bool true   # a comment
+
+com.grove.test count int 7
