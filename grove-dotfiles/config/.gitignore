@@ -5,6 +5,8 @@
 /ssh/*
 !/ssh/config
 !/zsh/
+!/ghostty/
+!/macchina/
 !/starship.toml
 
 /git/local

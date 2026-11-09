@@ -44,3 +44,11 @@ setup() { grove_test_setup; }
   ln -s /nowhere "$d/config/zsh/.zsh_sessions"
   git -C "$d" check-ignore -q config/zsh/.zsh_sessions
 }
+
+@test "ghostty and macchina configs are tracked" {
+  local p
+  for p in config/ghostty/config config/macchina/macchina.toml config/macchina/themes/grove.toml config/macchina/grove.ascii; do
+    run git -C "$GROVE_ROOT" check-ignore -q "$p"
+    [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
+  done
+}
