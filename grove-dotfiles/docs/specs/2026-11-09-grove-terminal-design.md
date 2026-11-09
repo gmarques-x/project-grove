@@ -296,3 +296,14 @@ The Brewfile adds `zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highligh
    - ⌃` works;
    - the Dock reads Ghostty, Safari, System Settings;
    - Terminal.app shows the plain prompt.
+
+## 12. Results (rollout on this Mac, 2026-11-09)
+
+- `grove install` ran in Terminal. Afterwards `grove check` reports all ten modules ok.
+- **Dock:** Ghostty (`com.mitchellh.ghostty`), Safari, System Settings. Terminal's tile was swapped in place, and its old bookmark was dropped.
+- **Completion:** `70-zsh` removed group write from `/opt/homebrew/share` (compaudit had flagged it, mode 775). New shells load both `share/zsh-completions` and `share/zsh/site-functions`, without a compinit prompt.
+- **Ghostty's template:** Ghostty had created a comment-only `config.ghostty` template in Application Support. It was left in place, as designed.
+- **Measured while building:**
+  - macchina 6.4 can't read the battery on macOS 27, so that readout is skipped;
+  - eza 0.23.5 reads file names from stdin when it gets no path and stdin isn't a terminal.
+- **Still to confirm by eye in Ghostty:** the summary, the prompt bar, ⌃` (needs the Accessibility grant; on the Portuguese layout the key may sit elsewhere), and the Terminal.app fallback.
