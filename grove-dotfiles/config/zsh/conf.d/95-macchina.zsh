@@ -4,6 +4,7 @@
 if [[ -o interactive && -t 1 && -z "$GROVE_FETCHED" && -z "$GROVE_NO_FETCH" ]] \
   && [[ "$TERM_PROGRAM" == ghostty || "$TERM_PROGRAM" == Apple_Terminal ]] \
   && (( $+commands[macchina] )); then
+  print
   macchina || true
   export GROVE_FETCHED=1
 fi

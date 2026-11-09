@@ -33,8 +33,8 @@ palette = 15=#D3C6AA
 background-opacity = 1
 window-theme = dark
 macos-titlebar-style = transparent
-window-padding-x = 12
-window-padding-y = 12
+window-padding-x = 24
+window-padding-y = 20
 
 # Quick terminal: ⌃` from any app (needs Ghostty allowed under Accessibility).
 keybind = global:ctrl+grave_accent=toggle_quick_terminal

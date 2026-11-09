@@ -289,8 +289,9 @@ fetch_shell() {
     script -q /dev/null /bin/zsh -ic 'print -r -- "fetched=$GROVE_FETCHED"' < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'  # script echoes ^D for the empty stdin
 }
 
-@test "macchina runs in a new Ghostty window" {
+@test "macchina runs in a new Ghostty window, one empty line below the top" {
   run fetch_shell TERM_PROGRAM=ghostty
+  [ "${lines[0]}" = "" ] || [[ "$output" == $'\n'FETCH* ]] || false
   [[ "$output" == *FETCH* ]] || false
   [[ "$output" == *"fetched=1"* ]] || false
 }
@@ -530,4 +531,9 @@ pty_alias_shell() {
   chmod 755 "$p/share"
   run env -i HOME="$HOME" PATH=/usr/bin:/bin HOMEBREW_PREFIX="$p" /bin/zsh -ic 'print -l $fpath' < /dev/null
   [[ "$output" == *"$p/share/zsh-completions"* ]] || false
+}
+
+@test "cls clears the screen and reloads zsh as a fresh login shell with the summary" {
+  run alias_shell 'alias cls'
+  [ "$output" = "cls='clear && GROVE_FETCHED= exec zsh -l'" ]
 }

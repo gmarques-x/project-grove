@@ -1,7 +1,7 @@
 # Prompt without icons, for Terminal.app (which can't draw Nerd Font glyphs):
-# the same blocks and colors as starship.toml, with square ends.
-add_newline = false
-format = """[ ](bg:#83C092)$username$directory$git_branch$git_status$cmd_duration$status$time[ ](bg:#E69875) $character"""
+# the same blocks and colors as starship.toml, with square ends and no arrows.
+add_newline = true
+format = """[ ](bg:#83C092)$username$directory$git_branch$git_status$time[ ](bg:#E69875) $character"""
 
 [username]
 show_always = true
@@ -26,16 +26,6 @@ untracked = "?"
 modified = "!"
 staged = "+"
 format = "([$all_status$ahead_behind ]($style))"
-
-[cmd_duration]
-style = "bg:#475258 fg:#D3C6AA"
-format = "[ $duration ]($style)"
-
-[status]
-disabled = false
-style = "bg:#E67E80 fg:#2D353B"
-symbol = "✗"
-format = "[ $symbol $status ]($style)"
 
 [time]
 disabled = false

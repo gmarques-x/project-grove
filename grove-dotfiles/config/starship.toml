@@ -1,25 +1,25 @@
-# One-line prompt: a bar of colored blocks (user, folder, git, time) with
-# rounded ends, then ❯. Nerd Font icons and ends are drawn by Ghostty.
-# Terminal.app uses starship-plain.toml. Colors: theme/everforest-dark-medium.
-add_newline = false
-format = """[](fg:#83C092)$username$directory$git_branch$git_status$cmd_duration$status$time[](fg:#E69875) $character"""
+# One-line prompt: a bar of blocks (user, folder, git, time) joined by arrows,
+# with rounded ends, then ❯. Nerd Font glyphs are drawn by Ghostty; Terminal.app
+# uses starship-plain.toml. Colors: theme/everforest-dark-medium.
+add_newline = true
+format = """[](fg:#83C092)$username$directory$git_branch$git_status[](fg:#A7C080 bg:#DBBC7F)[](fg:#DBBC7F bg:#E69875)$time[](fg:#E69875) $character"""
 
 [username]
 show_always = true
 style_user = "bg:#83C092 fg:#2D353B"
 style_root = "bg:#83C092 fg:#2D353B"
-format = "[ $user ]($style)"
+format = "[  $user ]($style)"
 
 [directory]
 style = "bg:#A7C080 fg:#2D353B"
 read_only_style = "bg:#A7C080 fg:#2D353B"
 read_only = " 󰌾"
-format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
+format = "[](fg:#83C092 bg:#A7C080)[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
 
 [git_branch]
 style = "bg:#DBBC7F fg:#2D353B"
 symbol = " "
-format = "[ $symbol$branch ]($style)"
+format = "[](fg:#A7C080 bg:#DBBC7F)[ $symbol$branch ]($style)"
 
 [git_status]
 style = "bg:#DBBC7F fg:#2D353B"
@@ -28,21 +28,11 @@ modified = "!"
 staged = "+"
 format = "([$all_status$ahead_behind ]($style))"
 
-[cmd_duration]
-style = "bg:#475258 fg:#D3C6AA"
-format = "[ 󰔛 $duration ]($style)"
-
-[status]
-disabled = false
-style = "bg:#E67E80 fg:#2D353B"
-symbol = "✗"
-format = "[ $symbol $status ]($style)"
-
 [time]
 disabled = false
 style = "bg:#E69875 fg:#2D353B"
 time_format = "%H:%M"
-format = "[ $time ]($style)"
+format = "[  $time ]($style)"
 
 [character]
 success_symbol = "[❯](fg:#D3C6AA)"

@@ -102,6 +102,7 @@ The shell has completions (menu selection, case-insensitive), suggestions from y
 | `lt` | a two-level tree | |
 | `cat` | `bat` (line numbers, git changes) | the original: `\cat` |
 | `cd` | zoxide: works like `cd`, and `cd proj` jumps to your most-used match | the original: `builtin cd` |
+| `cls` | clears the screen and reloads the shell, like a new window (summary included) | |
 | ⌃R / ⌃T / ⌥C | fzf: search history / pick files / jump to a folder | |
 
 `rg` is ripgrep. `grep` is unchanged.

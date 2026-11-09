@@ -1,4 +1,4 @@
 # Project Grove · macchina: the summary shown in every new terminal window
 # (conf.d/95-macchina.zsh). Colors and layout are in themes/grove.toml.
 theme = "grove"
-show = ["Host", "Machine", "OperatingSystem", "Kernel", "Processor", "Memory", "Battery", "Uptime", "Shell", "Terminal", "Packages"]
+show = ["Host", "Machine", "Kernel", "OperatingSystem", "DesktopEnvironment", "WindowManager", "Packages", "Terminal", "Shell", "LocalIP", "Backlight", "Resolution", "Uptime", "Processor", "ProcessorLoad", "Memory", "Battery"]

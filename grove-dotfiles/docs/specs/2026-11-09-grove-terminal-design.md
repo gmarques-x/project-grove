@@ -307,3 +307,25 @@ The Brewfile adds `zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highligh
   - macchina 6.4 can't read the battery on macOS 27, so that readout is skipped;
   - eza 0.23.5 reads file names from stdin when it gets no path and stdin isn't a terminal.
 - **Still to confirm by eye in Ghostty:** the summary, the prompt bar, ⌃` (needs the Accessibility grant; on the Portuguese layout the key may sit elsewhere), and the Terminal.app fallback.
+
+## 13. Look revision (2026-11-09, from the user's reference screenshot)
+
+The user asked for the spacing and organization of a reference Ghostty screenshot, keeping Grove's fonts and colors. This section replaces the matching parts of §6–§8.
+
+**Ghostty:** `window-padding-x = 24` and `window-padding-y = 20`. The summary starts one empty line below the top, because `95-macchina.zsh` prints a newline first.
+
+**macchina:**
+- `show` lists, in this order: Host, Machine, Kernel, OperatingSystem, DesktopEnvironment, WindowManager, Packages, Terminal, Shell, LocalIP, Backlight, Resolution, Uptime, Processor, ProcessorLoad, Memory, Battery. Readouts this Mac can't report are skipped.
+- The stats sit in a box (`border = "plain"`) titled ` Grove `, with an inner margin of 2×1.
+- Each label has a Nerd Font icon. The separator is the cube glyph (U+F1B2) in grey1.
+- Bars use `▮`. The palette row (`type = "Dark"`, `●`) shows the terminal's eight colors.
+- The logo is drawn at `scale: 2` (set in `theme/grove-logo.txt`): 36 columns × 20 lines beside the box.
+
+**Prompt:**
+- The order is user ( U+F179), folder, git, time ( U+F017).
+- Blocks are joined by powerline arrows (U+E0B0). A two-arrow fade (green → yellow → orange) leads into the time block.
+- The ends are rounded. `add_newline = true`, so there's an empty line between commands.
+- The duration and exit-code blocks are gone, and `❯` still turns red after a failure.
+- `starship-plain.toml` keeps the same blocks with square ends and no arrows.
+
+**`cls`:** `clear && GROVE_FETCHED= exec zsh -l`. It reloads the shell as a new window would, summary included.

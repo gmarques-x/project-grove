@@ -5,6 +5,8 @@
 # Legend: letter = palette name from theme/everforest-dark-medium, "." = empty.
 #   A = aqua    G = green    Y = yellow    T = grey0    D = bg_green    E = bg3
 #
+# scale: 2   (each letter becomes 2x2 pixels, so the logo matches the stats box)
+#
 ........AG........
 .......AAGG...YY..
 ......AAAGGG..YY..

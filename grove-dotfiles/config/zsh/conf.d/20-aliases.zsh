@@ -3,6 +3,7 @@
 
 alias zalias='${EDITOR:-vim} "$ZDOTDIR/conf.d/20-aliases.zsh"'   # edit this file
 alias zedit='${EDITOR:-vim} "$ZDOTDIR"'                          # edit the zsh config folder
+alias cls='clear && GROVE_FETCHED= exec zsh -l'                  # clear and reload, like a new window
 
 # Listings: folders first, then files, each A→Z ignoring case. Icons only where
 # the terminal can draw them (not Terminal.app). The originals stay as \ls, \cat.

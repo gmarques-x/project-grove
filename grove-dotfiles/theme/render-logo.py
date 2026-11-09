@@ -14,7 +14,14 @@ for line in open(os.path.join(HERE, "everforest-dark-medium")):
     if m:
         palette[m.group(1)] = tuple(int(m.group(2)[i:i + 2], 16) for i in (0, 2, 4))
 
-rows = [l.rstrip("\n") for l in open(os.path.join(HERE, "grove-logo.txt")) if l.strip() and not l.startswith("#")]
+lines = open(os.path.join(HERE, "grove-logo.txt")).read().splitlines()
+scale = 1
+for l in lines:
+    m = re.match(r"#\s*scale:\s*(\d+)", l)
+    if m:
+        scale = int(m.group(1))
+rows = [l for l in lines if l.strip() and not l.startswith("#")]
+rows = ["".join(c * scale for c in r) for r in rows for _ in range(scale)]
 width = max(len(r) for r in rows)
 rows = [r.ljust(width, ".") for r in rows]
 if len(rows) % 2:
