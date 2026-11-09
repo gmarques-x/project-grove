@@ -6,8 +6,8 @@
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
-    // The README banner's lockup, tones swapped (paper-toned logo and lettering
-    // on the ink's dark green); Ghostty reads the file itself. 76 x 15 cells,
+    // The README banner's logo and lettering in the paper's light tone, on a
+    // transparent background; Ghostty reads the file itself. 76 x 15 cells,
     // 3 rows down, so it sits centred beside the 22-row box.
     "type": "kitty-direct",
     "source": "~/.config/fastfetch/grove.png",

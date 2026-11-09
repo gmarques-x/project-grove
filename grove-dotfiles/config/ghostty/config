@@ -35,6 +35,9 @@ window-theme = dark
 macos-titlebar-style = transparent
 window-padding-x = 24
 window-padding-y = 20
+# New windows open 150 columns by 40 rows: room for the summary's image and box.
+window-width = 150
+window-height = 40
 
 # Quick terminal: ⌃` from any app (needs Ghostty allowed under Accessibility).
 keybind = global:ctrl+grave_accent=toggle_quick_terminal

@@ -86,7 +86,7 @@ To add a font:
 
 ## Terminal and shell
 
-**Ghostty** is the terminal: Everforest Dark Medium, JetBrains Mono 14, a solid window. Its config is `config/ghostty/config`.
+**Ghostty** is the terminal: Everforest Dark Medium, JetBrains Mono 12, a solid window. Its config is `config/ghostty/config`. New windows open at 150 × 40 (columns × rows).
 
 - **Quick terminal:** ⌃` drops a terminal down from the top of the screen, from any app. macOS only lets you grant this, so do it once: **System Settings › Privacy & Security › Accessibility**, then turn on Ghostty.
 - **Dock:** `grove install` gives Ghostty Terminal's place in the Dock. Terminal.app stays installed.

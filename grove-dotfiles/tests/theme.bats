@@ -69,6 +69,8 @@ ghostty_value() {
   [ "$(ghostty_value macos-titlebar-style)" = "transparent" ]
   [ "$(ghostty_value window-padding-x)" = "24" ]
   [ "$(ghostty_value window-padding-y)" = "20" ]
+  [ "$(ghostty_value window-width)" = "150" ]
+  [ "$(ghostty_value window-height)" = "40" ]
   ghostty_value palette | grep -qx '0=#475258'
   ghostty_value palette | grep -qx '8=#859289'
   [ "$(ghostty_value palette | wc -l | tr -d ' ')" -eq 16 ]
@@ -175,7 +177,7 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)'
   [[ "$box" == *"● ● ● ● ● ● ● ●"* ]] || false
 }
 
-@test "the image is a 1004 by 426 PNG with transparent rounded corners" {
+@test "the image is a 1004 by 426 PNG with transparency (logo and lettering only)" {
   local f="$GROVE_ROOT/config/fastfetch/grove.png"
   [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 426 yes " ]
 }
