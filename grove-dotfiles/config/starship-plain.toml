@@ -1,0 +1,37 @@
+# Prompt without icons, for Terminal.app (which can't draw Nerd Font glyphs). Everforest colors.
+add_newline = false
+format = """$directory$git_branch$git_status$fill$cmd_duration$jobs$status$line_break$character"""
+
+[fill]
+symbol = "─"
+style = "fg:#596763"
+
+[directory]
+style = "fg:#A7C080"
+before_repo_root_style = "fg:#83C092"
+read_only_style = "fg:#E67E80"
+
+[git_branch]
+style = "fg:#7FBBB3"
+symbol = ""
+
+[git_status]
+style = "fg:#D699B6"
+untracked = "[?](fg:#DBBC7F)"
+modified = "[!](fg:#D699B6)"
+staged = "[+](fg:#D699B6)"
+
+[cmd_duration]
+style = "fg:#859289"
+
+[jobs]
+style = "fg:#859289"
+
+[status]
+disabled = false
+symbol = "✗ "
+style = "fg:#E67E80"
+
+[character]
+success_symbol = "[❯](fg:#D3C6AA)"
+error_symbol = "[❯](fg:#E67E80)"

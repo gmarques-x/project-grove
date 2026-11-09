@@ -8,6 +8,7 @@
 !/ghostty/
 !/macchina/
 !/starship.toml
+!/starship-plain.toml
 
 /git/local
 /git/allowed_signers

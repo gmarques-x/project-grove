@@ -101,10 +101,32 @@ setup() {
   [ "$output" = "$HOME/.local/bin:/usr/bin:/bin" ]
 }
 
-@test "starship accepts the config" {
-  run env STARSHIP_CONFIG="$GROVE_ROOT/config/starship.toml" /opt/homebrew/bin/starship print-config >/dev/null 2>"$BATS_TEST_TMPDIR/err"
+@test "starship accepts both prompt configs" {
+  local f
+  for f in starship.toml starship-plain.toml; do
+    [ -f "$GROVE_ROOT/config/$f" ]
+    run env STARSHIP_CONFIG="$GROVE_ROOT/config/$f" /opt/homebrew/bin/starship print-config >/dev/null 2>"$BATS_TEST_TMPDIR/err"
+    [ "$status" -eq 0 ]
+    [ ! -s "$BATS_TEST_TMPDIR/err" ]
+  done
+}
+
+@test "Terminal.app gets the plain prompt" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin TERM_PROGRAM=Apple_Terminal /bin/zsh -ic 'print -r -- "$STARSHIP_CONFIG"'
   [ "$status" -eq 0 ]
-  [ ! -s "$BATS_TEST_TMPDIR/err" ]
+  [ "$output" = "$HOME/.config/starship-plain.toml" ]
+}
+
+@test "Ghostty gets the default prompt" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin TERM_PROGRAM=ghostty /bin/zsh -ic 'print -r -- "$STARSHIP_CONFIG"'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "zsh copies the old history when the new one is missing" {

@@ -1,4 +1,5 @@
-# Two-line prompt in the colors of the Everforest zsh port. No Nerd Font glyphs.
+# Two-line prompt in the colors of the Everforest zsh port, with Nerd Font icons
+# (Ghostty draws them). Terminal.app uses starship-plain.toml instead.
 add_newline = false
 format = """$directory$git_branch$git_status$fill$cmd_duration$jobs$status$line_break$character"""
 
@@ -10,10 +11,11 @@ style = "fg:#596763"
 style = "fg:#A7C080"
 before_repo_root_style = "fg:#83C092"
 read_only_style = "fg:#E67E80"
+read_only = " 󰌾"
 
 [git_branch]
 style = "fg:#7FBBB3"
-symbol = ""
+symbol = " "
 
 [git_status]
 style = "fg:#D699B6"
@@ -23,9 +25,11 @@ staged = "[+](fg:#D699B6)"
 
 [cmd_duration]
 style = "fg:#859289"
+format = "[󰔛 $duration]($style) "
 
 [jobs]
 style = "fg:#859289"
+symbol = "✦"
 
 [status]
 disabled = false

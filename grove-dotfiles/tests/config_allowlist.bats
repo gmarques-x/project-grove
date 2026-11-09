@@ -8,7 +8,7 @@ setup() { grove_test_setup; }
 
 @test "tracked config entries are not ignored" {
   local p
-  for p in config/zsh/.zshrc config/git/config config/ssh/config config/starship.toml; do
+  for p in config/zsh/.zshrc config/git/config config/ssh/config config/starship.toml config/starship-plain.toml; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ]
   done

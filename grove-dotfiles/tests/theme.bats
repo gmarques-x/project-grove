@@ -80,3 +80,34 @@ ghostty_value() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+# starship_core FILE: the file without its symbol fields (symbol, read_only, and
+# the format lines of [cmd_duration] and [jobs], where the icons go).
+starship_core() {
+  awk '
+    /^\[/ { section = $0 }
+    /^[[:space:]]*(symbol|read_only)[[:space:]]*=/ { next }
+    /^[[:space:]]*format[[:space:]]*=/ && (section == "[cmd_duration]" || section == "[jobs]") { next }
+    /^#/ { next }
+    { print }
+  ' "$1"
+}
+
+@test "the two prompts differ only in symbols" {
+  [ -f "$GROVE_ROOT/config/starship-plain.toml" ]
+  diff <(starship_core "$GROVE_ROOT/config/starship.toml") <(starship_core "$GROVE_ROOT/config/starship-plain.toml")
+}
+
+@test "the icon prompt uses the spec's glyphs" {
+  local f="$GROVE_ROOT/config/starship.toml"
+  grep -q $'\xee\x82\xa0' "$f"          # U+E0A0 git branch
+  grep -q $'\xf3\xb0\x8c\xbe' "$f"      # U+F033E lock
+  grep -q $'\xf3\xb0\x94\x9b' "$f"      # U+F051B timer
+  grep -q '✦' "$f"
+}
+
+@test "the plain prompt has no Nerd Font glyphs" {
+  # grep: 1 = no match (wanted), 2 = file missing.
+  LC_ALL=C run grep -q $'\xee\x82\xa0\|\xf3\xb0' "$GROVE_ROOT/config/starship-plain.toml"
+  [ "$status" -eq 1 ]
+}
