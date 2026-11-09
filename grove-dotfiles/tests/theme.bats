@@ -111,3 +111,30 @@ starship_core() {
   LC_ALL=C run grep -q $'\xee\x82\xa0\|\xf3\xb0' "$GROVE_ROOT/config/starship-plain.toml"
   [ "$status" -eq 1 ]
 }
+
+@test "macchina shows the spec's readouts in order" {
+  local got
+  got="$(sed -n 's/^show[[:space:]]*=[[:space:]]*\[\(.*\)\]/\1/p' "$GROVE_ROOT/config/macchina/macchina.toml" | tr -d ' "')"
+  [ "$got" = "Host,Machine,OperatingSystem,Kernel,Processor,Memory,Battery,Uptime,Shell,Terminal,Packages" ]
+  grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
+}
+
+@test "the tree mark is at most 10 lines by 20 columns" {
+  local f="$GROVE_ROOT/config/macchina/grove.ascii"
+  [ -f "$f" ]
+  [ "$(wc -l < "$f" | tr -d ' ')" -le 10 ]
+  [ "$(awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }' "$f")" -le 20 ]
+}
+
+@test "macchina accepts its config" {
+  command -v macchina >/dev/null || [ -x /opt/homebrew/bin/macchina ] || skip "macchina not installed"
+  local h="$BATS_TEST_TMPDIR/mhome"
+  mkdir -p "$h"
+  ln -s "$GROVE_ROOT/config" "$h/.config"
+  run env HOME="$h" XDG_CONFIG_HOME="$h/.config" PATH="/opt/homebrew/bin:/usr/bin:/bin" macchina
+  [ "$status" -eq 0 ]
+  [[ "$output" != *rror* ]] || false
+  [[ "$output" == *Host* ]] || false
+  run env HOME="$h" XDG_CONFIG_HOME="$h/.config" PATH="/opt/homebrew/bin:/usr/bin:/bin" macchina -l
+  [[ "$output" == *grove* ]] || false
+}

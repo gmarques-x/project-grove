@@ -241,3 +241,59 @@ setup() {
   run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -ic 'alias zalias'
   [[ "$output" == *'${EDITOR:-vim}'* ]] || false
 }
+
+# fetch_shell [VAR=value...]: an interactive zsh on a real terminal (via script),
+# with a fake macchina that prints FETCH, running `print -r -- "fetched=$GROVE_FETCHED"`.
+fetch_shell() {
+  load_module 70-zsh
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  mkdir -p "$BATS_TEST_TMPDIR/fetchbin"
+  [ -n "${NO_MACCHINA:-}" ] || { printf '#!/bin/sh\necho FETCH\n' > "$BATS_TEST_TMPDIR/fetchbin/macchina"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/macchina"; }
+  env -i HOME="$HOME" PATH="$BATS_TEST_TMPDIR/fetchbin:/usr/bin:/bin" "$@" \
+    script -q /dev/null /bin/zsh -ic 'print -r -- "fetched=$GROVE_FETCHED"' < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'  # script echoes ^D for the empty stdin
+}
+
+@test "macchina runs in a new Ghostty window" {
+  run fetch_shell TERM_PROGRAM=ghostty
+  [[ "$output" == *FETCH* ]] || false
+  [[ "$output" == *"fetched=1"* ]] || false
+}
+
+@test "macchina runs in a new Terminal.app window" {
+  run fetch_shell TERM_PROGRAM=Apple_Terminal
+  [[ "$output" == *FETCH* ]] || false
+}
+
+@test "macchina stays quiet when GROVE_FETCHED is inherited" {
+  run fetch_shell TERM_PROGRAM=ghostty GROVE_FETCHED=1
+  [[ "$output" != *FETCH* ]] || false
+  run fetch_shell TERM_PROGRAM=ghostty GROVE_FETCHED=
+  [[ "$output" == *FETCH* ]] || false
+}
+
+@test "macchina stays quiet with GROVE_NO_FETCH=1" {
+  run fetch_shell TERM_PROGRAM=ghostty GROVE_NO_FETCH=1
+  [ "$output" = "fetched=" ]
+}
+
+@test "macchina stays quiet in other terminals" {
+  run fetch_shell TERM_PROGRAM=vscode
+  [ "$output" = "fetched=" ]
+}
+
+@test "macchina stays quiet when stdout isn't a terminal" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  mkdir -p "$BATS_TEST_TMPDIR/fetchbin"
+  printf '#!/bin/sh\necho FETCH\n' > "$BATS_TEST_TMPDIR/fetchbin/macchina"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/macchina"
+  run env -i HOME="$HOME" PATH="$BATS_TEST_TMPDIR/fetchbin:/usr/bin:/bin" TERM_PROGRAM=ghostty /bin/zsh -ic 'print -r -- "fetched=$GROVE_FETCHED"'
+  [ "$output" = "fetched=" ]
+}
+
+@test "macchina stays quiet when macchina is missing" {
+  NO_MACCHINA=1 run fetch_shell TERM_PROGRAM=ghostty
+  [ "$status" -eq 0 ]
+  [ "$output" = "fetched=" ]
+}
