@@ -1,0 +1,13 @@
+com.apple.finder  NewWindowTarget                  string  PfHm   # new windows open Home
+com.apple.finder  ShowExternalHardDrivesOnDesktop  bool    false  # no external disks on the Desktop
+com.apple.finder  ShowRemovableMediaOnDesktop      bool    false  # no CDs, DVDs, iPods on the Desktop
+NSGlobalDomain    AppleShowAllExtensions           bool    true   # show all filename extensions
+com.apple.finder  FXEnableExtensionChangeWarning   bool    false  # no warning when changing an extension
+com.apple.finder  _FXSortFoldersFirst              bool    true   # folders on top in windows
+com.apple.finder  _FXSortFoldersFirstOnDesktop     bool    true   # folders on top on the Desktop
+com.apple.finder  FXDefaultSearchScope             string  SCcf   # search the current folder
+com.apple.finder  FXPreferredViewStyle             string  Nlsv   # List view by default
+com.apple.finder  FXPreferredGroupBy               string  None   # no grouping
+com.apple.finder  ShowPathbar                      bool    true   # path bar
+com.apple.finder  ShowStatusBar                    bool    true   # status bar
+com.apple.finder  ShowSidebar                      bool    true   # sidebar
