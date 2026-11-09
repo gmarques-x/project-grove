@@ -35,6 +35,10 @@ grove_info() {
   _grove_line '133;146;137' "$1" 1
 }
 
+# grove_note MSG: like grove_info but never hidden by --quiet (changes the user
+# must be able to find, such as backups).
+grove_note() { _grove_line '133;146;137' "$1" 1; }
+
 # grove_ask PROMPT DEFAULT: prompt on stderr, read from the terminal (never
 # stdin, which is the script itself under `curl | bash`), answer on stdout.
 grove_ask() {

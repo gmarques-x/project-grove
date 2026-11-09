@@ -192,3 +192,42 @@ M
   run "$GROVE" --yes --quiet install 30-you
   [[ "$output" != *"skipped 30-you"* ]] || false
 }
+
+# ---- I-3: failure output and --yes summary survive --quiet
+
+@test "a failed apply prints retry, log and backup folder even with --quiet" {
+  mkdir "$BATS_TEST_TMPDIR/mods" "$BATS_TEST_TMPDIR/mods/10-bk"
+  cat > "$BATS_TEST_TMPDIR/mods/10-bk/module.sh" <<'M'
+about() { :; }
+check() { return 3; }
+apply() { echo x > "$HOME/old"; grove_backup "$HOME/old" >/dev/null; return 1; }
+M
+  GROVE_MODULES="$BATS_TEST_TMPDIR/mods" run --separate-stderr "$GROVE" --quiet install
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"grove install bk"* ]] || false
+  [[ "$stderr" == *"log: $GROVE_STATE/logs/test.log"* ]] || false
+  [[ "$stderr" == *"backups: $GROVE_STATE/backup/test"* ]] || false
+}
+
+@test "no backups line when nothing was backed up" {
+  run --separate-stderr "$GROVE" --quiet install 40-broken
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"log: "* ]] || false
+  [[ "$stderr" != *"backups:"* ]] || false
+}
+
+@test "backup notices are not hidden by --quiet" {
+  echo old > "$HOME/.zshrc"; echo old > "$HOME/.zprofile"
+  local f
+  for f in "$GROVE_ROOT"/lib/*.sh; do . "$f"; done
+  GROVE_QUIET=1 run grove_link "$GROVE_ROOT/bin/grove" "$HOME/.zshrc"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"backed up $HOME/.zshrc to "* ]] || false
+}
+
+@test "--yes lists skipped needs-you modules in a final summary, even with --quiet" {
+  run "$GROVE" --yes --quiet install 30-you
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"Skipped because they need you"* ]] || false
+  [[ "$output" == *"30-you: run grove install you"* ]] || false
+}

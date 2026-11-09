@@ -63,7 +63,7 @@ grove_link() {
   fi
   if [ -e "$link" ]; then
     moved="$(grove_backup "$link")" || return 1
-    grove_info "backed up $link to $moved"
+    grove_note "backed up $link to $moved"
   fi
   mkdir -p "$(dirname "$link")" || { grove_fail "could not create folder for $link"; return 1; }
   if ! ln -s "$target" "$link"; then

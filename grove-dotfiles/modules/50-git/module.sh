@@ -64,6 +64,6 @@ apply() {
     || { grove_fail "could not write config/git/allowed_signers"; return 1; }
   if [ -f "$HOME/.gitconfig" ] && [ ! -L "$HOME/.gitconfig" ]; then
     moved="$(grove_backup "$HOME/.gitconfig")" || return 1
-    grove_info "backed up $HOME/.gitconfig to $moved"
+    grove_note "backed up $HOME/.gitconfig to $moved"
   fi
 }

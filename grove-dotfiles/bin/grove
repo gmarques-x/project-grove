@@ -105,7 +105,7 @@ _g_check() {
 }
 
 _g_install() {
-  local n rc sel skipped=0
+  local n rc sel skipped=0 skipped_list=""
   sel="$(_g_select "$@")" || return 1
   grove_local_ensure || { grove_fail "could not save personal values to $GROVE_LOCAL"; return 1; }
   for n in $sel; do
@@ -117,7 +117,7 @@ _g_install() {
         grove_you "$n"
         if [ "${GROVE_YES:-0}" = "1" ]; then
           grove_info "skipped $n (needs you; run: grove install $(_g_short "$n"))"
-          skipped=1; continue
+          skipped=1; skipped_list="$skipped_list $n"; continue
         fi ;;
       97|98) _g_contract_msg "$n" "$rc" check; _g_retry "$n"; return 1 ;;
       *) grove_fail "$n: check returned $rc"; _g_retry "$n"; return 1 ;;
@@ -129,11 +129,24 @@ _g_install() {
     fi
     grove_ok "$n applied"
   done
-  [ "$skipped" -eq 0 ] || return 3
+  if [ "$skipped" -ne 0 ]; then
+    printf '\n'
+    grove_note "Skipped because they need you:"
+    for n in $skipped_list; do grove_note "  $n: run grove install $(_g_short "$n")"; done
+    return 3
+  fi
   return 0
 }
 
-_g_retry() { grove_info "fix the problem, then run: grove install $(_g_short "$1")"; }
+# _g_retry NAME: after a failure, always say how to retry and where to look
+# (stderr, never hidden by --quiet).
+_g_retry() {
+  printf 'fix the problem, then run: grove install %s\n' "$(_g_short "$1")" >&2
+  printf 'log: %s/logs/%s.log\n' "$GROVE_STATE" "$GROVE_RUN_ID" >&2
+  if [ -d "$GROVE_STATE/backup/$GROVE_RUN_ID" ]; then
+    printf 'backups: %s/backup/%s\n' "$GROVE_STATE" "$GROVE_RUN_ID" >&2
+  fi
+}
 
 _g_update() {
   git -C "$GROVE_ROOT/.." pull --ff-only || { grove_fail "git pull failed"; return 1; }

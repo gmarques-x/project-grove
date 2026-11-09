@@ -29,7 +29,7 @@ apply() {
   for f in .zprofile .zshrc; do
     if [ -e "$HOME/$f" ] || [ -L "$HOME/$f" ]; then
       moved="$(grove_backup "$HOME/$f")" || return 1
-      grove_info "backed up $HOME/$f to $moved"
+      grove_note "backed up $HOME/$f to $moved"
     fi
   done
   grove_link "$GROVE_CONFIG/zsh/.zshenv" "$HOME/.zshenv" || return 1

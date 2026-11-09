@@ -36,7 +36,7 @@ _config_merge() {
       rmdir "$e" 2>/dev/null || true
     else
       moved="$(grove_backup "$e")" || return 1
-      grove_info "$e collides with the tracked config, backed up to $moved"
+      grove_note "$e collides with the tracked config, backed up to $moved"
     fi
   done
 }

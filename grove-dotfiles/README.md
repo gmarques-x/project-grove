@@ -28,6 +28,15 @@ It waits for Apple's Command Line Tools (finish the dialog that appears), clones
 
 Your personal values (name, email, GitHub username) live in `~/.config/grove/local.env`, which git ignores. Anything Grove replaces is moved, never deleted, to `~/.local/state/grove/backup/`.
 
+## Undo
+
+Grove only makes links and moves files aside, so it can be undone by hand:
+
+1. Remove the links: `~/.config`, `~/.zshenv`, `~/.ssh/config` and `~/.local/bin/grove` (`rm` on a link removes only the link).
+2. Move the files back from `~/.local/state/grove/backup/<run>/`. Paths inside a run folder are relative to `$HOME` (`<run>/.zshrc` goes back to `~/.zshrc`).
+
+Your app settings stay in the repo's `config/` folder; copy them back into a new `~/.config` if you want them.
+
 ## The `grove` command
 
 | Command | What it does |
