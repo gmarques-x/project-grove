@@ -11,31 +11,27 @@ setup() {
   source "$GROVE_ROOT/lib/local.sh"
 }
 
-stub_git() {
-  stub git 'case "$*" in
-  "config --global user.name") echo "gmarques-x" ;;
-  "config --global user.email") echo "g@x.y" ;;
-  *) exit 1 ;;
-esac'
+stub_git() { # records any call, so tests can prove git config is never read
+  stub git 'echo "git $*" >> "'"$BATS_TEST_TMPDIR"'/git.log"; echo "from-git"'
 }
 
-@test "ensure asks with defaults from git config" {
+@test "ensure asks without proposing anything and never reads git config" {
   stub_git
-  printf '\n\n\n' > "$GROVE_TTY"
+  printf 'Ann\n' > "$GROVE_TTY"
   run grove_local_ensure
   [ "$status" -eq 0 ]
-  grep -qx 'GROVE_NAME=gmarques-x' "$GROVE_LOCAL"
-  grep -qx 'GROVE_EMAIL=g@x.y' "$GROVE_LOCAL"
-  grep -qx 'GROVE_GITHUB_USER=gmarques-x' "$GROVE_LOCAL"
+  [[ "$output" == *"Your name: "* ]] || false
+  [[ "$output" != *"["* ]] || false
+  [ ! -e "$BATS_TEST_TMPDIR/git.log" ]
+  grep -qx 'GROVE_NAME=Ann' "$GROVE_LOCAL"
 }
 
 @test "ensure exports the three variables" {
-  stub_git
-  printf '\n\n\n' > "$GROVE_TTY"
+  printf 'v\n' > "$GROVE_TTY"
   grove_local_ensure >/dev/null 2>&1
-  [ "$GROVE_NAME" = "gmarques-x" ]
-  [ "$GROVE_EMAIL" = "g@x.y" ]
-  [ "$GROVE_GITHUB_USER" = "gmarques-x" ]
+  [ "$GROVE_NAME" = "v" ]
+  [ "$GROVE_EMAIL" = "v" ]
+  [ "$GROVE_GITHUB_USER" = "v" ]
 }
 
 @test "ensure keeps existing values without asking" {
@@ -50,34 +46,34 @@ esac'
 }
 
 @test "ensure asks only for missing values" {
-  stub_git
   mkdir -p "$(dirname "$GROVE_LOCAL")"
   printf 'GROVE_NAME=Ann\n' > "$GROVE_LOCAL"
   # grove_ask reopens the tty file each time, so every answer is its first line.
   printf 'x@y.z\n' > "$GROVE_TTY"
-  grove_local_ensure >/dev/null 2>&1
+  run grove_local_ensure
+  [[ "$output" != *"Your name"* ]] || false
+  grove_local_load
   [ "$GROVE_NAME" = "Ann" ]
   [ "$GROVE_EMAIL" = "x@y.z" ]
 }
 
-@test "ensure with GROVE_YES=1 does not prompt and fills defaults" {
+@test "ensure asks an empty answer again, three times, then saves nothing" {
+  printf '\n' > "$GROVE_TTY"
+  run grove_local_ensure
+  [ "$status" -eq 0 ]
+  [ "$(grep -o 'Your name: ' <<< "$output" | wc -l | tr -d ' ')" -eq 3 ]
+  [ ! -e "$GROVE_LOCAL" ]
+}
+
+@test "ensure with GROVE_YES=1 does not prompt and saves nothing" {
   stub_git
   export GROVE_YES=1
   export GROVE_TTY=/dev/null
   run grove_local_ensure
   [ "$status" -eq 0 ]
-  grep -qx 'GROVE_NAME=gmarques-x' "$GROVE_LOCAL"
-  grep -qx 'GROVE_EMAIL=g@x.y' "$GROVE_LOCAL"
-  grep -qx 'GROVE_GITHUB_USER=gmarques-x' "$GROVE_LOCAL"
-}
-
-@test "ensure with nothing in git config defaults to empty" {
-  stub git 'exit 1'
-  export GROVE_YES=1
-  grove_local_ensure >/dev/null 2>&1
-  [ -z "$GROVE_NAME" ]
-  [ -z "$GROVE_EMAIL" ]
-  [ -f "$GROVE_LOCAL" ]
+  [ -z "$output" ]
+  [ ! -e "$GROVE_LOCAL" ]
+  [ ! -e "$BATS_TEST_TMPDIR/git.log" ]
 }
 
 @test "load returns 3 when the file is missing or incomplete" {
@@ -91,7 +87,7 @@ esac'
 
 @test "local file is private" {
   stub_git
-  printf '\n\n\n' > "$GROVE_TTY"
+  printf 'v\n' > "$GROVE_TTY"
   grove_local_ensure >/dev/null 2>&1
   [ "$(stat -f %Lp "$GROVE_LOCAL")" = "600" ]
 }

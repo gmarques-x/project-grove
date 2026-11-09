@@ -14,7 +14,7 @@ It waits for Apple's Command Line Tools (finish the dialog that appears), clones
 
 `grove install` asks you for:
 
-- your name, email and GitHub username (pre-filled from your git config when it has them)
+- your name, email and GitHub username (nothing is suggested; type each one)
 - your Mac password, for Homebrew's first install
 - an SSH key passphrase, only if you don't have a key yet
 - a browser login for GitHub
@@ -46,7 +46,7 @@ Your app settings stay in the repo's `config/` folder; copy them back into a new
 | `grove update` | Brings an installed setup up to date. |
 | `grove list` | Lists the modules. |
 
-Options: `--yes` answers prompts with defaults and skips anything that needs you; `--quiet` prints less.
+Options: `--yes` asks nothing and skips anything that needs you (including your name and email, until a run that can ask); `--quiet` prints less.
 
 ## Modules
 

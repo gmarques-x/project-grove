@@ -71,3 +71,9 @@ on_tty() { script -q /dev/null /bin/bash -c "$1" < /dev/null; }
   NO_COLOR=1 GROVE_FORCE_COLOR=1,2 run grove_ok hi
   [[ "$output" != *$'\033['* ]] || false
 }
+
+@test "ask shows no brackets when there is no default" {
+  printf 'x\n' > "$GROVE_TTY"
+  run grove_ask "Your name" ""
+  [ "$output" = "Your name: x" ]
+}

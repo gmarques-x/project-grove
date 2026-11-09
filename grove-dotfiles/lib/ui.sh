@@ -41,9 +41,10 @@ grove_note() { _grove_line '133;146;137' "$1" 1; }
 
 # grove_ask PROMPT DEFAULT: prompt on stderr, read from the terminal (never
 # stdin, which is the script itself under `curl | bash`), answer on stdout.
+# With an empty DEFAULT the prompt shows no brackets.
 grove_ask() {
   local ans=""
-  printf '%s [%s]: ' "$1" "$2" >&2
+  if [ -n "$2" ]; then printf '%s [%s]: ' "$1" "$2" >&2; else printf '%s: ' "$1" >&2; fi
   read -r ans < "${GROVE_TTY:-/dev/tty}" || true
   printf '%s\n' "${ans:-$2}"
 }

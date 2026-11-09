@@ -125,7 +125,7 @@ GROVE_EMAIL="gustavo.marques@outlook.com"
 GROVE_GITHUB_USER="gmarques-x"
 ```
 
-They are asked once, pre-filled from the current git config when one exists. Modules generate personal files from them: `config/git/local` (identity) and `config/git/allowed_signers`.
+They are asked once, with nothing proposed: an empty answer is asked again (three tries), and nothing is saved until all three are filled. With `--yes` nothing is asked or saved. (Changed 2026-11-09 at the user's request; the first version pre-filled them from git config.) Modules generate personal files from them: `config/git/local` (identity) and `config/git/allowed_signers`.
 
 ## 7. The `grove` command
 
@@ -250,7 +250,7 @@ The first `grove install` on this Mac turns today's hand-made setup into the man
 
 ## 12. Testing
 
-- **Unit tests (bats-core):** `lib/link.sh` cases from section 10, `lib/defaults.sh` against a dummy domain (`com.grove.test`), `lib/local.sh` (prompting with defaults, writing and reading), and `check` for each module returning ok, needs work and needs you. Tests run with `HOME` and every `GROVE_*` variable pointed at a temporary folder.
+- **Unit tests (bats-core):** `lib/link.sh` cases from section 10, `lib/defaults.sh` against a dummy domain (`com.grove.test`), `lib/local.sh` (prompting without proposed values, writing and reading), and `check` for each module returning ok, needs work and needs you. Tests run with `HOME` and every `GROVE_*` variable pointed at a temporary folder.
 - **Lint:** `shellcheck` on every script.
 - **This Mac:** run the migration. Afterwards `grove check` reports every module ok, `git verify-commit` succeeds on a new commit, a new Terminal window shows the Starship prompt, and the Finder settings are unchanged.
 - **Fresh install:** a new macOS user account runs the bootstrap line and ends with `grove check` all ok. (Command Line Tools and Homebrew are shared by all accounts, so those two modules report ok there; their install paths are covered by unit tests.)
