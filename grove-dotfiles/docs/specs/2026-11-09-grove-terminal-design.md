@@ -30,7 +30,7 @@ On a fresh Mac, `grove install` sets all of this up. On this Mac, running it aga
 | Overrides (D5) | Allowed, but only in one place: the palette file's "Grove additions" section | Every app gets the same change, and a test enforces it. |
 | Font | JetBrains Mono 14, ligatures on | Comfortable on a MacBook Air; ligatures are the reason for the ligature family. |
 | Icons | Nerd Font glyphs, drawn by Ghostty's built-in symbol font | No patched font to install. Terminal.app can't draw them, so it gets a plain prompt. |
-| macchina | Every new top-level window, readouts: Machine & OS, Resources, Shell & terminal | Chosen by the user. Quiet in nested shells and tools. |
+| macchina | Every new window, readouts: Machine & OS, Resources, Shell & terminal | Chosen by the user. Quiet in nested shells and tools, through an inherited `GROVE_FETCHED` marker. |
 | Dock | Ghostty replaces Terminal in its slot | Chosen by the user. Terminal.app stays installed. |
 | Structure | One module, `90-terminal`; configs live in `config/`; Homebrew installs the apps | `~/.config` already links into the repo, so only checks and the Dock need code. |
 
@@ -160,7 +160,7 @@ macchina runs once, before the first prompt, only when all of these are true:
 
 - the shell is interactive (`[[ -o interactive ]]`) and stdout is a terminal (`[[ -t 1 ]]`);
 - `TERM_PROGRAM` is `ghostty` or `Apple_Terminal`;
-- `SHLVL` is `1`;
+- `GROVE_FETCHED` is unset. After running, the hook exports `GROVE_FETCHED=1`, so every shell started from that window (nested shells, `exec zsh`, tools like Claude Code) inherits it and stays quiet, while a new window starts without it. This replaces an earlier `SHLVL = 1` rule: Ghostty starts its shell through `login` and `exec`, so `SHLVL` isn't reliably 1 in a new window;
 - `GROVE_NO_FETCH` is unset or empty;
 - `macchina` is on PATH.
 
@@ -206,8 +206,8 @@ Running it again on a finished setup changes nothing and doesn't restart the Doc
 - `apply` prints the Accessibility step, also under `GROVE_QUIET=1`.
 
 **macchina hook** (in `modules_zsh.bats`), using a fake `macchina` that prints a marker:
-- it runs for `TERM_PROGRAM=ghostty` with `SHLVL=1` on a terminal;
-- it stays quiet when `SHLVL` is 2, when `GROVE_NO_FETCH=1`, when `TERM_PROGRAM` is something else, and when macchina is missing.
+- it runs for `TERM_PROGRAM=ghostty` on a terminal and exports `GROVE_FETCHED=1`;
+- it stays quiet when `GROVE_FETCHED=1` is inherited, when `GROVE_NO_FETCH=1`, when `TERM_PROGRAM` is something else, and when macchina is missing.
 
 **Prompt choice:** `STARSHIP_CONFIG` points to the plain file under `TERM_PROGRAM=Apple_Terminal` and is unset under `ghostty`.
 
