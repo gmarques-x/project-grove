@@ -61,6 +61,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `60-github` | GitHub login and SSH signing key |
 | `70-zsh` | zsh config, Starship prompt and the `grove` command |
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
+| `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and macchina |
 
 ## Fonts
 
@@ -82,6 +83,28 @@ To add a font:
    SF Mono|https://devimages-cdn.apple.com/design/resources/download/SF-Mono.dmg|apple-signed|*.pkg/Payload/Library/Fonts/*
    ```
 2. **From files you have:** drop `.ttf` or `.otf` files into `modules/30-fonts/local/`. They aren't committed.
+
+## Terminal and shell
+
+**Ghostty** is the terminal: Everforest Dark Medium, JetBrains Mono 14, a solid window. Its config is `config/ghostty/config`.
+
+- **Quick terminal:** ⌃` drops a terminal down from the top of the screen, from any app. macOS only lets you grant this, so do it once: **System Settings › Privacy & Security › Accessibility**, then turn on Ghostty.
+- **Dock:** `grove install` gives Ghostty Terminal's place in the Dock. Terminal.app stays installed.
+- **Prompt:** the Starship prompt shows icons in Ghostty. Terminal.app can't draw them, so it gets the same prompt without icons (`config/starship-plain.toml`).
+- **Summary:** every new window starts with a macchina summary. Shells started from that window stay quiet. Turn it off with `export GROVE_NO_FETCH=1` in `config/zsh/.zshenv`.
+
+The shell has completions (menu selection, case-insensitive), suggestions from your history in grey (→ accepts), syntax highlighting, and these replacements:
+
+| Type | Runs | |
+| --- | --- | --- |
+| `ls` | `eza -l`, folders first, then files, each A→Z | the original: `\ls` |
+| `ll` | the same, with hidden files | |
+| `lt` | a two-level tree | |
+| `cat` | `bat` (line numbers, git changes) | the original: `\cat` |
+| `cd` | zoxide: works like `cd`, and `cd proj` jumps to your most-used match | the original: `builtin cd` |
+| ⌃R / ⌃T / ⌥C | fzf: search history / pick files / jump to a folder | |
+
+`rg` is ripgrep. `grep` is unchanged.
 
 ## Adding a module
 
