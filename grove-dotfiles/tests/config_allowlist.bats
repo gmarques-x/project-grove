@@ -30,7 +30,17 @@ setup() { grove_test_setup; }
 
 @test "terminal session and history files in zsh are ignored" {
   local p
-  for p in config/zsh/.zsh_sessions/x.session config/zsh/.zsh_history config/zsh/.zcompdump config/zsh/.zcompdump-host-5.9; do
+  for p in config/zsh/.zsh_sessions config/zsh/.zsh_history config/zsh/.zcompdump config/zsh/.zcompdump-host-5.9; do
     git -C "$GROVE_ROOT" check-ignore -q "$p"
   done
+}
+
+@test "the sessions link in zsh is ignored even though it isn't a folder" {
+  local d
+  d="$(mktemp -d "$BATS_TEST_TMPDIR/repo.XXXX")"
+  git -C "$d" init -q
+  mkdir -p "$d/config/zsh"
+  cp "$GROVE_ROOT/config/.gitignore" "$d/config/.gitignore"
+  ln -s /nowhere "$d/config/zsh/.zsh_sessions"
+  git -C "$d" check-ignore -q config/zsh/.zsh_sessions
 }
