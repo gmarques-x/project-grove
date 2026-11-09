@@ -107,3 +107,50 @@ teardown() {
   run grove_defaults_check "$BATS_TEST_TMPDIR/nope.txt"
   [ "$status" -eq 1 ]
 }
+
+@test "non-canonical int 007 matches after apply" {
+  printf 'com.grove.test n int 007\ncom.grove.test m int +5\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"line 2"* ]]
+  printf 'com.grove.test n int 007\ncom.grove.test z int -0\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
+  [ "$output" = "2" ]
+  run grove_defaults_check "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 0 ]
+}
+
+@test "non-numeric int is rejected and nothing is written" {
+  printf 'com.grove.test a int 1\ncom.grove.test n int abc\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"line 2"* ]]
+  run defaults read com.grove.test a
+  [ "$status" -ne 0 ]
+}
+
+@test "non-numeric float is rejected" {
+  printf 'com.grove.test f float abc\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_check "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"line 1"* ]]
+}
+
+@test "live non-numeric value is a mismatch for float and int" {
+  defaults write com.grove.test f -string abc
+  defaults write com.grove.test i -string abc
+  printf 'com.grove.test f float 0.0\ncom.grove.test i int 0\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_check "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 3 ]
+  [ "${#lines[@]}" -eq 2 ]
+}
+
+@test "extra token after the value is rejected, trailing comment is fine" {
+  printf 'com.grove.test k string hello world\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"line 1"* ]]
+  printf 'com.grove.test k string hello # ok\n' > "$BATS_TEST_TMPDIR/s.txt"
+  run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
+  [ "$output" = "1" ]
+}
