@@ -478,6 +478,52 @@ pty_alias_shell() {
   [ "$output" = "$(printf 'none\nnone')" ]
 }
 
+# fake_yazi DIR: a yazi on PATH that "quits in" DIR by writing it to --cwd-file.
+fake_yazi() {
+  mkdir -p "$BATS_TEST_TMPDIR/fakebin"
+  cat > "$BATS_TEST_TMPDIR/fakebin/yazi" <<SH
+#!/bin/sh
+for a in "\$@"; do case "\$a" in --cwd-file=*) printf '%s' '$1' > "\${a#--cwd-file=}" ;; esac; done
+SH
+  chmod +x "$BATS_TEST_TMPDIR/fakebin/yazi"
+}
+
+@test "y opens yazi and moves the shell to the folder it quit in" {
+  local d="$BATS_TEST_TMPDIR/landed"
+  mkdir -p "$d"
+  fake_yazi "$d"
+  ALIAS_PATH="$BATS_TEST_TMPDIR/fakebin:/usr/bin:/bin" run alias_shell 'y; pwd'
+  [ "$output" = "$(cd "$d" && pwd -P)" ] || [ "$output" = "$d" ]
+}
+
+@test "y leaves the shell where it was when yazi quits without a folder" {
+  fake_yazi ""
+  ALIAS_PATH="$BATS_TEST_TMPDIR/fakebin:/usr/bin:/bin" run alias_shell "builtin cd '$BATS_TEST_TMPDIR' && y; pwd"
+  [ "$output" = "$BATS_TEST_TMPDIR" ]
+}
+
+@test "finder runs y" {
+  local d="$BATS_TEST_TMPDIR/landed"
+  mkdir -p "$d"
+  fake_yazi "$d"
+  ALIAS_PATH="$BATS_TEST_TMPDIR/fakebin:/usr/bin:/bin" run alias_shell 'alias finder; finder; pwd'
+  [ "${lines[0]}" = "finder=y" ]
+  [ "${lines[1]}" = "$(cd "$d" && pwd -P)" ] || [ "${lines[1]}" = "$d" ]
+}
+
+@test "y and finder are absent when yazi is missing" {
+  ALIAS_PATH=/usr/bin:/bin run alias_shell '(( $+functions[y] )) && print y; alias finder || print none'
+  [ "$output" = "none" ]
+}
+
+@test "yazi lists like ls: folders first, A to Z ignoring case, hidden files off" {
+  local f="$GROVE_ROOT/config/yazi/yazi.toml"
+  grep -qx 'sort_by = "alphabetical"' "$f"
+  grep -qx 'sort_sensitive = false' "$f"
+  grep -qx 'sort_dir_first = true' "$f"
+  grep -qx 'show_hidden = false' "$f"
+}
+
 @test "eza uses the Grove theme" {
   [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
   local d="$BATS_TEST_TMPDIR/themed"

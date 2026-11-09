@@ -203,3 +203,10 @@ INST
   [[ "$output" == *"git worktree"* ]] || false
   [ ! -e "$HOME/.config" ]
 }
+
+@test "the Brewfile installs yazi and its preview helpers" {
+  local f
+  for f in yazi fd jq poppler sevenzip resvg; do
+    grep -qx "brew \"$f\"" "$GROVE_ROOT/Brewfile" || { echo "missing: $f"; false; }
+  done
+}

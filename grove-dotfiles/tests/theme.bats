@@ -47,7 +47,7 @@ palette_value() {
   local missing
   missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/ghostty/config" \
       "$GROVE_ROOT/config/starship.toml" "$GROVE_ROOT/config/starship-plain.toml" \
-      "$GROVE_ROOT/config/macchina/themes/grove.toml" "$GROVE_ROOT/config/eza/theme.yml" \
+      "$GROVE_ROOT/config/macchina/themes/grove.toml" "$GROVE_ROOT/config/eza/theme.yml" "$GROVE_ROOT/config/yazi/theme.toml" \
       "$GROVE_ROOT"/config/zsh/conf.d/*.zsh) <(palette_hexes))"
   [ -z "$missing" ] || { echo "not in the palette: $missing"; false; }
 }

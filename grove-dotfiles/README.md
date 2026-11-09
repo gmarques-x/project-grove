@@ -103,9 +103,12 @@ The shell has completions (menu selection, case-insensitive), suggestions from y
 | `cat` | `bat` (line numbers, git changes) | the original: `\cat` |
 | `cd` | zoxide: works like `cd`, and `cd proj` jumps to your most-used match | the original: `builtin cd` |
 | `cls` | clears the screen and reloads the shell, like a new window (summary included) | |
+| `y` or `finder` | yazi, a file manager in the terminal; when you quit, the shell moves to the folder you were in | plain: `yazi` |
 | ⌃R / ⌃T / ⌥C | fzf: search history / pick files / jump to a folder | |
 
 `rg` is ripgrep. `grep` is unchanged.
+
+**yazi** lists like `ls` (folders first, A→Z, hidden files off; `.` shows them) in the same colors as eza. Its config is `config/yazi/`. It previews images in Ghostty, plus PDFs, archives and SVGs. Video thumbnails and HEIC/RAW images are left out, since they need ffmpeg and ImageMagick. Terminal.app shows plain previews and can't draw the file icons.
 
 ## Adding a module
 

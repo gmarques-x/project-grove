@@ -1,0 +1,7 @@
+# Project Grove · yazi. Lists like `ls`: folders first, then files, each A→Z
+# ignoring case. Hidden files start off; press . to show them.
+[mgr]
+sort_by = "alphabetical"
+sort_sensitive = false
+sort_dir_first = true
+show_hidden = false

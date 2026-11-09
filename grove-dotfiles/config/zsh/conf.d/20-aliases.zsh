@@ -18,3 +18,17 @@ fi
 if (( $+commands[bat] )); then
   alias cat='bat --paging=never'
 fi
+
+# y (or finder): yazi, and when you quit, the shell moves to the folder you were in.
+# Plain `yazi` still leaves the shell where it was.
+if (( $+commands[yazi] )); then
+  y() {
+    local tmp cwd
+    tmp="$(mktemp -t yazi-cwd.XXXXXX)" || return
+    command yazi "$@" --cwd-file="$tmp"
+    cwd="$(<"$tmp")"
+    [[ -n "$cwd" && "$cwd" != "$PWD" && -d "$cwd" ]] && builtin cd -- "$cwd"
+    command rm -f -- "$tmp"
+  }
+  alias finder='y'                                                # the same, by a friendlier name
+fi
