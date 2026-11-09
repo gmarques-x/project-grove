@@ -3,8 +3,21 @@
 
 about() { echo "the .config folder is a link to the tracked config"; }
 
+# _config_worktree: 0 (and a message on stdout) when GROVE_ROOT is inside a
+# linked git worktree (its ../.git is a file). Removing that worktree would
+# delete everything ~/.config points at. GROVE_ALLOW_WORKTREE=1 skips the guard.
+_config_worktree() {
+  [ "${GROVE_ALLOW_WORKTREE:-0}" = "1" ] && return 1
+  [ -f "$GROVE_ROOT/../.git" ] || return 1
+  echo "grove-dotfiles is running from a git worktree ($GROVE_ROOT); run it from the main project-grove checkout"
+}
+
 check() {
-  local link="$HOME/.config"
+  local link="$HOME/.config" msg
+  if msg="$(_config_worktree)"; then
+    grove_fail "$msg" || true
+    return 3
+  fi
   grove_link_check "$GROVE_CONFIG" "$link"
 }
 
@@ -29,7 +42,11 @@ _config_merge() {
 }
 
 apply() {
-  local link="$HOME/.config"
+  local link="$HOME/.config" msg
+  if msg="$(_config_worktree)"; then
+    grove_fail "$msg"
+    return 1
+  fi
   if [ -L "$link" ]; then
     if grove_link_check "$GROVE_CONFIG" "$link"; then return 0; fi
     grove_fail "$link is a symlink to $(readlink "$link"), not replacing it"

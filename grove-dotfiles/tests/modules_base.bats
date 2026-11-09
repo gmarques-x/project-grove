@@ -235,3 +235,21 @@ fake_fonts() { # fake_fonts BODY: temp GROVE_ROOT layout with a fake installer
   run check
   [ "$status" -eq 1 ]
 }
+
+# ---- C-1: worktree guard
+
+@test "config refuses to link from a linked git worktree" {
+  load_module 05-config
+  local fake="$BATS_TEST_TMPDIR/wt"
+  mkdir -p "$fake/grove-dotfiles"
+  echo "gitdir: /elsewhere" > "$fake/.git"
+  GROVE_ROOT="$fake/grove-dotfiles"
+  unset GROVE_ALLOW_WORKTREE
+  run check
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"git worktree"*"main project-grove checkout"* ]] || false
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"git worktree"* ]] || false
+  [ ! -e "$HOME/.config" ]
+}

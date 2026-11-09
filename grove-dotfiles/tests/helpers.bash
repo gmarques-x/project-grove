@@ -11,6 +11,8 @@ grove_test_setup() {
   export GROVE_RUN_ID=test
   export GROVE_TTY="$BATS_TEST_TMPDIR/tty"
   export NO_COLOR=1
+  # The suite may run from a linked worktree; one test unsets this (C-1).
+  export GROVE_ALLOW_WORKTREE=1
   export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
 }
 
