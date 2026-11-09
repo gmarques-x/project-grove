@@ -42,3 +42,19 @@ setup() {
   GROVE_QUIET=1 run grove_info x
   [ -z "$output" ]
 }
+
+# Real pseudo-terminal via macOS script(1): stdout is a tty inside the command.
+on_tty() { script -q /dev/null /bin/bash -c "$1" < /dev/null; }
+
+@test "color is emitted on a real tty" {
+  unset NO_COLOR
+  run on_tty 'source "$GROVE_ROOT/lib/ui.sh"; grove_ok fonts; grove_step S; grove_info i'
+  [[ "$output" == *$'\033[38;2;167;192;128m'*fonts* ]]
+  [[ "$output" == *$'\033[38;2;133;146;137m'* ]]
+}
+
+@test "NO_COLOR suppresses color on a real tty" {
+  run on_tty 'source "$GROVE_ROOT/lib/ui.sh"; grove_ok fonts'
+  [[ "$output" == *fonts* ]]
+  [[ "$output" != *$'\033['* ]]
+}
