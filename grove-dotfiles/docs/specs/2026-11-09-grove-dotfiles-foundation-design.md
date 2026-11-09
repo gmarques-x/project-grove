@@ -32,7 +32,7 @@ This spec covers the framework (the `grove` command, the module system, file lay
 - Modules: config link, Xcode Command Line Tools, Homebrew and Brewfile, fonts, git, SSH signing key, GitHub, zsh base with Starship prompt, Finder settings
 - Migrating this Mac from today's hand-made files
 - Tests and a fresh-install test on a new macOS user account
-- Making `project-grove` public with a README
+- Making `project-grove` public with a README. `artifacts/` is never published: it is gitignored and absent from history.
 
 **Not in this spec**
 
@@ -45,7 +45,7 @@ This spec covers the framework (the `grove` command, the module system, file lay
 
 ```
 project-grove/
-├── artifacts/                      design work for review (unchanged)
+├── artifacts/                      shared working files (local only, never committed)
 ├── grove-fonts/                    font installer (unchanged)
 └── grove-dotfiles/
     ├── README.md                   what it is, the bootstrap line, safety notes
