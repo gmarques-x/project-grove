@@ -106,3 +106,27 @@ setup() {
   [ "$status" -eq 0 ]
   [ ! -s "$BATS_TEST_TMPDIR/err" ]
 }
+
+@test "zsh copies the old history when the new one is missing" {
+  load_module 70-zsh
+  echo 'old cmd' > "$HOME/.zsh_history"
+  run check
+  [ "$status" -eq 3 ]
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/.local/state/zsh/history")" = 'old cmd' ]
+  [ "$(cat "$HOME/.zsh_history")" = 'old cmd' ]
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "zsh never overwrites an existing new history" {
+  load_module 70-zsh
+  mkdir -p "$HOME/.local/state/zsh"
+  echo 'old cmd' > "$HOME/.zsh_history"
+  echo 'new cmd' > "$HOME/.local/state/zsh/history"
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$HOME/.local/state/zsh/history")" = 'new cmd' ]
+  [ "$(cat "$HOME/.zsh_history")" = 'old cmd' ]
+}
