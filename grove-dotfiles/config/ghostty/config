@@ -3,7 +3,7 @@
 # (tests/theme.bats checks). Anything not set here is Ghostty's default.
 
 font-family = JetBrains Mono
-font-size = 14
+font-size = 12
 
 background = #2D353B
 foreground = #D3C6AA

@@ -59,7 +59,7 @@ ghostty_value() {
 
 @test "ghostty config sets the spec's keys" {
   [ "$(ghostty_value font-family)" = "JetBrains Mono" ]
-  [ "$(ghostty_value font-size)" = "14" ]
+  [ "$(ghostty_value font-size)" = "12" ]
   [ "$(ghostty_value background)" = "#2D353B" ]
   [ "$(ghostty_value foreground)" = "#D3C6AA" ]
   [ "$(ghostty_value selection-background)" = "#543A48" ]
@@ -117,7 +117,7 @@ prompt_styles() {
   grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
 }
 
-@test "the logo art is 20 lines by at most 40 columns, next to the stats box" {
+@test "the logo art is 20 lines by 54 columns, next to the stats box" {
   local f="$GROVE_ROOT/config/macchina/grove.ascii" w=0 line n
   [ -f "$f" ]
   [ "$(wc -l < "$f" | tr -d ' ')" -eq 20 ]
@@ -125,7 +125,7 @@ prompt_styles() {
     n="$(printf '%s' "$line" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')"
     [ "$n" -gt "$w" ] && w="$n"
   done < "$f"
-  [ "$w" -le 40 ]
+  [ "$w" -eq 54 ]
 }
 
 @test "the macchina art is the rendered logo" {
@@ -135,7 +135,7 @@ prompt_styles() {
 
 @test "the logo uses only palette colors from its legend" {
   run grep -v '^#' "$GROVE_ROOT/theme/grove-logo.txt"
-  [[ "$output" =~ ^[AGYTDE.[:space:]]*$ ]] || false
+  [[ "$output" =~ ^[AGYTDEWS.[:space:]]*$ ]] || false
 }
 
 @test "macchina accepts its config" {
@@ -200,4 +200,11 @@ render_prompt() {
   sed -n '/^\[box\]/,/^\[/p' "$t" | grep -qx 'title = " Grove "'
   sed -n '/^\[palette\]/,/^\[/p' "$t" | grep -qx 'visible = true'
   [ "$(sed -n '/^\[keys\]/,$p' "$t" | grep -c '= "')" -ge 17 ]
+}
+
+@test "the logo spells Project and Grove beside the tree, like the banner" {
+  local g; g="$(grep -v '^#' "$GROVE_ROOT/theme/grove-logo.txt")"
+  [[ "$g" == *S* ]] || false                      # the divider
+  [[ "$g" == *W* ]] || false                      # Grove in fg
+  [ "$(grep -c '^#.*scale: 1' "$GROVE_ROOT/theme/grove-logo.txt")" -eq 1 ]
 }

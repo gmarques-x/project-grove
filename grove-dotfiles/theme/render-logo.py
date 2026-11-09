@@ -6,7 +6,7 @@ Run from grove-dotfiles/. Colors come from theme/everforest-dark-medium.
 import os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LEGEND = {"A": "aqua", "G": "green", "Y": "yellow", "T": "grey0", "D": "bg_green", "E": "bg3"}
+LEGEND = {"A": "aqua", "G": "green", "Y": "yellow", "T": "grey0", "D": "bg_green", "E": "bg3", "S": "grey1", "W": "fg"}
 
 palette = {}
 for line in open(os.path.join(HERE, "everforest-dark-medium")):

@@ -329,3 +329,9 @@ The user asked for the spacing and organization of a reference Ghostty screensho
 - `starship-plain.toml` keeps the same blocks with square ends and no arrows.
 
 **`cls`:** `clear && GROVE_FETCHED= exec zsh -l`. It reloads the shell as a new window would, summary included.
+
+**Logo and font revision (2026-11-09, user request):**
+- **Font:** Ghostty's `font-size` is 12, the size the user settled on in the app.
+- **Logo:** redrawn like the README banner at 54 columns × 20 lines, 50% wider than before.
+  - The layout is the tree (aqua and green halves, grey0 trunk), a grey1 divider, then "Project" in a small green pixel font above "Grove" in a bold fg pixel font.
+  - `theme/grove-logo.txt` holds the full grid at `scale: 1`, and the legend adds `S` (grey1) and `W` (fg).
