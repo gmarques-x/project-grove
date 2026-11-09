@@ -61,7 +61,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `60-github` | GitHub login and SSH signing key |
 | `70-zsh` | zsh config, Starship prompt and the `grove` command |
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
-| `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and macchina |
+| `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |
 
 ## Fonts
 
@@ -91,7 +91,7 @@ To add a font:
 - **Quick terminal:** ⌃` drops a terminal down from the top of the screen, from any app. macOS only lets you grant this, so do it once: **System Settings › Privacy & Security › Accessibility**, then turn on Ghostty.
 - **Dock:** `grove install` gives Ghostty Terminal's place in the Dock. Terminal.app stays installed.
 - **Prompt:** the Starship prompt shows icons in Ghostty. Terminal.app can't draw them, so it gets the same prompt without icons (`config/starship-plain.toml`).
-- **Summary:** every new window starts with a macchina summary. Shells started from that window stay quiet. Turn it off with `export GROVE_NO_FETCH=1` in `config/zsh/.zshenv`.
+- **Summary:** every new window starts with a fastfetch summary: the Project Grove image beside your Mac's stats in a box. The image needs a Ghostty window at least 140 columns wide; narrower windows and Terminal.app show a text drawing instead, and windows under 125 columns show just the stats. Shells started from that window stay quiet. Turn it off with `export GROVE_NO_FETCH=1` in `config/zsh/.zshenv`. The config is `config/fastfetch/`.
 
 The shell has completions (menu selection, case-insensitive), suggestions from your history in grey (→ accepts), syntax highlighting, and these replacements:
 

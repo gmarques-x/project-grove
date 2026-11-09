@@ -1,0 +1,28 @@
+# A fastfetch summary once per new terminal window. GROVE_FETCHED is inherited
+# by every shell started from this one (nested shells, exec zsh, tools), so
+# they stay quiet. Turn it off with GROVE_NO_FETCH=1.
+#
+# The logo depends on the window: the Grove image in Ghostty when there's room
+# (140+ columns: image 76 + padding 4 + box 58), the text art when narrower or
+# in Terminal.app (which can't show images), and none under 125 columns.
+_grove_fetch() {
+  local dir="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
+  local -a logo
+  if [[ "$TERM_PROGRAM" == ghostty ]] && (( COLUMNS >= 140 )) && [[ -r "$dir/grove.png" ]]; then
+    logo=()
+  elif (( COLUMNS >= 125 )); then
+    logo=(--logo-type file --logo "$dir/grove.ascii" --logo-color-1 '#83C092')
+  else
+    logo=(--logo none)
+  fi
+  print
+  fastfetch "${logo[@]}" || true
+}
+
+if [[ -o interactive && -t 1 && -z "$GROVE_FETCHED" && -z "$GROVE_NO_FETCH" ]] \
+  && [[ "$TERM_PROGRAM" == ghostty || "$TERM_PROGRAM" == Apple_Terminal ]] \
+  && (( $+commands[fastfetch] )); then
+  _grove_fetch
+  export GROVE_FETCHED=1
+fi
+unfunction _grove_fetch

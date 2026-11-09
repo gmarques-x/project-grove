@@ -210,3 +210,9 @@ INST
     grep -qx "brew \"$f\"" "$GROVE_ROOT/Brewfile" || { echo "missing: $f"; false; }
   done
 }
+
+@test "the Brewfile installs fastfetch, not macchina" {
+  grep -qx 'brew "fastfetch"' "$GROVE_ROOT/Brewfile"
+  run grep -q macchina "$GROVE_ROOT/Brewfile"
+  [ "$status" -eq 1 ]
+}

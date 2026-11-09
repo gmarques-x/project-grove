@@ -278,58 +278,86 @@ login_shell() {
 }
 
 # fetch_shell [VAR=value...]: an interactive zsh on a real terminal (via script),
-# with a fake macchina that prints FETCH, running `print -r -- "fetched=$GROVE_FETCHED"`.
+# FETCH_COLS wide (default 160), with a fake fastfetch that prints FETCH and its
+# arguments, running `print -r -- "fetched=$GROVE_FETCHED"`.
 fetch_shell() {
   load_module 70-zsh
   [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply >/dev/null
   mkdir -p "$BATS_TEST_TMPDIR/fetchbin"
-  [ -n "${NO_MACCHINA:-}" ] || { printf '#!/bin/sh\necho FETCH\n' > "$BATS_TEST_TMPDIR/fetchbin/macchina"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/macchina"; }
+  [ -n "${NO_FASTFETCH:-}" ] || { printf '#!/bin/sh\necho FETCH "$@"\n' > "$BATS_TEST_TMPDIR/fetchbin/fastfetch"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/fastfetch"; }
   env -i HOME="$HOME" PATH="$BATS_TEST_TMPDIR/fetchbin:/usr/bin:/bin" "$@" \
-    script -q /dev/null /bin/zsh -ic 'print -r -- "fetched=$GROVE_FETCHED"' < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'  # script echoes ^D for the empty stdin
+    script -q /dev/null /bin/sh -c "stty cols ${FETCH_COLS:-160} rows 40; exec /bin/zsh -ic 'print -r -- \"fetched=\$GROVE_FETCHED\"'" < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'  # script echoes ^D for the empty stdin
 }
 
-@test "macchina runs in a new Ghostty window, one empty line below the top" {
+@test "fastfetch runs in a new Ghostty window, one empty line below the top" {
   run fetch_shell TERM_PROGRAM=ghostty
   [ "${lines[0]}" = "" ] || [[ "$output" == $'\n'FETCH* ]] || false
   [[ "$output" == *FETCH* ]] || false
   [[ "$output" == *"fetched=1"* ]] || false
 }
 
-@test "macchina runs in a new Terminal.app window" {
+@test "a wide Ghostty window gets the image (the config's default logo)" {
+  run fetch_shell TERM_PROGRAM=ghostty
+  [[ "$output" == *"FETCH"* ]] || false
+  [[ "$output" != *"--logo"* ]] || false
+}
+
+@test "a Ghostty window of 125 to 139 columns gets the text art, in aqua" {
+  FETCH_COLS=130 run fetch_shell TERM_PROGRAM=ghostty
+  [[ "$output" == *"FETCH --logo-type file --logo $HOME/.config/fastfetch/grove.ascii --logo-color-1 #83C092"* ]] || false
+}
+
+@test "Terminal.app gets the text art, even when wide" {
+  run fetch_shell TERM_PROGRAM=Apple_Terminal
+  [[ "$output" == *"--logo-type file --logo $HOME/.config/fastfetch/grove.ascii"* ]] || false
+}
+
+@test "Ghostty gets the text art when the image is missing" {
+  rm "$GROVE_CONFIG/fastfetch/grove.png"
+  run fetch_shell TERM_PROGRAM=ghostty
+  [[ "$output" == *"--logo-type file"* ]] || false
+}
+
+@test "a window under 125 columns gets the box alone" {
+  FETCH_COLS=100 run fetch_shell TERM_PROGRAM=ghostty
+  [[ "$output" == *"FETCH --logo none"* ]] || false
+}
+
+@test "fastfetch runs in a new Terminal.app window" {
   run fetch_shell TERM_PROGRAM=Apple_Terminal
   [[ "$output" == *FETCH* ]] || false
 }
 
-@test "macchina stays quiet when GROVE_FETCHED is inherited" {
+@test "fastfetch stays quiet when GROVE_FETCHED is inherited" {
   run fetch_shell TERM_PROGRAM=ghostty GROVE_FETCHED=1
   [[ "$output" != *FETCH* ]] || false
   run fetch_shell TERM_PROGRAM=ghostty GROVE_FETCHED=
   [[ "$output" == *FETCH* ]] || false
 }
 
-@test "macchina stays quiet with GROVE_NO_FETCH=1" {
+@test "fastfetch stays quiet with GROVE_NO_FETCH=1" {
   run fetch_shell TERM_PROGRAM=ghostty GROVE_NO_FETCH=1
   [ "$output" = "fetched=" ]
 }
 
-@test "macchina stays quiet in other terminals" {
+@test "fastfetch stays quiet in other terminals" {
   run fetch_shell TERM_PROGRAM=vscode
   [ "$output" = "fetched=" ]
 }
 
-@test "macchina stays quiet when stdout isn't a terminal" {
+@test "fastfetch stays quiet when stdout isn't a terminal" {
   load_module 70-zsh
   ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply >/dev/null
   mkdir -p "$BATS_TEST_TMPDIR/fetchbin"
-  printf '#!/bin/sh\necho FETCH\n' > "$BATS_TEST_TMPDIR/fetchbin/macchina"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/macchina"
+  printf '#!/bin/sh\necho FETCH\n' > "$BATS_TEST_TMPDIR/fetchbin/fastfetch"; chmod +x "$BATS_TEST_TMPDIR/fetchbin/fastfetch"
   run env -i HOME="$HOME" PATH="$BATS_TEST_TMPDIR/fetchbin:/usr/bin:/bin" TERM_PROGRAM=ghostty /bin/zsh -ic 'print -r -- "fetched=$GROVE_FETCHED"'
   [ "$output" = "fetched=" ]
 }
 
-@test "macchina stays quiet when macchina is missing" {
-  NO_MACCHINA=1 run fetch_shell TERM_PROGRAM=ghostty
+@test "fastfetch stays quiet when fastfetch is missing" {
+  NO_FASTFETCH=1 run fetch_shell TERM_PROGRAM=ghostty
   [ "$status" -eq 0 ]
   [ "$output" = "fetched=" ]
 }

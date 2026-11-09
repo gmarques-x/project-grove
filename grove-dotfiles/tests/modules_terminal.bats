@@ -17,9 +17,9 @@ setup() {
   mkdir -p "$GROVE_GHOSTTY_APP"
   export GROVE_GHOSTTY="$BATS_TEST_TMPDIR/stubs/ghostty-cli"
   stub ghostty-cli 'cat "'"$BATS_TEST_TMPDIR"'/ghostty-msg" 2>/dev/null; exit "$(cat "'"$BATS_TEST_TMPDIR"'/ghostty-rc" 2>/dev/null || echo 0)"'
-  stub macchina 'exit 0'
+  stub fastfetch 'exit 0'
   stub killall 'echo "$@" >> "'"$BATS_TEST_TMPDIR"'/killall.log"'
-  export GROVE_BREW="$BATS_TEST_TMPDIR/nobrew/bin/brew"   # no macchina next to it
+  export GROVE_BREW="$BATS_TEST_TMPDIR/nobrew/bin/brew"   # no fastfetch next to it
 }
 
 teardown() { /usr/bin/defaults delete "$GROVE_DOCK_DOMAIN" 2>/dev/null || true; }
@@ -70,9 +70,9 @@ dock_field() {
   [ "$status" -eq 3 ]
 }
 
-@test "check needs work when macchina is missing" {
+@test "check needs work when fastfetch is missing" {
   seed_dock "$(GHOSTTY)"
-  rm "$BATS_TEST_TMPDIR/stubs/macchina"
+  rm "$BATS_TEST_TMPDIR/stubs/fastfetch"
   PATH="$BATS_TEST_TMPDIR/stubs:/usr/bin:/bin" run check
   [ "$status" -eq 3 ]
 }
@@ -180,7 +180,7 @@ dock_field() {
   [ "$status" -eq 0 ]
 }
 
-@test "apply fails without Ghostty or macchina and points to grove install homebrew" {
+@test "apply fails without Ghostty or fastfetch and points to grove install homebrew" {
   rmdir "$GROVE_GHOSTTY_APP"
   run apply
   [ "$status" -eq 1 ]
@@ -195,14 +195,14 @@ dock_field() {
 }
 
 @test "about names the module" {
-  [ "$(about)" = "Ghostty, the prompt and macchina" ]
+  [ "$(about)" = "Ghostty, the prompt and fastfetch" ]
 }
 
-@test "check finds macchina next to brew when Homebrew isn't on PATH yet" {
+@test "check finds fastfetch next to brew when Homebrew isn't on PATH yet" {
   seed_dock "$(GHOSTTY)"
-  rm "$BATS_TEST_TMPDIR/stubs/macchina"
+  rm "$BATS_TEST_TMPDIR/stubs/fastfetch"
   mkdir -p "$BATS_TEST_TMPDIR/brew/bin"
-  printf '#!/bin/sh\n' > "$BATS_TEST_TMPDIR/brew/bin/macchina"; chmod +x "$BATS_TEST_TMPDIR/brew/bin/macchina"
+  printf '#!/bin/sh\n' > "$BATS_TEST_TMPDIR/brew/bin/fastfetch"; chmod +x "$BATS_TEST_TMPDIR/brew/bin/fastfetch"
   GROVE_BREW="$BATS_TEST_TMPDIR/brew/bin/brew" PATH="$BATS_TEST_TMPDIR/stubs:/usr/bin:/bin" run check
   [ "$status" -eq 0 ]
 }

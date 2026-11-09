@@ -47,7 +47,7 @@ palette_value() {
   local missing
   missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/ghostty/config" \
       "$GROVE_ROOT/config/starship.toml" "$GROVE_ROOT/config/starship-plain.toml" \
-      "$GROVE_ROOT/config/macchina/themes/grove.toml" "$GROVE_ROOT/config/eza/theme.yml" "$GROVE_ROOT/config/yazi/theme.toml" "$GROVE_ROOT/config/yazi/init.lua" \
+      "$GROVE_ROOT/config/fastfetch/config.jsonc" "$GROVE_ROOT/config/eza/theme.yml" "$GROVE_ROOT/config/yazi/theme.toml" "$GROVE_ROOT/config/yazi/init.lua" \
       "$GROVE_ROOT"/config/zsh/conf.d/*.zsh) <(palette_hexes))"
   [ -z "$missing" ] || { echo "not in the palette: $missing"; false; }
 }
@@ -110,24 +110,74 @@ prompt_styles() {
   [ "$status" -eq 1 ]
 }
 
-@test "macchina shows the spec's readouts in order" {
-  local got
-  got="$(sed -n 's/^show[[:space:]]*=[[:space:]]*\[\(.*\)\]/\1/p' "$GROVE_ROOT/config/macchina/macchina.toml" | tr -d ' "')"
-  [ "$got" = "Host,Machine,Kernel,OperatingSystem,DesktopEnvironment,WindowManager,Packages,Terminal,Shell,LocalIP,Backlight,Resolution,Uptime,Processor,ProcessorLoad,Memory,Battery" ]
-  grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
+# ff_json EXPR: a value from the fastfetch config (JSONC, // comments dropped),
+# as JSON. EXPR is Python, with the config as c.
+ff_json() {
+  python3 -c 'import json,re,sys; c=json.loads(re.sub(r"^\s*//.*$","",open(sys.argv[1]).read(),flags=re.M)); print(json.dumps(eval(sys.argv[2]),ensure_ascii=False))' \
+    "$GROVE_ROOT/config/fastfetch/config.jsonc" "$1"
 }
 
-@test "macchina accepts its config" {
-  command -v macchina >/dev/null || [ -x /opt/homebrew/bin/macchina ] || skip "macchina not installed"
-  local h="$BATS_TEST_TMPDIR/mhome"
-  mkdir -p "$h"
-  ln -s "$GROVE_ROOT/config" "$h/.config"
-  run env HOME="$h" XDG_CONFIG_HOME="$h/.config" PATH="/opt/homebrew/bin:/usr/bin:/bin" macchina
-  [ "$status" -eq 0 ]
+@test "fastfetch shows the spec's readouts in order" {
+  run ff_json '[m["type"] for m in c["modules"] if m["type"] != "custom"]'
+  [ "$output" = '["title", "host", "kernel", "os", "wm", "packages", "terminal", "shell", "localip", "brightness", "display", "uptime", "cpu", "cpuusage", "memory", "battery", "colors"]' ]
+}
+
+@test "fastfetch shows the image beside the box: kitty-direct, 76 by 22" {
+  run ff_json '[c["logo"][k] for k in ("type", "source", "width", "height", "preserveAspectRatio")]'
+  [ "$output" = '["kitty-direct", "~/.config/fastfetch/grove.png", 76, 22, true]' ]
+}
+
+@test "fastfetch's bars are green on bg3, ten marks, no brackets" {
+  run ff_json 'c["display"]["bar"]'
+  [ "$output" = '{"char": {"elapsed": "▮ ", "total": "▮ "}, "border": {"left": "", "right": ""}, "width": 10, "color": {"elapsed": "#A7C080", "total": "#475258"}}' ]
+}
+
+@test "fastfetch's labels are green and not bold, the separator grey1, values fg" {
+  local sep=$'\xef\x86\xb2'   # U+F1B2, as in macchina
+  run ff_json '[c["display"]["brightColor"], c["display"]["separator"], c["display"]["color"]["keys"], c["display"]["color"]["separator"], c["display"]["color"]["output"]]'
+  [ "$output" = "[false, \"$sep  \", \"#A7C080\", \"#859289\", \"#D3C6AA\"]" ]
+}
+
+@test "fastfetch's config writes colors as palette hex, never raw RGB" {
+  run grep -c '38;2' "$GROVE_ROOT/config/fastfetch/config.jsonc"
+  [ "$output" = 0 ]
+}
+
+# ff_screen COLS [ARGS...]: fastfetch with the Grove config on a COLS-wide
+# terminal, replayed to plain text.
+ff_screen() {
+  local cols="$1"; shift
+  local h="$BATS_TEST_TMPDIR/ffhome"
+  mkdir -p "$h"; [ -L "$h/.config" ] || ln -s "$GROVE_ROOT/config" "$h/.config"
+  env -i HOME="$h" PATH="/opt/homebrew/bin:/usr/bin:/bin" TERM=xterm-256color \
+    script -q "$BATS_TEST_TMPDIR/ff.out" /bin/sh -c "stty cols $cols rows 50; fastfetch $*" </dev/null >/dev/null 2>&1
+  python3 "$GROVE_ROOT/tests/vt.py" "$BATS_TEST_TMPDIR/ff.out" "$cols" | sed 's/^\^D//'   # script echoes ^D for the empty stdin
+}
+
+@test "fastfetch accepts its config" {
+  [ -x /opt/homebrew/bin/fastfetch ] || skip "fastfetch not installed"
+  run ff_screen 160 --logo none
+  [[ "$output" == *Kernel* ]] || false
   [[ "$output" != *rror* ]] || false
-  [[ "$output" == *Host* ]] || false
-  run env HOME="$h" XDG_CONFIG_HOME="$h/.config" PATH="/opt/homebrew/bin:/usr/bin:/bin" macchina -l
-  [[ "$output" == *grove* ]] || false
+}
+
+@test "fastfetch draws the stats in a 58-column box titled Grove, with the color dots" {
+  [ -x /opt/homebrew/bin/fastfetch ] || skip "fastfetch not installed"
+  run ff_screen 160 --logo none
+  local box
+  box="$(printf '%s\n' "$output" | sed -n '/┌/,/└/p')"
+  [ "$(printf '%s\n' "$box" | head -1)" = "┌ Grove $(printf '─%.0s' $(seq 49))┐" ]
+  [ "$(printf '%s\n' "$box" | tail -1)" = "└$(printf '─%.0s' $(seq 56))┘" ]
+  printf '%s\n' "$box" | sed '1d;$d' | python3 -c '
+import sys
+bad = [l for l in sys.stdin.read().split("\n") if l and not (len(l) == 58 and l[0] == "│" and l[-1] == "│")]
+print("\n".join(bad)); sys.exit(1 if bad else 0)'
+  [[ "$box" == *"● ● ● ● ● ● ● ●"* ]] || false
+}
+
+@test "the image is a 1004 by 624 PNG with transparent rounded corners" {
+  local f="$GROVE_ROOT/config/fastfetch/grove.png"
+  [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 624 yes " ]
 }
 
 # render_prompt FILE: the prompt Starship draws in a temp git repo, colors stripped.
@@ -173,16 +223,8 @@ render_prompt() {
   [[ "$output" == *"38;2;230;126;128m"*"❯"* ]] || false
 }
 
-@test "macchina draws the stats in a titled box with icons and the color dots" {
-  local t="$GROVE_ROOT/config/macchina/themes/grove.toml"
-  sed -n '/^\[box\]/,/^\[/p' "$t" | grep -qx 'visible = true'
-  sed -n '/^\[box\]/,/^\[/p' "$t" | grep -qx 'title = " Grove "'
-  sed -n '/^\[palette\]/,/^\[/p' "$t" | grep -qx 'visible = true'
-  [ "$(sed -n '/^\[keys\]/,$p' "$t" | grep -c '= "')" -ge 17 ]
-}
-
 @test "the art is light plain text: at most 20 lines by 58 to 64 columns, no color codes" {
-  local f="$GROVE_ROOT/config/macchina/grove.ascii" w
+  local f="$GROVE_ROOT/config/fastfetch/grove.ascii" w
   [ "$(wc -l < "$f" | tr -d ' ')" -le 20 ]
   w="$(awk '{ if (length > m) m = length } END { print m + 0 }' "$f")"
   [ "$w" -ge 58 ] && [ "$w" -le 64 ]
@@ -192,6 +234,3 @@ render_prompt() {
   grep -q '"Project Grove"' "$f"
 }
 
-@test "macchina colors the art aqua" {
-  sed -n '/^\[custom_ascii\]/,/^\[/p' "$GROVE_ROOT/config/macchina/themes/grove.toml" | grep -qx 'color = "#83C092"'
-}

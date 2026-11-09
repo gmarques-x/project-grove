@@ -1,0 +1,59 @@
+// Project Grove · fastfetch: the summary shown in every new terminal window
+// (zsh/conf.d/95-fetch.zsh picks the logo: this image in wide Ghostty windows,
+// grove.ascii in narrower ones and in Terminal.app, none when very narrow).
+// The stats sit in a 58-column box titled Grove. Every color comes from
+// theme/everforest-dark-medium, written as hex ({##RRGGBB} inside formats).
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    // The README banner's paper art; Ghostty reads the file itself.
+    "type": "kitty-direct",
+    "source": "~/.config/fastfetch/grove.png",
+    "width": 76,
+    "height": 22,
+    "preserveAspectRatio": true,
+    "padding": { "left": 1, "right": 3, "top": 0 }
+  },
+  "display": {
+    "brightColor": false,
+    "separator": "\uf1b2  ",
+    "color": { "keys": "#A7C080", "separator": "#859289", "output": "#D3C6AA", "title": "#D3C6AA" },
+    // $1: a box row's two edges (left edge, jump right, right edge, jump back).
+    // $2: an empty box row.
+    "constants": [
+      "│\u001b[56C│\u001b[57D",
+      "│                                                        │"
+    ],
+    "bar": {
+      "char": { "elapsed": "▮ ", "total": "▮ " },
+      "border": { "left": "", "right": "" },
+      "width": 10,
+      "color": { "elapsed": "#A7C080", "total": "#475258" }
+    },
+    "percent": { "type": 2 }
+  },
+  "modules": [
+    { "type": "custom", "format": "{##D3C6AA}┌ Grove ─────────────────────────────────────────────────┐" },
+    { "type": "custom", "format": "{##D3C6AA}{$2}" },
+    { "type": "title", "key": "{##D3C6AA}{$1}{#keys}  󰒋 Host        ", "format": "{user-name}@{host-name}" },
+    { "type": "host", "key": "{##D3C6AA}{$1}{#keys}  󰌢 Machine     ", "format": "{name}" },
+    { "type": "kernel", "key": "{##D3C6AA}{$1}{#keys}   Kernel       " },
+    { "type": "os", "key": "{##D3C6AA}{$1}{#keys}   OS           ", "format": "{name} {version}" },
+    { "type": "wm", "key": "{##D3C6AA}{$1}{#keys}   WM           " },
+    { "type": "packages", "key": "{##D3C6AA}{$1}{#keys}   Packages     ", "format": "{all} (Homebrew)" },
+    { "type": "terminal", "key": "{##D3C6AA}{$1}{#keys}   Terminal     " },
+    { "type": "shell", "key": "{##D3C6AA}{$1}{#keys}   Shell        " },
+    { "type": "localip", "key": "{##D3C6AA}{$1}{#keys}   Local IP     ", "format": "{ipv4}" },
+    { "type": "brightness", "key": "{##D3C6AA}{$1}{#keys}   Brightness   ", "format": "{percentage-bar}" },
+    { "type": "display", "key": "{##D3C6AA}{$1}{#keys}  󰍹 Resolution  ", "format": "{width}x{height} @ {refresh-rate} Hz" },
+    { "type": "uptime", "key": "{##D3C6AA}{$1}{#keys}   Uptime       " },
+    { "type": "cpu", "key": "{##D3C6AA}{$1}{#keys}   CPU          " },
+    { "type": "cpuusage", "key": "{##D3C6AA}{$1}{#keys}   CPU Load     ", "format": "{avg-bar}" },
+    { "type": "memory", "key": "{##D3C6AA}{$1}{#keys}  󰍛 Memory      ", "format": "{percentage-bar}" },
+    { "type": "battery", "key": "{##D3C6AA}{$1}{#keys}   Battery      ", "format": "{capacity-bar}" },
+    { "type": "custom", "format": "{##D3C6AA}{$2}" },
+    { "type": "colors", "key": "{##D3C6AA}{$1} ", "symbol": "circle", "paddingLeft": 0 },
+    { "type": "custom", "format": "{##D3C6AA}{$2}" },
+    { "type": "custom", "format": "{##D3C6AA}└────────────────────────────────────────────────────────┘" }
+  ]
+}

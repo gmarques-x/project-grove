@@ -1,9 +1,9 @@
 # shellcheck shell=bash
-# 90-terminal: Ghostty and macchina are installed (Homebrew does that), the
+# 90-terminal: Ghostty and fastfetch are installed (Homebrew does that), the
 # Ghostty config is valid and not overridden, and Ghostty has Terminal's slot
 # in the Dock. Tests redirect GROVE_DOCK_DOMAIN, GROVE_GHOSTTY, GROVE_GHOSTTY_APP.
 
-about() { echo "Ghostty, the prompt and macchina"; }
+about() { echo "Ghostty, the prompt and fastfetch"; }
 
 _TERM_PB=/usr/libexec/PlistBuddy
 _TERM_GHOSTTY_URL=file:///Applications/Ghostty.app/
@@ -16,7 +16,7 @@ _term_cli() { printf '%s' "${GROVE_GHOSTTY:-/Applications/Ghostty.app/Contents/M
 # Homebrew may not be on PATH yet in a fresh install run, so also look next to brew.
 _term_installed() {
   [ -d "$(_term_app)" ] || return 1
-  command -v macchina >/dev/null 2>&1 || [ -x "$(dirname "${GROVE_BREW:-/opt/homebrew/bin/brew}")/macchina" ]
+  command -v fastfetch >/dev/null 2>&1 || [ -x "$(dirname "${GROVE_BREW:-/opt/homebrew/bin/brew}")/fastfetch" ]
 }
 
 # _term_extra_config: Ghostty configs in Application Support (`config` or
@@ -139,7 +139,7 @@ check() {
 apply() {
   local tmp extra moved rc
   if ! _term_installed; then
-    grove_fail "Ghostty or macchina is missing; run grove install homebrew"
+    grove_fail "Ghostty or fastfetch is missing; run grove install homebrew"
     return 1
   fi
   while IFS= read -r extra; do
