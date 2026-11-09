@@ -1,0 +1,43 @@
+# Project Grove · Ghostty
+# Everforest Dark Medium. Every color comes from theme/everforest-dark-medium
+# (tests/theme.bats checks). Anything not set here is Ghostty's default.
+
+font-family = JetBrains Mono
+font-size = 14
+
+background = #2D353B
+foreground = #D3C6AA
+cursor-color = #D3C6AA
+selection-background = #543A48
+selection-foreground = #D3C6AA
+
+# ANSI colors in upstream's order; bright is the same as normal, except
+# bright black, which is grey1 (a Grove addition) so dim text stays readable.
+palette = 0=#475258
+palette = 1=#E67E80
+palette = 2=#A7C080
+palette = 3=#DBBC7F
+palette = 4=#7FBBB3
+palette = 5=#D699B6
+palette = 6=#83C092
+palette = 7=#D3C6AA
+palette = 8=#859289
+palette = 9=#E67E80
+palette = 10=#A7C080
+palette = 11=#DBBC7F
+palette = 12=#7FBBB3
+palette = 13=#D699B6
+palette = 14=#83C092
+palette = 15=#D3C6AA
+
+background-opacity = 1
+window-theme = dark
+macos-titlebar-style = transparent
+window-padding-x = 12
+window-padding-y = 12
+
+# Quick terminal: ⌃` from any app (needs Ghostty allowed under Accessibility).
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
+quick-terminal-position = top
+
+shell-integration = zsh

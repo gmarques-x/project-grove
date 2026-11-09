@@ -51,3 +51,32 @@ palette_value() {
       "$GROVE_ROOT"/config/zsh/conf.d/*.zsh) <(palette_hexes))"
   [ -z "$missing" ] || { echo "not in the palette: $missing"; false; }
 }
+
+# ghostty_value KEY: values of KEY in the Ghostty config, one per line.
+ghostty_value() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GROVE_ROOT/config/ghostty/config"
+}
+
+@test "ghostty config sets the spec's keys" {
+  [ "$(ghostty_value font-family)" = "JetBrains Mono" ]
+  [ "$(ghostty_value font-size)" = "14" ]
+  [ "$(ghostty_value background)" = "#2D353B" ]
+  [ "$(ghostty_value foreground)" = "#D3C6AA" ]
+  [ "$(ghostty_value selection-background)" = "#543A48" ]
+  [ "$(ghostty_value background-opacity)" = "1" ]
+  [ "$(ghostty_value keybind)" = "global:ctrl+grave_accent=toggle_quick_terminal" ]
+  [ "$(ghostty_value quick-terminal-position)" = "top" ]
+  [ "$(ghostty_value macos-titlebar-style)" = "transparent" ]
+  ghostty_value palette | grep -qx '0=#475258'
+  ghostty_value palette | grep -qx '8=#859289'
+  [ "$(ghostty_value palette | wc -l | tr -d ' ')" -eq 16 ]
+  [ "$(ghostty_value palette | cut -d= -f1 | sort -n | tr '\n' ' ')" = "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 " ]
+}
+
+@test "ghostty validates the config" {
+  local g="${GROVE_GHOSTTY:-/Applications/Ghostty.app/Contents/MacOS/ghostty}"
+  [ -x "$g" ] || skip "Ghostty not installed"
+  run "$g" +validate-config --config-file="$GROVE_ROOT/config/ghostty/config"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
