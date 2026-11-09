@@ -88,7 +88,7 @@ teardown() {
   printf '# c\ncom.grove.test onlythree string\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_check "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"line 2"* ]]
+  [[ "$output" == *"line 2"* ]] || false
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
   [[ "$output" == *"line 2"* ]]
@@ -98,7 +98,7 @@ teardown() {
   printf 'com.grove.test a int 1\ncom.grove.test b array x\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"line 2"* ]]
+  [[ "$output" == *"line 2"* ]] || false
   run defaults read com.grove.test a
   [ "$status" -ne 0 ]
 }
@@ -112,7 +112,7 @@ teardown() {
   printf 'com.grove.test n int 007\ncom.grove.test m int +5\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"line 2"* ]]
+  [[ "$output" == *"line 2"* ]] || false
   printf 'com.grove.test n int 007\ncom.grove.test z int -0\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$output" = "2" ]
@@ -124,7 +124,7 @@ teardown() {
   printf 'com.grove.test a int 1\ncom.grove.test n int abc\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"line 2"* ]]
+  [[ "$output" == *"line 2"* ]] || false
   run defaults read com.grove.test a
   [ "$status" -ne 0 ]
 }
@@ -149,7 +149,7 @@ teardown() {
   printf 'com.grove.test k string hello world\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"line 1"* ]]
+  [[ "$output" == *"line 1"* ]] || false
   printf 'com.grove.test k string hello # ok\n' > "$BATS_TEST_TMPDIR/s.txt"
   run grove_defaults_apply "$BATS_TEST_TMPDIR/s.txt"
   [ "$output" = "1" ]
