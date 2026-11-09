@@ -4,7 +4,10 @@
 # _grove_color_on [fd]: true when color is wanted on that fd. Call it directly,
 # never inside $(...), where fd 1 is the capture pipe and never a terminal.
 _grove_color_on() {
-  [ -z "${NO_COLOR:-}" ] && [ -t "${1:-1}" ]
+  [ -z "${NO_COLOR:-}" ] || return 1
+  # bin/grove sets GROVE_FORCE_COLOR when its real stdout is a terminal but
+  # output goes through a log pipe.
+  [ "${GROVE_FORCE_COLOR:-0}" = "1" ] || [ -t "${1:-1}" ]
 }
 
 # _grove_line <rgb> <text> <fd>: print text, colored when fd is a terminal.

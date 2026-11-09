@@ -1,0 +1,194 @@
+#!/bin/bash
+# grove: discover modules and run their check/apply. See docs/specs.
+
+_g_usage() {
+  cat <<'U'
+usage: grove [--yes] [--quiet] <command> [module...]
+
+commands:
+  install [module...]   check each module, apply the ones that need work
+  check                 report each module's status, change nothing
+  update                git pull --ff-only, then install
+  list                  list modules with their about line
+
+options:
+  --yes     take defaults, skip modules that need you
+  --quiet   less output
+  --help    this text
+U
+}
+
+# Resolve this script's folder through symlinks (bash 3.2 safe).
+_g_self_root() {
+  local src="$0" dir
+  while [ -L "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+  done
+  (cd -P "$(dirname "$src")/.." && pwd)
+}
+
+_g_names() { # full folder names, sorted
+  local d
+  for d in "$GROVE_MODULES"/*/; do
+    [ -f "${d}module.sh" ] && basename "$d"
+  done
+}
+
+_g_short() { local n="$1"; case "$n" in [0-9][0-9]-*) echo "${n#??-}" ;; *) echo "$n" ;; esac; }
+
+# _g_resolve NAME: print the full folder name, or fail.
+_g_resolve() {
+  local n
+  for n in $(_g_names); do
+    if [ "$n" = "$1" ] || [ "$(_g_short "$n")" = "$1" ]; then echo "$n"; return 0; fi
+  done
+  return 1
+}
+
+# _g_call NAME FUNCTION: run a module function in a subshell.
+# 97: module.sh did not source, 98: function missing.
+_g_call() {
+  (
+    MODULE_DIR="$GROVE_MODULES/$1"
+    export MODULE_DIR
+    # shellcheck disable=SC1090,SC1091
+    . "$MODULE_DIR/module.sh" || exit 97
+    [ "$(type -t "$2")" = "function" ] || exit 98
+    "$2"
+  )
+}
+
+_g_contract_msg() {
+  case "$2" in
+    97) grove_fail "$1: module.sh failed to load" ;;
+    98) grove_fail "$1: module is missing the function '$3'" ;;
+  esac
+}
+
+_g_about() { local out; out="$(_g_call "$1" about 2>/dev/null)" && echo "$out"; }
+
+# _g_select ARGS...: modules to act on (all when none given); exits 1 on unknown.
+_g_select() {
+  local a full bad=0 out=""
+  if [ $# -eq 0 ]; then _g_names; return 0; fi
+  for a in "$@"; do
+    if full="$(_g_resolve "$a")"; then out="$out$full
+"; else grove_fail "unknown module: $a"; bad=1; fi
+  done
+  [ "$bad" -eq 0 ] || return 1
+  printf '%s' "$out"
+}
+
+_g_list() {
+  local n
+  for n in $(_g_names); do
+    printf '%-20s %s\n' "$n" "$(_g_about "$n")"
+  done
+}
+
+_g_check() {
+  local n rc worst=0 sel
+  sel="$(_g_select "$@")" || return 1
+  for n in $sel; do
+    _g_call "$n" check; rc=$?
+    case "$rc" in
+      0) grove_ok "$n" ;;
+      3) grove_work "$n"; worst=3 ;;
+      4) grove_you "$n"; worst=3 ;;
+      97|98) _g_contract_msg "$n" "$rc" check; worst=3 ;;
+      *) grove_fail "$n: check returned $rc"; worst=3 ;;
+    esac
+  done
+  return "$worst"
+}
+
+_g_install() {
+  local n rc sel skipped=0
+  sel="$(_g_select "$@")" || return 1
+  grove_local_ensure || { grove_fail "could not save personal values to $GROVE_LOCAL"; return 1; }
+  for n in $sel; do
+    _g_call "$n" check; rc=$?
+    case "$rc" in
+      0) grove_ok "$n"; continue ;;
+      3) grove_work "$n" ;;
+      4)
+        grove_you "$n"
+        if [ "${GROVE_YES:-0}" = "1" ]; then
+          grove_info "skipped $n (needs you; run: grove install $(_g_short "$n"))"
+          skipped=1; continue
+        fi ;;
+      97|98) _g_contract_msg "$n" "$rc" check; _g_retry "$n"; return 1 ;;
+      *) grove_fail "$n: check returned $rc"; _g_retry "$n"; return 1 ;;
+    esac
+    _g_call "$n" apply; rc=$?
+    if [ "$rc" -ne 0 ]; then
+      case "$rc" in 97|98) _g_contract_msg "$n" "$rc" apply ;; *) grove_fail "$n: apply failed ($rc)" ;; esac
+      _g_retry "$n"; return 1
+    fi
+    grove_ok "$n applied"
+  done
+  [ "$skipped" -eq 0 ] || return 3
+  return 0
+}
+
+_g_retry() { grove_info "fix the problem, then run: grove install $(_g_short "$1")"; }
+
+_g_update() {
+  git -C "$GROVE_ROOT/.." pull --ff-only || { grove_fail "git pull failed"; return 1; }
+  _g_install "$@"
+}
+
+_g_main() {
+  case "$cmd" in
+    install) _g_install "$@" ;;
+    check) _g_check "$@" ;;
+    update) _g_update "$@" ;;
+    list) _g_list ;;
+  esac
+}
+
+# ---- parse arguments (options may appear anywhere)
+cmd=""; rest=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes) GROVE_YES=1 ;;
+    --quiet) GROVE_QUIET=1 ;;
+    --help|-h) _g_usage; exit 0 ;;
+    -*) echo "grove: unknown option: $1" >&2; _g_usage >&2; exit 2 ;;
+    *) if [ -z "$cmd" ]; then cmd="$1"; else rest+=("$1"); fi ;;
+  esac
+  shift
+done
+[ -n "$cmd" ] || { _g_usage >&2; exit 2; }
+case "$cmd" in
+  install|check|update|list) ;;
+  *) echo "grove: unknown command: $cmd" >&2; _g_usage >&2; exit 2 ;;
+esac
+
+# ---- environment (respect anything already set, so tests can redirect it)
+export GROVE_ROOT="${GROVE_ROOT:-$(_g_self_root)}"
+export GROVE_CONFIG="${GROVE_CONFIG:-$GROVE_ROOT/config}"
+export GROVE_STATE="${GROVE_STATE:-$HOME/.local/state/grove}"
+export GROVE_LOCAL="${GROVE_LOCAL:-$HOME/.config/grove/local.env}"
+export GROVE_RUN_ID="${GROVE_RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
+export GROVE_MODULES="${GROVE_MODULES:-$GROVE_ROOT/modules}"
+export GROVE_YES="${GROVE_YES:-0}" GROVE_QUIET="${GROVE_QUIET:-0}"
+
+for f in "$GROVE_ROOT"/lib/*.sh; do
+  # shellcheck disable=SC1090,SC1091
+  . "$f"
+done
+
+if [ "$cmd" != "install" ] && [ "$cmd" != "update" ]; then
+  grove_local_load || true
+fi
+export GROVE_NAME GROVE_EMAIL GROVE_GITHUB_USER
+
+# ---- run, teeing everything to the log. Color is decided from the real stdout
+# (the pipe to tee is never a terminal), and the log keeps the escape codes.
+mkdir -p "$GROVE_STATE/logs"
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then export GROVE_FORCE_COLOR=1; fi
+_g_main ${rest[@]+"${rest[@]}"} 2>&1 | tee -a "$GROVE_STATE/logs/$GROVE_RUN_ID.log"
+exit "${PIPESTATUS[0]}"
