@@ -1,14 +1,14 @@
-# grove-dotfiles Terminal Implementation Plan
+# grove-dotfiles Terminal and Shell Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ghostty as the Grove terminal (Everforest Dark Medium, quick terminal, in Terminal's Dock slot), Starship with icons plus a plain fallback for Terminal.app, and a macchina summary in every new window, all set up by `grove install`.
+**Goal:** Ghostty as the Grove terminal (Everforest Dark Medium, quick terminal, in Terminal's Dock slot), Starship with icons plus a plain fallback for Terminal.app, a macchina summary in every new window, and zsh completions, autosuggestions, syntax highlighting, fzf, zoxide, bat, eza and ripgrep with Everforest colors and aliases. All of it is set up by `grove install`.
 
 **Architecture:**
 - Config files live in `config/`, which is already linked as `~/.config`.
 - Homebrew installs Ghostty and macchina from the Brewfile.
 - One new module, `90-terminal`, checks the apps and the Ghostty config, and swaps the Dock tile.
-- Two `conf.d` files pick the prompt config and run macchina.
+- `conf.d` files pick the prompt config, run macchina, and load the shell tools in a fixed order.
 - One palette file, `theme/everforest-dark-medium`, is the only source of colors. A test enforces it.
 
 **Tech Stack:** bash 3.2, zsh 5.9, bats-core 1.14, shellcheck 0.11, `defaults`/PlistBuddy, Ghostty 1.4 (cask), macchina 6.4, Starship 1.27.
@@ -22,8 +22,8 @@
   - `conf.d/*.zsh` is zsh and must print nothing unless the spec says so (macchina).
 - **Module `check`:** returns `0` ok, `1` failed, `3` needs work, `4` needs you, and never changes anything. `apply` runs only when `check` didn't return 0.
 - **Nothing is deleted:** a replaced file goes through `grove_backup`, into `$GROVE_STATE/backup/$GROVE_RUN_ID/…`.
-- **Colors:** every `#RRGGBB` in `config/ghostty/config`, `config/starship.toml`, `config/starship-plain.toml` and `config/macchina/themes/grove.toml` must appear in `theme/everforest-dark-medium`. Grove's additions are only `fill #596763` and bright black = grey1.
-- **Exact values** (font, sizes, palette slots, keybind, readout order, Dock rules) are in the spec, §5–§9. Copy them from there.
+- **Colors:** every `#RRGGBB` in `config/ghostty/config`, `config/starship.toml`, `config/starship-plain.toml`, `config/macchina/themes/grove.toml`, `config/eza/theme.yml` and `config/zsh/conf.d/*.zsh` must appear in `theme/everforest-dark-medium`. Grove's additions are only `fill #596763` and bright black = grey1.
+- **Exact values** (font, sizes, palette slots, keybind, readout order, Dock rules, aliases, plugin colors) are in the spec, §5–§10. Copy them from there.
 - **Test seams:** tests redirect the Dock domain with `GROVE_DOCK_DOMAIN` and Ghostty's CLI with `GROVE_GHOSTTY`.
   - Default domain: `com.apple.dock`.
   - Default CLI: `/Applications/Ghostty.app/Contents/MacOS/ghostty`.
@@ -62,7 +62,7 @@
   - **Palette file format:** one `name = #RRGGBB` per line; `#` starts a comment only at the start of a line; blank lines allowed. Section comments `# Upstream (Dark Medium)` and `# Grove additions`.
   - **`tests/theme.bats` helper `palette_hexes`:** prints every hex in the palette file, uppercased, one per line.
   - **`config_hexes FILE…`:** prints every `#RRGGBB` found in those files, uppercased.
-  - **The color test:** checks the four config files from the Global Constraints, skipping any that don't exist yet, so later tasks only add files.
+  - **The color test:** checks the config files from the Global Constraints, skipping any that don't exist yet, so later tasks only add files.
 
 - [ ] **Step 1:** Add `cask "ghostty"` and `brew "macchina"` to the Brewfile. Run `/opt/homebrew/bin/brew bundle install --no-upgrade --file grove-dotfiles/Brewfile`. Expected: Ghostty.app in `/Applications`, `macchina --version` prints 6.4.x.
 - [ ] **Step 2: Record the tool facts** the later tasks depend on, in the task report. Run each and note the answer:
@@ -228,10 +228,75 @@
 - [ ] **Step 4:** Run the suite and shellcheck. Expected: PASS.
 - [ ] **Step 5: Commit:** "Add the 90-terminal module: checks Ghostty and swaps it into the Dock".
 
-### Task 6: Docs and rollout on this Mac (interactive, with the user)
+### Task 6: Completions, zoxide, fzf and the plugins
 
 **Files:**
-- Modify: `grove-dotfiles/README.md` (module table row `90-terminal`, and a short "Terminal" section: Ghostty, quick terminal, the Accessibility step, the plain prompt in Terminal.app, `GROVE_NO_FETCH`)
+- Modify: `grove-dotfiles/Brewfile`, `grove-dotfiles/config/zsh/.zshenv`, `grove-dotfiles/modules/70-zsh/module.sh`
+- Create: `grove-dotfiles/config/zsh/conf.d/30-completion.zsh`, `40-tools.zsh`, `85-autosuggest.zsh`, `98-highlight.zsh`
+- Test: `grove-dotfiles/tests/modules_zsh.bats`
+
+**Interfaces:**
+- Consumes: the color test from Task 1, which scans `conf.d/*.zsh`.
+- Produces:
+  - `.zshenv` exports `EZA_CONFIG_DIR="$XDG_CONFIG_HOME/eza"` and `_ZO_DATA_DIR="$XDG_DATA_HOME/zoxide"`.
+  - `70-zsh` helper `_zsh_insecure_dirs`: prints the folders `compaudit` reports. Tests override the command with `GROVE_COMPAUDIT`.
+
+- [ ] **Step 1:** Add `zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highlighting`, `fzf`, `ripgrep`, `zoxide`, `bat` and `eza` to the Brewfile, and run `brew bundle install --no-upgrade`. Note in the report whether a real `compaudit` lists any Homebrew folders.
+- [ ] **Step 2: Write failing tests** in `modules_zsh.bats`. Use an interactive zsh with a temp HOME linked to the temp config, as in the existing login tests. Real Homebrew plugins are used when installed; otherwise the test is skipped.
+  - `completion writes its dump under the XDG cache`: after `zsh -ic exit`, `$HOME/.cache/zsh/zcompdump-*` exists, and no `.zcompdump*` exists in `$HOME` or the zsh config folder. Stderr is empty.
+  - `cd is zoxide and builtin cd still works`: `whence -w cd` prints `cd: function`. `builtin cd /tmp && pwd` prints `/tmp` (or `/private/tmp`).
+  - `the plugins load and highlighting loads last`:
+    - `print $ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE` prints `fg=#859289`;
+    - `(( ${+ZSH_HIGHLIGHT_VERSION} ))` succeeds;
+    - the last name in `$ZDOTDIR/conf.d/*.zsh(N:t)` sorted is `98-highlight.zsh`.
+  - `fzf keys are bound`: `bindkey '^R'` names an `fzf-` widget.
+  - `shell tool files are quiet without their tools`: with `PATH=/usr/bin:/bin` and `HOMEBREW_PREFIX` pointing at an empty folder, `zsh -ic exit` gives status 0 and no output on stdout or stderr.
+  - `zoxide and eza keep their files in XDG folders`: `print $_ZO_DATA_DIR $EZA_CONFIG_DIR` prints the two paths from Interfaces.
+  - `zsh needs work while compaudit reports Homebrew folders`: `GROVE_COMPAUDIT` stub prints a temp folder with mode 775. `check` returns 3. After `apply`, the folder is 755, and `check` is ok.
+- [ ] **Step 3:** Run them. Expected: FAIL.
+- [ ] **Step 4: Implement** the four files per spec §10 and the two `.zshenv` exports. Add the `_zsh_insecure_dirs` check to `70-zsh` `check`, and the `chmod go-w` on exactly those folders to `apply`.
+- [ ] **Step 5:** Run the suite, shellcheck, and `zsh -n` on each new file. Expected: PASS, including the color test over `98-highlight.zsh` and `85-autosuggest.zsh`.
+- [ ] **Step 6: Commit:** "Add completions, zoxide, fzf, autosuggestions and syntax highlighting".
+
+### Task 7: eza and bat, with the aliases
+
+**Files:**
+- Create: `grove-dotfiles/config/eza/theme.yml`, `grove-dotfiles/config/bat/config`
+- Modify: `grove-dotfiles/config/zsh/conf.d/20-aliases.zsh`, `grove-dotfiles/config/.gitignore`, `grove-dotfiles/tests/config_allowlist.bats`
+- Test: `grove-dotfiles/tests/modules_zsh.bats`, `grove-dotfiles/tests/theme.bats`
+
+**Interfaces:**
+- Consumes: `EZA_CONFIG_DIR` from Task 6.
+- Produces: the aliases `ls`, `ll`, `lt`, `cat` (spec §10).
+
+- [ ] **Step 1: Write failing tests:**
+  - `ls, ll and lt expand as in the spec, with icons in Ghostty`: under `TERM_PROGRAM=ghostty`, `alias ll` contains `eza -la --group-directories-first --sort=name --git --icons=auto`. `alias ls` is the same without `a`, and `alias lt` contains `--tree --level=2`.
+  - `Terminal.app gets the listings without icons`: under `TERM_PROGRAM=Apple_Terminal`, no alias contains `--icons`.
+  - `cat is bat without paging`: `alias cat` contains `bat --paging=never`.
+  - `ll lists hidden files, folders first, each A to Z ignoring case`: skip unless `eza` is installed. In a temp folder holding `b.txt`, `A.txt`, `.hidden`, `zdir/` and `Cdir/`, run `ll` without colors, through `NO_COLOR=1` or `--color=never`. The names, in order, must be `Cdir`, `zdir`, then `.hidden`, `A.txt`, `b.txt`. Before writing the assertion, check how eza 0.x sorts dotfiles under `--sort=name`, and record it in the report. If dotfiles sort elsewhere, match eza's real order and note it.
+  - `ls hides hidden files`: the same folder without `.hidden`.
+  - `the aliases are absent when eza and bat are missing`: with `PATH=/usr/bin:/bin`, `alias ls` fails.
+  - `bat uses the ansi theme`: `config/bat/config` has `--theme=ansi` and `--style=numbers,changes,header`.
+  - Allowlist: `config/eza/theme.yml` and `config/bat/config` are tracked.
+- [ ] **Step 2:** Run them. Expected: FAIL.
+- [ ] **Step 3: Implement:**
+  - the aliases in `20-aliases.zsh`, keeping `zalias` and `zedit`, each tool guarded by `(( $+commands[eza] ))` and `(( $+commands[bat] ))`;
+  - the eza theme with palette colors: directories blue, executables green, symlinks aqua, permissions in yellow, red and green, dates and sizes grey1/fg, git status matching the prompt;
+  - the bat config;
+  - `!/bat/` and `!/eza/` in `config/.gitignore`.
+- [ ] **Step 4:** Run the suite and lint. Expected: PASS, including the color test over `eza/theme.yml`.
+- [ ] **Step 5: Commit:** "Use eza and bat for ls, ll, lt and cat, in Everforest colors".
+
+### Task 8: Docs and rollout on this Mac (interactive, with the user)
+
+**Files:**
+- Modify: `grove-dotfiles/README.md`: a module table row for `90-terminal`, and a short "Terminal and shell" section covering:
+  - Ghostty and the quick terminal;
+  - the Accessibility step;
+  - the plain prompt in Terminal.app;
+  - `GROVE_NO_FETCH`;
+  - the aliases (`ls`, `ll`, `lt`, `cat`, `cd`) and how to reach the originals;
+  - fzf's keys.
 - Modify: `grove-dotfiles/docs/specs/2026-11-09-grove-terminal-design.md` (a "Results" note at the end)
 
 - [ ] **Step 1:** README changes. Run the full suite and lint. Commit: "Document the terminal setup".
@@ -243,5 +308,8 @@
   - a new Ghostty window shows the summary, then the icon prompt;
   - a nested `zsh` shows no summary;
   - ⌃` toggles the quick terminal from another app;
-  - Terminal.app shows the plain prompt with no broken glyphs.
+  - Terminal.app shows the plain prompt with no broken glyphs;
+  - `ll` in `~/Developer/project-grove` shows hidden files, folders first, with icons and git status;
+  - suggestions appear in grey, a mistyped command turns red, and ⌃R opens fzf;
+  - `cd grove` jumps there after one visit.
 - [ ] **Step 5:** Record the results, including the `SHLVL` that Ghostty's first shell reports, which explains the marker choice, in the spec's Results note. Commit: "Record the terminal rollout results".

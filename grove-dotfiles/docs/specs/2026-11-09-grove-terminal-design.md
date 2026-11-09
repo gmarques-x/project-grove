@@ -1,4 +1,4 @@
-# grove-dotfiles · Terminal (Ghostty, Starship, macchina)
+# grove-dotfiles · Terminal and shell (Ghostty, Starship, macchina, zsh tools)
 
 **Status:** approved design, 2026-11-09
 **Builds on:** [2026-11-09-grove-dotfiles-foundation-design.md](2026-11-09-grove-dotfiles-foundation-design.md)
@@ -10,7 +10,7 @@ Ghostty becomes the Project Grove terminal:
 - a ⌃` quick terminal that drops down from any app;
 - it takes Terminal's place in the Dock, and Terminal.app stays installed as a fallback.
 
-The Starship prompt keeps its layout and colors and gains icons, which Ghostty draws without a patched font. macchina shows a short Everforest summary in every new window.
+The Starship prompt keeps its layout and colors and gains icons, which Ghostty draws without a patched font. macchina shows a short Everforest summary in every new window. zsh gets completions, autosuggestions, syntax highlighting and fzf. ripgrep, zoxide, bat and eza are installed, and `ls`, `ll`, `lt`, `cat` and `cd` use them.
 
 On a fresh Mac, `grove install` sets all of this up. On this Mac, running it again moves Terminal's Dock slot to Ghostty and changes nothing else.
 
@@ -20,6 +20,7 @@ On a fresh Mac, `grove install` sets all of this up. On this Mac, running it aga
 - ⌃` toggles the quick terminal, once Ghostty is allowed under Accessibility.
 - The Dock reads Ghostty, Safari, System Settings.
 - Terminal.app still works, with the icon-free prompt and no broken glyphs.
+- `ll` lists everything, hidden files included, folders first and then files, each A→Z. `ls` lists the same way without the hidden files.
 
 ## 2. Decisions
 
@@ -32,13 +33,13 @@ On a fresh Mac, `grove install` sets all of this up. On this Mac, running it aga
 | Icons | Nerd Font glyphs, drawn by Ghostty's built-in symbol font | No patched font to install. Terminal.app can't draw them, so it gets a plain prompt. |
 | macchina | Every new window, readouts: Machine & OS, Resources, Shell & terminal | Chosen by the user. Quiet in nested shells and tools, through an inherited `GROVE_FETCHED` marker. |
 | Dock | Ghostty replaces Terminal in its slot | Chosen by the user. Terminal.app stays installed. |
+| Shell tools | Homebrew installs them and zsh loads them directly; the classic commands are replaced through aliases | Chosen by the user. No plugin manager to maintain. |
 | Structure | One module, `90-terminal`; configs live in `config/`; Homebrew installs the apps | `~/.config` already links into the repo, so only checks and the Dock need code. |
 
 ## 3. Out of scope
 
 - Light variants and following macOS Appearance (D2).
 - Editor module.
-- Shell plugins and completions.
 - Ghostty themes for other variants.
 - Granting the Accessibility permission. macOS allows only the user to do that, so it's a printed manual step.
 
@@ -46,11 +47,13 @@ On a fresh Mac, `grove install` sets all of this up. On this Mac, running it aga
 
 ```
 grove-dotfiles/
-├── Brewfile                          + cask "ghostty", + brew "macchina"
+├── Brewfile                          + cask "ghostty", + brew "macchina", + the shell tools (§10)
 ├── theme/
 │   └── everforest-dark-medium        palette: upstream colors + Grove additions
 ├── config/
-│   ├── .gitignore                    + !/ghostty/, + !/macchina/
+│   ├── .gitignore                    + !/ghostty/, + !/macchina/, + !/bat/, + !/eza/
+│   ├── bat/config
+│   ├── eza/theme.yml
 │   ├── ghostty/config
 │   ├── macchina/macchina.toml
 │   ├── macchina/themes/grove.toml
@@ -58,8 +61,13 @@ grove-dotfiles/
 │   ├── starship.toml                 prompt with icons
 │   ├── starship-plain.toml           prompt without icons (Terminal.app)
 │   └── zsh/conf.d/
+│       ├── 20-aliases.zsh            + the eza and bat aliases
+│       ├── 30-completion.zsh
+│       ├── 40-tools.zsh              zoxide and fzf
+│       ├── 85-autosuggest.zsh
 │       ├── 90-prompt.zsh             chooses the Starship config, then inits Starship
-│       └── 95-macchina.zsh           the summary on new windows
+│       ├── 95-macchina.zsh           the summary on new windows
+│       └── 98-highlight.zsh          syntax highlighting, loaded last
 ├── modules/90-terminal/module.sh
 └── tests/
     ├── modules_terminal.bats
@@ -77,7 +85,7 @@ grove-dotfiles/
   - `fill #596763`: the prompt's `─` line, carried over from the Everforest zsh port.
   - Bright black: `grey1` instead of upstream's `bg3`, so dim terminal text stays readable. This is a mapping, not a new color.
 
-The test in `tests/theme.bats` collects every `#RRGGBB` in `config/ghostty/config`, both Starship files and `config/macchina/themes/grove.toml`. It fails if any of them is missing from the palette file, ignoring case.
+The test in `tests/theme.bats` collects every `#RRGGBB` in `config/ghostty/config`, both Starship files, `config/macchina/themes/grove.toml`, `config/eza/theme.yml` and `config/zsh/conf.d/*.zsh`. It fails if any of them is missing from the palette file, ignoring case.
 
 ## 6. Ghostty
 
@@ -194,7 +202,50 @@ Ghostty's CLI is `/Applications/Ghostty.app/Contents/MacOS/ghostty`. Tests overr
 
 Running it again on a finished setup changes nothing and doesn't restart the Dock.
 
-## 10. Testing
+## 10. Shell
+
+### Installs
+
+The Brewfile adds `zsh-completions`, `zsh-autosuggestions`, `zsh-syntax-highlighting`, `fzf`, `ripgrep`, `zoxide`, `bat` and `eza`. zsh loads them from `$HOMEBREW_PREFIX/share`, falling back to `/opt/homebrew/share`. Every `conf.d` file checks that its tool is there, and does nothing without it.
+
+### `conf.d` files, in load order
+
+| File | Contents |
+| --- | --- |
+| `20-aliases.zsh` | The aliases below. |
+| `30-completion.zsh` | Adds `share/zsh-completions` to `fpath`, then runs `compinit -d "$XDG_CACHE_HOME/zsh/zcompdump-$ZSH_VERSION"` and sets the completion cache to `$XDG_CACHE_HOME/zsh/zcompcache`. Menu selection is on (`zstyle ':completion:*' menu select`), and matching ignores case. |
+| `40-tools.zsh` | `eval "$(zoxide init zsh --cmd cd)"` and `source <(fzf --zsh)`. |
+| `85-autosuggest.zsh` | Sources zsh-autosuggestions with `ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#859289'` (grey1). → accepts a suggestion, which is the plugin's default. |
+| `98-highlight.zsh` | Sources zsh-syntax-highlighting, last of all. It sets `ZSH_HIGHLIGHT_STYLES`: command, builtin, alias and function green `#A7C080`; `unknown-token` red `#E67E80`; strings yellow `#DBBC7F`; `path` underlined; comments grey1 `#859289`. |
+
+### Aliases (`20-aliases.zsh`)
+
+| Alias | Runs |
+| --- | --- |
+| `ls` | `eza -l --group-directories-first --sort=name --git` plus icons |
+| `ll` | `eza -la --group-directories-first --sort=name --git` plus icons |
+| `lt` | `eza --tree --level=2 --group-directories-first` plus icons |
+| `cat` | `bat --paging=never` |
+| `cd` | zoxide, through `--cmd cd` in `40-tools.zsh`: it works like `cd`, and `cd proj` jumps to the most-used match |
+
+- "Plus icons" means `--icons=auto`, except when `TERM_PROGRAM` is `Apple_Terminal`.
+- `--sort=name` ignores case.
+- The `eza` and `bat` aliases are defined only when the tool is installed.
+- The originals stay reachable as `\ls`, `\cat` and `builtin cd`.
+- `grep` isn't replaced. `rg` is available under its own name.
+
+### Colors and locations
+
+- **bat:** `config/bat/config` sets `--theme=ansi` (the terminal's Everforest colors) and `--style=numbers,changes,header`.
+- **eza:** `config/eza/theme.yml`, with palette colors for file types, permissions, sizes, dates and git status. `EZA_CONFIG_DIR="$XDG_CONFIG_HOME/eza"` is exported in `.zshenv`, because on macOS eza otherwise looks in `~/Library/Application Support`.
+- **zoxide:** `_ZO_DATA_DIR="$XDG_DATA_HOME/zoxide"` is exported in `.zshenv`, for the same reason.
+- **fzf:** `FZF_DEFAULT_COMMAND='rg --files --hidden --glob "!.git"'`, and `FZF_DEFAULT_OPTS` sets palette colors: background bg0, text fg, selection background bg_visual, matches green, prompt aqua, pointer red, borders bg3. Both are set in `40-tools.zsh`.
+
+### Completion safety
+
+`compinit` warns about folders other users can write to. If `compaudit` lists Homebrew's `share/zsh` folders, `70-zsh` `apply` runs `chmod go-w` on exactly those folders, as Homebrew's docs recommend, and `check` returns 3 until they're fixed. The check is never suppressed with `compinit -u` or `-i`.
+
+## 11. Testing
 
 **`tests/modules_terminal.bats`.** Uses fake `ghostty` and `macchina` commands, a temporary Dock domain, and a temp HOME:
 - `check` returns 3 when Ghostty is missing, when macchina is missing, and when the Dock has Terminal.
@@ -214,7 +265,16 @@ Running it again on a finished setup changes nothing and doesn't restart the Doc
 **`tests/theme.bats`:**
 - the palette check from §5;
 - the two Starship files differ only in symbols;
-- `config/.gitignore` tracks `ghostty/config` and the macchina files.
+- `config/.gitignore` tracks `ghostty/config`, the macchina files, `bat/config` and `eza/theme.yml`.
+
+**Shell** (in `modules_zsh.bats`, using an interactive zsh with a temp HOME):
+- `ls`, `ll` and `lt` expand as in §10. `ll` and `ls` include `--icons=auto` under `ghostty` and leave it out under `Apple_Terminal`.
+- `ll` in a real folder lists hidden files, folders before files, each A→Z, ignoring case. This runs with the real `eza` when it's installed and is skipped otherwise.
+- `cd` is zoxide's function, and `builtin cd` still reaches the builtin.
+- `compinit` prints no warning and writes its dump under `$XDG_CACHE_HOME/zsh/`. No `.zcompdump` appears in `$HOME` or `$ZDOTDIR`.
+- Syntax highlighting is the last plugin loaded. The test checks that `98-highlight.zsh` sorts last in `conf.d`.
+- Each `conf.d` file prints nothing and doesn't fail when its tool is missing.
+- `70-zsh` `check` returns 3 when `compaudit` reports Homebrew folders, and `apply` fixes their permissions. Tested with a fake `compaudit` result.
 
 **Real tools, run when they're installed and skipped otherwise:**
 - `ghostty +validate-config` on the real config;
