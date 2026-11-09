@@ -1,40 +1,48 @@
-# Two-line prompt in the colors of the Everforest zsh port, with Nerd Font icons
-# (Ghostty draws them). Terminal.app uses starship-plain.toml instead.
+# One-line prompt: a bar of colored blocks (user, folder, git, time) with
+# rounded ends, then ❯. Nerd Font icons and ends are drawn by Ghostty.
+# Terminal.app uses starship-plain.toml. Colors: theme/everforest-dark-medium.
 add_newline = false
-format = """$directory$git_branch$git_status$fill$cmd_duration$jobs$status$line_break$character"""
+format = """[](fg:#83C092)$username$directory$git_branch$git_status$cmd_duration$status$time[](fg:#E69875) $character"""
 
-[fill]
-symbol = "─"
-style = "fg:#596763"
+[username]
+show_always = true
+style_user = "bg:#83C092 fg:#2D353B"
+style_root = "bg:#83C092 fg:#2D353B"
+format = "[ $user ]($style)"
 
 [directory]
-style = "fg:#A7C080"
-before_repo_root_style = "fg:#83C092"
-read_only_style = "fg:#E67E80"
+style = "bg:#A7C080 fg:#2D353B"
+read_only_style = "bg:#A7C080 fg:#2D353B"
 read_only = " 󰌾"
+format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
 
 [git_branch]
-style = "fg:#7FBBB3"
+style = "bg:#DBBC7F fg:#2D353B"
 symbol = " "
+format = "[ $symbol$branch ]($style)"
 
 [git_status]
-style = "fg:#D699B6"
-untracked = "[?](fg:#DBBC7F)"
-modified = "[!](fg:#D699B6)"
-staged = "[+](fg:#D699B6)"
+style = "bg:#DBBC7F fg:#2D353B"
+untracked = "?"
+modified = "!"
+staged = "+"
+format = "([$all_status$ahead_behind ]($style))"
 
 [cmd_duration]
-style = "fg:#859289"
-format = "[󰔛 $duration]($style) "
-
-[jobs]
-style = "fg:#859289"
-symbol = "✦"
+style = "bg:#475258 fg:#D3C6AA"
+format = "[ 󰔛 $duration ]($style)"
 
 [status]
 disabled = false
-symbol = "✗ "
-style = "fg:#E67E80"
+style = "bg:#E67E80 fg:#2D353B"
+symbol = "✗"
+format = "[ $symbol $status ]($style)"
+
+[time]
+disabled = false
+style = "bg:#E69875 fg:#2D353B"
+time_format = "%H:%M"
+format = "[ $time ]($style)"
 
 [character]
 success_symbol = "[❯](fg:#D3C6AA)"

@@ -1,36 +1,47 @@
-# Prompt without icons, for Terminal.app (which can't draw Nerd Font glyphs). Everforest colors.
+# Prompt without icons, for Terminal.app (which can't draw Nerd Font glyphs):
+# the same blocks and colors as starship.toml, with square ends.
 add_newline = false
-format = """$directory$git_branch$git_status$fill$cmd_duration$jobs$status$line_break$character"""
+format = """[ ](bg:#83C092)$username$directory$git_branch$git_status$cmd_duration$status$time[ ](bg:#E69875) $character"""
 
-[fill]
-symbol = "─"
-style = "fg:#596763"
+[username]
+show_always = true
+style_user = "bg:#83C092 fg:#2D353B"
+style_root = "bg:#83C092 fg:#2D353B"
+format = "[ $user ]($style)"
 
 [directory]
-style = "fg:#A7C080"
-before_repo_root_style = "fg:#83C092"
-read_only_style = "fg:#E67E80"
+style = "bg:#A7C080 fg:#2D353B"
+read_only_style = "bg:#A7C080 fg:#2D353B"
+read_only = " (read-only)"
+format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
 
 [git_branch]
-style = "fg:#7FBBB3"
+style = "bg:#DBBC7F fg:#2D353B"
 symbol = ""
+format = "[ $symbol$branch ]($style)"
 
 [git_status]
-style = "fg:#D699B6"
-untracked = "[?](fg:#DBBC7F)"
-modified = "[!](fg:#D699B6)"
-staged = "[+](fg:#D699B6)"
+style = "bg:#DBBC7F fg:#2D353B"
+untracked = "?"
+modified = "!"
+staged = "+"
+format = "([$all_status$ahead_behind ]($style))"
 
 [cmd_duration]
-style = "fg:#859289"
-
-[jobs]
-style = "fg:#859289"
+style = "bg:#475258 fg:#D3C6AA"
+format = "[ $duration ]($style)"
 
 [status]
 disabled = false
-symbol = "✗ "
-style = "fg:#E67E80"
+style = "bg:#E67E80 fg:#2D353B"
+symbol = "✗"
+format = "[ $symbol $status ]($style)"
+
+[time]
+disabled = false
+style = "bg:#E69875 fg:#2D353B"
+time_format = "%H:%M"
+format = "[ $time ]($style)"
 
 [character]
 success_symbol = "[❯](fg:#D3C6AA)"

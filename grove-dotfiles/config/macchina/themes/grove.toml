@@ -23,5 +23,5 @@ border = "plain"
 visible = false
 
 [custom_ascii]
-color = "#A7C080"
+# The Grove logo in pixels (theme/grove-logo.txt); its colors are in the file.
 path = "~/.config/macchina/grove.ascii"

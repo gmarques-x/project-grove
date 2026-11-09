@@ -81,34 +81,28 @@ ghostty_value() {
   [ -z "$output" ]
 }
 
-# starship_core FILE: the file without its symbol fields (symbol, read_only, and
-# the format lines of [cmd_duration] and [jobs], where the icons go).
-starship_core() {
-  awk '
-    /^\[/ { section = $0 }
-    /^[[:space:]]*(symbol|read_only)[[:space:]]*=/ { next }
-    /^[[:space:]]*format[[:space:]]*=/ && (section == "[cmd_duration]" || section == "[jobs]") { next }
-    /^#/ { next }
-    { print }
-  ' "$1"
+# prompt_styles FILE: "[table] key = value" for every style, toggle and time setting.
+prompt_styles() {
+  awk '/^\[/ { t = $0 } /^[[:space:]]*(style[a-z_]*|show_always|disabled|time_format)[[:space:]]*=/ { print t " " $0 }' "$1"
 }
 
-@test "the two prompts differ only in symbols" {
+@test "the two prompts have the same blocks and colors" {
   [ -f "$GROVE_ROOT/config/starship-plain.toml" ]
-  diff <(starship_core "$GROVE_ROOT/config/starship.toml") <(starship_core "$GROVE_ROOT/config/starship-plain.toml")
+  diff <(prompt_styles "$GROVE_ROOT/config/starship.toml") <(prompt_styles "$GROVE_ROOT/config/starship-plain.toml")
 }
 
 @test "the icon prompt uses the spec's glyphs" {
   local f="$GROVE_ROOT/config/starship.toml"
+  grep -q $'\xee\x82\xb6' "$f"          # U+E0B6 rounded left end
+  grep -q $'\xee\x82\xb4' "$f"          # U+E0B4 rounded right end
   grep -q $'\xee\x82\xa0' "$f"          # U+E0A0 git branch
   grep -q $'\xf3\xb0\x8c\xbe' "$f"      # U+F033E lock
   grep -q $'\xf3\xb0\x94\x9b' "$f"      # U+F051B timer
-  grep -q '✦' "$f"
 }
 
 @test "the plain prompt has no Nerd Font glyphs" {
   # grep: 1 = no match (wanted), 2 = file missing.
-  LC_ALL=C run grep -q $'\xee\x82\xa0\|\xf3\xb0' "$GROVE_ROOT/config/starship-plain.toml"
+  LC_ALL=C run grep -q $'\xee\x82\|\xf3\xb0' "$GROVE_ROOT/config/starship-plain.toml"
   [ "$status" -eq 1 ]
 }
 
@@ -119,11 +113,25 @@ starship_core() {
   grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
 }
 
-@test "the tree mark is at most 10 lines by 20 columns" {
-  local f="$GROVE_ROOT/config/macchina/grove.ascii"
+@test "the logo art is at most 10 lines by 20 columns" {
+  local f="$GROVE_ROOT/config/macchina/grove.ascii" w=0 line n
   [ -f "$f" ]
   [ "$(wc -l < "$f" | tr -d ' ')" -le 10 ]
-  [ "$(awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }' "$f")" -le 20 ]
+  while IFS= read -r line; do
+    n="$(printf '%s' "$line" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')"
+    [ "$n" -gt "$w" ] && w="$n"
+  done < "$f"
+  [ "$w" -le 20 ]
+}
+
+@test "the macchina art is the rendered logo" {
+  command -v python3 >/dev/null || [ -x /opt/homebrew/bin/python3 ] || skip "python3 not installed"
+  diff <(PATH="/opt/homebrew/bin:$PATH" python3 -I "$GROVE_ROOT/theme/render-logo.py") "$GROVE_ROOT/config/macchina/grove.ascii"
+}
+
+@test "the logo uses only palette colors from its legend" {
+  run grep -v '^#' "$GROVE_ROOT/theme/grove-logo.txt"
+  [[ "$output" =~ ^[AGYTDE.[:space:]]*$ ]] || false
 }
 
 @test "macchina accepts its config" {
@@ -137,4 +145,34 @@ starship_core() {
   [[ "$output" == *Host* ]] || false
   run env HOME="$h" XDG_CONFIG_HOME="$h/.config" PATH="/opt/homebrew/bin:/usr/bin:/bin" macchina -l
   [[ "$output" == *grove* ]] || false
+}
+
+# render_prompt FILE: the prompt Starship draws in a temp git repo, colors stripped.
+render_prompt() {
+  local r="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$r" && git -C "$r" init -q -b main && touch "$r/new"
+  (cd "$r" && env STARSHIP_CONFIG="$1" /opt/homebrew/bin/starship prompt --status 0) | sed $'s/\033\\[[0-9;]*m//g; s/%{//g; s/%}//g'
+}
+
+@test "the prompt bar reads user, folder, git, time, with rounded ends" {
+  [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
+  run render_prompt "$GROVE_ROOT/config/starship.toml"
+  local me; me="$(id -un)"
+  [[ "$output" =~ ^$'\xee\x82\xb6'\ $me\ .*repo\ .*main\ .*\?.*\ [0-9]{2}:[0-9]{2}\ $'\xee\x82\xb4'\ ❯ ]] || { echo "$output"; false; }
+}
+
+@test "the plain prompt bar has the same blocks without rounded ends" {
+  [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
+  run render_prompt "$GROVE_ROOT/config/starship-plain.toml"
+  local me; me="$(id -un)"
+  [[ "$output" =~ ^\ \ $me\ .*repo\ .*main\ .*\?.*\ [0-9]{2}:[0-9]{2}\ +❯ ]] || { echo "$output"; false; }
+  [[ "$output" != *$'\xee\x82'* ]] || false
+}
+
+@test "a failed command adds a red block and turns the prompt character red" {
+  [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
+  local r="$BATS_TEST_TMPDIR/repo2"; mkdir -p "$r"
+  run bash -c "cd '$r' && STARSHIP_CONFIG='$GROVE_ROOT/config/starship.toml' /opt/homebrew/bin/starship prompt --status 1"
+  [[ "$output" == *"48;2;230;126;128m"*"✗ 1"* ]] || false
+  [[ "$output" == *"38;2;230;126;128m"*"❯"* ]] || false
 }

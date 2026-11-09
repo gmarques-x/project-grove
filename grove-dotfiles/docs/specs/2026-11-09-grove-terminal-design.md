@@ -120,32 +120,34 @@ The file must pass `ghostty +validate-config --config-file=<file>`.
 
 ## 7. Starship
 
-### `config/starship.toml` (icons)
+*Revised 2026-11-09 at the user's request: the two-line prompt became a one-line bar.*
 
-It keeps today's format, colors and order. The only changes are symbols:
+### `config/starship.toml` (Ghostty)
 
-| Module | Symbol | Nerd Font name |
-| --- | --- | --- |
-| `git_branch` | `` followed by a space | `nf-pl-branch`, U+E0A0 |
-| `directory.read_only` | space, then `󰌾` | `nf-md-lock`, U+F033E |
-| `cmd_duration` | `󰔛` before the duration | `nf-md-timer_outline`, U+F051B |
-| `jobs` | `✦` with the count | (Unicode) |
+The prompt is one line: a bar of colored blocks with rounded ends, then `❯`.
 
-These stay as they are:
-- the git status marks `? ! +`;
-- `status` with `✗`;
-- `character` with `❯`;
-- the `─` fill.
+| Order | Block | Background | Text |
+| --- | --- | --- | --- |
+| — | left end `` (U+E0B6) | — | aqua `#83C092` |
+| 1 | `username` (always shown) | aqua `#83C092` | bg0 `#2D353B` |
+| 2 | `directory` (read-only adds `󰌾`, U+F033E) | green `#A7C080` | bg0 |
+| 3 | `git_branch` (`` U+E0A0) + `git_status` (`? ! +`, ahead/behind) | yellow `#DBBC7F` | bg0 |
+| 4 | `cmd_duration` (`󰔛` U+F051B), only for slow commands | bg3 `#475258` | fg `#D3C6AA` |
+| 5 | `status` (`✗ N`), only after a failure | red `#E67E80` | bg0 |
+| 6 | `time` (`%H:%M`) | orange `#E69875` | bg0 |
+| — | right end `` (U+E0B4) | — | orange |
 
-### `config/starship-plain.toml`
+The blocks touch. Only the two ends of the bar are rounded. `❯` follows a space, in fg, and turns red `#E67E80` after an error. The git blocks disappear outside a repo.
 
-Today's `starship.toml`, unchanged.
+### `config/starship-plain.toml` (Terminal.app)
 
-A test checks that the two files differ only in symbol values: each file, with its symbol fields stripped, gives the same text.
+The same blocks, colors and order, without Nerd Font glyphs. The ends are square: a space on the block's own color. There's no branch icon or timer icon, and read-only shows ` (read-only)`.
+
+A test checks that both files set the same tables, styles and toggles, and that the plain file has no Nerd Font glyphs. Other tests render both prompts in a temp repo and check the block order.
 
 ### Choosing the file (`conf.d/90-prompt.zsh`)
 
-When `TERM_PROGRAM` is `Apple_Terminal`, it exports `STARSHIP_CONFIG="$XDG_CONFIG_HOME/starship-plain.toml"`. Everywhere else, Starship uses its default path, `~/.config/starship.toml`. Then it runs `starship init zsh`, as today.
+When `TERM_PROGRAM` is `Apple_Terminal`, it exports `STARSHIP_CONFIG="$XDG_CONFIG_HOME/starship-plain.toml"`. Everywhere else, Starship uses its default path, `~/.config/starship.toml`. Then it runs `starship init zsh`.
 
 ## 8. macchina
 
@@ -158,7 +160,11 @@ When `TERM_PROGRAM` is `Apple_Terminal`, it exports `STARSHIP_CONFIG="$XDG_CONFI
 - bars (memory, battery) in aqua `#83C092` on bg3 `#475258`;
 - custom ASCII art from `~/.config/macchina/grove.ascii`, colored green.
 
-**`config/macchina/grove.ascii`:** a small tree, at most 10 lines and 20 columns.
+**`config/macchina/grove.ascii`:** the Grove logo as 24-bit color pixel art, at most 10 lines and 20 columns, shown to the left of the stats.
+- Each character is two pixels drawn with half blocks (`▀ ▄ █`): the tree's left half in aqua and right half in green, a yellow moon, dark bg_green background pines, and a bg3 ground line.
+- The picture is kept as a letter grid in `theme/grove-logo.txt`, one palette color per letter. `theme/render-logo.py` writes the `.ascii` file from it.
+- A test checks that the committed file matches the grid.
+- The theme no longer sets `custom_ascii.color`, because the colors are in the file. *(Revised 2026-11-09 at the user's request; the first version was a one-color text tree.)*
 
 The configs must give no errors in `macchina --doctor`. Readout names and theme keys follow macchina 6.4's documentation. If a name doesn't exist in 6.4, the plan uses the nearest one and notes it.
 
