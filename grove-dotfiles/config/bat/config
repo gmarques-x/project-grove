@@ -1,0 +1,4 @@
+# Project Grove · bat. The ansi theme uses the terminal's 16 colors, which are
+# Everforest in Ghostty.
+--theme=ansi
+--style=numbers,changes,header

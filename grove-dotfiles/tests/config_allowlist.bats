@@ -52,3 +52,11 @@ setup() { grove_test_setup; }
     [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
   done
 }
+
+@test "eza and bat configs are tracked" {
+  local p
+  for p in config/eza/theme.yml config/bat/config; do
+    run git -C "$GROVE_ROOT" check-ignore -q "$p"
+    [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
+  done
+}

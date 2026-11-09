@@ -1,5 +1,6 @@
 # shellcheck disable=SC2016,SC2030,SC2031,SC1090,SC1091,SC2154
 load helpers
+bats_require_minimum_version 1.5.0
 
 load_module() {
   local f
@@ -411,4 +412,93 @@ fetch_shell() {
   run apply
   [ "$status" -eq 0 ]
   [ "$(stat -f %Lp "$other")" = "775" ]
+}
+
+# alias_shell CMD [VAR=value...]: an interactive zsh with the real Homebrew tools
+# on PATH but no plugins; stderr dropped (fzf's no-tty notice).
+alias_shell() {
+  local cmd="$1"; shift
+  load_module 70-zsh
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  env -i HOME="$HOME" PATH="${ALIAS_PATH:-/opt/homebrew/bin:/usr/bin:/bin}" "$@" /bin/zsh -ic "$cmd" 2>/dev/null < /dev/null
+}
+
+# pty_alias_shell CMD [VAR=value...]: like alias_shell, on a real terminal
+# (eza only lists the current folder when stdin is a terminal). Colors stripped.
+pty_alias_shell() {
+  local cmd="$1"; shift
+  load_module 70-zsh
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/bin:/bin" GROVE_NO_FETCH=1 "$@" \
+    script -q /dev/null /bin/zsh -ic "$cmd" < /dev/null 2>&1 | tr -d '\r\b' | sed -e 's/\^D//g' -e $'s/\033\[[0-9;]*m//g'
+}
+
+@test "ls, ll and lt expand as in the spec, with icons in Ghostty" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  run alias_shell 'alias ll; alias ls; alias lt' TERM_PROGRAM=ghostty
+  [[ "${lines[0]}" == *"eza -la --group-directories-first --sort=name --git --icons=auto"* ]] || false
+  [[ "${lines[1]}" == *"eza -l --group-directories-first --sort=name --git --icons=auto"* ]] || false
+  [[ "${lines[2]}" == *"eza --tree --level=2 --group-directories-first --icons=auto"* ]] || false
+}
+
+@test "Terminal.app gets the listings without icons" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  run alias_shell 'alias ll; alias ls; alias lt' TERM_PROGRAM=Apple_Terminal
+  [ "${#lines[@]}" -eq 3 ]
+  [[ "$output" != *--icons* ]] || false
+}
+
+@test "cat is bat without paging" {
+  [ -x /opt/homebrew/bin/bat ] || skip "bat not installed"
+  run alias_shell 'alias cat'
+  [[ "$output" == *"bat --paging=never"* ]] || false
+}
+
+@test "ll lists hidden files, folders first, each A to Z ignoring case" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d="$BATS_TEST_TMPDIR/listing"
+  mkdir -p "$d/zdir" "$d/Cdir"; touch "$d/b.txt" "$d/A.txt" "$d/.hidden"
+  run pty_alias_shell "cd '$d' && ll" TERM_PROGRAM=Apple_Terminal
+  [ "$(printf '%s\n' "${lines[@]}" | grep -v 'fzf\|zle' | awk 'NF { print $NF }' | tr '\n' ' ')" = "Cdir zdir .hidden A.txt b.txt " ]
+}
+
+@test "ls hides hidden files" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d="$BATS_TEST_TMPDIR/listing"
+  mkdir -p "$d/zdir" "$d/Cdir"; touch "$d/b.txt" "$d/A.txt" "$d/.hidden"
+  run pty_alias_shell "cd '$d' && ls" TERM_PROGRAM=Apple_Terminal
+  [ "$(printf '%s\n' "${lines[@]}" | grep -v 'fzf\|zle' | awk 'NF { print $NF }' | tr '\n' ' ')" = "Cdir zdir A.txt b.txt " ]
+}
+
+@test "the aliases are absent when eza and bat are missing" {
+  ALIAS_PATH=/usr/bin:/bin run alias_shell 'alias ls || print none; alias cat || print none'
+  [ "$output" = "$(printf 'none\nnone')" ]
+}
+
+@test "eza uses the Grove theme" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d="$BATS_TEST_TMPDIR/themed"
+  mkdir -p "$d/folder"
+  run alias_shell "command eza --color=always --oneline '$d'"
+  [[ "$output" == *$'\033['*'38;2;127;187;179m'*folder* ]] || false
+}
+
+@test "bat reads its config from the XDG folder and uses the ansi theme" {
+  [ -x /opt/homebrew/bin/bat ] || skip "bat not installed"
+  run alias_shell 'command bat --config-file'
+  [ "$output" = "$HOME/.config/bat/config" ]
+  grep -qx -- '--theme=ansi' "$GROVE_ROOT/config/bat/config"
+  grep -qx -- '--style=numbers,changes,header' "$GROVE_ROOT/config/bat/config"
+}
+
+# eza reads file names from stdin when it has no path and stdin isn't a terminal;
+# with a path (the usual case in a loop) it doesn't.
+@test "ls with a path inside a read loop doesn't swallow the loop's input" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d="$BATS_TEST_TMPDIR/loop"
+  mkdir -p "$d"; touch "$d/one" "$d/two"
+  run alias_shell "cd '$d' && printf 'one\ntwo\n' | while read -r f; do ls \"\$f\" >/dev/null; print seen \$f; done"
+  [ "$(printf '%s\n' "${lines[@]}" | tr '\n' ' ')" = "seen one seen two " ]
 }

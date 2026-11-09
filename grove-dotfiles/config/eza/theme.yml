@@ -1,0 +1,103 @@
+# Project Grove · eza colors, Everforest Dark Medium (theme/everforest-dark-medium).
+colourful: true
+
+filekinds:
+  normal: {foreground: "#D3C6AA"}
+  directory: {foreground: "#7FBBB3", is_bold: true}
+  symlink: {foreground: "#83C092"}
+  pipe: {foreground: "#D699B6"}
+  block_device: {foreground: "#DBBC7F"}
+  char_device: {foreground: "#DBBC7F"}
+  socket: {foreground: "#D699B6"}
+  special: {foreground: "#E69875"}
+  executable: {foreground: "#A7C080", is_bold: true}
+  mount_point: {foreground: "#7FBBB3", is_underline: true}
+
+perms:
+  user_read: {foreground: "#DBBC7F"}
+  user_write: {foreground: "#E67E80"}
+  user_execute_file: {foreground: "#A7C080"}
+  user_execute_other: {foreground: "#A7C080"}
+  group_read: {foreground: "#DBBC7F"}
+  group_write: {foreground: "#E67E80"}
+  group_execute: {foreground: "#A7C080"}
+  other_read: {foreground: "#DBBC7F"}
+  other_write: {foreground: "#E67E80"}
+  other_execute: {foreground: "#A7C080"}
+  special_user_file: {foreground: "#D699B6"}
+  special_other: {foreground: "#D699B6"}
+  attribute: {foreground: "#859289"}
+
+size:
+  major: {foreground: "#D3C6AA"}
+  minor: {foreground: "#859289"}
+  number_byte: {foreground: "#D3C6AA"}
+  number_kilo: {foreground: "#D3C6AA"}
+  number_mega: {foreground: "#D3C6AA"}
+  number_giga: {foreground: "#D3C6AA"}
+  number_huge: {foreground: "#D3C6AA"}
+  unit_byte: {foreground: "#859289"}
+  unit_kilo: {foreground: "#859289"}
+  unit_mega: {foreground: "#859289"}
+  unit_giga: {foreground: "#859289"}
+  unit_huge: {foreground: "#859289"}
+
+users:
+  user_you: {foreground: "#D3C6AA"}
+  user_root: {foreground: "#E67E80"}
+  user_other: {foreground: "#859289"}
+  group_yours: {foreground: "#D3C6AA"}
+  group_other: {foreground: "#859289"}
+  group_root: {foreground: "#E67E80"}
+
+links:
+  normal: {foreground: "#859289"}
+  multi_link_file: {foreground: "#DBBC7F"}
+
+git:
+  new: {foreground: "#A7C080"}
+  modified: {foreground: "#D699B6"}
+  deleted: {foreground: "#E67E80"}
+  renamed: {foreground: "#83C092"}
+  typechange: {foreground: "#D699B6"}
+  ignored: {foreground: "#7A8478"}
+  conflicted: {foreground: "#E67E80"}
+
+git_repo:
+  branch_main: {foreground: "#7FBBB3"}
+  branch_other: {foreground: "#D699B6"}
+  git_clean: {foreground: "#A7C080"}
+  git_dirty: {foreground: "#E67E80"}
+
+security_context:
+  colon: {foreground: "#859289"}
+  user: {foreground: "#D3C6AA"}
+  role: {foreground: "#D699B6"}
+  typ: {foreground: "#7A8478"}
+  range: {foreground: "#D699B6"}
+
+file_type:
+  image: {foreground: "#D699B6"}
+  video: {foreground: "#D699B6"}
+  music: {foreground: "#83C092"}
+  lossless: {foreground: "#83C092"}
+  crypto: {foreground: "#E67E80"}
+  document: {foreground: "#D3C6AA"}
+  compressed: {foreground: "#E69875"}
+  temp: {foreground: "#7A8478"}
+  compiled: {foreground: "#7A8478"}
+  build: {foreground: "#DBBC7F"}
+  source: {foreground: "#D3C6AA"}
+
+punctuation: {foreground: "#859289"}
+date: {foreground: "#83C092"}
+inode: {foreground: "#859289"}
+blocks: {foreground: "#859289"}
+header: {foreground: "#D3C6AA", is_underline: true}
+octal: {foreground: "#859289"}
+flags: {foreground: "#D699B6"}
+
+symlink_path: {foreground: "#83C092"}
+control_char: {foreground: "#E67E80"}
+broken_symlink: {foreground: "#E67E80"}
+broken_path_overlay: {foreground: "#E67E80", is_underline: true}
