@@ -36,8 +36,8 @@ _finder_view_ok() {
   local live want
   live="$(defaults export "$(_finder_domain)" - 2>/dev/null \
     | plutil -extract StandardViewSettings xml1 -o - - 2>/dev/null \
-    | plutil -convert json -o - - 2>/dev/null)" || return 1
-  want="$(plutil -convert json -o - "$MODULE_DIR/StandardViewSettings.plist")" || return 1
+    | plutil -convert json -r -o - - 2>/dev/null)" || return 1
+  want="$(plutil -convert json -r -o - "$MODULE_DIR/StandardViewSettings.plist")" || return 1
   [ -n "$live" ] && [ "$live" = "$want" ]
 }
 
@@ -52,10 +52,11 @@ check() {
   return 0
 }
 
+# The sidebar is a manual step, so this always prints (not via grove_info).
 _finder_checklist() {
-  grove_info "Sidebar is a manual step: Finder > Settings > Sidebar."
-  grove_info "  shown:  Applications, Home, Developer, Documents, Downloads, iCloud Drive, Macintosh HD"
-  grove_info "  hidden: Recents, Shared, AirDrop, Desktop"
+  grove_you "Finder sidebar: set by hand in Finder > Settings > Sidebar"
+  printf '  shown:  Applications, Home, Developer, Documents, Downloads, iCloud Drive, Macintosh HD\n'
+  printf '  hidden: Recents, Shared, AirDrop, Desktop\n'
 }
 
 apply() {

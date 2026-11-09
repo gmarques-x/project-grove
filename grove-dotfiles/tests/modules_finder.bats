@@ -101,3 +101,23 @@ teardown() {
   grep -q '^NSGlobalDomain ' "$GROVE_ROOT/modules/80-macos-finder/settings.txt"
   [ "$(defaults export com.grove.testglobal - | plutil -extract AppleShowAllExtensions raw -o - -)" = true ]
 }
+
+@test "the checklist prints even under GROVE_QUIET" {
+  load_module 80-macos-finder
+  GROVE_QUIET=1 run apply
+  [[ "$output" == *"Applications, Home, Developer"* ]] || false
+  [[ "$output" == *"Recents, Shared, AirDrop, Desktop"* ]] || false
+}
+
+@test "check ignores key order in the view block" {
+  load_module 80-macos-finder
+  apply >/dev/null
+  # re-import the same content with reversed key order
+  plutil -convert json -r -o "$BATS_TEST_TMPDIR/v.json" "$MODULE_DIR/StandardViewSettings.plist"
+  osascript -l JavaScript -e 'function run(a){var o=JSON.parse(a[0]);function r(x){if(Array.isArray(x))return x.map(r);if(x&&typeof x=="object"){var n={};Object.keys(x).sort().reverse().forEach(function(k){n[k]=r(x[k])});return n}return x}return JSON.stringify(r(o))}' "$(cat "$BATS_TEST_TMPDIR/v.json")" > "$BATS_TEST_TMPDIR/rev.json"
+  plutil -convert xml1 -o "$BATS_TEST_TMPDIR/rev.plist" "$BATS_TEST_TMPDIR/rev.json"
+  grep -q reversed "$BATS_TEST_TMPDIR/rev.json" || [ "$(head -c 40 "$BATS_TEST_TMPDIR/rev.json")" != "$(head -c 40 "$BATS_TEST_TMPDIR/v.json")" ]
+  defaults write com.grove.test StandardViewSettings "$(cat "$BATS_TEST_TMPDIR/rev.plist")"
+  run check
+  [ "$status" -eq 0 ]
+}
