@@ -9,12 +9,9 @@
 grove-dotfiles/modules/30-fonts/local/*
 !grove-dotfiles/modules/30-fonts/local/.gitkeep
 
-# Raw settings recordings contain personal data (recent folders, bookmarks,
-# file paths). Only the recording tools and exported setting blocks are tracked.
-.recording/**/baseline/
-.recording/**/sidebar/
-.recording/**/*-final.plist
-.recording/**/*-at-pause.plist
+# Settings recorders and their recordings: development tools for Gustavo and
+# Claude, with personal data (recent folders, bookmarks, paths). Local only.
+.recording/
 
 # Shared working files between Gustavo and Claude. Never published.
 artifacts/
