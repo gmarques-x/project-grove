@@ -117,7 +117,7 @@ prompt_styles() {
   grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
 }
 
-@test "the logo art is 20 lines by 54 columns, next to the stats box" {
+@test "the logo art is 20 lines by 56 columns, next to the stats box" {
   local f="$GROVE_ROOT/config/macchina/grove.ascii" w=0 line n
   [ -f "$f" ]
   [ "$(wc -l < "$f" | tr -d ' ')" -eq 20 ]
@@ -125,7 +125,7 @@ prompt_styles() {
     n="$(printf '%s' "$line" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')"
     [ "$n" -gt "$w" ] && w="$n"
   done < "$f"
-  [ "$w" -eq 54 ]
+  [ "$w" -eq 56 ]
 }
 
 @test "the macchina art is the rendered logo" {
@@ -207,4 +207,12 @@ render_prompt() {
   [[ "$g" == *S* ]] || false                      # the divider
   [[ "$g" == *W* ]] || false                      # Grove in fg
   [ "$(grep -c '^#.*scale: 1' "$GROVE_ROOT/theme/grove-logo.txt")" -eq 1 ]
+}
+
+@test "the logo ends with the banner tagline, centered, after an empty line" {
+  local f="$GROVE_ROOT/config/macchina/grove.ascii" last prev
+  last="$(tail -1 "$f" | sed $'s/\033\\[[0-9;]*m//g')"
+  prev="$(tail -2 "$f" | head -1 | sed $'s/\033\\[[0-9;]*m//g')"
+  [[ "$last" == "           A complete macOS desktop overhaul."* ]] || { echo "[$last]"; false; }
+  [ -z "${prev// /}" ]
 }

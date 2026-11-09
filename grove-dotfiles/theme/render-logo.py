@@ -15,11 +15,17 @@ for line in open(os.path.join(HERE, "everforest-dark-medium")):
         palette[m.group(1)] = tuple(int(m.group(2)[i:i + 2], 16) for i in (0, 2, 4))
 
 lines = open(os.path.join(HERE, "grove-logo.txt")).read().splitlines()
-scale = 1
+scale, caption, caption_color = 1, "", "fg"
 for l in lines:
     m = re.match(r"#\s*scale:\s*(\d+)", l)
     if m:
         scale = int(m.group(1))
+    m = re.match(r"#\s*caption:\s*(.*\S)", l)
+    if m:
+        caption = m.group(1)
+    m = re.match(r"#\s*caption-color:\s*(\w+)", l)
+    if m:
+        caption_color = m.group(1)
 rows = [l for l in lines if l.strip() and not l.startswith("#")]
 rows = ["".join(c * scale for c in r) for r in rows for _ in range(scale)]
 width = max(len(r) for r in rows)
@@ -45,4 +51,9 @@ for top, bottom in zip(rows[0::2], rows[1::2]):
         else:
             cells.append("\033[0;38;2;%d;%d;%d;48;2;%d;%d;%dm▀" % (rgb(t) + rgb(b)))
     out.append("".join(cells) + "\033[0m")
+if caption:
+    # An empty line, then the caption as text, centered under the art.
+    pad = max(0, (width * scale - len(caption)) // 2)
+    out.append("")
+    out.append(" " * pad + "\033[0;38;2;%d;%d;%dm" % palette[caption_color] + caption + "\033[0m")
 sys.stdout.write("\n".join(out) + "\n")
