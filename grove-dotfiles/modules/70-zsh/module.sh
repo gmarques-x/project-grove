@@ -27,6 +27,25 @@ _zsh_home_leftovers() {
   return 0
 }
 
+# compinit refuses folders that others can write to. _zsh_insecure_dirs lists
+# the ones compaudit reports inside the Homebrew prefix (anything else is never
+# touched). GROVE_COMPAUDIT replaces the compaudit run in tests.
+_zsh_brew_prefix() { dirname "$(dirname "${GROVE_BREW:-/opt/homebrew/bin/brew}")"; }
+_zsh_insecure_dirs() {
+  local prefix d
+  prefix="$(_zsh_brew_prefix)"
+  if [ -n "${GROVE_COMPAUDIT:-}" ]; then
+    "$GROVE_COMPAUDIT" 2>/dev/null
+  else
+    # shellcheck disable=SC2016
+    /bin/zsh -fc 'fpath=("$1/share/zsh-completions" "$1/share/zsh/site-functions" $fpath)
+      autoload -Uz compaudit; compaudit 2>/dev/null' _ "$prefix"
+  fi | while IFS= read -r d; do
+    case "$d" in "$prefix"/*) [ -d "$d" ] && printf '%s\n' "$d" ;; esac
+  done
+  return 0
+}
+
 check() {
   grove_link_check "$GROVE_CONFIG/zsh/.zshenv" "$HOME/.zshenv" || return 3
   grove_link_check "$GROVE_ROOT/bin/grove" "$HOME/.local/bin/grove" || return 3
@@ -37,6 +56,7 @@ check() {
   grove_link_check "$(_zsh_sessions_dir)" "$(_zsh_sessions_link)" || return 3
   [ -d "$(_zsh_sessions_dir)" ] || return 3
   [ -z "$(_zsh_home_leftovers)" ] || return 3
+  [ -z "$(_zsh_insecure_dirs)" ] || return 3
   return 0
 }
 
@@ -62,6 +82,11 @@ apply() {
     moved="$(grove_backup "$old")" || return 1
     grove_note "backed up $old to $moved"
   done
+  local d
+  while IFS= read -r d; do
+    chmod go-w "$d" || { grove_fail "could not fix permissions on $d"; return 1; }
+    grove_note "removed group/other write access on $d (zsh completion refuses it)"
+  done < <(_zsh_insecure_dirs)
 }
 
 _zsh_apply_sessions() {

@@ -1,7 +1,10 @@
 # Login shells: Homebrew environment and the ssh keychain. Silent.
-if [ -x /opt/homebrew/bin/brew ]; then
-  eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+# GROVE_BREW (the path grove uses for brew) lets tests point this elsewhere.
+_grove_brew="${GROVE_BREW:-/opt/homebrew/bin/brew}"
+if [ -x "$_grove_brew" ]; then
+  eval "$("$_grove_brew" shellenv zsh)"
 fi
+unset _grove_brew
 if command -v ssh-add >/dev/null 2>&1; then
   ssh-add --apple-load-keychain -q 2>/dev/null
 fi

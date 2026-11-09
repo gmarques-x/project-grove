@@ -17,6 +17,40 @@ setup() {
   grove_copy_tracked_config "$BATS_TEST_TMPDIR/config"
   export GROVE_CONFIG="$BATS_TEST_TMPDIR/config"
   stub starship 'exit 0'
+  # Never let a test fix permissions on the real Homebrew folders.
+  stub fake-compaudit 'exit 0'
+  export GROVE_COMPAUDIT="$BATS_TEST_TMPDIR/stubs/fake-compaudit"
+}
+
+# brew_prefix: a temp Homebrew prefix whose share/ links to the real plugins
+# (skips the test when they aren't installed). Prints the prefix.
+brew_prefix() {
+  local p="$BATS_TEST_TMPDIR/brew" d
+  mkdir -p "$p/share"
+  for d in zsh-completions zsh-autosuggestions zsh-syntax-highlighting; do
+    [ -d "/opt/homebrew/share/$d" ] || return 1
+    ln -sfn "/opt/homebrew/share/$d" "$p/share/$d"
+  done
+  printf '%s\n' "$p"
+}
+
+# tool_shell CMD [VAR=value...]: an interactive zsh on a real terminal (script),
+# with the temp prefix and the real Homebrew tools on PATH. Output merged, \r and
+# script's ^D echo stripped.
+tool_shell() {
+  local cmd="$1"; shift
+  load_module 70-zsh
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/bin:/bin" HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/brew" GROVE_NO_FETCH=1 "$@" \
+    script -q /dev/null /bin/zsh -ic "$cmd" < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'
+}
+
+# login_shell CMD: a login + interactive zsh on a real terminal (script), as a new
+# Terminal or Ghostty window starts it; no Homebrew prefix, no fetch.
+login_shell() {
+  env -i HOME="$HOME" PATH=/usr/bin:/bin GROVE_BREW=/nonexistent GROVE_NO_FETCH=1 \
+    script -q /dev/null /bin/zsh -lic "$1" < /dev/null 2>&1 | tr -d '\r\b' | sed 's/\^D//g'
 }
 
 @test "zsh links zshenv and grove" {
@@ -69,7 +103,7 @@ setup() {
   load_module 70-zsh
   ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply
-  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -lic 'echo $ZDOTDIR; echo $HISTFILE; print -l $path'
+  run login_shell 'echo $ZDOTDIR; echo $HISTFILE; print -l $path'
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "$HOME/.config/zsh" ]
   [ "${lines[1]}" = "$HOME/.local/state/zsh/history" ]
@@ -87,7 +121,7 @@ setup() {
   load_module 70-zsh
   ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply
-  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -lic 'echo $ZDOTDIR; echo $HISTFILE'
+  run login_shell 'echo $ZDOTDIR; echo $HISTFILE'
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 2 ]
 }
@@ -220,7 +254,7 @@ setup() {
   load_module 70-zsh
   ln -s "$GROVE_CONFIG" "$HOME/.config"
   apply
-  run env -i HOME="$HOME" PATH=/usr/bin:/bin TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=T1 /bin/zsh -lic 'print ok'
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin GROVE_BREW=/nonexistent TERM_PROGRAM=Apple_Terminal TERM_SESSION_ID=T1 /bin/zsh -lic 'print ok'
   [ "$status" -eq 0 ]
   [ -z "$(find "$HOME" -maxdepth 1 -name '.z*' ! -name .zshenv)" ]
   [ -z "$(find "$GROVE_CONFIG/zsh" -maxdepth 1 \( -name '.zsh_history' -o -name '.zcompdump*' \))" ]
@@ -296,4 +330,85 @@ fetch_shell() {
   NO_MACCHINA=1 run fetch_shell TERM_PROGRAM=ghostty
   [ "$status" -eq 0 ]
   [ "$output" = "fetched=" ]
+}
+
+
+@test "completion writes its dump under the XDG cache" {
+  brew_prefix >/dev/null || skip "zsh plugins not installed"
+  run tool_shell 'print done'
+  [ "$status" -eq 0 ]
+  [ "$output" = "done" ]
+  ls "$HOME"/.cache/zsh/zcompdump-* >/dev/null
+  [ -z "$(find "$HOME" "$GROVE_CONFIG/zsh" -maxdepth 1 -name '.zcompdump*')" ]
+}
+
+@test "cd is zoxide and builtin cd still works" {
+  brew_prefix >/dev/null || skip "zsh plugins not installed"
+  run tool_shell 'whence -w cd; builtin cd /tmp && pwd -P'
+  [ "${lines[0]}" = "cd: function" ]
+  [ "${lines[1]}" = "/private/tmp" ]
+}
+
+@test "the plugins load and highlighting loads last" {
+  brew_prefix >/dev/null || skip "zsh plugins not installed"
+  run tool_shell 'print -r -- $ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE; (( ${+ZSH_HIGHLIGHT_VERSION} )) && print highlight; print -r -- ${${(o)$(print -l $ZDOTDIR/conf.d/*.zsh(N:t))}[-1]}'
+  [ "${lines[0]}" = "fg=#859289" ]
+  [ "${lines[1]}" = "highlight" ]
+  [ "${lines[2]}" = "98-highlight.zsh" ]
+}
+
+@test "fzf keys are bound" {
+  brew_prefix >/dev/null || skip "zsh plugins not installed"
+  run tool_shell "bindkey '^R'"
+  [[ "$output" == *fzf-* ]] || false
+}
+
+@test "shell tool files are quiet without their tools" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  mkdir -p "$BATS_TEST_TMPDIR/empty"
+  run --separate-stderr env -i HOME="$HOME" PATH=/usr/bin:/bin HOMEBREW_PREFIX="$BATS_TEST_TMPDIR/empty" /bin/zsh -ic 'exit 0'
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$stderr" ]
+}
+
+@test "zoxide and eza keep their files in XDG folders" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -c 'print -r -- $_ZO_DATA_DIR; print -r -- $EZA_CONFIG_DIR'
+  [ "${lines[0]}" = "$HOME/.local/share/zoxide" ]
+  [ "${lines[1]}" = "$HOME/.config/eza" ]
+}
+
+@test "zsh needs work while compaudit reports Homebrew folders" {
+  load_module 70-zsh
+  local prefix="$BATS_TEST_TMPDIR/hb" d
+  d="$prefix/share"
+  mkdir -p "$prefix/bin" "$d"
+  chmod 775 "$d"
+  export GROVE_BREW="$prefix/bin/brew"
+  stub fake-compaudit '[ -n "$(find "'"$d"'" -maxdepth 0 -perm -g+w)" ] && echo "'"$d"'"; exit 0'
+  apply >/dev/null
+  chmod 775 "$d"
+  run check
+  [ "$status" -eq 3 ]
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(stat -f %Lp "$d")" = "755" ]
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "zsh never changes permissions outside the Homebrew prefix" {
+  load_module 70-zsh
+  local other="$BATS_TEST_TMPDIR/elsewhere"
+  mkdir -p "$other"; chmod 775 "$other"
+  export GROVE_BREW="$BATS_TEST_TMPDIR/hb/bin/brew"
+  stub fake-compaudit 'echo "'"$other"'"; exit 0'
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(stat -f %Lp "$other")" = "775" ]
 }
