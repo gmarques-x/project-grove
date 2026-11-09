@@ -19,12 +19,12 @@ The summary shown in every new terminal window keeps its look (a boxed "Grove" p
 | Topic | Decision | Why |
 | --- | --- | --- |
 | Tool | **fastfetch** replaces macchina | It can show images in Ghostty and color its bars; macchina can do neither. |
-| Image | The banner reframed: logo to the landscape's rock, features row removed, made taller (aspect 1.61), rounded corners, 1004 × 624 PNG | Approved by the user after the spike. |
-| Image tones | **Everforest night**, recolored from the theme: lightness picks a color on a palette ramp (paper bg0 → bg_green → fill → aqua → green → darkest ink fg), and the sun is the theme's yellow, drawn as a full disc behind the peak. The front pines and the rock (lower right) are removed into dark paper; the hills, lake and mountains behind them stay | Chosen by the user: first the swapped version, then "more green, following the theme colors". It blends into the terminal. |
-| Image style | **Pixel art**: the Everforest night image shrunk 3×, every pixel snapped to an exact palette color (no dithering), scaled back up with hard edges and stepped corners, 1002 × 624. The tagline is redrawn as pixel text in JetBrains Mono 10 | Chosen by the user (3× over a chunkier 4×). Small text can't survive shrinking, so it's redrawn. |
+| Image (earlier) | The banner reframed: logo to the landscape's rock, features row removed, made taller (aspect 1.61), rounded corners, 1004 × 624 PNG | Approved by the user after the spike. |
+| Image (earlier) tones | **Everforest night**, recolored from the theme: lightness picks a color on a palette ramp (paper bg0 → bg_green → fill → aqua → green → darkest ink fg), and the sun is the theme's yellow, drawn as a full disc behind the peak. The front pines and the rock (lower right) are removed into dark paper; the hills, lake and mountains behind them stay | Chosen by the user: first the swapped version, then "more green, following the theme colors". It blends into the terminal. |
+| Image (final) | **The lockup, tones swapped**: the banner framed on logo, Project Grove and tagline (2.36 : 1, 1004 × 426); sky, mountains and sketch marks cleaned to plain paper; then the paper takes the lettering's dark green `#27332A` and the logo and lettering take the paper's `#DAC7A2`, keeping the paper grain and the logo's camo. Shown 76 × 15 cells, 3 rows down, centred beside the 22-row box | Chosen by the user after the night, green and pixel-art versions, smooth over pixel art. |
 | Image source | The PNG itself is committed (`config/fastfetch/grove.png`, ~1 MB) | It's derived from the banner the user made for the public README. The tool that made it stays private, like the other dev tools (see the private-files rule). |
-| Image colors | Every opaque pixel is an exact palette color (tested); only the corners' edge pixels are partly transparent | The palette rule covers config colors. Every color in the fastfetch config still comes from the palette (tested). |
-| Size | Image 76 columns × 22 rows (the box's height); the whole summary needs ~140 columns | It matches the box; the width follows from the image's shape. |
+| Image colors | The banner's own two tones, swapped, so the image is **exempt** from the palette rule. Every color in the fastfetch config still comes from the palette (tested). |
+| Size | Image 76 columns × 15 rows, 3 rows down (centred on the 22-row box); the whole summary needs ~140 columns | It matches the box; the width follows from the image's shape. |
 | Narrow windows | ≥ 140 columns: image (1 + 76 + 3 + the 58-column box = 138). 125–139: today's text art (1 + 61 + 3 + 58 = 123). < 125: box only | Never wraps or overlaps. |
 | Terminal.app | Text art (it can't show images) | Same as today. |
 | Readouts | Same as macchina, except **Desktop** is dropped (fastfetch has nothing to show on macOS). **Machine** shows the model name ("MacBook Air (15-inch, M4, 2025)") instead of "Mac16,13" | Closest match. |
@@ -56,7 +56,7 @@ grove-dotfiles/
 
 ## 5. The config (`config/fastfetch/config.jsonc`)
 
-- **Logo:** `kitty-direct` (Ghostty reads the file itself), source `~/.config/fastfetch/grove.png` (fastfetch expands `~`; checked), width 76, height 22, aspect kept, padding left 1, right 3.
+- **Logo:** `kitty-direct` (Ghostty reads the file itself), source `~/.config/fastfetch/grove.png` (fastfetch expands `~`; checked), width 76, height 15, aspect kept, padding left 1, right 3, top 3.
 - **Box:** inner width 56, drawn with fastfetch's own constants: `┌ Grove ───┐`, `│ … │` rows (left edge, jump right, right edge, jump back) and `└───┘`; an empty row under the title and above the dots, as today. Border and title fg.
 - **Readouts, in order:** Host (`user@host`), Machine, Kernel, OS (`name version`), WM, Packages (`N (Homebrew)`), Terminal, Shell, Local IP (IPv4), Brightness (bar), Resolution (`W×H @ Hz`), Uptime, CPU, CPU Load (bar, if kept), Memory (bar), Battery (bar), then the color dots.
 - **Keys:** the same Nerd Font icons as macchina's `[keys]`, padded to one width; labels green `#A7C080`.

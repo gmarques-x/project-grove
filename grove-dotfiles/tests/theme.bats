@@ -122,9 +122,9 @@ ff_json() {
   [ "$output" = '["title", "host", "kernel", "os", "wm", "packages", "terminal", "shell", "localip", "brightness", "display", "uptime", "cpu", "cpuusage", "memory", "battery", "colors"]' ]
 }
 
-@test "fastfetch shows the image beside the box: kitty-direct, 76 by 22" {
-  run ff_json '[c["logo"][k] for k in ("type", "source", "width", "height", "preserveAspectRatio")]'
-  [ "$output" = '["kitty-direct", "~/.config/fastfetch/grove.png", 76, 22, true]' ]
+@test "fastfetch shows the image beside the box: kitty-direct, 76 by 15, centred on the box's 22 rows" {
+  run ff_json '[c["logo"][k] for k in ("type", "source", "width", "height", "preserveAspectRatio")] + [c["logo"]["padding"]["top"]]'
+  [ "$output" = '["kitty-direct", "~/.config/fastfetch/grove.png", 76, 15, true, 3]' ]
 }
 
 @test "fastfetch's bars are green on bg3, ten marks, no brackets" {
@@ -175,43 +175,9 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)'
   [[ "$box" == *"● ● ● ● ● ● ● ●"* ]] || false
 }
 
-@test "the image is a 1002 by 624 PNG with transparent corners" {
+@test "the image is a 1004 by 426 PNG with transparent rounded corners" {
   local f="$GROVE_ROOT/config/fastfetch/grove.png"
-  [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1002 624 yes " ]
-}
-
-@test "the image is pixel art in palette colors only" {
-  python3 - "$GROVE_ROOT/config/fastfetch/grove.png" "$GROVE_ROOT/theme/everforest-dark-medium" <<'PY'
-import re, sys, zlib, struct
-# Read the PNG without Pillow: 8-bit RGBA, non-interlaced (what Grove writes).
-data = open(sys.argv[1], "rb").read()
-w, h, depth, ctype = struct.unpack(">IIBB", data[16:26])
-assert (depth, ctype) == (8, 6), (depth, ctype)
-idat, i = b"", 8
-while i < len(data):
-    n, typ = struct.unpack(">I4s", data[i:i + 8])
-    if typ == b"IDAT": idat += data[i + 8:i + 8 + n]
-    i += 12 + n
-raw, stride, prev, rows = zlib.decompress(idat), w * 4, bytearray(w * 4), []
-for y in range(h):
-    f, line = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
-    for x in range(stride):
-        a = line[x - 4] if x >= 4 else 0; b = prev[x]; c = prev[x - 4] if x >= 4 else 0
-        if f == 1: line[x] = (line[x] + a) & 255
-        elif f == 2: line[x] = (line[x] + b) & 255
-        elif f == 3: line[x] = (line[x] + (a + b) // 2) & 255
-        elif f == 4:
-            p = a + b - c; pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-            line[x] = (line[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
-    rows.append(line); prev = line
-pal = {m.upper() for m in re.findall(r"#([0-9A-Fa-f]{6})", open(sys.argv[2]).read())}
-seen = set()
-for line in rows:
-    for x in range(0, len(line), 4):
-        if line[x + 3] == 255: seen.add("%02X%02X%02X" % tuple(line[x:x + 3]))
-bad = seen - pal
-print("not in the palette:", sorted(bad)[:10]); sys.exit(1 if bad else 0)
-PY
+  [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 426 yes " ]
 }
 
 # render_prompt FILE: the prompt Starship draws in a temp git repo, colors stripped.

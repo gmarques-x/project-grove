@@ -1,6 +1,10 @@
 # macOS
 .DS_Store
 
+# Editor swap files (vim), e.g. while zalias has a file open
+*.sw?
+.*.sw?
+
 # Font files are never committed (licenses). The 30-fonts module downloads
 # them, and its local/ folder is for your own copies.
 *.ttf
