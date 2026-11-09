@@ -19,11 +19,15 @@ _term_installed() {
   command -v macchina >/dev/null 2>&1 || [ -x "$(dirname "${GROVE_BREW:-/opt/homebrew/bin/brew}")/macchina" ]
 }
 
-# _term_extra_config: the Application Support config path, when that file
-# exists and isn't empty (Ghostty reads it after ~/.config, so it would win).
+# _term_extra_config: Ghostty configs in Application Support (`config` or
+# `config.ghostty`) that set anything, one per line. Ghostty reads them as well
+# as ~/.config/ghostty/config, so they could override Grove. Its generated
+# template holds only comments and doesn't count.
 _term_extra_config() {
-  local f="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
-  [ -s "$f" ] && printf '%s\n' "$f"
+  local d="$HOME/Library/Application Support/com.mitchellh.ghostty" f
+  for f in "$d/config" "$d/config.ghostty"; do
+    [ -f "$f" ] && grep -qv '^[[:space:]]*\(#.*\)\{0,1\}$' "$f" && printf '%s\n' "$f"
+  done
   return 0
 }
 
@@ -108,11 +112,10 @@ _term_dock_fix() {
   return 0
 }
 
-# _term_dock_export FILE: the current Dock settings, or an empty plist when the
-# domain doesn't exist yet.
+# _term_dock_export FILE: the current Dock settings. Fails when they can't be
+# read; a domain that doesn't exist exports as an empty plist, which is fine.
 _term_dock_export() {
-  defaults export "$(_term_dock_domain)" "$1" 2>/dev/null && [ -s "$1" ] && return 0
-  "$_TERM_PB" -c "Add :persistent-apps array" "$1" >/dev/null 2>&1
+  defaults export "$(_term_dock_domain)" "$1" 2>/dev/null && [ -s "$1" ]
 }
 
 check() {
@@ -139,11 +142,13 @@ apply() {
     grove_fail "Ghostty or macchina is missing; run grove install homebrew"
     return 1
   fi
-  extra="$(_term_extra_config)"
-  if [ -n "$extra" ]; then
+  while IFS= read -r extra; do
+    [ -n "$extra" ] || continue
     moved="$(grove_backup "$extra")" || return 1
-    grove_note "backed up $extra to $moved (it overrode ~/.config/ghostty/config)"
-  fi
+    grove_note "backed up $extra to $moved (it could override ~/.config/ghostty/config)"
+  done <<EOF
+$(_term_extra_config)
+EOF
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/grove-dock.XXXXXX")" || return 1
   if ! _term_dock_export "$tmp/dock.plist"; then
     rm -rf "$tmp"; grove_fail "could not read the Dock settings"; return 1

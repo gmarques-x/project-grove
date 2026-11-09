@@ -41,7 +41,9 @@ _zsh_insecure_dirs() {
     /bin/zsh -fc 'fpath=("$1/share/zsh-completions" "$1/share/zsh/site-functions" $fpath)
       autoload -Uz compaudit; compaudit 2>/dev/null' _ "$prefix"
   fi | while IFS= read -r d; do
-    case "$d" in "$prefix"/*) [ -d "$d" ] && printf '%s\n' "$d" ;; esac
+    # Folders owned by someone else (another account's Homebrew) can't be fixed
+    # here; 30-completion.zsh leaves them out of fpath instead.
+    case "$d" in "$prefix"/*) [ -d "$d" ] && [ -O "$d" ] && printf '%s\n' "$d" ;; esac
   done
   return 0
 }

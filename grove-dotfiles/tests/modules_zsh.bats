@@ -502,3 +502,32 @@ pty_alias_shell() {
   run alias_shell "cd '$d' && printf 'one\ntwo\n' | while read -r f; do ls \"\$f\" >/dev/null; print seen \$f; done"
   [ "$(printf '%s\n' "${lines[@]}" | tr '\n' ' ')" = "seen one seen two " ]
 }
+
+@test "zsh leaves Homebrew folders owned by someone else alone" {
+  load_module 70-zsh
+  # /usr/share is inside the prefix /usr and owned by root, like another user's Homebrew.
+  export GROVE_BREW=/usr/bin/brew
+  stub fake-compaudit 'echo /usr/share; exit 0'
+  run apply
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"/usr/share"* ]] || false
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "completion skips Homebrew folders that aren't safe for this user" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  local p="$BATS_TEST_TMPDIR/hb"
+  mkdir -p "$p/share/zsh/site-functions" "$p/share/zsh-completions"
+  chmod 775 "$p/share"
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin HOMEBREW_PREFIX="$p" /bin/zsh -ic 'print -l $fpath' < /dev/null
+  [[ "$output" != *"$p/share/zsh-completions"* ]] || false
+  # site-functions sits in share/zsh (safe), so it stays; compaudit checks only a folder and its parent.
+  [[ "$output" == *"$p/share/zsh/site-functions"* ]] || false
+  [[ "$output" != *"insecure"* ]] || false
+  chmod 755 "$p/share"
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin HOMEBREW_PREFIX="$p" /bin/zsh -ic 'print -l $fpath' < /dev/null
+  [[ "$output" == *"$p/share/zsh-completions"* ]] || false
+}

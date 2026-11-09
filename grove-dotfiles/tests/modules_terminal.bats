@@ -206,3 +206,44 @@ dock_field() {
   GROVE_BREW="$BATS_TEST_TMPDIR/brew/bin/brew" PATH="$BATS_TEST_TMPDIR/stubs:/usr/bin:/bin" run check
   [ "$status" -eq 0 ]
 }
+
+@test "a config.ghostty with settings in Application Support is backed up too" {
+  seed_dock "$(GHOSTTY)"
+  local extra="$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty"
+  mkdir -p "$(dirname "$extra")"
+  printf '# my old setup\nfont-size = 20\n' > "$extra"
+  run check
+  [ "$status" -eq 3 ]
+  apply >/dev/null
+  [ ! -e "$extra" ]
+  [ -f "$GROVE_STATE/backup/test/Library/Application Support/com.mitchellh.ghostty/config.ghostty" ]
+}
+
+@test "Ghostty's comment-only template in Application Support is left alone" {
+  seed_dock "$(GHOSTTY)"
+  local extra="$HOME/Library/Application Support/com.mitchellh.ghostty/config.ghostty"
+  mkdir -p "$(dirname "$extra")"
+  printf '# This is the configuration file for Ghostty.\n\n#   font-size = 10\n' > "$extra"
+  run check
+  [ "$status" -eq 0 ]
+  apply >/dev/null
+  [ -f "$extra" ]
+}
+
+@test "apply leaves the Dock untouched when the export fails" {
+  seed_dock "$(SAFARI)" "$(TERMINAL)"
+  stub defaults '[ "$1" = export ] && exit 1; [ "$1" = import ] && touch "'"$BATS_TEST_TMPDIR"'/imported"; exec /usr/bin/defaults "$@"'
+  run apply
+  [ "$status" -eq 1 ]
+  [ ! -e "$BATS_TEST_TMPDIR/imported" ]
+  [ ! -e "$BATS_TEST_TMPDIR/killall.log" ]
+  rm "$BATS_TEST_TMPDIR/stubs/defaults"
+  [ "$(dock_field file-label)" = "Safari|Terminal" ]
+}
+
+@test "check fails when the Dock can't be read" {
+  seed_dock "$(GHOSTTY)"
+  stub defaults '[ "$1" = export ] && exit 1; exec /usr/bin/defaults "$@"'
+  run check
+  [ "$status" -eq 1 ]
+}
