@@ -30,18 +30,16 @@ grove_bootstrap() {
 
   # 2. Clone the repo, unless it is already there. Never delete or overwrite.
   if [ -e "$clone_dir" ]; then
-    local origin=""
-    if [ -d "$clone_dir/.git" ]; then
-      origin="$(git -C "$clone_dir" remote get-url origin 2>/dev/null || true)"
+    if [ ! -e "$clone_dir/.git" ]; then
+      echo "Stopping: $clone_dir already exists but has no .git, so it is not a project-grove clone." >&2
+      echo "Nothing was changed. Move it aside or set GROVE_CLONE_DIR to another folder, then run this again." >&2
+      return 1
     fi
-    case "$origin" in
-      *project-grove*) ;;
-      *)
-        echo "Stopping: $clone_dir already exists but is not a clone of project-grove." >&2
-        echo "Nothing was changed. Move it aside or set GROVE_CLONE_DIR to another folder, then run this again." >&2
-        return 1
-        ;;
-    esac
+    if [ ! -e "$clone_dir/grove-dotfiles/bin/grove" ]; then
+      echo "Stopping: $clone_dir is a git repo but has no grove-dotfiles/bin/grove, so it is not project-grove." >&2
+      echo "Nothing was changed. Move it aside or set GROVE_CLONE_DIR to another folder, then run this again." >&2
+      return 1
+    fi
     echo "Using the existing clone at $clone_dir"
   else
     mkdir -p "$(dirname "$clone_dir")"
@@ -52,8 +50,9 @@ grove_bootstrap() {
   # 3. Hand over to grove. When piped from curl, stdin is this script, so
   # prompts need the terminal.
   local grove="$clone_dir/grove-dotfiles/bin/grove"
-  if [ -r /dev/tty ] && : </dev/tty 2>/dev/null; then
-    exec "$grove" install </dev/tty
+  local tty="${GROVE_TTY:-/dev/tty}"
+  if [ -r "$tty" ] && : <"$tty" 2>/dev/null; then
+    exec "$grove" install <"$tty"
   fi
   exec "$grove" install
 }

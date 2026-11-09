@@ -10,7 +10,7 @@ Open Terminal and paste:
 curl -fsSL https://raw.githubusercontent.com/gmarques-x/project-grove/main/grove-dotfiles/bootstrap.sh | bash
 ```
 
-It waits for Apple's Command Line Tools (finish the dialog that appears), clones the repo to `~/Developer/project-grove`, and runs `grove install`.
+It waits for Apple's Command Line Tools (finish the dialog that appears), clones the repo to `~/Developer/project-grove`, and runs `grove install`. If that folder already exists but isn't project-grove, it stops without touching anything; set `GROVE_CLONE_DIR` to clone somewhere else.
 
 `grove install` asks you for:
 
@@ -24,7 +24,7 @@ It waits for Apple's Command Line Tools (finish the dialog that appears), clones
 > **`~/.config` IS the folder `project-grove/grove-dotfiles/config`.** It is a link, not a copy.
 >
 > - Deleting or re-cloning the repo deletes everything in `~/.config`.
-> - Never run `git clean -x` in the repo.
+> - Never run `git clean` in the repo (`-x` and `-X` both remove ignored files such as `local.env`).
 
 Your personal values (name, email, GitHub username) live in `~/.config/grove/local.env`, which git ignores. Anything Grove replaces is moved, never deleted, to `~/.local/state/grove/backup/`.
 
