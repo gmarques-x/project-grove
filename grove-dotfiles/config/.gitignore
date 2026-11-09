@@ -2,6 +2,8 @@
 !/.gitignore
 !/git/
 !/ssh/
+/ssh/*
+!/ssh/config
 !/zsh/
 !/starship.toml
 

@@ -20,3 +20,10 @@ setup() { grove_test_setup; }
     git -C "$GROVE_ROOT" check-ignore -q "$p"
   done
 }
+
+@test "only ssh/config is tracked under ssh" {
+  git -C "$GROVE_ROOT" check-ignore -q config/ssh/id_ed25519
+  git -C "$GROVE_ROOT" check-ignore -q config/ssh/known_hosts
+  run git -C "$GROVE_ROOT" check-ignore -q config/ssh/config
+  [ "$status" -ne 0 ]
+}
