@@ -15,3 +15,6 @@ grove-fonts/local/*
 .recording/**/sidebar/
 .recording/**/*-final.plist
 .recording/**/*-at-pause.plist
+
+# Shared working files between Gustavo and Claude. Never published.
+artifacts/
