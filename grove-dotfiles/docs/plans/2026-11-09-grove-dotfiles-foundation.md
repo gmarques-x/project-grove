@@ -20,7 +20,7 @@
 - Nothing is deleted: anything replaced moves to `$GROVE_STATE/backup/$GROVE_RUN_ID/<path relative to $HOME>`.
 - Personal values (`GROVE_NAME`, `GROVE_EMAIL`, `GROVE_GITHUB_USER`) never appear in tracked files.
 - Output colors (Everforest Dark): ok `#A7C080`, needs work `#DBBC7F`, needs you `#83C092`, failed `#E67E80`, dim `#859289`. Colors off when stdout isn't a terminal or `NO_COLOR` is set.
-- `project-grove/artifacts/` is never committed, published or referenced from tracked files (it's gitignored).
+- The private Finder recording is never committed, published or referenced from tracked files (it is gitignored).
 - Commits are signed (already configured globally). End each commit message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Run tests with `bats grove-dotfiles/tests` from `project-grove/`; lint with `shellcheck -x` on every changed script.
 
@@ -262,7 +262,7 @@ Module: ok when both links are right, no real `~/.zprofile`/`~/.zshrc` exist, an
 **Interfaces:**
 - Consumes: `grove_defaults_check`, `grove_defaults_apply` (Task 5).
 
-`settings.txt`: the 14 scalar settings from the "Apply with" block of `artifacts/finder-changes.md` (a local file: read it, never commit or link to it), in the Task 5 format. The module also handles `FavoriteTagNames` (wanted: empty-string array) and the `StandardViewSettings` block (compare `defaults export com.apple.finder - | plutil -extract StandardViewSettings xml1 -o - -` with the file, normalized through `plutil -convert json`). Apply restarts Finder (`killall Finder`) only when it wrote something. After apply, it prints the sidebar checklist from the spec (shown: Applications, Home, Developer, Documents, Downloads, iCloud Drive, Macintosh HD; hidden: Recents, Shared, AirDrop, Desktop). Domains are overridable for tests with `GROVE_FINDER_DOMAIN` and `GROVE_GLOBAL_DOMAIN`.
+`settings.txt`: the 14 scalar settings from the "Apply with" block of the Finder recording (a local, ignored file under `.recording/finder/`: read it, never commit or link to it), in the Task 5 format. The module also handles `FavoriteTagNames` (wanted: empty-string array) and the `StandardViewSettings` block (compare `defaults export com.apple.finder - | plutil -extract StandardViewSettings xml1 -o - -` with the file, normalized through `plutil -convert json`). Apply restarts Finder (`killall Finder`) only when it wrote something. After apply, it prints the sidebar checklist from the spec (shown: Applications, Home, Developer, Documents, Downloads, iCloud Drive, Macintosh HD; hidden: Recents, Shared, AirDrop, Desktop). Domains are overridable for tests with `GROVE_FINDER_DOMAIN` and `GROVE_GLOBAL_DOMAIN`.
 
 - [ ] **Step 1: Write failing tests** (domains pointed at `com.grove.test` and `com.grove.testglobal`; stub `killall`):
   - `finder needs work on an empty domain`, `finder is ok after apply`.
@@ -310,7 +310,7 @@ Changes the real home folder. Run only after Tasks 1–12 pass.
 Needs the user's explicit go-ahead at this step, because it publishes content.
 
 - [ ] **Step 1:** Confirm with the user that the repo can be made public now.
-- [ ] **Step 2:** Check nothing private goes out. `artifacts/` is never published (user rule): `git ls-files artifacts` and `git log --all --format=%h -- artifacts` both print nothing. `git grep -nI -e 'oauth' -e 'token' -e 'BEGIN OPENSSH PRIVATE'` returns nothing. `git ls-files grove-dotfiles/config` lists only allowlisted files.
+- [ ] **Step 2:** Check nothing private goes out. The Finder recording is never published (user rule): `git ls-files .recording` and `git log --all --format=%h -- .recording` both print nothing. `git grep -nI -e 'oauth' -e 'token' -e 'BEGIN OPENSSH PRIVATE'` returns nothing. `git ls-files grove-dotfiles/config` lists only allowlisted files.
 - [ ] **Step 3:** `gh repo create gmarques-x/project-grove --public --source . --remote origin --push` (description: "A complete macOS desktop overhaul, grown from Everforest.").
 - [ ] **Step 4:** Verify: `curl -fsSL https://raw.githubusercontent.com/gmarques-x/project-grove/main/grove-dotfiles/bootstrap.sh | head -1` prints the shebang.
 
