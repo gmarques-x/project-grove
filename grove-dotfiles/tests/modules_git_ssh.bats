@@ -167,3 +167,25 @@ load_agent() {
   run check
   [ "$status" -eq 4 ]
 }
+
+@test "git needs you when name or email is empty" {
+  load_module 50-git
+  make_key
+  GROVE_NAME=""
+  run check
+  [ "$status" -eq 4 ]
+  GROVE_NAME=x; GROVE_EMAIL=""
+  run check
+  [ "$status" -eq 4 ]
+}
+
+@test "git apply refuses an empty name or email and writes nothing" {
+  load_module 50-git
+  make_key
+  GROVE_EMAIL=""
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"set your name and email"* ]] || false
+  [ ! -e "$GROVE_CONFIG/git/local" ]
+  [ ! -e "$GROVE_CONFIG/git/allowed_signers" ]
+}

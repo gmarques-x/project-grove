@@ -25,5 +25,5 @@ apply() {
   fi
   PATH="$(dirname "$brew"):$PATH"
   export PATH
-  "$brew" bundle install --file "$GROVE_ROOT/Brewfile"
+  "$brew" bundle install --no-upgrade --file "$GROVE_ROOT/Brewfile"
 }

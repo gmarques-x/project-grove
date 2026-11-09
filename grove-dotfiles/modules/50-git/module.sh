@@ -45,6 +45,7 @@ _git_write() {
 }
 
 check() {
+  [ -n "${GROVE_NAME-}" ] && [ -n "${GROVE_EMAIL-}" ] || return 4
   [ -f "$(_git_pub)" ] || return 4
   if [ -f "$HOME/.gitconfig" ] && [ ! -L "$HOME/.gitconfig" ]; then return 3; fi
   _git_same "$GROVE_CONFIG/git/local" _git_local_content || return 3
@@ -54,6 +55,10 @@ check() {
 
 apply() {
   local moved
+  if [ -z "${GROVE_NAME-}" ] || [ -z "${GROVE_EMAIL-}" ]; then
+    grove_fail "set your name and email: edit ~/.config/grove/local.env or run grove install without --yes"
+    return 1
+  fi
   if [ ! -f "$(_git_pub)" ]; then
     grove_fail "no public key at $(_git_pub)"
     return 1

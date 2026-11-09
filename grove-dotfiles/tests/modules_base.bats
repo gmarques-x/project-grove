@@ -162,7 +162,7 @@ esac'
   export GROVE_BREW="$BATS_TEST_TMPDIR/stubs/brew"
   run apply
   [ "$status" -eq 0 ]
-  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "bundle install --file $GROVE_ROOT/Brewfile" ]
+  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "bundle install --no-upgrade --file $GROVE_ROOT/Brewfile" ]
 }
 
 @test "homebrew apply installs brew first when missing" {
@@ -183,7 +183,7 @@ INST
   run apply
   [ "$status" -eq 0 ]
   [ -x "$GROVE_BREW" ]
-  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "bundle install --file $GROVE_ROOT/Brewfile" ]
+  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "bundle install --no-upgrade --file $GROVE_ROOT/Brewfile" ]
 }
 
 # ---- 30-fonts
