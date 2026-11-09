@@ -23,3 +23,15 @@ stub() {
   printf '#!/bin/bash\n%s\n' "$body" > "$BATS_TEST_TMPDIR/stubs/$cmd"
   chmod +x "$BATS_TEST_TMPDIR/stubs/$cmd"
 }
+
+# grove_copy_tracked_config DEST [ROOT]: copy only the git-tracked files of
+# ROOT/config (default $GROVE_ROOT) into DEST, so private ignored files
+# (gh/hosts.yml, grove/local.env, git/local) never reach a test's temp copy.
+grove_copy_tracked_config() {
+  local dest="$1" root="${2:-$GROVE_ROOT}" f
+  mkdir -p "$dest"
+  while IFS= read -r -d '' f; do
+    mkdir -p "$dest/$(dirname "$f")"
+    cp -p "$root/config/$f" "$dest/$f"
+  done < <(git -C "$root/config" ls-files -z .)
+}

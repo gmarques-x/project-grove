@@ -16,7 +16,7 @@ load_module() {
 setup() {
   grove_test_setup
   # Temp copy of config/ (Ruling R4): apply moves things into it.
-  cp -R "$GROVE_ROOT/config" "$BATS_TEST_TMPDIR/config"
+  grove_copy_tracked_config "$BATS_TEST_TMPDIR/config"
   export GROVE_CONFIG="$BATS_TEST_TMPDIR/config"
   export GROVE_POLL_SECONDS=0
 }
