@@ -1,0 +1,22 @@
+# Fonts grove installs. One per line, four fields separated by "|":
+#
+#   name     a label for the output
+#   url      a .zip archive, a .dmg or .pkg installer, or a single .ttf / .otf
+#   verify   how to check the download:
+#              <sha256>      exact checksum (curl -sL <url> | shasum -a 256)
+#              apple-signed  .dmg / .pkg only: the package must be signed by Apple.
+#                            Use this for Apple fonts, which Apple updates in place.
+#              (empty)       no check; a warning is printed
+#   pattern  which files to install (shell glob, "*" also matches "/"):
+#              .zip          relative to the archive root
+#              .dmg / .pkg   relative to the expanded package
+#              .ttf / .otf   ignored
+#            Only .ttf and .otf files are ever installed.
+#
+# Font files you already have go in local/ next to this file instead.
+
+# Principal font: monospace for terminal, editor and code.
+JetBrains Mono 2.304|https://github.com/JetBrains/JetBrainsMono/releases/download/v2.304/JetBrainsMono-2.304.zip|6f6376c6ed2960ea8a963cd7387ec9d76e3f629125bc33d1fdcd7eb7012f7bbf|fonts/ttf/*.ttf
+
+# Companion font: SF Pro, SF Pro Text, SF Pro Display, SF Pro Rounded (Apple license).
+SF Pro|https://devimages-cdn.apple.com/design/resources/download/SF-Pro.dmg|apple-signed|*.pkg/Payload/Library/Fonts/*

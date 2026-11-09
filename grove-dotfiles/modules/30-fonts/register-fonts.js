@@ -4,7 +4,7 @@
 // Usage: osascript -l JavaScript register-fonts.js [--verify] <font file>...
 //   --verify  only check whether the fonts are active; register nothing
 //
-// Called by install-fonts.sh. Output: "checked=N missing=M [names...]"
+// Called by the 30-fonts module. Output: "checked=N missing=M [names...]"
 ObjC.import('CoreText');
 ObjC.import('Foundation');
 

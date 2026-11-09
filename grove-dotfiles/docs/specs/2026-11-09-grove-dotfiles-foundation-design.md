@@ -15,13 +15,13 @@ This spec covers the framework (the `grove` command, the module system, file lay
 | Decision | Choice | Why |
 |----------|--------|-----|
 | Audience | Public repo, built for this one person | Shows Project Grove on the GitHub profile. Personal values are asked at install time and never committed. |
-| Location | `project-grove/grove-dotfiles/` inside the existing repo; `project-grove` becomes public | One clone installs everything; the installer calls `../grove-fonts` directly. |
+| Location | `project-grove/grove-dotfiles/` inside the existing repo; `project-grove` becomes public | One clone installs everything. (The font installer started as a separate `grove-fonts/` folder and was folded into the `30-fonts` module on 2026-11-09.) |
 | File management | Grove's own symlink script | No dependencies before Homebrew, edits in place show up in `git diff`, backups before replacing anything. |
 | Interface | A `grove` command | `grove install`, `grove check`, `grove update`, `grove list`. |
 | Config home | `~/.config` is one symlink to `grove-dotfiles/config/` | Everything an app reads from `~/.config` lives in the repo folder. |
 | zsh | Fully in `~/.config/zsh/` via `ZDOTDIR` | Only `~/.zshenv` stays in the home folder, as a link. |
 | Prompt | Starship, styled after the Everforest zsh port | The port (sainnhe/dotfiles `.zsh-theme`, MIT) needs Powerlevel10k, which now has very limited support. Starship is maintained and configured by one file in `~/.config`. |
-| Language | bash 3.2 (built into macOS) | Runs before Homebrew exists. Same as grove-fonts. |
+| Language | bash 3.2 (built into macOS) | Runs before Homebrew exists. |
 | Order | Framework first, then modules | Shell, Terminal and Editor need their own design rounds. |
 
 ## 3. Scope
@@ -45,7 +45,6 @@ This spec covers the framework (the `grove` command, the module system, file lay
 
 ```
 project-grove/
-├── grove-fonts/                    font installer (unchanged)
 └── grove-dotfiles/
     ├── README.md                   what it is, the bootstrap line, safety notes
     ├── bootstrap.sh                entry point for a fresh Mac
@@ -60,7 +59,11 @@ project-grove/
     │   ├── 05-config/module.sh
     │   ├── 10-xcode-tools/module.sh
     │   ├── 20-homebrew/module.sh
-    │   ├── 30-fonts/module.sh
+    │   ├── 30-fonts/
+    │   │   ├── module.sh
+    │   │   ├── fonts.txt               fonts to download
+    │   │   ├── register-fonts.js       registers fonts with macOS
+    │   │   └── local/                  your own font files (untracked)
     │   ├── 40-ssh/module.sh
     │   ├── 50-git/module.sh
     │   ├── 60-github/module.sh
@@ -89,7 +92,7 @@ Each module is a folder in `modules/` with a `module.sh` that defines three func
 | `check` | Inspects the Mac. Changes nothing. Prints what it found. | `0` ok · `3` needs work · `4` needs you (a password, passphrase or browser step) |
 | `apply` | Makes the change. Safe to run again. | `0` success · non-zero failure |
 
-The exit codes match grove-fonts (`0` ok, `3` missing). `grove` sources one module at a time in a subshell, so modules can't leak variables into each other. Modules run in number order. A later module (Shell, Terminal, Editor) is a new folder, for example `90-terminal/`. The framework doesn't change.
+The exit codes are `0` ok and `3` missing. `grove` sources one module at a time in a subshell, so modules can't leak variables into each other. Modules run in number order. A later module (Shell, Terminal, Editor) is a new folder, for example `90-terminal/`. The framework doesn't change.
 
 Modules get these variables from `grove`: `GROVE_ROOT` (the grove-dotfiles folder), `GROVE_CONFIG` (`$GROVE_ROOT/config`), `GROVE_STATE` (`~/.local/state/grove`), `GROVE_LOCAL` (`~/.config/grove/local.env`), `GROVE_YES` (1 when running unattended). Tests set them to point into a throwaway folder.
 
@@ -160,7 +163,7 @@ The repo must be public for the curl line to work.
 | 05 | config | `~/.config` is a link to `config/` | Moves an existing `~/.config` folder's contents into `config/` (untracked files stay untracked), backs up anything that would be overwritten, creates the link | |
 | 10 | xcode-tools | `xcode-select -p` succeeds | Starts `xcode-select --install` | Apple's dialog |
 | 20 | homebrew | `brew` exists; `brew bundle check` passes | Starts the official Homebrew installer if missing; `brew bundle install` | Mac password (first install only) |
-| 30 | fonts | `grove-fonts/install-fonts.sh --check` exits 0 | `install-fonts.sh --quiet` | |
+| 30 | fonts | every font in `fonts.txt` and `local/` is installed and active | download, verify, copy to `~/Library/Fonts`, register | |
 | 40 | ssh | `~/.ssh/config` is the right link; `~/.ssh/id_ed25519` exists and is loaded in the agent | Links `~/.ssh/config`; if there is no key, runs `ssh-keygen` (ed25519) and `ssh-add --apple-use-keychain` | The passphrase, when creating a key |
 | 50 | git | `local.env` values match `git config user.name/email`; signing settings present; `~/.gitconfig` retired | Writes `config/git/local` and `allowed_signers`; backs up and removes `~/.gitconfig` | |
 | 60 | github | `gh auth status` is signed in with `admin:ssh_signing_key`; the key's fingerprint is in `gh ssh-key list` as a signing key | `gh auth login` / `gh auth refresh -s admin:ssh_signing_key`; `gh ssh-key add --type signing` | Browser login |

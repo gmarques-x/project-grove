@@ -1,13 +1,13 @@
 # macOS
 .DS_Store
 
-# Font files are never committed (licenses). grove-fonts downloads them,
-# and grove-fonts/local/ is for your own copies.
+# Font files are never committed (licenses). The 30-fonts module downloads
+# them, and its local/ folder is for your own copies.
 *.ttf
 *.otf
 *.dmg
-grove-fonts/local/*
-!grove-fonts/local/.gitkeep
+grove-dotfiles/modules/30-fonts/local/*
+!grove-dotfiles/modules/30-fonts/local/.gitkeep
 
 # Raw settings recordings contain personal data (recent folders, bookmarks,
 # file paths). Only the recording tools and exported setting blocks are tracked.

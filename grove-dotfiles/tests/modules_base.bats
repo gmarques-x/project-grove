@@ -186,56 +186,6 @@ INST
   [ "$(cat "$BATS_TEST_TMPDIR/args")" = "bundle install --no-upgrade --file $GROVE_ROOT/Brewfile" ]
 }
 
-# ---- 30-fonts
-
-fake_fonts() { # fake_fonts BODY: temp GROVE_ROOT layout with a fake installer
-  mkdir -p "$BATS_TEST_TMPDIR/layout/grove-dotfiles" "$BATS_TEST_TMPDIR/layout/grove-fonts"
-  printf '#!/bin/bash\n%s\n' "$1" > "$BATS_TEST_TMPDIR/layout/grove-fonts/install-fonts.sh"
-  chmod +x "$BATS_TEST_TMPDIR/layout/grove-fonts/install-fonts.sh"
-  export GROVE_ROOT="$BATS_TEST_TMPDIR/layout/grove-dotfiles"
-}
-
-@test "fonts maps install-fonts exit codes" {
-  local real="$GROVE_ROOT"
-  # shellcheck disable=SC2016
-  fake_fonts 'echo "$@" > "'"$BATS_TEST_TMPDIR"'/args"; exit "$(cat "'"$BATS_TEST_TMPDIR"'/rc")"'
-  for lib in "$real"/lib/*.sh; do . "$lib"; done
-  . "$real/modules/30-fonts/module.sh"
-  echo 0 > "$BATS_TEST_TMPDIR/rc"
-  run check
-  [ "$status" -eq 0 ]
-  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "--check --quiet" ]
-  echo 3 > "$BATS_TEST_TMPDIR/rc"
-  run check
-  [ "$status" -eq 3 ]
-  echo 1 > "$BATS_TEST_TMPDIR/rc"
-  run check
-  [ "$status" -eq 1 ]
-  echo 2 > "$BATS_TEST_TMPDIR/rc"
-  run check
-  [ "$status" -eq 1 ]
-}
-
-@test "fonts apply runs install-fonts --quiet and passes its status on" {
-  local real="$GROVE_ROOT"
-  fake_fonts 'echo "$@" > "'"$BATS_TEST_TMPDIR"'/args"; exit 0'
-  for lib in "$real"/lib/*.sh; do . "$lib"; done
-  . "$real/modules/30-fonts/module.sh"
-  run apply
-  [ "$status" -eq 0 ]
-  [ "$(cat "$BATS_TEST_TMPDIR/args")" = "--quiet" ]
-}
-
-@test "fonts fails when install-fonts.sh is missing" {
-  local real="$GROVE_ROOT"
-  fake_fonts 'exit 0'
-  rm "$BATS_TEST_TMPDIR/layout/grove-fonts/install-fonts.sh"
-  for lib in "$real"/lib/*.sh; do . "$lib"; done
-  . "$real/modules/30-fonts/module.sh"
-  run check
-  [ "$status" -eq 1 ]
-}
-
 # ---- C-1: worktree guard
 
 @test "config refuses to link from a linked git worktree" {

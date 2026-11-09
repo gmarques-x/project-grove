@@ -55,12 +55,33 @@ Options: `--yes` answers prompts with defaults and skips anything that needs you
 | `05-config` | Makes `~/.config` a link to the tracked config |
 | `10-xcode-tools` | Xcode command line tools |
 | `20-homebrew` | Homebrew and the Brewfile |
-| `30-fonts` | Fonts from grove-fonts |
+| `30-fonts` | JetBrains Mono, SF Pro and your own fonts (see Fonts) |
 | `40-ssh` | ssh config, ed25519 key and agent |
 | `50-git` | git identity and commit signing |
 | `60-github` | GitHub login and SSH signing key |
 | `70-zsh` | zsh config, Starship prompt and the `grove` command |
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
+
+## Fonts
+
+| Role | Font | Used for | License |
+| --- | --- | --- | --- |
+| Principal | **JetBrains Mono** and **JetBrains Mono NL** (2.304, 32 static TTFs) | Terminal, editor, code | SIL Open Font License 1.1 |
+| Companion | **SF Pro**, **SF Pro Text**, **SF Pro Display**, **SF Pro Rounded** (47 files) | Interface and reading text | Apple font license |
+
+`grove install fonts` copies them to `~/Library/Fonts` (no admin password) and registers them with macOS, which this version of macOS needs before apps can use a font. Downloads are cached in `~/Library/Caches/grove/fonts` and fetched again only when the server has a newer file.
+
+- JetBrains Mono is checked against a fixed SHA-256. The variable and web fonts in the release are left out, so font menus don't show duplicates.
+- SF Pro is unpacked from Apple's installer without running it, after checking that the package is signed by Apple. Apple updates the download in place, so a fixed checksum wouldn't last.
+- Font files are never committed, because of their licenses.
+
+To add a font:
+
+1. **From a download:** add a line to `modules/30-fonts/fonts.txt`: a name, a URL (`.zip`, `.dmg`, `.pkg`, `.ttf` or `.otf`), how to verify it, and which files to take. The comments at the top of the file explain each field. Other Apple fonts work like SF Pro, for example:
+   ```
+   SF Mono|https://devimages-cdn.apple.com/design/resources/download/SF-Mono.dmg|apple-signed|*.pkg/Payload/Library/Fonts/*
+   ```
+2. **From files you have:** drop `.ttf` or `.otf` files into `modules/30-fonts/local/`. They aren't committed.
 
 ## Adding a module
 
