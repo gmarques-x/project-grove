@@ -205,3 +205,17 @@ setup() {
   [ -L "$GROVE_CONFIG/zsh/.zsh_sessions" ]
 }
 
+@test "interactive shells get zalias and zedit, opening the alias file and the zsh folder in the editor" {
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\necho "edit $*"\n' > "$BATS_TEST_TMPDIR/bin/fake-editor"
+  chmod +x "$BATS_TEST_TMPDIR/bin/fake-editor"
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin EDITOR="$BATS_TEST_TMPDIR/bin/fake-editor" /bin/zsh -ic 'zalias; zedit'
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "edit $HOME/.config/zsh/conf.d/20-aliases.zsh" ]
+  [ "${lines[1]}" = "edit $HOME/.config/zsh" ]
+  run env -i HOME="$HOME" PATH=/usr/bin:/bin /bin/zsh -ic 'alias zalias'
+  [[ "$output" == *'${EDITOR:-vim}'* ]] || false
+}
