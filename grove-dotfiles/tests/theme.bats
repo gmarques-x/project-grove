@@ -181,10 +181,11 @@ render_prompt() {
   [ "$(sed -n '/^\[keys\]/,$p' "$t" | grep -c '= "')" -ge 17 ]
 }
 
-@test "the art is light plain text: at most 20 lines by 44 columns, no color codes" {
-  local f="$GROVE_ROOT/config/macchina/grove.ascii"
+@test "the art is light plain text: at most 20 lines by 58 to 64 columns, no color codes" {
+  local f="$GROVE_ROOT/config/macchina/grove.ascii" w
   [ "$(wc -l < "$f" | tr -d ' ')" -le 20 ]
-  [ "$(awk '{ if (length > m) m = length } END { print m + 0 }' "$f")" -le 44 ]
+  w="$(awk '{ if (length > m) m = length } END { print m + 0 }' "$f")"
+  [ "$w" -ge 58 ] && [ "$w" -le 64 ]
   run grep -c $'\033' "$f"
   [ "$output" = 0 ]
   [ "$(grep -c '█\|▀\|▄' "$f")" -eq 0 ]

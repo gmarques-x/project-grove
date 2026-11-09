@@ -333,5 +333,5 @@ The user asked for the spacing and organization of a reference Ghostty screensho
 **Logo and font revision (2026-11-09, user request):**
 - **Font:** Ghostty's `font-size` is 12, the size the user settled on in the app.
 - **Logo:** after trying pixel art, the user preferred a light touch, so the art is now plain ASCII in the reference screenshot's style: a sparse night sky of `. + *`, a small `- 0 -` moon, and a `"Project Grove"` label whose arrow points at a tiny pine.
-  - It's at most 20 lines × 44 columns, with no color codes; macchina colors it aqua (`custom_ascii.color = "#83C092"`).
+  - It's 18 lines × 61 columns (widened 1.5× at the user's request), with no color codes; macchina colors it aqua (`custom_ascii.color = "#83C092"`).
   - The pixel tooling (`theme/grove-logo.txt`, `theme/render-logo.py`) was removed.
