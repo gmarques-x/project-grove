@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Font files are never committed (licenses). grove-fonts downloads them,
+# and grove-fonts/local/ is for your own copies.
+*.ttf
+*.otf
+*.dmg
+grove-fonts/local/*
+!grove-fonts/local/.gitkeep
+
+# Raw settings recordings contain personal data (recent folders, bookmarks,
+# file paths). Only the recording tools and exported setting blocks are tracked.
+.recording/**/baseline/
+.recording/**/sidebar/
+.recording/**/*-final.plist
+.recording/**/*-at-pause.plist
