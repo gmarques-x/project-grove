@@ -108,7 +108,7 @@ The shell has completions (menu selection, case-insensitive), suggestions from y
 
 `rg` is ripgrep. `grep` is unchanged.
 
-**yazi** lists like `ls` (folders first, A→Z, hidden files off; `.` shows them) in the same colors as eza. Its config is `config/yazi/`. It previews images in Ghostty, plus PDFs, archives and SVGs. Video thumbnails and HEIC/RAW images are left out, since they need ffmpeg and ImageMagick. Terminal.app shows plain previews and can't draw the file icons.
+**yazi** lists like `ls` (folders first, A→Z, hidden files off; `.` shows them) in the same colors as eza. Its top bar is drawn like the prompt (`config/yazi/init.lua`), with a line under it, and the hovered row is a rounded pill. Its config is `config/yazi/`. It previews images in Ghostty, plus PDFs, archives and SVGs. Video thumbnails and HEIC/RAW images are left out, since they need ffmpeg and ImageMagick. Terminal.app shows plain previews and can't draw the file icons.
 
 ## Adding a module
 

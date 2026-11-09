@@ -524,6 +524,41 @@ SH
   grep -qx 'show_hidden = false' "$f"
 }
 
+# yazi_screen [VAR=value...]: yazi's first screen on a 100x30 terminal, opened
+# in a folder with one subfolder and quit with q. Raw output, colors included.
+yazi_screen() {
+  local d="$BATS_TEST_TMPDIR/yz"
+  mkdir -p "$d/sub"; touch "$d/file.txt"
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  (sleep 3; printf q) | env -i HOME="$HOME" PATH="/opt/homebrew/bin:/usr/bin:/bin" TERM=xterm-256color COLORTERM=truecolor "$@" \
+    script -q "$BATS_TEST_TMPDIR/yazi.out" /bin/sh -c "stty rows 30 cols 100; cd '$d' && exec yazi" >/dev/null 2>&1
+  cat "$BATS_TEST_TMPDIR/yazi.out"
+}
+
+@test "yazi's top bar is the prompt bar: aqua user, green folder, yellow end" {
+  [ -x /opt/homebrew/bin/yazi ] || skip "yazi not installed"
+  run yazi_screen TERM_PROGRAM=ghostty
+  [[ "$output" == *$'\xee\x82\xb6'* ]] || false                 # rounded start
+  [[ "$output" == *'48;2;131;192;146'*$'\xef\x85\xb9'* ]] || false   # aqua block, apple
+  [[ "$output" == *'48;2;167;192;128'*'/yz'* ]] || false        # green folder block
+  [[ "$output" == *'38;2;219;188;127'*$'\xee\x82\xb4'* ]] || false   # yellow rounded end
+  [[ "$output" == *'────'* ]] || false                          # the line under it
+}
+
+@test "yazi's top bar has no Nerd Font glyphs in Terminal.app" {
+  [ -x /opt/homebrew/bin/yazi ] || skip "yazi not installed"
+  local bar
+  run yazi_screen TERM_PROGRAM=Apple_Terminal
+  bar="${output%%$'\e[2;1H'*}"        # everything drawn before the second row
+  [[ "$bar" == *'48;2;131;192;146'* ]] || false
+  [[ "$bar" != *$'\xee\x82'* ]] || false     # no rounded ends or arrows
+  [[ "$bar" != *$'\xef\x85\xb9'* ]] || false
+}
+
+@test "yazi's hovered row is a rounded pill" {
+  grep -qx 'padding = { open = "'$'\xee\x82\xb6''", close = "'$'\xee\x82\xb4''" }' "$GROVE_ROOT/config/yazi/theme.toml"
+}
+
 @test "eza uses the Grove theme" {
   [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
   local d="$BATS_TEST_TMPDIR/themed"

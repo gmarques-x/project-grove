@@ -35,6 +35,8 @@ unset_alt   = { fg = "#E69875", bg = "#3D484D" }
 parent  = { bg = "#3D484D" }
 current = { bg = "#543A48", bold = true }
 preview = { underline = true }
+# Rounded ends, so the hovered row is a pill like the prompt's blocks.
+padding = { open = "", close = "" }
 
 [status]
 perm_sep   = { fg = "#7A8478" }

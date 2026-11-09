@@ -63,7 +63,7 @@ setup() { grove_test_setup; }
 
 @test "yazi configs are tracked" {
   local p
-  for p in config/yazi/yazi.toml config/yazi/theme.toml; do
+  for p in config/yazi/yazi.toml config/yazi/theme.toml config/yazi/init.lua; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
   done
