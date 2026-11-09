@@ -44,17 +44,20 @@ _grove_local_value() {
 # grove_local_ensure: load, fill missing values (defaults from git config; the
 # GitHub default is the name), write the file, export the variables.
 grove_local_ensure() {
-  local def_name def_email
+  local def_name def_email filled=0
   grove_local_load || true
   if [ -z "${GROVE_NAME+x}" ]; then
     def_name="$(git config --global user.name 2>/dev/null || true)"
-    _grove_local_value GROVE_NAME "Your name" "$def_name"
+    _grove_local_value GROVE_NAME "Your name" "$def_name"; filled=1
   fi
   if [ -z "${GROVE_EMAIL+x}" ]; then
     def_email="$(git config --global user.email 2>/dev/null || true)"
-    _grove_local_value GROVE_EMAIL "Your email" "$def_email"
+    _grove_local_value GROVE_EMAIL "Your email" "$def_email"; filled=1
   fi
-  _grove_local_value GROVE_GITHUB_USER "Your GitHub username" "$GROVE_NAME"
-  grove_local_write || return 1
+  if [ -z "${GROVE_GITHUB_USER+x}" ]; then
+    _grove_local_value GROVE_GITHUB_USER "Your GitHub username" "$GROVE_NAME"; filled=1
+  fi
+  # A complete file is never rewritten (keeps extra lines, mtime, inode).
+  if [ "$filled" -eq 1 ]; then grove_local_write || return 1; fi
   export GROVE_NAME GROVE_EMAIL GROVE_GITHUB_USER
 }

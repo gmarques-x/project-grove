@@ -9,21 +9,21 @@ setup() {
 
 @test "status lines carry their label" {
   run grove_ok "fonts"
-  [[ "$output" == *ok* && "$output" == *fonts* ]]
+  [[ "$output" == *ok* && "$output" == *fonts* ]] || false
   run grove_work "fonts"
-  [[ "$output" == *"needs work"* && "$output" == *fonts* ]]
+  [[ "$output" == *"needs work"* && "$output" == *fonts* ]] || false
   run grove_you "fonts"
-  [[ "$output" == *"needs you"* && "$output" == *fonts* ]]
+  [[ "$output" == *"needs you"* && "$output" == *fonts* ]] || false
   run --separate-stderr grove_fail "boom"
   [ -z "$output" ]
-  [[ "$stderr" == *boom* ]]
+  [[ "$stderr" == *boom* ]] || false
 }
 
 @test "no color codes when NO_COLOR is set" {
   run grove_ok "fonts"
-  [[ "$output" != *$'\033['* ]]
+  [[ "$output" != *$'\033['* ]] || false
   run grove_step "Title"
-  [[ "$output" != *$'\033['* ]]
+  [[ "$output" != *$'\033['* ]] || false
 }
 
 @test "ask returns the default on an empty reply" {
@@ -49,12 +49,25 @@ on_tty() { script -q /dev/null /bin/bash -c "$1" < /dev/null; }
 @test "color is emitted on a real tty" {
   unset NO_COLOR
   run on_tty 'source "$GROVE_ROOT/lib/ui.sh"; grove_ok fonts; grove_step S; grove_info i'
-  [[ "$output" == *$'\033[38;2;167;192;128m'*fonts* ]]
-  [[ "$output" == *$'\033[38;2;133;146;137m'* ]]
+  [[ "$output" == *$'\033[38;2;167;192;128m'*fonts* ]] || false
+  [[ "$output" == *$'\033[38;2;133;146;137m'* ]] || false
 }
 
 @test "NO_COLOR suppresses color on a real tty" {
   run on_tty 'source "$GROVE_ROOT/lib/ui.sh"; grove_ok fonts'
-  [[ "$output" == *fonts* ]]
-  [[ "$output" != *$'\033['* ]]
+  [[ "$output" == *fonts* ]] || false
+  [[ "$output" != *$'\033['* ]] || false
+}
+
+@test "GROVE_FORCE_COLOR forces color per fd and NO_COLOR beats it" {
+  source "$GROVE_ROOT/lib/ui.sh"
+  unset NO_COLOR
+  GROVE_FORCE_COLOR=1 run grove_ok hi
+  [[ "$output" == *$'\033['* ]] || false
+  GROVE_FORCE_COLOR=1 run grove_fail hi
+  [[ "$output" != *$'\033['* ]] || false
+  GROVE_FORCE_COLOR=1,2 run grove_fail hi
+  [[ "$output" == *$'\033['* ]] || false
+  NO_COLOR=1 GROVE_FORCE_COLOR=1,2 run grove_ok hi
+  [[ "$output" != *$'\033['* ]] || false
 }

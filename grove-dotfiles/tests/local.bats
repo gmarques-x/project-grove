@@ -111,3 +111,13 @@ esac'
   [ "$GROVE_NAME" = 'Gus "G" Marques' ]
   [ "$GROVE_GITHUB_USER" = 'gus g' ]
 }
+
+@test "ensure does not rewrite a complete file" {
+  mkdir -p "$(dirname "$GROVE_LOCAL")"
+  printf 'GROVE_NAME=a\nGROVE_EMAIL=b\nGROVE_GITHUB_USER=c\nEXTRA=1\n' > "$GROVE_LOCAL"
+  local before; before="$(ls -i "$GROVE_LOCAL")"
+  run grove_local_ensure
+  [ "$status" -eq 0 ]
+  [ "$before" = "$(ls -i "$GROVE_LOCAL")" ]
+  grep -qx 'EXTRA=1' "$GROVE_LOCAL"
+}

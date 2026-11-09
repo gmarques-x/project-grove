@@ -186,9 +186,26 @@ if [ "$cmd" != "install" ] && [ "$cmd" != "update" ]; then
 fi
 export GROVE_NAME GROVE_EMAIL GROVE_GITHUB_USER
 
-# ---- run, teeing everything to the log. Color is decided from the real stdout
-# (the pipe to tee is never a terminal), and the log keeps the escape codes.
+# ---- run, teeing each stream to the log without merging them: stdout and
+# stderr each go through their own tee (via FIFOs), so stderr stays on stderr.
+# Color is decided from the real fds (a pipe is never a terminal); the log keeps
+# the escape codes.
 mkdir -p "$GROVE_STATE/logs"
-if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then export GROVE_FORCE_COLOR=1; fi
-_g_main ${rest[@]+"${rest[@]}"} 2>&1 | tee -a "$GROVE_STATE/logs/$GROVE_RUN_ID.log"
-exit "${PIPESTATUS[0]}"
+_g_log="$GROVE_STATE/logs/$GROVE_RUN_ID.log"
+_g_force=""
+if [ -z "${NO_COLOR:-}" ]; then
+  [ -t 1 ] && _g_force="1"
+  [ -t 2 ] && _g_force="${_g_force:+$_g_force,}2"
+fi
+[ -z "$_g_force" ] || export GROVE_FORCE_COLOR="$_g_force"
+_g_tmp="$(mktemp -d "${TMPDIR:-/tmp}/grove.XXXXXX")" || exit 1
+mkfifo "$_g_tmp/out" "$_g_tmp/err" || exit 1
+tee -a "$_g_log" < "$_g_tmp/out" &
+_g_p1=$!
+tee -a "$_g_log" < "$_g_tmp/err" >&2 &
+_g_p2=$!
+_g_main ${rest[@]+"${rest[@]}"} > "$_g_tmp/out" 2> "$_g_tmp/err"
+_g_rc=$?
+wait "$_g_p1" "$_g_p2"
+rm -rf "$_g_tmp"
+exit "$_g_rc"

@@ -5,9 +5,10 @@
 # never inside $(...), where fd 1 is the capture pipe and never a terminal.
 _grove_color_on() {
   [ -z "${NO_COLOR:-}" ] || return 1
-  # bin/grove sets GROVE_FORCE_COLOR when its real stdout is a terminal but
-  # output goes through a log pipe.
-  [ "${GROVE_FORCE_COLOR:-0}" = "1" ] || [ -t "${1:-1}" ]
+  # bin/grove sets GROVE_FORCE_COLOR to a comma list of fds ("1", "1,2") whose
+  # real target is a terminal while output goes through a log pipe.
+  case ",${GROVE_FORCE_COLOR:-}," in *",${1:-1},"*) return 0 ;; esac
+  [ -t "${1:-1}" ]
 }
 
 # _grove_line <rgb> <text> <fd>: print text, colored when fd is a terminal.
