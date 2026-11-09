@@ -27,3 +27,10 @@ setup() { grove_test_setup; }
   run git -C "$GROVE_ROOT" check-ignore -q config/ssh/config
   [ "$status" -ne 0 ]
 }
+
+@test "terminal session and history files in zsh are ignored" {
+  local p
+  for p in config/zsh/.zsh_sessions/x.session config/zsh/.zsh_history config/zsh/.zcompdump config/zsh/.zcompdump-host-5.9; do
+    git -C "$GROVE_ROOT" check-ignore -q "$p"
+  done
+}

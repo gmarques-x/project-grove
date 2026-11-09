@@ -9,3 +9,6 @@
 
 /git/local
 /git/allowed_signers
+/zsh/.zsh_sessions/
+/zsh/.zsh_history
+/zsh/.zcompdump*
