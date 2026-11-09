@@ -332,8 +332,6 @@ The user asked for the spacing and organization of a reference Ghostty screensho
 
 **Logo and font revision (2026-11-09, user request):**
 - **Font:** Ghostty's `font-size` is 12, the size the user settled on in the app.
-- **Logo:** replicates the README banner's logo block at 56 columns × 20 lines.
-  - **Pine:** three drooping tiers with a camouflage texture (aqua base, green highlights, bg_green shadows), a light edge under each tier, and a flared trunk.
-  - **Lettering:** a grey1 divider, then "Project" in a small serif and "Grove" in a bold slab serif, both in fg.
-  - **Tagline:** "A complete macOS desktop overhaul." is printed as real text in grey2, centered on the last line after an empty one.
-  - **Source:** `theme/grove-logo.txt` holds the grid (`scale: 1`), with `caption:` and `caption-color:` lines for the tagline.
+- **Logo:** after trying pixel art, the user preferred a light touch, so the art is now plain ASCII in the reference screenshot's style: a sparse night sky of `. + *`, a small `- 0 -` moon, and a `"Project Grove"` label whose arrow points at a tiny pine.
+  - It's at most 20 lines × 44 columns, with no color codes; macchina colors it aqua (`custom_ascii.color = "#83C092"`).
+  - The pixel tooling (`theme/grove-logo.txt`, `theme/render-logo.py`) was removed.

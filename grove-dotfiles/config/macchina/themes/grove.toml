@@ -1,5 +1,5 @@
 # Everforest Dark Medium, from theme/everforest-dark-medium.
-# The Grove logo on the left; the stats in a titled box with an icon per label
+# A light ASCII sky on the left; the stats in a titled box with an icon per label
 # (Nerd Font, drawn by Ghostty) and the terminal's colors as dots underneath.
 # Labels green, separators grey1, values in the terminal's fg. macchina 6.4
 # colors a bar's filled part with the label color; it has no bar color key.
@@ -32,7 +32,8 @@ x = 2
 y = 1
 
 [custom_ascii]
-# The Grove logo in pixels (theme/grove-logo.txt); its colors are in the file.
+# A light night sky with a small pine: plain text, colored aqua here.
+color = "#83C092"
 path = "~/.config/macchina/grove.ascii"
 
 [keys]

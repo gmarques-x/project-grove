@@ -117,27 +117,6 @@ prompt_styles() {
   grep -qx 'theme = "grove"' "$GROVE_ROOT/config/macchina/macchina.toml"
 }
 
-@test "the logo art is 20 lines by 56 columns, next to the stats box" {
-  local f="$GROVE_ROOT/config/macchina/grove.ascii" w=0 line n
-  [ -f "$f" ]
-  [ "$(wc -l < "$f" | tr -d ' ')" -eq 20 ]
-  while IFS= read -r line; do
-    n="$(printf '%s' "$line" | sed $'s/\033\\[[0-9;]*m//g' | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')"
-    [ "$n" -gt "$w" ] && w="$n"
-  done < "$f"
-  [ "$w" -eq 56 ]
-}
-
-@test "the macchina art is the rendered logo" {
-  command -v python3 >/dev/null || [ -x /opt/homebrew/bin/python3 ] || skip "python3 not installed"
-  diff <(PATH="/opt/homebrew/bin:$PATH" python3 -I "$GROVE_ROOT/theme/render-logo.py") "$GROVE_ROOT/config/macchina/grove.ascii"
-}
-
-@test "the logo uses only palette colors from its legend" {
-  run grep -v '^#' "$GROVE_ROOT/theme/grove-logo.txt"
-  [[ "$output" =~ ^[AGYTDEWS.[:space:]]*$ ]] || false
-}
-
 @test "macchina accepts its config" {
   command -v macchina >/dev/null || [ -x /opt/homebrew/bin/macchina ] || skip "macchina not installed"
   local h="$BATS_TEST_TMPDIR/mhome"
@@ -202,17 +181,16 @@ render_prompt() {
   [ "$(sed -n '/^\[keys\]/,$p' "$t" | grep -c '= "')" -ge 17 ]
 }
 
-@test "the logo spells Project and Grove beside the tree, like the banner" {
-  local g; g="$(grep -v '^#' "$GROVE_ROOT/theme/grove-logo.txt")"
-  [[ "$g" == *S* ]] || false                      # the divider
-  [[ "$g" == *W* ]] || false                      # Grove in fg
-  [ "$(grep -c '^#.*scale: 1' "$GROVE_ROOT/theme/grove-logo.txt")" -eq 1 ]
+@test "the art is light plain text: at most 20 lines by 44 columns, no color codes" {
+  local f="$GROVE_ROOT/config/macchina/grove.ascii"
+  [ "$(wc -l < "$f" | tr -d ' ')" -le 20 ]
+  [ "$(awk '{ if (length > m) m = length } END { print m + 0 }' "$f")" -le 44 ]
+  run grep -c $'\033' "$f"
+  [ "$output" = 0 ]
+  [ "$(grep -c '█\|▀\|▄' "$f")" -eq 0 ]
+  grep -q '"Project Grove"' "$f"
 }
 
-@test "the logo ends with the banner tagline, centered, after an empty line" {
-  local f="$GROVE_ROOT/config/macchina/grove.ascii" last prev
-  last="$(tail -1 "$f" | sed $'s/\033\\[[0-9;]*m//g')"
-  prev="$(tail -2 "$f" | head -1 | sed $'s/\033\\[[0-9;]*m//g')"
-  [[ "$last" == "           A complete macOS desktop overhaul."* ]] || { echo "[$last]"; false; }
-  [ -z "${prev// /}" ]
+@test "macchina colors the art aqua" {
+  sed -n '/^\[custom_ascii\]/,/^\[/p' "$GROVE_ROOT/config/macchina/themes/grove.toml" | grep -qx 'color = "#83C092"'
 }
