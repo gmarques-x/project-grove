@@ -100,6 +100,32 @@ gt_copy_config() {
   [[ "$output" != *"backed up"* ]] || false
 }
 
+@test "a render into another folder leaves the last-written records alone" {
+  run "$CLI" set dark-medium
+  [ "$status" -eq 0 ]
+  before="$(cd "$GROVE_STATE/theme-rendered" && find . -type f -exec cksum {} + | LC_ALL=C sort)"
+  gt_copy_config "$BATS_TEST_TMPDIR/preview"
+  run "$CLI" render --scheme light-soft --config "$BATS_TEST_TMPDIR/preview"
+  [ "$status" -eq 0 ]
+  [ -f "$BATS_TEST_TMPDIR/preview/ghostty/config" ]
+  after="$(cd "$GROVE_STATE/theme-rendered" && find . -type f -exec cksum {} + | LC_ALL=C sort)"
+  [ "$before" = "$after" ]
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"backed up"* ]] || false
+}
+
+@test "a render through a link to the config still records what it wrote" {
+  run "$CLI" set dark-medium
+  [ "$status" -eq 0 ]
+  ln -s "$GROVE_ROOT/config" "$HOME/.config"
+  run "$CLI" render --scheme dark-hard --config "$HOME/.config"
+  [ "$status" -eq 0 ]
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"backed up"* ]] || false
+}
+
 @test "set --json lists every step" {
   run "$CLI" set --json dark-soft
   [ "$status" -eq 0 ]

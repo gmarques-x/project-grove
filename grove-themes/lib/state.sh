@@ -41,14 +41,26 @@ _gt_backup() {
   grove_backup "$1"
 }
 
+# _gt_is_live_config DIR: 0 when DIR is $GROVE_ROOT/config (both resolved).
+_gt_is_live_config() {
+  local a b
+  a="$(cd -P "$1" 2>/dev/null && pwd)" || return 1
+  b="$(cd -P "${GROVE_ROOT:?}/config" 2>/dev/null && pwd)" || return 1
+  [ "$a" = "$b" ]
+}
+
 # gt_render_all SCHEME CONFIG_DIR: render every template under CONFIG_DIR into a
 # temp folder beside it, then mv each result into place. A render failure moves
-# nothing; a failed mv returns 1 (a later render repairs what is left).
+# nothing; a failed mv returns 1 (a later render repairs what is left). The
+# last-written records ($GROVE_STATE/theme-rendered, for the edited-file
+# backup) are read and written only when CONFIG_DIR is $GROVE_ROOT/config, so
+# a render into another folder (a preview) can't make them stale.
 gt_render_all() {
-  local scheme="$1" cfg="$2" palettes tmp t rc=0 out last dest
+  local scheme="$1" cfg="$2" palettes tmp t rc=0 out last dest live=0
   local rendered="$GROVE_STATE/theme-rendered"
   palettes="${GROVE_ROOT:?}/theme"
   [ -d "$cfg" ] || { echo "grove-themes: no config folder $cfg" >&2; return 1; }
+  _gt_is_live_config "$cfg" && live=1
   : "${GROVE_RUN_ID:=$(date +%Y%m%d-%H%M%S)}"
   export GROVE_RUN_ID
   tmp="$(mktemp -d "$cfg/.grove-themes.XXXXXX")" || return 1
@@ -62,7 +74,7 @@ gt_render_all() {
   done
   for t in $(gt_templates "$cfg"); do
     last="$rendered/${t%.tmpl}"
-    if [ -f "$last" ] && [ -f "$cfg/${t%.tmpl}" ] && ! cmp -s "$last" "$cfg/${t%.tmpl}"; then
+    if [ "$live" = 1 ] && [ -f "$last" ] && [ -f "$cfg/${t%.tmpl}" ] && ! cmp -s "$last" "$cfg/${t%.tmpl}"; then
       if dest="$(_gt_backup "$cfg/${t%.tmpl}")" && [ -n "$dest" ]; then
         echo "backed up edited ${t%.tmpl} to $dest"
       else
@@ -74,7 +86,7 @@ gt_render_all() {
     if ! mv -f "$tmp/${t%.tmpl}" "$cfg/${t%.tmpl}"; then
       echo "grove-themes: could not write $cfg/${t%.tmpl}" >&2
       rc=1
-    else
+    elif [ "$live" = 1 ]; then
       mkdir -p "$rendered/$(dirname "${t%.tmpl}")" && cp -f "$cfg/${t%.tmpl}" "$last" \
         || echo "grove-themes: could not record $last" >&2
     fi
