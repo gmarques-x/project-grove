@@ -11,6 +11,8 @@ struct GalleryView: View {
     static let width: CGFloat = 760
     static let height: CGFloat = 404
     static let buttonsClearance: CGFloat = 28
+    /// `State` used directly: see GroveThemesApp on why not `@State`.
+    private var focus = State(initialValue: KeyboardFocus(layout: .gallery))
 
     var body: some View {
         let theme = model.currentColors
@@ -27,7 +29,8 @@ struct GalleryView: View {
                     if let colors = model.colors(for: scheme) {
                         SchemeCard(scheme: scheme, colors: colors,
                                    isCurrent: scheme == model.list?.current,
-                                   isBusy: model.busyScheme == scheme) {
+                                   isBusy: model.busyScheme == scheme,
+                                   isFocused: focus.wrappedValue.focused == .scheme(scheme)) {
                             Task { await model.switchTo(scheme) }
                         }
                         .disabled(model.switchingDisabled)
@@ -41,6 +44,10 @@ struct GalleryView: View {
         .padding(.top, Self.buttonsClearance)
         .frame(width: Self.width, alignment: .top)
         .frame(minHeight: Self.height, alignment: .top)
+        .keyboardNavigation(focus.projectedValue, current: model.list?.current ?? "",
+                            schemesDisabled: model.switchingDisabled) { item in
+            if case .scheme(let scheme) = item { Task { await model.switchTo(scheme) } }
+        }
         .ignoresSafeArea(.container, edges: .top)
         .font(GroveFont.mono(12))
         .foregroundStyle(Color(theme.fg))

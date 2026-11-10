@@ -8,6 +8,8 @@ struct SchemeCard: View {
     let colors: ThemeColors
     let isCurrent: Bool
     let isBusy: Bool
+    /// The keyboard focus box is on this card.
+    var isFocused = false
     let action: () -> Void
     @Environment(\.theme) private var theme
 
@@ -34,6 +36,9 @@ struct SchemeCard: View {
             .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
+        .focusBox(isFocused, cornerRadius: 10, outset: 5)
     }
 
     private var desktop: some View {

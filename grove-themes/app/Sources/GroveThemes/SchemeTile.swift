@@ -7,6 +7,8 @@ struct SchemeTile: View {
     let colors: ThemeColors
     let isCurrent: Bool
     let isBusy: Bool
+    /// The keyboard focus box is on this tile.
+    var isFocused = false
     let action: () -> Void
     @Environment(\.theme) private var theme
 
@@ -45,6 +47,9 @@ struct SchemeTile: View {
             .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
+        .focusBox(isFocused, cornerRadius: 8, outset: 5)
         .help(StatusText.displayName(scheme))
     }
 }
