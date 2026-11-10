@@ -15,12 +15,21 @@ public struct TomlEntry: Equatable, Sendable {
     public var value: TomlValue
     public var leadingComments: [String]
     public var trailingComment: String?
+    /// Line the entry started on when parsed; 0 for entries built in code.
+    /// Not part of equality, so an edited document compares by content.
+    public var line: Int
 
-    public init(key: String, value: TomlValue, leadingComments: [String] = [], trailingComment: String? = nil) {
+    public init(key: String, value: TomlValue, leadingComments: [String] = [], trailingComment: String? = nil, line: Int = 0) {
         self.key = key
         self.value = value
         self.leadingComments = leadingComments
         self.trailingComment = trailingComment
+        self.line = line
+    }
+
+    public static func == (a: TomlEntry, b: TomlEntry) -> Bool {
+        a.key == b.key && a.value == b.value && a.leadingComments == b.leadingComments
+            && a.trailingComment == b.trailingComment
     }
 }
 
@@ -129,7 +138,7 @@ public struct TomlDocument: Equatable, Sendable {
                 throw TomlError(line: lineNo, message: "duplicate key \"\(key)\"")
             }
             sections[last].entries.append(
-                TomlEntry(key: key, value: value, leadingComments: pending, trailingComment: comment))
+                TomlEntry(key: key, value: value, leadingComments: pending, trailingComment: comment, line: lineNo))
             pending = []
         }
         return TomlDocument(sections: sections, trailingComments: pending)
@@ -143,6 +152,9 @@ private struct Scanner {
     private var pos = 0
     var position: Int { get { pos } set { pos = newValue } }
     private let line: Int
+    /// Errors report the line the scanner is on, which moves down as a
+    /// multi-line array's continuation lines are appended.
+    private var currentLine: Int { line + chars[0..<min(pos, chars.count)].filter { $0 == "\n" }.count }
 
     init(_ chars: [Character], line: Int) {
         self.chars = chars
@@ -151,7 +163,7 @@ private struct Scanner {
 
     mutating func append(_ more: String) { chars.append(contentsOf: more) }
 
-    private func fail(_ message: String) -> TomlError { TomlError(line: line, message: message) }
+    private func fail(_ message: String) -> TomlError { TomlError(line: currentLine, message: message) }
 
     private var peek: Character? { pos < chars.count ? chars[pos] : nil }
 
