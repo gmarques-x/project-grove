@@ -13,18 +13,9 @@ struct DropdownView: View {
         let theme = model.currentColors
         VStack(alignment: .leading, spacing: 12) {
             header(theme)
-            if let error = model.error {
-                Text(error.message)
-                    .font(GroveFont.mono(11.5))
-                    .foregroundStyle(Color(theme.red))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
             VStack(alignment: .leading, spacing: 8) {
                 row("DARK", model.schemes(dark: true), theme)
                 row("LIGHT", model.schemes(dark: false), theme)
-            }
-            if let entry = model.switches.first {
-                StatusLine(entry: entry)
             }
             VStack(alignment: .leading, spacing: 2) {
                 MenuRow(title: "Open Grove Themes…", isFocused: focus.wrappedValue.focused == .openWindow) {
@@ -96,37 +87,6 @@ struct DropdownView: View {
                 }
             }
         }
-    }
-}
-
-/// The last switch in words; a step that needs you or failed is named in red,
-/// with its message under the line.
-private struct StatusLine: View {
-    let entry: LogEntry
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        let line = StatusText.line(for: entry, now: Date(), calendar: .current)
-        let problems = StatusText.chips(for: entry).filter { $0.kind == .needsYou || $0.kind == .failed }
-        // The line ends with " · <problems>" exactly when there are problems.
-        var parts = line.components(separatedBy: " · ")
-        let problemPart = problems.isEmpty ? nil : parts.popLast()
-        let red = Color(theme.red)
-        VStack(alignment: .leading, spacing: 4) {
-            if let problemPart {
-                Text("\(parts.joined(separator: " · ")) · \(Text(problemPart).foregroundStyle(red))")
-            } else {
-                Text(line)
-            }
-            ForEach(Array(problems.enumerated()), id: \.offset) { _, chip in
-                Text(chip.message.isEmpty ? chip.text : "\(chip.text) — \(chip.message)")
-                    .foregroundStyle(red)
-            }
-        }
-        .font(GroveFont.mono(11.5))
-        .lineSpacing(2)
-        .opacity(0.85)
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

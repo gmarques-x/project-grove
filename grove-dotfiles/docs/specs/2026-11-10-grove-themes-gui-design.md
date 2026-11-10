@@ -11,7 +11,6 @@ A small native Mac app, Grove Themes, puts the six Everforest schemes one click 
 - After `grove install`, the tree is in the menu bar, and it's there again after logging out and in.
 - One click on a tile switches the desktop, and the dropdown shows the result line ("Switched to Light Soft at 13:12 · 11 updated now, yazi next launch").
 - The dropdown and the window recolour themselves to the new scheme, also when the switch was made from the terminal.
-- The dropdown's status line shows the last switch, made from the app or the terminal, with any step that needs you or failed in red.
 - `grove check` reports `97-themes-app` ok.
 
 ## 2. Decisions
@@ -49,7 +48,7 @@ A Swift package with two targets:
 - **`GroveThemesCore`** (library, unit-tested): runs the CLI through a `CLIRunner` protocol (the real one uses `Process`; tests use a fake), decodes `list`, `set` and `log` JSON, turns step results into the status line and the log chips, and finds the state file to watch (`$GROVE_STATE/theme`, default `~/.local/state/grove/theme`).
 - **`GroveThemes`** (executable, the SwiftUI app): `MenuBarExtra` with the dropdown, a `Window` scene for the gallery, a theme object that maps the current scheme's colours to SwiftUI colours, and a file watcher on the state file that reloads `list` and `log` when it changes (switches made in the terminal show up within a second).
 
-**Dropdown** (about 320 pt wide): the pine, "Grove Themes" and the current scheme's name; two labelled rows (Dark, Light) of three tiles (Hard, Medium, Soft), each tile drawn in its scheme's bg0 with "Aa" in its fg and five accent dots; a tick and a green border on the current one. Clicking a tile runs `set <scheme> --json`: that tile shows a spinner and the others are disabled until it returns. Under the tiles, the status line of the last switch; a step that needs you or failed shows in red with its message. Then "Open Grove Themes…" and "Quit".
+**Dropdown** (about 320 pt wide): the pine, "Grove Themes" and the current scheme's name; two labelled rows (Dark, Light) of three tiles (Hard, Medium, Soft), each tile drawn in its scheme's bg0 with "Aa" in its fg and five accent dots; a tick and a green border on the current one. Clicking a tile runs `set <scheme> --json`: that tile shows a spinner and the others are disabled until it returns. Then "Open Grove Themes…" and "Quit". No status line, log or error messages (the user's choice, 2026-11-10); `grove-themes log` shows the history in the terminal.
 
 **Gallery window** (760 pt wide, sized to fit the cards, about 404 pt tall): seamless like Ghostty, no title bar or title, the scheme's bg0 up to the top edge with the window buttons over it in the top-left corner and the cards 28 pt lower to clear them; the window drags by any empty background. Six cards in a 3 × 2 grid, each a small desktop (the scheme's bg0 with the Grove lockup in its ink, and a terminal snippet in bg1 with prompt colours), the current one with a green border and "● on". Each card's scheme name is styled exactly like the dropdown's current-scheme line under "Grove Themes": the same size, regular weight, fg at 75% opacity (one shared text style in the code, so the two can't drift apart). Clicking a card switches, as in the dropdown. No log: the switch log is `grove-themes log`, and the dropdown keeps its status line.
 
