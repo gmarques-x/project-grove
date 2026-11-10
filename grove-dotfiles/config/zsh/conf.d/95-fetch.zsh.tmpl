@@ -8,7 +8,7 @@
 _grove_fetch() {
   local dir="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
   local -a logo
-  if [[ "$TERM_PROGRAM" == ghostty ]] && (( COLUMNS >= 140 )) && [[ -r "$dir/grove.png" ]]; then
+  if [[ "$TERM_PROGRAM" == ghostty ]] && (( COLUMNS >= 140 )) && [[ -r "$dir/{{fetch_image}}" ]]; then
     logo=()
   elif (( COLUMNS >= 125 )); then
     logo=(--logo-type file --logo "$dir/grove.ascii" --logo-color-1 '{{aqua}}')
