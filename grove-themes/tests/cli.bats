@@ -7,6 +7,7 @@ setup() {
   export GROVE_STATE="$HOME/.local/state/grove"
   mkdir -p "$GROVE_ROOT"
   cp -R "$DOTFILES/theme" "$GROVE_ROOT/theme"
+  cp -R "$DOTFILES/lib" "$GROVE_ROOT/lib"
   gt_copy_config "$GROVE_ROOT/config"
   CLI="$GT_ROOT/bin/grove-themes"
 }

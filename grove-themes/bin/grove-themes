@@ -37,6 +37,8 @@ export GROVE_STATE="${GROVE_STATE:-$HOME/.local/state/grove}"
 . "$GT_ROOT/lib/render.sh"
 # shellcheck source=/dev/null
 . "$GT_ROOT/lib/state.sh"
+# shellcheck source=/dev/null
+. "$GT_ROOT/lib/steps.sh"
 
 _gt_json_list() { # words -> "a", "b"
   local out="" s
@@ -90,7 +92,8 @@ cmd_render() {
 }
 
 cmd_set() {
-  local json="$1" scheme="$2" msg="" result="live"
+  local json="$1" scheme="$2" msg="" result="live" rc=0 lines tab name res text out="" sep=""
+  tab="$(printf '\t')"
   [ -n "$scheme" ] || { _gt_usage >&2; exit 2; }
   gt_valid "$scheme" || _gt_unknown "$scheme"
   if ! msg="$(gt_render_all "$scheme" "$GROVE_ROOT/config" 2>&1)"; then
@@ -98,14 +101,27 @@ cmd_set() {
   elif ! gt_write_state "$scheme"; then
     result="failed"; msg="could not write $GROVE_STATE/theme"
   fi
-  if [ "$json" = 1 ]; then
-    printf '{"scheme": "%s", "steps": [{"name": "configs", "result": "%s", "message": "%s"}]}\n' \
-      "$scheme" "$result" "$(_gt_json_esc "$msg")"
-  else
-    [ -z "$msg" ] || echo "$msg" >&2
-    [ "$result" = failed ] || echo "grove-themes: $scheme"
+  lines="configs$tab$result$tab$(printf '%s' "$msg" | tr '\n' ' ')"
+  if [ "$result" != failed ]; then
+    lines="$lines
+$(gt_step_ghostty; gt_step_zsh; gt_step_static
+      gt_step_appearance "$scheme"; gt_step_accent "$scheme"; gt_step_wallpaper "$scheme")"
   fi
-  [ "$result" != failed ] || exit 1
+  while IFS="$tab" read -r name res text; do
+    case "$res" in failed|needs-you) rc=1 ;; esac
+    if [ "$json" = 1 ]; then
+      out="$out$sep$(printf '{"name": "%s", "result": "%s", "message": "%s"}' "$name" "$res" "$(_gt_json_esc "$text")")"
+      sep=", "
+    else
+      printf '%-11s %-12s %s\n' "$name" "$res" "$text"
+    fi
+  done <<< "$lines"
+  if [ "$json" = 1 ]; then
+    printf '{"scheme": "%s", "steps": [%s]}\n' "$scheme" "$out"
+  elif [ "$result" != failed ]; then
+    echo "grove-themes: $scheme"
+  fi
+  exit "$rc"
 }
 
 json=0

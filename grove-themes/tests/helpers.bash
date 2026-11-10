@@ -7,6 +7,16 @@ gt_test_setup() {
   mkdir -p "$HOME" "$BATS_TEST_TMPDIR/stubs"
   export NO_COLOR=1
   export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
+  # Safety: `set` must never reach the real desktop. No-op fakes for everything
+  # it calls; tests that care replace them.
+  local c s
+  for c in osascript defaults kill ps; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
+  export GROVE_KILL="$BATS_TEST_TMPDIR/stubs/kill"
+  export GROVE_WALLPAPER_DIR="$BATS_TEST_TMPDIR/wallpapers"
+  mkdir -p "$GROVE_WALLPAPER_DIR"
+  for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
+    : > "$GROVE_WALLPAPER_DIR/wallpaper-project-grove-$s.png"
+  done
 }
 
 # stub <cmd> <script body>: executable bash stub placed first on PATH.

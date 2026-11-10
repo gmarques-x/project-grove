@@ -84,6 +84,28 @@ fi'
   [[ "$output" == *Automation* ]]
 }
 
+@test "wallpaper: wants the current scheme's picture" {
+  mkdir -p "$GROVE_STATE"; echo light-soft > "$GROVE_STATE/theme"
+  load_module
+  SOFT="$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers/wallpaper-project-grove-light-soft.png"
+  printf '%s\n%s\n' "$WANT" "$WANT" > "$BATS_TEST_TMPDIR/desktops"
+  run check
+  [ "$status" -eq 3 ]
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(sort -u "$BATS_TEST_TMPDIR/desktops")" = "$SOFT" ]
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "wallpaper: an unknown or empty scheme means dark-medium" {
+  mkdir -p "$GROVE_STATE"; echo nonsense > "$GROVE_STATE/theme"
+  load_module
+  [ "$(_wp_file)" = "$WANT" ]
+  : > "$GROVE_STATE/theme"
+  [ "$(_wp_file)" = "$WANT" ]
+}
+
 @test "wallpaper: the README lists the module" {
   grep -q '^| `85-macos-wallpaper` |' "$GROVE_ROOT/README.md"
 }

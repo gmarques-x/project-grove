@@ -30,13 +30,27 @@ gt_write_state() {
   mv "$file.tmp" "$file" || { rm -f "$file.tmp"; return 1; }
 }
 
+# _gt_backup PATH: grove's grove_backup (needs $GROVE_ROOT/lib); prints where
+# PATH went. Backups of one run land in $GROVE_STATE/backup/$GROVE_RUN_ID.
+_gt_backup() {
+  local f
+  for f in ui link; do
+    # shellcheck source=/dev/null
+    . "${GROVE_ROOT:?}/lib/$f.sh" || return 1
+  done
+  grove_backup "$1"
+}
+
 # gt_render_all SCHEME CONFIG_DIR: render every template under CONFIG_DIR into a
 # temp folder beside it, then mv each result into place. A render failure moves
 # nothing; a failed mv returns 1 (a later render repairs what is left).
 gt_render_all() {
-  local scheme="$1" cfg="$2" palettes tmp t rc=0 out
+  local scheme="$1" cfg="$2" palettes tmp t rc=0 out last dest
+  local rendered="$GROVE_STATE/theme-rendered"
   palettes="${GROVE_ROOT:?}/theme"
   [ -d "$cfg" ] || { echo "grove-themes: no config folder $cfg" >&2; return 1; }
+  : "${GROVE_RUN_ID:=$(date +%Y%m%d-%H%M%S)}"
+  export GROVE_RUN_ID
   tmp="$(mktemp -d "$cfg/.grove-themes.XXXXXX")" || return 1
   for t in $(gt_templates "$cfg"); do
     mkdir -p "$tmp/$(dirname "$t")" || { rm -rf "$tmp"; return 1; }
@@ -47,9 +61,22 @@ gt_render_all() {
     fi
   done
   for t in $(gt_templates "$cfg"); do
+    last="$rendered/${t%.tmpl}"
+    if [ -f "$last" ] && [ -f "$cfg/${t%.tmpl}" ] && ! cmp -s "$last" "$cfg/${t%.tmpl}"; then
+      if dest="$(_gt_backup "$cfg/${t%.tmpl}")" && [ -n "$dest" ]; then
+        echo "backed up edited ${t%.tmpl} to $dest"
+      else
+        echo "grove-themes: could not back up $cfg/${t%.tmpl}" >&2
+        rc=1
+        continue
+      fi
+    fi
     if ! mv -f "$tmp/${t%.tmpl}" "$cfg/${t%.tmpl}"; then
       echo "grove-themes: could not write $cfg/${t%.tmpl}" >&2
       rc=1
+    else
+      mkdir -p "$rendered/$(dirname "${t%.tmpl}")" && cp -f "$cfg/${t%.tmpl}" "$last" \
+        || echo "grove-themes: could not record $last" >&2
     fi
   done
   rm -rf "$tmp"
