@@ -479,10 +479,10 @@ pty_alias_shell() {
   [[ "$output" != *--icons* ]] || false
 }
 
-@test "cat is bat without paging" {
+@test "cat is bat, paging only files longer than the window" {
   [ -x /opt/homebrew/bin/bat ] || skip "bat not installed"
   run alias_shell 'alias cat'
-  [[ "$output" == *"bat --paging=never"* ]] || false
+  [[ "$output" == *"bat --paging=auto"* ]] || false
 }
 
 @test "ll lists hidden files, folders first, each A to Z ignoring case" {

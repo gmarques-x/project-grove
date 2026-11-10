@@ -16,7 +16,7 @@ if (( $+commands[eza] )); then
   unset _grove_icons
 fi
 if (( $+commands[bat] )); then
-  alias cat='bat --paging=never'
+  alias cat='bat --paging=auto'  # pages only files longer than the window
 fi
 
 # y (or finder): yazi, and when you quit, the shell moves to the folder you were in.

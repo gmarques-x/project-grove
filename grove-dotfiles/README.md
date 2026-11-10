@@ -101,7 +101,7 @@ The shell has completions (menu selection, case-insensitive), suggestions from y
 | `ls` | `eza -l`, folders first, then files, each A→Z | the original: `\ls` |
 | `ll` | the same, with hidden files | |
 | `lt` | a two-level tree | |
-| `cat` | `bat` (line numbers, git changes) | the original: `\cat` |
+| `cat` | `bat` (line numbers, git changes; long files open in a pager) | the original: `\cat` |
 | `cd` | zoxide: works like `cd`, and `cd proj` jumps to your most-used match | the original: `builtin cd` |
 | `cls` | clears the screen and reloads the shell, like a new window (summary included) | |
 | `y` or `finder` | yazi, a file manager in the terminal; when you quit, the shell moves to the folder you were in | plain: `yazi` |
