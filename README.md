@@ -21,6 +21,7 @@ It clones this repo to `~/Developer/project-grove` and runs `grove install`. Rea
 | Folder | What it is |
 | --- | --- |
 | [`grove-dotfiles/`](grove-dotfiles/) | The `grove` installer and every config it links into `~/.config`: Ghostty, zsh, Starship, git, SSH, bat, eza, yazi and fastfetch, plus Homebrew packages, fonts and Finder settings. |
+| [`grove-wallpapers/`](grove-wallpapers/) | Desktop wallpapers in the same palette. `grove-terminal.png`: the Grove logo and lettering centred on the terminal's background `#2D353B`, 2880 × 1864. |
 
 More pieces will grow here over time.
 
