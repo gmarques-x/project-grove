@@ -11,23 +11,20 @@ import tempfile
 from urllib.parse import quote
 
 
-def desktop_holders(store):
-    """Dicts that hold a "Desktop" key: all-spaces, displays, spaces."""
-    found = []
-
-    def add(node):
-        if isinstance(node, dict) and isinstance(node.get("Desktop"), dict):
+def desktop_holders(node, found=None):
+    """Every dict holding a "Desktop" dict, anywhere in the tree except under
+    "Idle" (the screen saver)."""
+    if found is None:
+        found = []
+    if isinstance(node, dict):
+        if isinstance(node.get("Desktop"), dict):
             found.append(node)
-
-    add(store.get("AllSpacesAndDisplays"))
-    for d in (store.get("Displays") or {}).values():
-        add(d)
-    for space in (store.get("Spaces") or {}).values():
-        if not isinstance(space, dict):
-            continue
-        add(space.get("Default"))
-        for d in (space.get("Displays") or {}).values():
-            add(d)
+        for key, value in node.items():
+            if key not in ("Idle", "Desktop"):
+                desktop_holders(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            desktop_holders(value, found)
     return found
 
 

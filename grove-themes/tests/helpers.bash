@@ -69,7 +69,8 @@ def entry(url):
             "Idle": {"Content": {"Choices": [{"Provider": "com.apple.wallpaper.choice.aerials", "Configuration": b"idle", "Files": []}]}, "LastSet": 2}}
 store = {"AllSpacesAndDisplays": entry("file:///old/all.png"),
          "Displays": {"D1": entry("file:///old/d1.png")},
-         "Spaces": {"S1": {"Default": entry("file:///gone/deleted.png"), "Displays": {"D1": entry("file:///old/s1d1.png")}}, "": {"Default": entry("file:///old/blank.png")}}}
+         "Spaces": {"S1": {"Default": entry("file:///gone/deleted.png"), "Displays": {"D1": entry("file:///old/s1d1.png")}}, "": {"Default": entry("file:///old/blank.png")}},
+         "SystemDefault": dict(entry("file:///old/sys.png"), Displays={"D1": entry("file:///old/sysd1.png")})}
 with open(sys.argv[1], "wb") as f:
     plistlib.dump(store, f, fmt=plistlib.FMT_BINARY)
 PY

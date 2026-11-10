@@ -7,10 +7,10 @@ HELPER() { /usr/bin/python3 -I "$GT_ROOT/lib/wallpaper_store.py" "$@"; }
   gt_make_store "$BATS_TEST_TMPDIR/Index.plist"
   run HELPER "$BATS_TEST_TMPDIR/Index.plist" "/tmp/my dir/w p.png"
   [ "$status" -eq 0 ]
-  [ "$output" = 5 ]
+  [ "$output" = 7 ]
   [ "$(gt_store_urls "$BATS_TEST_TMPDIR/Index.plist" | sort -u)" = "file:///tmp/my%20dir/w%20p.png" ]
-  [ "$(gt_store_urls "$BATS_TEST_TMPDIR/Index.plist" | wc -l | tr -d ' ')" = 5 ]
-  [ "$(gt_store_idle "$BATS_TEST_TMPDIR/Index.plist" | wc -l | tr -d ' ')" = 5 ]
+  [ "$(gt_store_urls "$BATS_TEST_TMPDIR/Index.plist" | wc -l | tr -d ' ')" = 7 ]
+  [ "$(gt_store_idle "$BATS_TEST_TMPDIR/Index.plist" | wc -l | tr -d ' ')" = 7 ]
   [ "$(gt_store_idle "$BATS_TEST_TMPDIR/Index.plist" | sort -u)" = "com.apple.wallpaper.choice.aerials:idle" ]
   [ ! -e "$BATS_TEST_TMPDIR/Index.plist.tmp" ]
 }
