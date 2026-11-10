@@ -153,6 +153,16 @@ chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
   [[ "$(chrome_line)" == *"next-launch"*"Chrome takes the new colours the next time it starts (load ~/.config/chrome-theme once in chrome://extensions if you haven't)"* ]] || false
 }
 
+@test "chrome: set removes Chrome's compiled theme so it rebuilds at the next start" {
+  export GROVE_CHROME_APP="$BATS_TEST_TMPDIR/Google Chrome.app"
+  mkdir -p "$GROVE_CHROME_APP" "$GROVE_ROOT/config/chrome-theme"
+  echo stale > "$GROVE_ROOT/config/chrome-theme/Cached Theme.pak"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [ ! -e "$GROVE_ROOT/config/chrome-theme/Cached Theme.pak" ]
+  [ -f "$GROVE_ROOT/config/chrome-theme/manifest.json" ]
+}
+
 @test "chrome: installed but the theme wasn't rendered fails" {
   export GROVE_CHROME_APP="$BATS_TEST_TMPDIR/Google Chrome.app"
   mkdir -p "$GROVE_CHROME_APP"

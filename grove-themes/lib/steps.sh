@@ -52,8 +52,11 @@ gt_step_static() {
 }
 
 # gt_step_chrome: Chrome's profile can't be read without Full Disk Access, so
-# this only checks that the theme was rendered.
+# this only checks that the theme was rendered. Chrome compiles the theme into
+# "Cached Theme.pak" in the theme folder and reuses it at every start, whatever
+# the manifest says; removing it makes Chrome rebuild from the new colours.
 gt_step_chrome() {
+  rm -f "${GROVE_ROOT:?}/config/chrome-theme/Cached Theme.pak"
   if [ ! -d "${GROVE_CHROME_APP:-/Applications/Google Chrome.app}" ]; then
     _gt_line chrome live "Chrome not installed"
   elif [ -f "${GROVE_ROOT:?}/config/chrome-theme/manifest.json" ]; then
