@@ -163,7 +163,8 @@ public struct KeysFile: Equatable, Sendable {
 
     private static func validateHyper(_ e: TomlEntry) throws(TomlError) {
         switch (e.key, e.value) {
-        case ("key", .string): break
+        case ("key", .string(let s)):
+            guard s == "caps_lock" else { throw TomlError(line: e.line, message: "key must be \"caps_lock\"") }
         case ("enabled", .bool): break
         case ("tap", .string(let s)):
             guard TapAction(rawValue: s) != nil else {

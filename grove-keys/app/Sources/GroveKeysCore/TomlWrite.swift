@@ -32,7 +32,8 @@ extension TomlDocument {
     }
 
     private static func keyText(_ key: String) -> String {
-        isBare(key, allowHyphen: true) ? key : quoted(key)
+        // All-digit keys (workspace numbers) are quoted: `"1" = "main"`.
+        isBare(key, allowHyphen: true) && !key.allSatisfy(\.isNumber) ? key : quoted(key)
     }
 
     /// Names after the first (a mode, a host name) are quoted when they hold

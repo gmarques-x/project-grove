@@ -64,11 +64,11 @@ import Testing
 
     @Test func setMonitorCreatesHostSectionAtEnd() throws {
         var f = try KeysFile(text: try fixture("keys.toml"))
-        f.setMonitor(host: "Host", workspace: "1", target: "main")
-        #expect(f.document.serialized().hasSuffix("\n\n[monitors.\"Host\"]\n\"1\" = \"main\"\n") || f.document.serialized().hasSuffix("\n\n[monitors.Host]\n1 = \"main\"\n"))
-        #expect(f.monitors(host: "Host").map(\.workspace) == ["1"])
-        #expect(f.monitors(host: "Host").map(\.target) == ["main"])
-        #expect(f.monitors(host: "Other").isEmpty)
+        f.setMonitor(host: "Other-Mac", workspace: "1", target: "secondary")
+        #expect(f.document.serialized().hasSuffix("\n[monitors.\"Other-Mac\"]\n\"1\" = \"secondary\"\n"))
+        #expect(f.monitors(host: "Other-Mac").map(\.workspace) == ["1"])
+        #expect(f.monitors(host: "Other-Mac").map(\.target) == ["secondary"])
+        #expect(f.monitors(host: "Elsewhere").isEmpty)
     }
 
     @Test func newSectionsGoInFixedOrder() throws {
@@ -86,6 +86,7 @@ import Testing
         #expect(line("[hyper]\ntap_ms = 1\ntap = \"space\"\n") == 3)
         #expect(line("[hyper]\ncolor = \"red\"\n") == 2)
         #expect(line("\n[hyper]\ntap_ms = -5\n") == 3)
+        #expect(line("[hyper]\nkey = \"right_shift\"\n") == 2)
         #expect(line("[launch]\nt = 3\n") == 2)
         #expect(line("[aerospace.main]\na = 3\n") == 2)
     }
