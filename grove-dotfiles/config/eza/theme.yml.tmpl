@@ -1,0 +1,103 @@
+# Project Grove · eza colors, Everforest Dark Medium (theme/everforest-dark-medium).
+colourful: true
+
+filekinds:
+  normal: {foreground: "{{fg}}"}
+  directory: {foreground: "{{blue}}", is_bold: true}
+  symlink: {foreground: "{{aqua}}"}
+  pipe: {foreground: "{{purple}}"}
+  block_device: {foreground: "{{yellow}}"}
+  char_device: {foreground: "{{yellow}}"}
+  socket: {foreground: "{{purple}}"}
+  special: {foreground: "{{orange}}"}
+  executable: {foreground: "{{green}}", is_bold: true}
+  mount_point: {foreground: "{{blue}}", is_underline: true}
+
+perms:
+  user_read: {foreground: "{{yellow}}"}
+  user_write: {foreground: "{{red}}"}
+  user_execute_file: {foreground: "{{green}}"}
+  user_execute_other: {foreground: "{{green}}"}
+  group_read: {foreground: "{{yellow}}"}
+  group_write: {foreground: "{{red}}"}
+  group_execute: {foreground: "{{green}}"}
+  other_read: {foreground: "{{yellow}}"}
+  other_write: {foreground: "{{red}}"}
+  other_execute: {foreground: "{{green}}"}
+  special_user_file: {foreground: "{{purple}}"}
+  special_other: {foreground: "{{purple}}"}
+  attribute: {foreground: "{{grey1}}"}
+
+size:
+  major: {foreground: "{{fg}}"}
+  minor: {foreground: "{{grey1}}"}
+  number_byte: {foreground: "{{fg}}"}
+  number_kilo: {foreground: "{{fg}}"}
+  number_mega: {foreground: "{{fg}}"}
+  number_giga: {foreground: "{{fg}}"}
+  number_huge: {foreground: "{{fg}}"}
+  unit_byte: {foreground: "{{grey1}}"}
+  unit_kilo: {foreground: "{{grey1}}"}
+  unit_mega: {foreground: "{{grey1}}"}
+  unit_giga: {foreground: "{{grey1}}"}
+  unit_huge: {foreground: "{{grey1}}"}
+
+users:
+  user_you: {foreground: "{{fg}}"}
+  user_root: {foreground: "{{red}}"}
+  user_other: {foreground: "{{grey1}}"}
+  group_yours: {foreground: "{{fg}}"}
+  group_other: {foreground: "{{grey1}}"}
+  group_root: {foreground: "{{red}}"}
+
+links:
+  normal: {foreground: "{{grey1}}"}
+  multi_link_file: {foreground: "{{yellow}}"}
+
+git:
+  new: {foreground: "{{green}}"}
+  modified: {foreground: "{{purple}}"}
+  deleted: {foreground: "{{red}}"}
+  renamed: {foreground: "{{aqua}}"}
+  typechange: {foreground: "{{purple}}"}
+  ignored: {foreground: "{{grey0}}"}
+  conflicted: {foreground: "{{red}}"}
+
+git_repo:
+  branch_main: {foreground: "{{blue}}"}
+  branch_other: {foreground: "{{purple}}"}
+  git_clean: {foreground: "{{green}}"}
+  git_dirty: {foreground: "{{red}}"}
+
+security_context:
+  colon: {foreground: "{{grey1}}"}
+  user: {foreground: "{{fg}}"}
+  role: {foreground: "{{purple}}"}
+  typ: {foreground: "{{grey0}}"}
+  range: {foreground: "{{purple}}"}
+
+file_type:
+  image: {foreground: "{{purple}}"}
+  video: {foreground: "{{purple}}"}
+  music: {foreground: "{{aqua}}"}
+  lossless: {foreground: "{{aqua}}"}
+  crypto: {foreground: "{{red}}"}
+  document: {foreground: "{{fg}}"}
+  compressed: {foreground: "{{orange}}"}
+  temp: {foreground: "{{grey0}}"}
+  compiled: {foreground: "{{grey0}}"}
+  build: {foreground: "{{yellow}}"}
+  source: {foreground: "{{fg}}"}
+
+punctuation: {foreground: "{{grey1}}"}
+date: {foreground: "{{aqua}}"}
+inode: {foreground: "{{grey1}}"}
+blocks: {foreground: "{{grey1}}"}
+header: {foreground: "{{fg}}", is_underline: true}
+octal: {foreground: "{{grey1}}"}
+flags: {foreground: "{{purple}}"}
+
+symlink_path: {foreground: "{{aqua}}"}
+control_char: {foreground: "{{red}}"}
+broken_symlink: {foreground: "{{red}}"}
+broken_path_overlay: {foreground: "{{red}}", is_underline: true}

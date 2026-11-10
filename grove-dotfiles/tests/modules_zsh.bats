@@ -94,7 +94,7 @@ login_shell() {
 @test "zsh files parse" {
   local f
   for f in "$GROVE_ROOT"/config/zsh/.zshenv "$GROVE_ROOT"/config/zsh/.zprofile \
-           "$GROVE_ROOT"/config/zsh/.zshrc "$GROVE_ROOT"/config/zsh/conf.d/*.zsh; do
+           "$GROVE_ROOT"/config/zsh/.zshrc "$GROVE_RENDERED"/zsh/conf.d/*.zsh; do
     run /bin/zsh -n "$f"
     [ "$status" -eq 0 ]
   done
@@ -139,8 +139,8 @@ login_shell() {
 @test "starship accepts both prompt configs" {
   local f
   for f in starship.toml starship-plain.toml; do
-    [ -f "$GROVE_ROOT/config/$f" ]
-    run env STARSHIP_CONFIG="$GROVE_ROOT/config/$f" /opt/homebrew/bin/starship print-config >/dev/null 2>"$BATS_TEST_TMPDIR/err"
+    [ -f "$GROVE_RENDERED/$f" ]
+    run env STARSHIP_CONFIG="$GROVE_RENDERED/$f" /opt/homebrew/bin/starship print-config >/dev/null 2>"$BATS_TEST_TMPDIR/err"
     [ "$status" -eq 0 ]
     [ ! -s "$BATS_TEST_TMPDIR/err" ]
   done
@@ -584,7 +584,7 @@ yazi_screen() {
 }
 
 @test "yazi's hovered row is a rounded pill" {
-  grep -qx 'padding = { open = "'$'\xee\x82\xb6''", close = "'$'\xee\x82\xb4''" }' "$GROVE_ROOT/config/yazi/theme.toml"
+  grep -qx 'padding = { open = "'$'\xee\x82\xb6''", close = "'$'\xee\x82\xb4''" }' "$GROVE_RENDERED/yazi/theme.toml"
 }
 
 @test "eza uses the Grove theme" {

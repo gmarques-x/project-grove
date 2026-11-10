@@ -87,18 +87,37 @@ SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
   done
 }
 
-@test "every config color comes from the palette" {
+# scheme_hexes SCHEME: every #RRGGBB in theme/everforest-SCHEME, uppercased.
+scheme_hexes() {
+  grep -v '^[[:space:]]*#' "$GROVE_ROOT/theme/everforest-$1" | grep -oE '#[0-9A-Fa-f]{6}' | tr '[:lower:]' '[:upper:]' | sort -u
+}
+
+@test "every scheme's render uses only that scheme's palette colours" {
+  local s t out missing
+  # shellcheck source=/dev/null
+  . "$GROVE_ROOT/../grove-themes/lib/render.sh"
+  for s in $SCHEMES; do
+    out="$BATS_TEST_TMPDIR/$s"
+    for t in $(gt_templates "$GROVE_ROOT/config"); do
+      mkdir -p "$(dirname "$out/$t")"
+      gt_render_file "$s" "$GROVE_ROOT/theme" "$GROVE_ROOT/config/$t" "$out/${t%.tmpl}" || false
+    done
+    [ -n "$(config_hexes $(find "$out" -type f))" ] || { echo "$s: no colours rendered"; false; }
+    missing="$(comm -23 <(config_hexes $(find "$out" -type f)) <(scheme_hexes "$s"))"
+    [ -z "$missing" ] || { echo "$s: not in its palette: $missing"; false; }
+  done
+}
+
+@test "configs that aren't templates use only Dark Medium colours" {
   local missing
-  missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/ghostty/config" \
-      "$GROVE_ROOT/config/starship.toml" "$GROVE_ROOT/config/starship-plain.toml" \
-      "$GROVE_ROOT/config/fastfetch/config.jsonc" "$GROVE_ROOT/config/eza/theme.yml" "$GROVE_ROOT/config/yazi/theme.toml" "$GROVE_ROOT/config/yazi/init.lua" "$GROVE_ROOT/config/vscode/settings.json" "$GROVE_ROOT/config/vscode/grove-icons/grove-icon-theme.json" \
-      "$GROVE_ROOT"/config/zsh/conf.d/*.zsh) <(palette_hexes))"
+  missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/vscode/grove-icons/grove-icon-theme.json" \
+      $(git -C "$GROVE_ROOT" ls-files ':(glob)config/zsh/conf.d/*.zsh' | sed "s|^|$GROVE_ROOT/|")) <(palette_hexes))"
   [ -z "$missing" ] || { echo "not in the palette: $missing"; false; }
 }
 
 # ghostty_value KEY: values of KEY in the Ghostty config, one per line.
 ghostty_value() {
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GROVE_ROOT/config/ghostty/config"
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GROVE_RENDERED/ghostty/config"
 }
 
 @test "ghostty config sets the spec's keys" {
@@ -124,7 +143,7 @@ ghostty_value() {
 @test "ghostty validates the config" {
   local g="${GROVE_GHOSTTY:-/Applications/Ghostty.app/Contents/MacOS/ghostty}"
   [ -x "$g" ] || skip "Ghostty not installed"
-  run "$g" +validate-config --config-file="$GROVE_ROOT/config/ghostty/config"
+  run "$g" +validate-config --config-file="$GROVE_RENDERED/ghostty/config"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -135,12 +154,12 @@ prompt_styles() {
 }
 
 @test "the two prompts have the same blocks and colors" {
-  [ -f "$GROVE_ROOT/config/starship-plain.toml" ]
-  diff <(prompt_styles "$GROVE_ROOT/config/starship.toml") <(prompt_styles "$GROVE_ROOT/config/starship-plain.toml")
+  [ -f "$GROVE_RENDERED/starship-plain.toml" ]
+  diff <(prompt_styles "$GROVE_RENDERED/starship.toml") <(prompt_styles "$GROVE_RENDERED/starship-plain.toml")
 }
 
 @test "the icon prompt uses the spec's glyphs" {
-  local f="$GROVE_ROOT/config/starship.toml"
+  local f="$GROVE_RENDERED/starship.toml"
   grep -q $'\xee\x82\xb6' "$f"          # U+E0B6 rounded left end
   grep -q $'\xee\x82\xb4' "$f"          # U+E0B4 rounded right end
   grep -q $'\xee\x82\xa0' "$f"          # U+E0A0 git branch
@@ -152,7 +171,7 @@ prompt_styles() {
 
 @test "the plain prompt has no Nerd Font glyphs" {
   # grep: 1 = no match (wanted), 2 = file missing.
-  LC_ALL=C run grep -q $'\xee\x82\|\xf3\xb0' "$GROVE_ROOT/config/starship-plain.toml"
+  LC_ALL=C run grep -q $'\xee\x82\|\xf3\xb0' "$GROVE_RENDERED/starship-plain.toml"
   [ "$status" -eq 1 ]
 }
 
@@ -160,7 +179,7 @@ prompt_styles() {
 # as JSON. EXPR is Python, with the config as c.
 ff_json() {
   python3 -c 'import json,re,sys; c=json.loads(re.sub(r"^\s*//.*$","",open(sys.argv[1]).read(),flags=re.M)); print(json.dumps(eval(sys.argv[2]),ensure_ascii=False))' \
-    "$GROVE_ROOT/config/fastfetch/config.jsonc" "$1"
+    "$GROVE_RENDERED/fastfetch/config.jsonc" "$1"
 }
 
 @test "fastfetch shows the spec's readouts in order" {
@@ -185,7 +204,7 @@ ff_json() {
 }
 
 @test "fastfetch's config writes colors as palette hex, never raw RGB" {
-  run grep -c '38;2' "$GROVE_ROOT/config/fastfetch/config.jsonc"
+  run grep -c '38;2' "$GROVE_RENDERED/fastfetch/config.jsonc"
   [ "$output" = 0 ]
 }
 
@@ -194,7 +213,7 @@ ff_json() {
 ff_screen() {
   local cols="$1"; shift
   local h="$BATS_TEST_TMPDIR/ffhome"
-  mkdir -p "$h"; [ -L "$h/.config" ] || ln -s "$GROVE_ROOT/config" "$h/.config"
+  mkdir -p "$h"; [ -L "$h/.config" ] || ln -s "$GROVE_RENDERED" "$h/.config"
   env -i HOME="$h" PATH="/opt/homebrew/bin:/usr/bin:/bin" TERM=xterm-256color \
     script -q "$BATS_TEST_TMPDIR/ff.out" /bin/sh -c "stty cols $cols rows 50; fastfetch $*" </dev/null >/dev/null 2>&1
   python3 "$GROVE_ROOT/tests/vt.py" "$BATS_TEST_TMPDIR/ff.out" "$cols" | sed 's/^\^D//'   # script echoes ^D for the empty stdin
@@ -235,7 +254,7 @@ render_prompt() {
 
 @test "the prompt bar reads user, folder, git, time, joined by arrows with rounded ends" {
   [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
-  run render_prompt "$GROVE_ROOT/config/starship.toml"
+  run render_prompt "$GROVE_RENDERED/starship.toml"
   local me; me="$(id -un)" A=$'\xee\x82\xb0'
   [[ "$output" =~ ^$'\xee\x82\xb6'.*$me\ $A\ .*repo\ $A\ .*main\ .*\?.*$A.*[0-9]{2}:[0-9]{2}\ $'\xee\x82\xb4'\ \ ?❯ ]] || { echo "$output"; false; }
   [[ "$output" == *$'\xef\x85\xb9'* ]] || false   # U+F179 before the user
@@ -244,19 +263,19 @@ render_prompt() {
 @test "the prompt has no duration or exit-code blocks" {
   [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
   local r="$BATS_TEST_TMPDIR/repo3"; mkdir -p "$r"
-  run bash -c "cd '$r' && STARSHIP_CONFIG='$GROVE_ROOT/config/starship.toml' /opt/homebrew/bin/starship prompt --status 1 --cmd-duration 9000"
+  run bash -c "cd '$r' && STARSHIP_CONFIG='$GROVE_RENDERED/starship.toml' /opt/homebrew/bin/starship prompt --status 1 --cmd-duration 9000"
   [[ "$output" != *"✗"* ]] || false
   [[ "$output" != *"9s"* ]] || false
 }
 
 @test "prompts are separated by an empty line" {
-  grep -qx 'add_newline = true' "$GROVE_ROOT/config/starship.toml"
-  grep -qx 'add_newline = true' "$GROVE_ROOT/config/starship-plain.toml"
+  grep -qx 'add_newline = true' "$GROVE_RENDERED/starship.toml"
+  grep -qx 'add_newline = true' "$GROVE_RENDERED/starship-plain.toml"
 }
 
 @test "the plain prompt bar has the same blocks without rounded ends" {
   [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
-  run render_prompt "$GROVE_ROOT/config/starship-plain.toml"
+  run render_prompt "$GROVE_RENDERED/starship-plain.toml"
   local me; me="$(id -un)"
   [[ "$output" =~ ^\ \ $me\ .*repo\ .*main\ .*\?.*\ [0-9]{2}:[0-9]{2}\ +❯ ]] || { echo "$output"; false; }
   [[ "$output" != *$'\xee\x82'* ]] || false
@@ -265,7 +284,7 @@ render_prompt() {
 @test "a failed command turns the prompt character red" {
   [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
   local r="$BATS_TEST_TMPDIR/repo2"; mkdir -p "$r"
-  run bash -c "cd '$r' && STARSHIP_CONFIG='$GROVE_ROOT/config/starship.toml' /opt/homebrew/bin/starship prompt --status 1"
+  run bash -c "cd '$r' && STARSHIP_CONFIG='$GROVE_RENDERED/starship.toml' /opt/homebrew/bin/starship prompt --status 1"
   [[ "$output" == *"38;2;230;126;128m"*"❯"* ]] || false
 }
 

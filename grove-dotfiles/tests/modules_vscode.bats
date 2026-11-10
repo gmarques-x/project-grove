@@ -49,11 +49,11 @@ vsc_ready() {
 vsc_json() { sed '/^[[:space:]]*\/\//d' "$1"; }
 
 @test "vscode: settings are valid JSON" {
-  vsc_json "$GROVE_CONFIG/vscode/settings.json" | jq -e . >/dev/null
+  vsc_json "$GROVE_RENDERED/vscode/settings.json" | jq -e . >/dev/null
 }
 
 @test "vscode: settings choose Everforest, Grove Icons and JetBrains Mono 12" {
-  vsc_json "$GROVE_CONFIG/vscode/settings.json" | jq -e '
+  vsc_json "$GROVE_RENDERED/vscode/settings.json" | jq -e '
     .["workbench.colorTheme"] == "Everforest Dark" and
     .["workbench.iconTheme"] == "grove-icons" and
     .["everforest.darkContrast"] == "medium" and
@@ -65,9 +65,9 @@ vsc_json() { sed '/^[[:space:]]*\/\//d' "$1"; }
 }
 
 @test "vscode: terminal colors are Ghostty's" {
-  local g="$GROVE_CONFIG/ghostty/config" want got
+  local g="$GROVE_RENDERED/ghostty/config" want got
   want="$(sed -n 's/^foreground = //p' "$g"; sed -n 's/^palette = [0-9]*=//p' "$g")"
-  got="$(vsc_json "$GROVE_CONFIG/vscode/settings.json" | jq -r '
+  got="$(vsc_json "$GROVE_RENDERED/vscode/settings.json" | jq -r '
     .["workbench.colorCustomizations"]["[Everforest Dark]"] as $c
     | ["foreground", (["Black","Red","Green","Yellow","Blue","Magenta","Cyan","White"]
         | (map("ansi" + .) + map("ansiBright" + .)))[]]

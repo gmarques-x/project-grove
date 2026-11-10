@@ -8,7 +8,7 @@ setup() { grove_test_setup; }
 
 @test "tracked config entries are not ignored" {
   local p
-  for p in config/zsh/.zshrc config/git/config config/ssh/config config/starship.toml config/starship-plain.toml config/vscode/settings.json; do
+  for p in config/zsh/.zshrc config/git/config config/ssh/config config/starship.toml.tmpl config/starship-plain.toml.tmpl config/vscode/settings.json.tmpl; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ]
   done
@@ -47,7 +47,7 @@ setup() { grove_test_setup; }
 
 @test "ghostty and fastfetch configs are tracked" {
   local p
-  for p in config/ghostty/config config/fastfetch/config.jsonc config/fastfetch/grove.png config/fastfetch/grove.ascii; do
+  for p in config/ghostty/config.tmpl config/fastfetch/config.jsonc.tmpl config/fastfetch/grove.png config/fastfetch/grove.ascii; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
   done
@@ -60,7 +60,7 @@ setup() { grove_test_setup; }
 
 @test "eza and bat configs are tracked" {
   local p
-  for p in config/eza/theme.yml config/bat/config; do
+  for p in config/eza/theme.yml.tmpl config/bat/config; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
   done
@@ -68,8 +68,22 @@ setup() { grove_test_setup; }
 
 @test "yazi configs are tracked" {
   local p
-  for p in config/yazi/yazi.toml config/yazi/theme.toml config/yazi/init.lua; do
+  for p in config/yazi/yazi.toml config/yazi/theme.toml.tmpl config/yazi/init.lua.tmpl; do
     run git -C "$GROVE_ROOT" check-ignore -q "$p"
     [ "$status" -ne 0 ] || { echo "ignored: $p"; false; }
+  done
+}
+
+@test "generated files are ignored, templates are tracked" {
+  local f
+  for f in ghostty/config starship.toml starship-plain.toml fastfetch/config.jsonc \
+           eza/theme.yml yazi/theme.toml yazi/init.lua vscode/settings.json \
+           zsh/conf.d/40-tools.zsh zsh/conf.d/85-autosuggest.zsh \
+           zsh/conf.d/95-fetch.zsh zsh/conf.d/98-highlight.zsh; do
+    git -C "$GROVE_ROOT" check-ignore -q "config/$f" || { echo "not ignored: $f"; false; }
+    [ -z "$(git -C "$GROVE_ROOT" ls-files "config/$f")" ] || { echo "still tracked: $f"; false; }
+    run git -C "$GROVE_ROOT" check-ignore -q "config/$f.tmpl"
+    [ "$status" -ne 0 ] || { echo "ignored: $f.tmpl"; false; }
+    [ -n "$(git -C "$GROVE_ROOT" ls-files "config/$f.tmpl")" ] || { echo "not tracked: $f.tmpl"; false; }
   done
 }

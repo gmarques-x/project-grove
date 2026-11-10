@@ -1,0 +1,39 @@
+# One-line prompt: a bar of blocks (user, folder, git, time) joined by arrows,
+# with rounded ends, then ❯. Nerd Font glyphs are drawn by Ghostty; Terminal.app
+# uses starship-plain.toml. Colors: theme/everforest-dark-medium.
+add_newline = true
+format = """[](fg:{{aqua}})$username$directory$git_branch$git_status[](fg:{{green}} bg:{{yellow}})[](fg:{{yellow}} bg:{{orange}})$time[](fg:{{orange}}) $character"""
+
+[username]
+show_always = true
+style_user = "bg:{{aqua}} fg:{{bg0}}"
+style_root = "bg:{{aqua}} fg:{{bg0}}"
+format = "[  $user ]($style)"
+
+[directory]
+style = "bg:{{green}} fg:{{bg0}}"
+read_only_style = "bg:{{green}} fg:{{bg0}}"
+read_only = " 󰌾"
+format = "[](fg:{{aqua}} bg:{{green}})[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
+
+[git_branch]
+style = "bg:{{yellow}} fg:{{bg0}}"
+symbol = " "
+format = "[](fg:{{green}} bg:{{yellow}})[ $symbol$branch ]($style)"
+
+[git_status]
+style = "bg:{{yellow}} fg:{{bg0}}"
+untracked = "?"
+modified = "!"
+staged = "+"
+format = "([$all_status$ahead_behind ]($style))"
+
+[time]
+disabled = false
+style = "bg:{{orange}} fg:{{bg0}}"
+time_format = "%H:%M"
+format = "[  $time ]($style)"
+
+[character]
+success_symbol = "[❯](fg:{{fg}})"
+error_symbol = "[❯](fg:{{red}})"

@@ -4,6 +4,7 @@
   "workbench.colorTheme": "Everforest Dark",
   "workbench.iconTheme": "grove-icons",
   "everforest.darkContrast": "medium",
+  "everforest.lightContrast": "medium",
 
   "editor.fontFamily": "JetBrains Mono",
   "editor.fontSize": 12,
@@ -32,5 +33,6 @@
       "terminal.ansiBrightCyan": "#83C092",
       "terminal.ansiBrightWhite": "#D3C6AA"
     }
-  }
+  },
+  "workbench.startupEditor": "none"
 }
