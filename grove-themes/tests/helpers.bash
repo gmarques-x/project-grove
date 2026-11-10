@@ -1,10 +1,15 @@
 # Shared test helpers. Every .bats file: `load helpers` + `setup() { gt_test_setup; }`.
+# setup_suite.bash already gives every test a safe baseline; gt_test_setup
+# narrows it to this test's own temp folder.
 
 gt_test_setup() {
   GT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
   export GT_ROOT
   export HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$HOME" "$BATS_TEST_TMPDIR/stubs"
+  export GROVE_STATE="$HOME/.local/state/grove"
+  # No live checkout: tests that need one point GROVE_ROOT at their own copy.
+  export GROVE_ROOT="$BATS_TEST_TMPDIR/no-grove-root"
   export NO_COLOR=1
   export PATH="$BATS_TEST_TMPDIR/stubs:$PATH"
   # Safety: `set` must never reach the real desktop. No-op fakes for everything
@@ -12,6 +17,7 @@ gt_test_setup() {
   local c s
   for c in osascript defaults kill ps; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
   export GROVE_KILL="$BATS_TEST_TMPDIR/stubs/kill"
+  export GROVE_PS="$BATS_TEST_TMPDIR/stubs/ps"
   export GROVE_WALLPAPER_DIR="$BATS_TEST_TMPDIR/wallpapers"
   mkdir -p "$GROVE_WALLPAPER_DIR"
   for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
