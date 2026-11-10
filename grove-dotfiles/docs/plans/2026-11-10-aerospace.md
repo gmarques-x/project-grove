@@ -21,7 +21,7 @@
 - `_argb` format: `0xff` + the six hex digits upper-case, e.g. dark-medium green → `0xffA7C080`.
 - Brewfile lines, verbatim: `cask "nikitabobko/tap/aerospace"` and `brew "FelixKratz/formulae/borders"`.
 - Module `about`: `AeroSpace tiles the desktop`.
-- Privacy: no tracked file names or links to `project-grove/artifacts/` or `.recording/`.
+- Privacy: no tracked file names or links to the project's private folders.
 - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
@@ -150,7 +150,7 @@ The contents are the spec's §4–§5 verbatim (gaps, shortcuts, service mode, r
 
 ### Task 6: Live install and hand check (controller, with the user)
 
-- [ ] **Step 1:** Privacy checks: `git ls-files artifacts .recording`, `git log --all --oneline -- artifacts .recording` and `git grep -n artifacts -- . ':!.gitignore'` all print nothing.
+- [ ] **Step 1:** Privacy checks: the project's private folders are untracked, absent from history, and named by no tracked file.
 - [ ] **Step 2:** `grove install homebrew aerospace` (Accessibility was granted in Task 1, so apply should only write the Spaces setting and restart nothing). Then `aerospace reload-config` and `/bin/sh ~/.config/borders/bordersrc`.
 - [ ] **Step 3:** `grove check` → every module ok, `98-aerospace` included (the Spaces change still waits for a logout; the check reads the setting, so it is ok).
 - [ ] **Step 4:** `grove-themes set light-soft` then back to the current scheme: the `borders` line says `live recoloured` both times.
