@@ -19,7 +19,7 @@ check() {
     return 3
   fi
   grove_link_check "$GROVE_CONFIG" "$link" || return 3
-  _config_generated_ok || return 3
+  _config_generated_ok
 }
 
 # The grove-themes app sits next to this checkout.
@@ -27,11 +27,15 @@ _config_themes() { echo "$GROVE_ROOT/../grove-themes"; }
 
 # _config_generated_ok: 0 when every template in the config has its generated
 # file and it equals a render of the current scheme (rendered into a temp
-# folder, so nothing in the config changes).
+# folder, so nothing in the config changes), 3 when one doesn't, 1 when
+# grove-themes is missing (apply couldn't render either).
 _config_generated_ok() {
   local themes tmp t ok=0 scheme
   themes="$(_config_themes)"
-  [ -r "$themes/lib/render.sh" ] || return 0
+  if [ ! -r "$themes/lib/render.sh" ] || [ ! -r "$themes/lib/state.sh" ]; then
+    grove_fail "grove-themes not found at $themes"
+    return 1
+  fi
   [ -d "$GROVE_CONFIG" ] || return 0
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/grove-config.XXXXXX")" || return 3
   (

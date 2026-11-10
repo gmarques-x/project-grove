@@ -130,6 +130,17 @@ setup() {
   [ "$(cd "$GROVE_CONFIG" && find . | LC_ALL=C sort)" = "$before" ]
 }
 
+@test "config: check fails when grove-themes is missing, like apply" {
+  load_module 05-config
+  apply
+  _config_themes() { echo "$BATS_TEST_TMPDIR/no-grove-themes"; }
+  run check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"grove-themes not found"* ]] || false
+  run apply
+  [ "$status" -eq 1 ]
+}
+
 # ---- 10-xcode-tools
 
 @test "xcode-tools needs you when missing" {
