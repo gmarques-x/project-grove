@@ -190,7 +190,7 @@ chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
   [ "$(gt_store_urls "$GROVE_WALLPAPER_STORE" | sort -u)" = "file://$GROVE_WALLPAPER_DIR/wallpaper-project-grove-light-soft.png" ]
   [ "$(gt_store_idle "$GROVE_WALLPAPER_STORE" | sort -u)" = "com.apple.wallpaper.choice.aerials:idle" ]
   [ -n "$(find "$GROVE_STATE/backup" -name Index.plist)" ]
-  grep -qx 'killall WallpaperAgent' "$CALLS"
+  grep -qx 'killall -KILL WallpaperAgent' "$CALLS"
 }
 
 @test "wallpaper: a failing helper names the backup in the message" {

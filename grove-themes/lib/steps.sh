@@ -122,7 +122,9 @@ _gt_copy_backup() {
 # gt_step_wallpaper SCHEME: the scheme's picture on every screen and Space.
 # osascript changes the visible Spaces at once; the rest live in macOS's
 # wallpaper store, which wallpaper_store.py rewrites (backed up first) before
-# WallpaperAgent is restarted. Seams: GROVE_WALLPAPER_STORE, GROVE_KILLALL.
+# WallpaperAgent is force-stopped (-KILL: a normal quit saves its in-memory
+# copy over ours) and launchd restarts it. Seams: GROVE_WALLPAPER_STORE,
+# GROVE_KILLALL.
 gt_step_wallpaper() {
   local dir file store lib msg backup
   dir="${GROVE_WALLPAPER_DIR:-${GROVE_ROOT:?}/../grove-wallpapers}"
@@ -153,7 +155,7 @@ OSA
     return 0
   fi
   if msg="$(/usr/bin/python3 -I "$lib/wallpaper_store.py" "$store" "$file" 2>&1)"; then
-    "${GROVE_KILLALL:-killall}" WallpaperAgent >/dev/null 2>&1 || true
+    "${GROVE_KILLALL:-killall}" -KILL WallpaperAgent >/dev/null 2>&1 || true
     _gt_line wallpaper live "$1 on every Space"
   else
     _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: $(printf '%s' "$msg" | tr '\n\t' '  ') (backup: $backup)"
