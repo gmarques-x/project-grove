@@ -123,7 +123,7 @@ SETI_JSON="/Applications/Visual Studio Code.app/Contents/Resources/app/extension
   load_module
   run check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"grove install homebrew"* ]]
+  [[ "$output" == *"grove install homebrew"* ]] || false
 }
 
 @test "vscode: finds code next to brew" {
@@ -169,9 +169,77 @@ SETI_JSON="/Applications/Visual Studio Code.app/Contents/Resources/app/extension
   load_module
   run check
   [ "$status" -eq 0 ]
-  ! grep -q -- --install-extension "$BATS_TEST_TMPDIR/code-args"
+  run grep -q -- --install-extension "$BATS_TEST_TMPDIR/code-args"
+  [ "$status" -eq 1 ]
 }
 
 @test "vscode: the README lists the module" {
   grep -q '^| `95-vscode` |' "$GROVE_ROOT/README.md"
+}
+
+@test "vscode: apply links the settings, installs both, then check is ok" {
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  [ -L "$SETTINGS" ]
+  [ "$(readlink "$SETTINGS")" = "$GROVE_CONFIG/vscode/settings.json" ]
+  grep -qx -- "--install-extension sainnhe.everforest" "$BATS_TEST_TMPDIR/code-args"
+  [ "$(grep -c -- '--install-extension .*\.vsix --force$' "$BATS_TEST_TMPDIR/code-args")" -eq 1 ]
+  [[ "$output" == *"next time it opens"* ]] || false
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "vscode: apply backs up an existing settings file" {
+  mkdir -p "$GROVE_VSCODE_USER"
+  echo '{"a":1}' > "$SETTINGS"
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  [ -L "$SETTINGS" ]
+  local b
+  b="$(find "$GROVE_STATE/backup/test" -name settings.json)"
+  [ -n "$b" ]
+  [ "$(cat "$b")" = '{"a":1}' ]
+}
+
+@test "vscode: apply installs only what's missing" {
+  echo 'sainnhe.everforest@0.3.0' > "$BATS_TEST_TMPDIR/extensions"
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  run grep -q -- "--install-extension sainnhe.everforest" "$BATS_TEST_TMPDIR/code-args"
+  [ "$status" -eq 1 ]
+}
+
+@test "vscode: apply replaces another Grove Icons version" {
+  printf 'sainnhe.everforest@0.3.0\ngrove.grove-icons@9.9.9\n' > "$BATS_TEST_TMPDIR/extensions"
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(grep -c '^grove.grove-icons@' "$BATS_TEST_TMPDIR/extensions")" -eq 1 ]
+  grep -qx "grove.grove-icons@$ICONS_VERSION" "$BATS_TEST_TMPDIR/extensions"
+}
+
+@test "vscode: the vsix holds the extension and its manifest" {
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  local list f
+  list="$(unzip -Z1 "$BATS_TEST_TMPDIR/last.vsix")"
+  for f in extension.vsixmanifest '[Content_Types].xml' extension/package.json \
+      extension/grove-icon-theme.json extension/seti.woff extension/NOTICE; do
+    printf '%s\n' "$list" | grep -qxF "$f" || { echo "missing: $f"; false; }
+  done
+  [ -z "$(printf "%s\n" "$list" | grep build.py)" ]
+  unzip -p "$BATS_TEST_TMPDIR/last.vsix" extension.vsixmanifest | grep -q "Version=\"$ICONS_VERSION\""
+}
+
+@test "vscode: apply fails when code can't install" {
+  export FAKE_CODE_FAIL=1
+  load_module
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Failed Installing Extensions"* ]] || false
+  [[ "$output" != *"next time it opens"* ]] || false
 }

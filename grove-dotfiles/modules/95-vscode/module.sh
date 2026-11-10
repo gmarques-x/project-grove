@@ -55,3 +55,58 @@ check() {
   _vsc_installed "$_VSC_ICONS_ID@$(_vsc_icons_version)" || return 3
   return 0
 }
+
+# _vsc_vsix DIR: zip Grove Icons into DIR/grove-icons.vsix (the committed files
+# plus the two manifests a vsix needs; build.py stays out) and print its path.
+_vsc_vsix() {
+  local dir="$1" v f
+  v="$(_vsc_icons_version)" || return 1
+  mkdir -p "$dir/extension" || return 1
+  for f in package.json grove-icon-theme.json seti.woff NOTICE; do
+    cp "$(_vsc_icons)/$f" "$dir/extension/$f" || return 1
+  done
+  cat > "$dir/[Content_Types].xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension=".json" ContentType="application/json"/><Default Extension=".woff" ContentType="font/woff"/><Default Extension=".vsixmanifest" ContentType="text/xml"/><Default Extension="" ContentType="text/plain"/></Types>
+XML
+  cat > "$dir/extension.vsixmanifest" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata><Identity Language="en-US" Id="grove-icons" Version="$v" Publisher="grove"/><DisplayName>Grove Icons</DisplayName><Description xml:space="preserve">VS Code's Seti icons in Everforest colors</Description><Categories>Themes</Categories></Metadata>
+  <Installation><InstallationTarget Id="Microsoft.VisualStudio.Code"/></Installation>
+  <Dependencies/>
+  <Assets><Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true"/></Assets>
+</PackageManifest>
+XML
+  (cd "$dir" && /usr/bin/zip -qrX grove-icons.vsix extension.vsixmanifest '[Content_Types].xml' extension) || return 1
+  printf '%s/grove-icons.vsix' "$dir"
+}
+
+apply() {
+  local code tmp vsix rc=0
+  if ! code="$(_vsc_code)"; then
+    grove_fail "VS Code's code command is missing; run grove install homebrew"
+    return 1
+  fi
+  grove_link "$GROVE_CONFIG/vscode/settings.json" "$(_vsc_settings)" || return 1
+  if ! _vsc_installed "$_VSC_EVERFOREST"; then
+    "$code" --install-extension "$_VSC_EVERFOREST" >/dev/null || {
+      grove_fail "could not install $_VSC_EVERFOREST (is the Mac online?)"
+      return 1
+    }
+  fi
+  if ! _vsc_installed "$_VSC_ICONS_ID@$(_vsc_icons_version)"; then
+    tmp="$(mktemp -d)" || return 1
+    if vsix="$(_vsc_vsix "$tmp")"; then
+      "$code" --install-extension "$vsix" --force >/dev/null || rc=1
+    else
+      rc=1
+    fi
+    rm -rf "$tmp"
+    if [ "$rc" -ne 0 ]; then
+      grove_fail "could not install Grove Icons"
+      return 1
+    fi
+  fi
+  grove_note "VS Code picks up the theme the next time it opens."
+}
