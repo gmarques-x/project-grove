@@ -101,6 +101,35 @@ setup() {
   [ ! -L "$HOME/.config" ]
 }
 
+@test "config: needs work when generated files are missing, apply renders them" {
+  load_module 05-config
+  find "$GROVE_CONFIG" -type f -name '*.tmpl' | while IFS= read -r t; do rm -f "${t%.tmpl}"; done
+  [ ! -e "$GROVE_CONFIG/ghostty/config" ]
+  apply
+  [ "$(readlink "$HOME/.config")" = "$GROVE_CONFIG" ]
+  [ -f "$GROVE_CONFIG/ghostty/config" ]
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "config: needs work when a generated file differs from a render" {
+  load_module 05-config
+  apply
+  echo extra >> "$GROVE_CONFIG/ghostty/config"
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "config: check changes nothing" {
+  load_module 05-config
+  apply
+  rm "$GROVE_CONFIG/yazi/theme.toml"
+  before="$(cd "$GROVE_CONFIG" && find . | LC_ALL=C sort)"
+  run check
+  [ "$status" -eq 3 ]
+  [ "$(cd "$GROVE_CONFIG" && find . | LC_ALL=C sort)" = "$before" ]
+}
+
 # ---- 10-xcode-tools
 
 @test "xcode-tools needs you when missing" {

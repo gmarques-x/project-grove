@@ -1,0 +1,129 @@
+#!/bin/bash
+# grove-themes: switch the desktop between the six Everforest schemes.
+
+_gt_usage() {
+  cat <<'U'
+usage: grove-themes <command>
+
+commands:
+  list                           the six schemes, the current one marked
+  current                        the current scheme's name
+  set SCHEME                     switch to SCHEME
+  render [--scheme S] [--config DIR]
+                                 write the configs (default: current scheme,
+                                 $GROVE_ROOT/config)
+
+options:
+  --json   machine-readable output on list, current and set
+U
+}
+
+# Resolve this script's folder through symlinks (bash 3.2 safe).
+_gt_self_root() {
+  local src="$0" dir
+  while [ -L "$src" ]; do
+    dir="$(cd -P "$(dirname "$src")" && pwd)"
+    src="$(readlink "$src")"
+    case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+  done
+  (cd -P "$(dirname "$src")/.." && pwd)
+}
+
+GT_ROOT="$(_gt_self_root)" || exit 1
+export GROVE_ROOT="${GROVE_ROOT:-$GT_ROOT/../grove-dotfiles}"
+export GROVE_STATE="${GROVE_STATE:-$HOME/.local/state/grove}"
+
+# shellcheck source=/dev/null
+. "$GT_ROOT/lib/render.sh"
+# shellcheck source=/dev/null
+. "$GT_ROOT/lib/state.sh"
+
+_gt_json_list() { # words -> "a", "b"
+  local out="" s
+  for s in "$@"; do out="$out${out:+, }\"$s\""; done
+  printf '%s' "$out"
+}
+
+_gt_json_esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' '; }
+
+_gt_unknown() {
+  echo "grove-themes: unknown scheme: $1" >&2
+  echo "schemes:" >&2
+  gt_schemes | sed 's/^/  /' >&2
+  exit 2
+}
+
+cmd_list() {
+  local json="$1" cur s
+  cur="$(gt_current)"
+  if [ "$json" = 1 ]; then
+    # shellcheck disable=SC2046
+    printf '{"current": "%s", "schemes": [%s]}\n' "$cur" "$(_gt_json_list $(gt_schemes))"
+    return 0
+  fi
+  for s in $(gt_schemes); do
+    if [ "$s" = "$cur" ]; then echo "* $s"; else echo "  $s"; fi
+  done
+}
+
+cmd_current() {
+  local json="$1" cur
+  cur="$(gt_current)"
+  if [ "$json" = 1 ]; then printf '{"current": "%s"}\n' "$cur"; else echo "$cur"; fi
+}
+
+cmd_render() {
+  local scheme="" cfg="$GROVE_ROOT/config"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --scheme) [ $# -ge 2 ] || { _gt_usage >&2; exit 2; }; scheme="$2"; shift 2 ;;
+      --config) [ $# -ge 2 ] || { _gt_usage >&2; exit 2; }; cfg="$2"; shift 2 ;;
+      *) _gt_usage >&2; exit 2 ;;
+    esac
+  done
+  if [ -n "$scheme" ]; then
+    gt_valid "$scheme" || _gt_unknown "$scheme"
+  else
+    scheme="$(gt_current)"
+  fi
+  gt_render_all "$scheme" "$cfg" || exit 1
+}
+
+cmd_set() {
+  local json="$1" scheme="$2" msg="" result="live"
+  [ -n "$scheme" ] || { _gt_usage >&2; exit 2; }
+  gt_valid "$scheme" || _gt_unknown "$scheme"
+  if ! msg="$(gt_render_all "$scheme" "$GROVE_ROOT/config" 2>&1)"; then
+    result="failed"
+  elif ! gt_write_state "$scheme"; then
+    result="failed"; msg="could not write $GROVE_STATE/theme"
+  fi
+  if [ "$json" = 1 ]; then
+    printf '{"scheme": "%s", "steps": [{"name": "configs", "result": "%s", "message": "%s"}]}\n' \
+      "$scheme" "$result" "$(_gt_json_esc "$msg")"
+  else
+    [ -z "$msg" ] || echo "$msg" >&2
+    [ "$result" = failed ] || echo "grove-themes: $scheme"
+  fi
+  [ "$result" != failed ] || exit 1
+}
+
+json=0
+args=()
+for a in "$@"; do
+  case "$a" in
+    --json) json=1 ;;
+    -h|--help) _gt_usage; exit 0 ;;
+    *) args+=("$a") ;;
+  esac
+done
+set -- ${args[@]+"${args[@]}"}
+[ $# -ge 1 ] || { _gt_usage >&2; exit 2; }
+cmd="$1"; shift
+case "$cmd" in
+  list) [ $# -eq 0 ] || { _gt_usage >&2; exit 2; }; cmd_list "$json" ;;
+  current) [ $# -eq 0 ] || { _gt_usage >&2; exit 2; }; cmd_current "$json" ;;
+  set) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_set "$json" "${1:-}" ;;
+  render) cmd_render "$@" ;;
+  *) _gt_usage >&2; exit 2 ;;
+esac

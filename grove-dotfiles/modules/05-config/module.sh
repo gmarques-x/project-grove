@@ -18,7 +18,34 @@ check() {
     grove_fail "$msg" || true
     return 3
   fi
-  grove_link_check "$GROVE_CONFIG" "$link"
+  grove_link_check "$GROVE_CONFIG" "$link" || return 3
+  _config_generated_ok || return 3
+}
+
+# The grove-themes app sits next to this checkout.
+_config_themes() { echo "$GROVE_ROOT/../grove-themes"; }
+
+# _config_generated_ok: 0 when every template in the config has its generated
+# file and it equals a render of the current scheme (rendered into a temp
+# folder, so nothing in the config changes).
+_config_generated_ok() {
+  local themes tmp t ok=0 scheme
+  themes="$(_config_themes)"
+  [ -r "$themes/lib/render.sh" ] || return 0
+  [ -d "$GROVE_CONFIG" ] || return 0
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/grove-config.XXXXXX")" || return 3
+  (
+    # shellcheck source=/dev/null
+    . "$themes/lib/render.sh" && . "$themes/lib/state.sh" || exit 3
+    scheme="$(gt_current 2>/dev/null)"
+    for t in $(gt_templates "$GROVE_CONFIG"); do
+      mkdir -p "$tmp/$(dirname "$t")"
+      gt_render_file "$scheme" "$GROVE_ROOT/theme" "$GROVE_CONFIG/$t" "$tmp/${t%.tmpl}" >/dev/null 2>&1 || exit 3
+      cmp -s "$tmp/${t%.tmpl}" "$GROVE_CONFIG/${t%.tmpl}" || exit 3
+    done
+  ) || ok=3
+  rm -rf "$tmp"
+  return $ok
 }
 
 # _config_merge SRC DST: move what is in folder SRC into folder DST. A name that
@@ -48,7 +75,7 @@ apply() {
     return 1
   fi
   if [ -L "$link" ]; then
-    if grove_link_check "$GROVE_CONFIG" "$link"; then return 0; fi
+    if grove_link_check "$GROVE_CONFIG" "$link"; then _config_render; return; fi
     grove_fail "$link is a symlink to $(readlink "$link"), not replacing it"
     return 1
   fi
@@ -64,5 +91,14 @@ apply() {
       return 1
     fi
   fi
-  grove_link "$GROVE_CONFIG" "$link"
+  grove_link "$GROVE_CONFIG" "$link" || return 1
+  _config_render
+}
+
+# _config_render: write the generated files for the current scheme.
+_config_render() {
+  local cli
+  cli="$(_config_themes)/bin/grove-themes"
+  [ -x "$cli" ] || { grove_fail "grove-themes not found at $cli"; return 1; }
+  "$cli" render --config "$GROVE_CONFIG" || { grove_fail "could not render the config files"; return 1; }
 }

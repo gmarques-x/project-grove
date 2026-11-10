@@ -62,6 +62,17 @@ login_shell() {
   [ "$(readlink "$HOME/.local/bin/grove")" = "$GROVE_ROOT/bin/grove" ]
 }
 
+@test "70-zsh links grove-themes into ~/.local/bin" {
+  load_module 70-zsh
+  run check
+  [ "$status" -eq 3 ]
+  apply
+  [ "$(readlink "$HOME/.local/bin/grove-themes")" = "$GROVE_ROOT/../grove-themes/bin/grove-themes" ]
+  rm "$HOME/.local/bin/grove-themes"
+  run check
+  [ "$status" -eq 3 ]
+}
+
 @test "zsh retires old zprofile and zshrc into the backup" {
   load_module 70-zsh
   echo 'export OLD=1' > "$HOME/.zshrc"

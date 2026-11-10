@@ -52,14 +52,14 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 
 | Module | What it does |
 | --- | --- |
-| `05-config` | Makes `~/.config` a link to the tracked config |
+| `05-config` | Makes `~/.config` a link to the tracked config and renders its generated files (`grove-themes render`) |
 | `10-xcode-tools` | Xcode command line tools |
 | `20-homebrew` | Homebrew and the Brewfile |
 | `30-fonts` | JetBrains Mono, SF Pro and your own fonts (see Fonts) |
 | `40-ssh` | ssh config, ed25519 key and agent |
 | `50-git` | git identity and commit signing |
 | `60-github` | GitHub login and SSH signing key |
-| `70-zsh` | zsh config, Starship prompt and the `grove` command |
+| `70-zsh` | zsh config, Starship prompt and the `grove` and `grove-themes` commands |
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
 | `85-macos-wallpaper` | Desktop wallpaper: `grove-wallpapers/wallpaper-project-grove-dark-medium.png` on every screen (other Spaces are a manual step) |
 | `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |

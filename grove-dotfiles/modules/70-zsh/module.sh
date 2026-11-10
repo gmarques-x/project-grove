@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # 70-zsh: zsh files from the tracked config, the grove command on PATH.
 
-about() { echo "zsh config, Starship prompt and the grove command"; }
+about() { echo "zsh config, Starship prompt and the grove and grove-themes commands"; }
 
 _zsh_starship() {
   command -v starship >/dev/null 2>&1 || [ -x /opt/homebrew/bin/starship ]
@@ -51,6 +51,7 @@ _zsh_insecure_dirs() {
 check() {
   grove_link_check "$GROVE_CONFIG/zsh/.zshenv" "$HOME/.zshenv" || return 3
   grove_link_check "$GROVE_ROOT/bin/grove" "$HOME/.local/bin/grove" || return 3
+  grove_link_check "$GROVE_ROOT/../grove-themes/bin/grove-themes" "$HOME/.local/bin/grove-themes" || return 3
   [ ! -e "$HOME/.zprofile" ] && [ ! -L "$HOME/.zprofile" ] || return 3
   [ ! -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ] || return 3
   _zsh_starship || return 3
@@ -73,6 +74,7 @@ apply() {
   grove_link "$GROVE_CONFIG/zsh/.zshenv" "$HOME/.zshenv" || return 1
   mkdir -p "$HOME/.local/bin" || { grove_fail "could not create $HOME/.local/bin"; return 1; }
   grove_link "$GROVE_ROOT/bin/grove" "$HOME/.local/bin/grove" || return 1
+  grove_link "$GROVE_ROOT/../grove-themes/bin/grove-themes" "$HOME/.local/bin/grove-themes" || return 1
   if _zsh_hist_pending; then
     mkdir -p "$(dirname "$(_zsh_hist_new)")" || { grove_fail "could not create $(dirname "$(_zsh_hist_new)")"; return 1; }
     cp -n "$(_zsh_hist_old)" "$(_zsh_hist_new)" || { grove_fail "could not copy shell history"; return 1; }

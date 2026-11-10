@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # grove-themes template renderer. Source it; it sets no shell options.
 # Templates use {{name}}, name = [a-z0-9_]+. Bash 3.2 safe.
 
