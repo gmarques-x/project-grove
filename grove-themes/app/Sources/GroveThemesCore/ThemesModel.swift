@@ -9,13 +9,26 @@ public final class ThemesModel {
     /// The scheme being switched to; set while `set` runs.
     public var busyScheme: String?
     public var error: CLIError?
+    /// The last switch made from the app, stamped when it ended. The CLI doesn't
+    /// log a switch whose configs step failed, so this is the only record of one.
+    public private(set) var lastSwitch: LogEntry?
 
     public var isBusy: Bool { busyScheme != nil }
 
-    private let client: GroveThemesClient
+    /// The switches to show, newest first: the log, led by the last switch made
+    /// here when the CLI didn't log it and nothing was logged after it.
+    public var switches: [LogEntry] {
+        guard let last = lastSwitch, last.configsFailed,
+              last.time > (log.first?.time ?? .distantPast) else { return log }
+        return [last] + log
+    }
 
-    public init(client: GroveThemesClient) {
+    private let client: GroveThemesClient
+    private let now: @MainActor () -> Date
+
+    public init(client: GroveThemesClient, now: @escaping @MainActor () -> Date = Date.init) {
         self.client = client
+        self.now = now
     }
 
     /// Reloads the list and the last five switches; clears `error` once the CLI answers.
@@ -38,7 +51,8 @@ public final class ThemesModel {
         defer { busyScheme = nil }
         var failure: CLIError?
         do {
-            _ = try await client.set(scheme)
+            let (result, exit) = try await client.set(scheme)
+            lastSwitch = LogEntry(time: now(), scheme: result.scheme, exit: Int(exit), steps: result.steps)
         } catch {
             failure = Self.cliError(error)
         }

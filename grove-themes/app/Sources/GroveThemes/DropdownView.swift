@@ -21,7 +21,7 @@ struct DropdownView: View {
                 row("DARK", model.schemes(dark: true), theme)
                 row("LIGHT", model.schemes(dark: false), theme)
             }
-            if let entry = model.log.first {
+            if let entry = model.switches.first {
                 StatusLine(entry: entry)
             }
             VStack(alignment: .leading, spacing: 2) {

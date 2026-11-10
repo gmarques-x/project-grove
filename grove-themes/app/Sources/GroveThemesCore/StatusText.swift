@@ -18,7 +18,8 @@ public struct Chip: Equatable, Sendable {
 /// named; `needs-you` and `failed` steps are named, with their message on the chip.
 public enum StatusText {
     /// "Switched to Dark Medium at 13:10 · 10 updated now, yazi next launch · appearance needs you";
-    /// a switch from another day reads "on 9 Nov at 13:10".
+    /// a switch from another day reads "on 9 Nov at 13:10", and one whose configs
+    /// failed "Couldn't switch to Dark Hard at 13:10 · configs failed".
     public static func line(for entry: LogEntry, now: Date, calendar: Calendar) -> String {
         let parts = Parts(entry.steps)
         var done: [String] = []
@@ -26,7 +27,8 @@ public enum StatusText {
         done += parts.nextLaunch.map { "\($0.name) next launch" }
         let problems = parts.problems.map { "\($0.name) \($0.result == .failed ? "failed" : "needs you")" }
 
-        var line = "Switched to \(displayName(entry.scheme)) \(when(entry.time, now: now, calendar: calendar))"
+        let verb = entry.configsFailed ? "Couldn't switch to" : "Switched to"
+        var line = "\(verb) \(displayName(entry.scheme)) \(when(entry.time, now: now, calendar: calendar))"
         if !done.isEmpty { line += " · " + done.joined(separator: ", ") }
         if !problems.isEmpty { line += " · " + problems.joined(separator: ", ") }
         return line

@@ -71,4 +71,9 @@ public struct LogEntry: Decodable, Equatable, Sendable {
         self.exit = exit
         self.steps = steps
     }
+
+    /// The configs weren't written: nothing else ran, and the CLI didn't log it.
+    public var configsFailed: Bool {
+        steps.contains { $0.name == "configs" && $0.result == .failed }
+    }
 }

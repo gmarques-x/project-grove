@@ -28,7 +28,7 @@ struct GalleryView: View {
                         }
                     }
                 }
-                LogView(entries: Array(model.log.prefix(5)))
+                LogView(entries: Array(model.switches.prefix(5)))
             }
             .padding(18)
         }

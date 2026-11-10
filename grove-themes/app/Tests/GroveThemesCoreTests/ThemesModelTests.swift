@@ -112,6 +112,49 @@ actor GatedRunner: CLIRunner {
         #expect(model.busyScheme == nil)
     }
 
+    /// The CLI doesn't log a switch whose configs step failed, so the model
+    /// keeps it: without it the dropdown would still show the switch before.
+    @Test func aFailedConfigsStepIsShownThoughTheCLIDidntLogIt() async throws {
+        let failed = #"{"scheme": "dark-hard", "steps": [{"name": "configs", "result": "failed", "message": "could not write /state/theme"}]}"#
+        var answers = try fixtureAnswers()
+        answers["set"] = .ok(Data(failed.utf8), status: 1)
+        // The fixture log's newest entry is 2026-11-10 13:43:58 UTC; this is a minute on.
+        let now = Date(timeIntervalSince1970: 1_794_318_298)
+        let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: answers)), now: { now })
+        await model.switchTo("dark-hard")
+        #expect(model.error == nil)
+        #expect(model.lastSwitch == LogEntry(time: now, scheme: "dark-hard", exit: 1,
+                                             steps: [Step(name: "configs", result: .failed,
+                                                          message: "could not write /state/theme")]))
+        #expect(model.switches.map(\.scheme) == ["dark-hard", "light-soft", "dark-medium"])
+
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let line = StatusText.line(for: try #require(model.switches.first), now: now, calendar: utc)
+        #expect(line == "Couldn't switch to Dark Hard at 13:44 · configs failed")
+        #expect(StatusText.chips(for: try #require(model.switches.first))
+            == [Chip(text: "failed: configs", kind: .failed, message: "could not write /state/theme")])
+    }
+
+    @Test func aLoggedSwitchIsNotShownTwice() async throws {
+        let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: try fixtureAnswers())),
+                                now: { Date(timeIntervalSince1970: 1_794_318_298) })
+        await model.switchTo("dark-medium")
+        #expect(model.lastSwitch?.scheme == "dark-medium")
+        #expect(model.switches == model.log)
+    }
+
+    @Test func aNewerLoggedSwitchReplacesTheFailedOne() async throws {
+        let failed = #"{"scheme": "dark-hard", "steps": [{"name": "configs", "result": "failed", "message": "boom"}]}"#
+        var answers = try fixtureAnswers()
+        answers["set"] = .ok(Data(failed.utf8), status: 1)
+        // An hour before the fixture log's newest entry: that switch came after.
+        let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: answers)),
+                                now: { Date(timeIntervalSince1970: 1_794_314_638) })
+        await model.switchTo("dark-hard")
+        #expect(model.switches == model.log)
+    }
+
     @Test func aBadLogEntryDropsOnlyThatEntry() async throws {
         let log = """
         {"entries": [\
