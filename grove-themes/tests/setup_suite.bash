@@ -13,12 +13,14 @@ setup_suite() {
   export GROVE_WALLPAPER_DIR="$base/wallpapers"
   export GROVE_CHROME_APP="$base/no-chrome.app"
   mkdir -p "$HOME" "$base/stubs" "$GROVE_WALLPAPER_DIR"
-  for c in osascript defaults kill ps; do
+  for c in osascript defaults kill killall ps; do
     printf '#!/bin/bash\ncat > /dev/null 2>&1 < /dev/null; exit 0\n' > "$base/stubs/$c"
     chmod +x "$base/stubs/$c"
   done
   export PATH="$base/stubs:$PATH"
   export GROVE_KILL="$base/stubs/kill"
+  export GROVE_KILLALL="$base/stubs/killall"
+  export GROVE_WALLPAPER_STORE="$base/wallpaper-store/Index.plist"
   export GROVE_PS="$base/stubs/ps"
   for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
     : > "$GROVE_WALLPAPER_DIR/wallpaper-project-grove-$s.png"

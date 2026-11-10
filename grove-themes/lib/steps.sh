@@ -6,7 +6,7 @@
 # or 1 when any line is failed or needs-you. result is one of: live,
 # next-prompt, next-launch, needs-you, failed.
 # Seams: GROVE_PS (default ps), GROVE_WALLPAPER_DIR (default
-# $GROVE_ROOT/../grove-wallpapers), GROVE_CHROME_APP (default
+# $GROVE_ROOT/../grove-wallpapers), GROVE_WALLPAPER_STORE, GROVE_KILLALL (default killall), GROVE_CHROME_APP (default
 # /Applications/Google Chrome.app), GROVE_KILL (default the kill builtin; a
 # PATH stub cannot shadow a builtin). osascript and defaults come from PATH.
 
@@ -99,24 +99,49 @@ gt_step_accent() {
   fi
 }
 
-# gt_step_wallpaper SCHEME: the scheme's picture on every screen.
+# gt_step_wallpaper SCHEME: the scheme's picture on every screen and Space.
+# osascript changes the visible Spaces at once; the rest live in macOS's
+# wallpaper store, which wallpaper_store.py rewrites (backed up first) before
+# WallpaperAgent is restarted. Seams: GROVE_WALLPAPER_STORE, GROVE_KILLALL.
 gt_step_wallpaper() {
-  local dir file
+  local dir file store lib msg tmp
   dir="${GROVE_WALLPAPER_DIR:-${GROVE_ROOT:?}/../grove-wallpapers}"
   file="$dir/wallpaper-project-grove-$1.png"
+  store="${GROVE_WALLPAPER_STORE:-$HOME/Library/Application Support/com.apple.wallpaper/Store/Index.plist}"
+  lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   if [ ! -r "$file" ]; then
     _gt_line wallpaper failed "wallpaper not found: $file"
     return 1
   fi
-  if osascript - "$file" >/dev/null 2>&1 <<'OSA'
+  if ! osascript - "$file" >/dev/null 2>&1 <<'OSA'
 on run argv
   tell application "System Events" to set picture of every desktop to POSIX file (item 1 of argv)
 end run
 OSA
   then
-    _gt_line wallpaper live "$1 on every screen; other Spaces keep theirs"
-  else
     _gt_line wallpaper needs-you "$GT_AUTOMATION_HINT"
     return 1
+  fi
+  if [ ! -f "$store" ]; then
+    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: no wallpaper store at $store"
+    return 0
+  fi
+  # grove_backup moves the store aside, so keep a copy to put back.
+  tmp="$store.grove-tmp"
+  if ! cp -p "$store" "$tmp" 2>/dev/null; then
+    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: could not copy the wallpaper store"
+    return 0
+  fi
+  if ! _gt_backup "$store" >/dev/null 2>&1 || ! mv "$tmp" "$store"; then
+    [ -e "$store" ] || mv "$tmp" "$store" 2>/dev/null
+    rm -f "$tmp"
+    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: could not back up the wallpaper store"
+    return 0
+  fi
+  if msg="$(/usr/bin/python3 -I "$lib/wallpaper_store.py" "$store" "$file" 2>&1)"; then
+    "${GROVE_KILLALL:-killall}" WallpaperAgent >/dev/null 2>&1 || true
+    _gt_line wallpaper live "$1 on every Space"
+  else
+    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: $(printf '%s' "$msg" | tr '\n\t' '  ')"
   fi
 }

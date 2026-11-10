@@ -15,6 +15,7 @@ setup() {
   CLI="$GT_ROOT/bin/grove-themes"
   stub osascript 'echo "osascript $*" >> "$CALLS"; [ "$1" != - ] || cat >> "$CALLS"; [ -z "$FAKE_OSA_FAIL" ] || { echo "not authorized" >&2; exit 1; }'
   stub defaults 'echo "defaults $*" >> "$CALLS"'
+  stub killall 'echo "killall $*" >> "$CALLS"'
   stub kill 'echo "kill $*" >> "$CALLS"'
   stub fakeps 'printf "%s\n" "  101 /Applications/Ghostty.app/Contents/MacOS/ghostty" "  202 /usr/bin/zsh" "  303 /Applications/Ghostty.app/Contents/MacOS/ghostty" "  404 /Applications/Ghostty.app/Contents/MacOS/ghostty-helper"'
   stub noneps 'printf "%s\n" "  202 /usr/bin/zsh"'
@@ -169,4 +170,23 @@ chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
     [[ " $seen " != *" $v "* ]] || false
     seen="$seen $v"
   done
+}
+
+@test "wallpaper: every Space's entry is rewritten, with a backup and a WallpaperAgent restart" {
+  gt_make_store "$GROVE_WALLPAPER_STORE"
+  run "$CLI" set light-soft
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"light-soft on every Space"* ]] || false
+  [ "$(gt_store_urls "$GROVE_WALLPAPER_STORE" | sort -u)" = "file://$GROVE_WALLPAPER_DIR/wallpaper-project-grove-light-soft.png" ]
+  [ "$(gt_store_idle "$GROVE_WALLPAPER_STORE" | sort -u)" = "com.apple.wallpaper.choice.aerials:idle" ]
+  [ -n "$(find "$GROVE_STATE/backup" -name Index.plist)" ]
+  grep -qx 'killall WallpaperAgent' "$CALLS"
+}
+
+@test "wallpaper: a missing store leaves the visible Spaces done, no restart" {
+  run "$CLI" set light-soft
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"light-soft on the visible Spaces; other Spaces couldn't be updated: "* ]] || false
+  run grep -q killall "$CALLS"
+  [ "$status" -ne 0 ]
 }

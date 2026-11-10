@@ -23,6 +23,8 @@ Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (
 
 Chrome can't be themed by policy on macOS, so Grove renders an unpacked theme extension to `~/.config/chrome-theme`. Load it once: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and pick `~/.config/chrome-theme` (⌘⇧. shows hidden folders in the picker). After that, `grove-themes set` rewrites its colours, and Chrome picks them up the next time it starts. Each scheme has its own extension version (`1.0.N`), so Chrome rebuilds its cached theme on every switch. `set` can't tell whether the theme is loaded (macOS keeps Chrome's profile private), so it reports `chrome` as next-launch whenever the theme was rendered.
 
+The wallpaper step sets the picture on every Space, not only the visible ones: after `osascript` it backs up macOS's wallpaper store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist`), rewrites every Space's entry with `lib/wallpaper_store.py` and restarts WallpaperAgent.
+
 Tests: `bats tests`.
 
 ## The menu bar app

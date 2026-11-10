@@ -15,8 +15,11 @@ gt_test_setup() {
   # Safety: `set` must never reach the real desktop. No-op fakes for everything
   # it calls; tests that care replace them.
   local c s
-  for c in osascript defaults kill ps; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
+  for c in osascript defaults kill killall ps; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
   export GROVE_KILL="$BATS_TEST_TMPDIR/stubs/kill"
+  export GROVE_KILLALL="$BATS_TEST_TMPDIR/stubs/killall"
+  # Never the real wallpaper store: a path that doesn't exist unless a test makes it.
+  export GROVE_WALLPAPER_STORE="$BATS_TEST_TMPDIR/wallpaper-store/Index.plist"
   export GROVE_PS="$BATS_TEST_TMPDIR/stubs/ps"
   export GROVE_WALLPAPER_DIR="$BATS_TEST_TMPDIR/wallpapers"
   # Never the real Chrome: not installed unless a test says otherwise.
@@ -51,4 +54,60 @@ gt_toy_palettes() {
       echo "amp   = #A&B/C\\$n"
     } > "$PALETTES/everforest-$s"
   done
+}
+
+# gt_make_store PATH: a fake macOS wallpaper store (binary plist) with image
+# entries (one pointing at a deleted file) and Idle (screen saver) entries.
+gt_make_store() {
+  mkdir -p "$(dirname "$1")"
+  /usr/bin/python3 -I - "$1" <<'PY'
+import plistlib, sys
+def cfg(url):
+    return plistlib.dumps({"type": "imageFile", "url": {"relative": url}}, fmt=plistlib.FMT_BINARY)
+def entry(url):
+    return {"Desktop": {"Content": {"Choices": [{"Provider": "com.apple.wallpaper.choice.image", "Configuration": cfg(url), "Files": []}], "Shuffle": "$null"}, "LastSet": 1},
+            "Idle": {"Content": {"Choices": [{"Provider": "com.apple.wallpaper.choice.aerials", "Configuration": b"idle", "Files": []}]}, "LastSet": 2}}
+store = {"AllSpacesAndDisplays": entry("file:///old/all.png"),
+         "Displays": {"D1": entry("file:///old/d1.png")},
+         "Spaces": {"S1": {"Default": entry("file:///gone/deleted.png"), "Displays": {"D1": entry("file:///old/s1d1.png")}}, "": {"Default": entry("file:///old/blank.png")}}}
+with open(sys.argv[1], "wb") as f:
+    plistlib.dump(store, f, fmt=plistlib.FMT_BINARY)
+PY
+}
+
+# gt_store_urls PATH: every Desktop choice's image URL, one per line, sorted.
+gt_store_urls() {
+  /usr/bin/python3 -I - "$1" <<'PY'
+import plistlib, sys
+s = plistlib.load(open(sys.argv[1], "rb"))
+out = []
+def walk(n):
+    if isinstance(n, dict):
+        d = n.get("Desktop")
+        if isinstance(d, dict):
+            for c in d["Content"]["Choices"]:
+                out.append(plistlib.loads(c["Configuration"])["url"]["relative"])
+        for k, v in n.items():
+            if k != "Desktop":
+                walk(v)
+walk(s)
+print("\n".join(sorted(out)))
+PY
+}
+
+# gt_store_idle PATH: the Idle choices' providers, sorted.
+gt_store_idle() {
+  /usr/bin/python3 -I - "$1" <<'PY'
+import plistlib, sys
+s = plistlib.load(open(sys.argv[1], "rb"))
+out = []
+def walk(n):
+    if isinstance(n, dict):
+        if "Idle" in n:
+            out.append(n["Idle"]["Content"]["Choices"][0]["Provider"] + ":" + n["Idle"]["Content"]["Choices"][0]["Configuration"].decode())
+        for v in n.values():
+            walk(v)
+walk(s)
+print("\n".join(sorted(out)))
+PY
 }
