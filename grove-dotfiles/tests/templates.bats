@@ -11,8 +11,9 @@ setup() {
   PALETTES="$GROVE_ROOT/theme"
 }
 
-# The thirteen generated files, one per line.
-GENERATED="chrome-theme/manifest.json
+# The fourteen generated files, one per line.
+GENERATED="borders/bordersrc
+chrome-theme/manifest.json
 eza/theme.yml
 fastfetch/config.jsonc
 ghostty/config
@@ -26,7 +27,7 @@ zsh/conf.d/85-autosuggest.zsh
 zsh/conf.d/95-fetch.zsh
 zsh/conf.d/98-highlight.zsh"
 
-@test "the templates are the thirteen colour-carrying configs" {
+@test "the templates are the fourteen colour-carrying configs" {
   local want
   want="$(printf '%s\n' "$GENERATED" | sed 's/$/.tmpl/' | LC_ALL=C sort)"
   [ "$(gt_templates "$GROVE_ROOT/config")" = "$want" ] || { diff <(echo "$want") <(gt_templates "$GROVE_ROOT/config"); false; }
@@ -54,7 +55,7 @@ zsh/conf.d/98-highlight.zsh"
       n=$((n + 1))
     done
   done
-  [ "$n" -eq 78 ]
+  [ "$n" -eq 84 ]
 }
 
 @test "the Dark Medium render is today's config" {
@@ -114,5 +115,18 @@ palette_rgb() {
       [ "$(chrome_color "$s" "$1")" = "$want" ] || { echo "$s $1: got $(chrome_color "$s" "$1"), want $want ($2)"; false; }
     done
     [ "$(jq '.theme.colors | length' "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json")" -eq 17 ] || false
+  done
+}
+
+@test "bordersrc colours the borders for every scheme" {
+  local s out green bg3 want
+  for s in $(gt_schemes); do
+    out="$BATS_TEST_TMPDIR/$s-bordersrc"
+    gt_render_file "$s" "$PALETTES" "$GROVE_ROOT/config/borders/bordersrc.tmpl" "$out"
+    green="$(sed -n 's/^green *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
+    bg3="$(sed -n 's/^bg3 *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
+    [ -n "$green" ] && [ -n "$bg3" ]
+    want="borders active_color=0xff$green inactive_color=0xff$bg3 width=5.0 style=round hidpi=on"
+    [ "$(grep -v '^#' "$out" | grep -v '^$')" = "$want" ] || { echo "$s:"; cat "$out"; false; }
   done
 }

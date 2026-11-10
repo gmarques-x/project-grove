@@ -16,7 +16,8 @@ gt_valid() {
 }
 
 # gt_values SCHEME PALETTE_DIR: name<TAB>value lines, palette entries first,
-# then name_rgb ("R, G, B" in decimal) for each #RRGGBB entry, then appearance,
+# then name_rgb ("R, G, B" in decimal) and name_argb (0xffRRGGBB, upper case)
+# for each #RRGGBB entry, then appearance,
 # contrast, vscode_theme, fetch_image, chrome_version (1.0.N, N the scheme's
 # position, so every switch changes Chrome's cached theme).
 gt_values() {
@@ -27,6 +28,7 @@ gt_values() {
   sed -n "s/^[[:space:]]*\\([a-z0-9_][a-z0-9_]*\\)[[:space:]]*=[[:space:]]*#\\([0-9A-Fa-f]\\{6\\}\\)[[:space:]]*\$/\\1 \\2/p" \
     "$dir/everforest-$scheme" | while read -r name hex; do
     printf '%s_rgb\t%d, %d, %d\n' "$name" "$((16#${hex:0:2}))" "$((16#${hex:2:2}))" "$((16#${hex:4:2}))"
+    printf '%s_argb\t0xff%s\n' "$name" "$(printf '%s' "$hex" | tr '[:lower:]' '[:upper:]')"
   done
   n=0
   for s in $(gt_schemes); do

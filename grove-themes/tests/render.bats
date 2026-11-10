@@ -67,10 +67,11 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
 @test "gt_values lists palette entries then computed names" {
   run gt_values dark-hard "$PALETTES"
   [ "${lines[0]}" = "$(printf 'fg\t#D3C6A1')" ]
-  [ "${#lines[@]}" -eq 9 ]
+  [ "${#lines[@]}" -eq 10 ]
   [ "${lines[3]}" = "$(printf 'fg_rgb\t211, 198, 161')" ]
-  [ "${lines[7]}" = "$(printf 'fetch_image\tgrove.png')" ]
-  [ "${lines[8]}" = "$(printf 'chrome_version\t1.0.1')" ]
+  [ "${lines[4]}" = "$(printf 'fg_argb\t0xffD3C6A1')" ]
+  [ "${lines[8]}" = "$(printf 'fetch_image\tgrove.png')" ]
+  [ "${lines[9]}" = "$(printf 'chrome_version\t1.0.1')" ]
 }
 
 @test "gt_templates lists *.tmpl relative and sorted" {
@@ -100,6 +101,15 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
   gt_render_file dark-medium "$BATS_TEST_TMPDIR/p" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
   [ "$(cat "$BATS_TEST_TMPDIR/out")" = "45, 53, 59|255, 255, 255|0, 0, 0" ]
   [ -z "$(gt_values dark-medium "$BATS_TEST_TMPDIR/p" | awk -F"\t" '$1 == "note_rgb"')" ]
+}
+
+@test "every #RRGGBB value also gets a name_argb, 0xff and upper-case hex" {
+  mkdir -p "$BATS_TEST_TMPDIR/p"
+  printf 'white = #ffeedd\ngreen = #A7C080\nnote = notahex\n' > "$BATS_TEST_TMPDIR/p/everforest-dark-medium"
+  printf '{{white_argb}}|{{green_argb}}\n' > "$BATS_TEST_TMPDIR/t.tmpl"
+  gt_render_file dark-medium "$BATS_TEST_TMPDIR/p" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
+  [ "$(cat "$BATS_TEST_TMPDIR/out")" = "0xffFFEEDD|0xffA7C080" ]
+  [ -z "$(gt_values dark-medium "$BATS_TEST_TMPDIR/p" | awk -F"\t" '$1 == "note_argb"')" ]
 }
 
 @test "chrome_version is 1.0.N, N the scheme's position" {

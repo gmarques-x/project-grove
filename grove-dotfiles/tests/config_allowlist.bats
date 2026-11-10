@@ -101,3 +101,9 @@ setup() { grove_test_setup; }
   [ "$status" -ne 0 ]
   [ "$(git -C "$GROVE_ROOT" ls-files config/chrome-theme)" = "config/chrome-theme/manifest.json.tmpl" ]
 }
+
+@test "the borders template is tracked and its render is ignored" {
+  run git -C "$GROVE_ROOT" check-ignore -q config/borders/bordersrc.tmpl
+  [ "$status" -ne 0 ]
+  git -C "$GROVE_ROOT" check-ignore -q config/borders/bordersrc
+}
