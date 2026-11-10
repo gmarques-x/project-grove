@@ -18,9 +18,17 @@ struct GroveThemesApp: App {
         let model = ThemesModel(client: GroveThemesClient(runner: ProcessRunner(path: cli)))
         self.model = model
         watcher = StateWatcher(file: StatePath.url(environment: environment, home: home)) {
-            Task { await model.refresh() }
+            Task { await model.refreshRetryingWhileNotInstalled() }
         }
-        Task { await model.refresh() }
+        // A `.window` MenuBarExtra may keep its view alive, so `.onAppear` alone
+        // can miss a reopened dropdown: the dropdown (or the gallery) becoming
+        // key, or the app becoming active, re-checks too.
+        for name in [NSWindow.didBecomeKeyNotification, NSApplication.didBecomeActiveNotification] {
+            _ = NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in await model.refreshRetryingWhileNotInstalled() }
+            }
+        }
+        Task { await model.refreshRetryingWhileNotInstalled() }
     }
 
     var body: some Scene {

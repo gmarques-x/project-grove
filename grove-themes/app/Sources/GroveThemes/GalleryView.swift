@@ -38,6 +38,6 @@ struct GalleryView: View {
         .background(Color(theme.bg0))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
-        .task { await model.refresh() }
+        .task { await model.refreshRetryingWhileNotInstalled() }
     }
 }

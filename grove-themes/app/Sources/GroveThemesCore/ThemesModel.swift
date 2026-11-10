@@ -25,6 +25,7 @@ public final class ThemesModel {
 
     private let client: GroveThemesClient
     private let now: @MainActor () -> Date
+    @ObservationIgnored private var retrying = false
 
     public init(client: GroveThemesClient, now: @escaping @MainActor () -> Date = Date.init) {
         self.client = client
@@ -41,6 +42,24 @@ public final class ThemesModel {
             error = nil
         } catch {
             self.error = Self.cliError(error)
+        }
+    }
+
+    /// Refreshes, and while the CLI isn't installed refreshes again every
+    /// `interval` until it is, so the app notices `grove install` without being
+    /// reopened. Stops when `sleep` throws (its task was cancelled). A call
+    /// while another is retrying only refreshes once: one loop is enough.
+    public func refreshRetryingWhileNotInstalled(
+        every interval: Duration = .seconds(5),
+        sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) async {
+        await refresh()
+        guard !retrying else { return }
+        retrying = true
+        defer { retrying = false }
+        while case .notInstalled = error {
+            do { try await sleep(interval) } catch { return }
+            await refresh()
         }
     }
 

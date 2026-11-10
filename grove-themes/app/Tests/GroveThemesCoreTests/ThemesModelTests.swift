@@ -38,6 +38,41 @@ actor GatedRunner: CLIRunner {
     }
 }
 
+/// Records the waits a retry loop asks for.
+actor Sleeps {
+    private(set) var intervals: [Duration] = []
+
+    /// Returns how many waits there have been, this one included.
+    func add(_ interval: Duration) -> Int {
+        intervals.append(interval)
+        return intervals.count
+    }
+}
+
+/// A wait that lasts until the test opens it.
+actor SleepGate {
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var watchers: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            waiting = continuation
+            watchers.forEach { $0.resume() }
+            watchers = []
+        }
+    }
+
+    func waitUntilWaiting() async {
+        if waiting != nil { return }
+        await withCheckedContinuation { watchers.append($0) }
+    }
+
+    func open() {
+        waiting?.resume()
+        waiting = nil
+    }
+}
+
 @MainActor @Suite struct ThemesModelTests {
     @Test func refreshLoadsListAndLog() async throws {
         let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: try fixtureAnswers())))
@@ -153,6 +188,63 @@ actor GatedRunner: CLIRunner {
                                 now: { Date(timeIntervalSince1970: 1_794_314_638) })
         await model.switchTo("dark-hard")
         #expect(model.switches == model.log)
+    }
+
+    @Test func refreshRetriesEveryIntervalUntilTheCLIIsInstalled() async throws {
+        let runner = FakeRunner(answers: try fixtureAnswers(), failure: .notInstalled("/missing/grove-themes"))
+        let model = ThemesModel(client: GroveThemesClient(runner: runner))
+        let sleeps = Sleeps()
+        // grove install lands the CLI during the second wait.
+        await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) { interval in
+            if await sleeps.add(interval) == 2 { await runner.setFailure(nil) }
+        }
+        #expect(await sleeps.intervals == [.seconds(5), .seconds(5)])
+        #expect(await runner.count("list") == 3)
+        #expect(model.error == nil)
+        #expect(model.list?.current == "dark-medium")
+    }
+
+    @Test func refreshDoesNotRetryOtherErrors() async throws {
+        var answers = try fixtureAnswers()
+        answers["list"] = .ok(Data("oops".utf8))
+        let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: answers)))
+        let sleeps = Sleeps()
+        await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) { _ = await sleeps.add($0) }
+        #expect(await sleeps.intervals.isEmpty)
+        #expect(model.error == .unreadable("oops"))
+    }
+
+    @Test func retryingStopsWhenItsTaskIsCancelled() async throws {
+        let runner = FakeRunner(answers: try fixtureAnswers(), failure: .notInstalled("/missing/grove-themes"))
+        let model = ThemesModel(client: GroveThemesClient(runner: runner))
+        await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) { _ in throw CancellationError() }
+        #expect(await runner.count("list") == 1)
+        #expect(model.error == .notInstalled("/missing/grove-themes"))
+        // The loop is over, so a later call retries again.
+        let sleeps = Sleeps()
+        await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) {
+            _ = await sleeps.add($0)
+            await runner.setFailure(nil)
+        }
+        #expect(await sleeps.intervals == [.seconds(5)])
+        #expect(model.error == nil)
+    }
+
+    @Test func aSecondCallWhileRetryingOnlyRefreshesOnce() async throws {
+        let runner = FakeRunner(answers: try fixtureAnswers(), failure: .notInstalled("/missing/grove-themes"))
+        let model = ThemesModel(client: GroveThemesClient(runner: runner))
+        let gate = SleepGate()
+        let first = Task { await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) { _ in await gate.wait() } }
+        await gate.waitUntilWaiting()
+        let sleeps = Sleeps()
+        await model.refreshRetryingWhileNotInstalled(every: .seconds(5)) { _ = await sleeps.add($0) }
+        #expect(await sleeps.intervals.isEmpty)
+        #expect(await runner.count("list") == 2)
+        await runner.setFailure(nil)
+        await gate.open()
+        await first.value
+        #expect(await runner.count("list") == 3)
+        #expect(model.error == nil)
     }
 
     @Test func aBadLogEntryDropsOnlyThatEntry() async throws {

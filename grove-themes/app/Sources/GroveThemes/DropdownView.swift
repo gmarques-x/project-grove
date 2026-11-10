@@ -43,7 +43,7 @@ struct DropdownView: View {
         .background(Color(theme.bg0))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
-        .onAppear { Task { await model.refresh() } }
+        .onAppear { Task { await model.refreshRetryingWhileNotInstalled() } }
     }
 
     private func header(_ theme: ThemeColors) -> some View {
