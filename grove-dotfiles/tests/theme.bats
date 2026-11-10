@@ -37,10 +37,54 @@ palette_value() {
   done
 }
 
-@test "the palette's Grove additions are only the fill color" {
+@test "the palette's Grove additions are only the fill color and the terminal roles" {
   run sed -n '/^# Grove additions/,$p' "$GROVE_ROOT/$PALETTE_REL"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$')" = "fill = #596763" ]
+  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
+}
+
+# scheme_value SCHEME NAME: the hex for NAME in theme/everforest-SCHEME.
+scheme_value() {
+  sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*\(#[0-9A-Fa-f]\{6\}\).*/\1/p" "$GROVE_ROOT/theme/everforest-$1" | head -1
+}
+
+SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
+
+@test "each palette has every upstream color" {
+  local scheme name hex
+  while read -r scheme name hex; do
+    [ "$(scheme_value "$scheme" "$name")" = "$hex" ] || { echo "$scheme $name: got '$(scheme_value "$scheme" "$name")', want $hex"; false; }
+  done < "$GROVE_ROOT/tests/fixtures/everforest-upstream.txt"
+}
+
+@test "terminal roles follow upstream" {
+  local s v black white i
+  for s in $SCHEMES; do
+    if [[ $s == dark-* ]]; then black=bg3; white=fg; else black=fg; white=bg3; fi
+    v() { scheme_value "$s" "$1"; }
+    [ "$(v term0)" = "$(v $black)" ] || { echo "$s term0"; false; }
+    [ "$(v term7)" = "$(v $white)" ] || { echo "$s term7"; false; }
+    i=1
+    for n in red green yellow blue purple aqua; do
+      [ "$(v term$i)" = "$(v $n)" ] || { echo "$s term$i"; false; }
+      i=$((i + 1))
+    done
+    [ "$(v term8)" = "$(v grey1)" ] || { echo "$s term8"; false; }
+    for i in 1 2 3 4 5 6 7; do
+      [ "$(v term$((i + 8)))" = "$(v term$i)" ] || { echo "$s term$((i + 8))"; false; }
+    done
+  done
+}
+
+@test "fill is Grove's" {
+  local s
+  for s in $SCHEMES; do
+    if [[ $s == dark-* ]]; then
+      [ "$(scheme_value "$s" fill)" = "#596763" ] || { echo "$s fill"; false; }
+    else
+      [ "$(scheme_value "$s" fill)" = "$(scheme_value "$s" bg5)" ] || { echo "$s fill"; false; }
+    fi
+  done
 }
 
 @test "every config color comes from the palette" {

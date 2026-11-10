@@ -1,0 +1,58 @@
+# Everforest Light Medium, the Project Grove palette.
+# Every color a Grove config uses must appear here (tests/theme.bats checks).
+# Format: name = #RRGGBB. Lines starting with # are comments.
+
+# Upstream (Light Medium)
+# Source: https://github.com/sainnhe/everforest/blob/master/autoload/everforest.vim
+# Copyright (c) Sainnhe Park, MIT License.
+
+# Backgrounds
+bg_dim    = #EFEBD4
+bg0       = #FDF6E3
+bg1       = #F4F0D9
+bg2       = #EFEBD4
+bg3       = #E6E2CC
+bg4       = #E0DCC7
+bg5       = #BDC3AF
+bg_visual = #EAEDC8
+bg_red    = #FDE3DA
+bg_yellow = #FAEDCD
+bg_green  = #F0F1D2
+bg_blue   = #E9F0E9
+bg_purple = #FAE8E2
+
+# Foregrounds
+fg     = #5C6A72
+red    = #F85552
+orange = #F57D26
+yellow = #DFA000
+green  = #8DA101
+aqua   = #35A77C
+blue   = #3A94C5
+purple = #DF69BA
+grey0  = #A6B0A0
+grey1  = #939F91
+grey2  = #829181
+
+# Grove additions
+# The prompt's ─ fill line, the scheme's bg5.
+fill = #BDC3AF
+# Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
+# colors. Bright black (ANSI 8) is grey1 instead of upstream's fg, so dim
+# terminal text stays readable. A mapping, not a new color.
+term0  = #5C6A72
+term1  = #F85552
+term2  = #8DA101
+term3  = #DFA000
+term4  = #3A94C5
+term5  = #DF69BA
+term6  = #35A77C
+term7  = #E6E2CC
+term8  = #939F91
+term9  = #F85552
+term10 = #8DA101
+term11 = #DFA000
+term12 = #3A94C5
+term13 = #DF69BA
+term14 = #35A77C
+term15 = #E6E2CC

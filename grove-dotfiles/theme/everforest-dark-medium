@@ -37,5 +37,22 @@ grey2  = #9DA9A0
 # Grove additions
 # The prompt's ─ fill line, carried over from the Everforest zsh port.
 fill = #596763
-# Terminal bright black (ANSI 8) is grey1 instead of upstream's bg3, so dim
+# Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
+# colors. Bright black (ANSI 8) is grey1 instead of upstream's bg3, so dim
 # terminal text stays readable. A mapping, not a new color.
+term0  = #475258
+term1  = #E67E80
+term2  = #A7C080
+term3  = #DBBC7F
+term4  = #7FBBB3
+term5  = #D699B6
+term6  = #83C092
+term7  = #D3C6AA
+term8  = #859289
+term9  = #E67E80
+term10 = #A7C080
+term11 = #DBBC7F
+term12 = #7FBBB3
+term13 = #D699B6
+term14 = #83C092
+term15 = #D3C6AA

@@ -1,0 +1,58 @@
+# Everforest Dark Soft, the Project Grove palette.
+# Every color a Grove config uses must appear here (tests/theme.bats checks).
+# Format: name = #RRGGBB. Lines starting with # are comments.
+
+# Upstream (Dark Soft)
+# Source: https://github.com/sainnhe/everforest/blob/master/autoload/everforest.vim
+# Copyright (c) Sainnhe Park, MIT License.
+
+# Backgrounds
+bg_dim    = #293136
+bg0       = #333C43
+bg1       = #3A464C
+bg2       = #434F55
+bg3       = #4D5960
+bg4       = #555F66
+bg5       = #5D6B66
+bg_visual = #5C3F4F
+bg_red    = #59464C
+bg_yellow = #55544A
+bg_green  = #48584E
+bg_blue   = #3F5865
+bg_purple = #4E4953
+
+# Foregrounds
+fg     = #D3C6AA
+red    = #E67E80
+orange = #E69875
+yellow = #DBBC7F
+green  = #A7C080
+aqua   = #83C092
+blue   = #7FBBB3
+purple = #D699B6
+grey0  = #7A8478
+grey1  = #859289
+grey2  = #9DA9A0
+
+# Grove additions
+# The prompt's ─ fill line, carried over from the Everforest zsh port.
+fill = #596763
+# Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
+# colors. Bright black (ANSI 8) is grey1 instead of upstream's bg3, so dim
+# terminal text stays readable. A mapping, not a new color.
+term0  = #4D5960
+term1  = #E67E80
+term2  = #A7C080
+term3  = #DBBC7F
+term4  = #7FBBB3
+term5  = #D699B6
+term6  = #83C092
+term7  = #D3C6AA
+term8  = #859289
+term9  = #E67E80
+term10 = #A7C080
+term11 = #DBBC7F
+term12 = #7FBBB3
+term13 = #D699B6
+term14 = #83C092
+term15 = #D3C6AA
