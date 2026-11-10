@@ -36,8 +36,7 @@ func renderAeroSpace() -> Never {
     let text = AeroSpaceRenderer.render(keys: keys, base: base, host: localHostName())
     let out = env["GROVE_KEYS_RENDER_OUT"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? paths.output
     do {
-        try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try text.write(to: out, atomically: true, encoding: .utf8)
+        try writeAtomically(Data(text.utf8), to: out)
     } catch {
         fail("cannot write \(out.path): \(error.localizedDescription)")
     }
