@@ -88,14 +88,21 @@ gt_copy_config() {
 
 @test "an unwritable target keeps the old state" {
   "$CLI" set dark-hard
+  cp -R "$GROVE_ROOT/config" "$BATS_TEST_TMPDIR/snapshot"
   chmod a-w "$GROVE_ROOT/config/yazi"
   run "$CLI" set light-soft
   chmod u+w "$GROVE_ROOT/config/yazi"
   [ "$status" -eq 1 ]
   [ "$(cat "$GROVE_STATE/theme")" = "dark-hard" ]
+  # no temp folder left behind
+  [ -z "$(find "$GROVE_ROOT/config" -name '.grove-themes.*')" ]
   run "$CLI" render
   [ "$status" -eq 0 ]
   [ "$(cat "$GROVE_STATE/theme")" = "dark-hard" ]
+  [ -z "$(find "$GROVE_ROOT/config" -name '.grove-themes.*')" ]
+  # every file is back to the dark-hard render
+  run diff -r "$BATS_TEST_TMPDIR/snapshot" "$GROVE_ROOT/config"
+  [ "$status" -eq 0 ]
 }
 
 @test "render writes the configs for the current scheme" {
