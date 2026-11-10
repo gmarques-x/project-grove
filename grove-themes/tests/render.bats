@@ -64,3 +64,16 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
   run gt_templates "$BATS_TEST_TMPDIR/cfg"
   [ "$output" = "$(printf 'a/y.tmpl\nb/z.tmpl')" ]
 }
+
+@test "render works under set -euo pipefail" {
+  printf 'fg={{fg}}\n' > "$BATS_TEST_TMPDIR/t.tmpl"
+  run /bin/bash -c 'set -euo pipefail; source "$1/lib/render.sh"; gt_render_file dark-hard "$2" "$3" "$4"; echo done' _ "$GT_ROOT" "$PALETTES" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
+  [ "$status" -eq 0 ]
+  [ "$output" = done ]
+  [ "$(cat "$BATS_TEST_TMPDIR/out")" = "fg=#D3C6A1" ]
+  [ ! -e "$BATS_TEST_TMPDIR/out.tmp" ]
+  printf 'x={{nope}}\n' > "$BATS_TEST_TMPDIR/u.tmpl"
+  run /bin/bash -c 'set -euo pipefail; source "$1/lib/render.sh"; gt_render_file dark-hard "$2" "$3" "$4" || echo "rc=$?"' _ "$GT_ROOT" "$PALETTES" "$BATS_TEST_TMPDIR/u.tmpl" "$BATS_TEST_TMPDIR/out2"
+  [[ "$output" == *"unknown name: nope"*"rc=1"* ]] || false
+  [ ! -e "$BATS_TEST_TMPDIR/out2" ]
+}

@@ -52,7 +52,8 @@ EOT
     return 1
   fi
   rm -f "$script"
-  bad="$(grep -o '{{[a-z0-9_]*}}' "$tmp" | head -n 1)"
+  bad="$(grep -o '{{[a-z0-9_]*}}' "$tmp" || true)"
+  bad="${bad%%$'\n'*}"
   if [ -n "$bad" ]; then
     name="${bad#\{\{}"
     name="${name%\}\}}"
