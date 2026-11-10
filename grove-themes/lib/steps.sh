@@ -8,7 +8,8 @@
 # Seams: GROVE_PS (default ps), GROVE_WALLPAPER_DIR (default
 # $GROVE_ROOT/../grove-wallpapers), GROVE_WALLPAPER_STORE, GROVE_KILLALL (default killall), GROVE_CHROME_APP (default
 # /Applications/Google Chrome.app), GROVE_KILL (default the kill builtin; a
-# PATH stub cannot shadow a builtin). osascript and defaults come from PATH.
+# PATH stub cannot shadow a builtin), GROVE_BORDERS_SH (default /bin/sh, runs
+# the borders script). osascript and defaults come from PATH.
 
 GT_AUTOMATION_HINT="allow Grove Themes or your terminal to control System Events (System Settings > Privacy & Security > Automation), then switch again"
 
@@ -69,6 +70,24 @@ gt_step_chrome() {
 
 gt_step_yazi() {
   _gt_line yazi next-launch "read at launch"
+}
+
+# gt_step_borders: rerun the rendered bordersrc when JankyBorders is running;
+# a running borders takes the new colours in place. A stopped one is left alone
+# (AeroSpace starts it with the same script).
+gt_step_borders() {
+  local pid comm running=0
+  while read -r pid comm; do
+    [ "${comm##*/}" = borders ] && running=1
+  done < <("${GROVE_PS:-ps}" -axo pid=,comm= 2>/dev/null)
+  if [ "$running" -eq 0 ]; then
+    _gt_line borders live "not running"
+  elif "${GROVE_BORDERS_SH:-/bin/sh}" "${GROVE_ROOT:?}/config/borders/bordersrc" >/dev/null 2>&1; then
+    _gt_line borders live "recoloured"
+  else
+    _gt_line borders failed "could not recolour the borders"
+    return 1
+  fi
 }
 
 # gt_step_appearance SCHEME

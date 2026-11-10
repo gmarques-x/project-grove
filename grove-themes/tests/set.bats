@@ -143,7 +143,45 @@ gt_copy_config() {
   run "$CLI" set --json dark-soft
   [ "$status" -eq 0 ]
   names="$(printf '%s' "$output" | grep -o '"name": "[a-z]*"' | sed 's/"name": //' | tr -d '"\n' )"
-  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodechromeyazi""appearanceaccentwallpaper" ]
+  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodechromeyaziborders""appearanceaccentwallpaper" ]
+}
+
+borders_line() { printf '%s\n' "$output" | grep '^borders '; }
+
+# fake_borders_sh: GROVE_BORDERS_SH logs the script it runs, exits $FAKE_SH_RC.
+fake_borders_sh() {
+  stub fakesh 'echo "sh $*" >> "$CALLS"; exit "${FAKE_SH_RC:-0}"'
+  export GROVE_BORDERS_SH="$BATS_TEST_TMPDIR/stubs/fakesh"
+  stub bordersps 'printf "%s\n" "  202 /usr/bin/zsh" "  505 /opt/homebrew/bin/borders" "  606 /usr/bin/vim bordersrc"'
+}
+
+@test "borders: recolours a running borders" {
+  fake_borders_sh
+  export GROVE_PS=bordersps
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$(borders_line)" == *"live"*"recoloured"* ]] || false
+  grep -qx "sh $GROVE_ROOT/config/borders/bordersrc" "$CALLS"
+  grep -q 'active_color=' "$GROVE_ROOT/config/borders/bordersrc"
+}
+
+@test "borders: leaves a stopped borders alone" {
+  fake_borders_sh
+  stub vimps 'printf "%s\n" "  606 /usr/bin/vim" "  707 /tmp/bordersrc"'
+  export GROVE_PS=vimps
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$(borders_line)" == *"live"*"not running"* ]] || false
+  run grep -q '^sh ' "$CALLS"
+  [ "$status" -ne 0 ]
+}
+
+@test "borders: a failing script fails the step" {
+  fake_borders_sh
+  export GROVE_PS=bordersps FAKE_SH_RC=1
+  run "$CLI" set dark-soft
+  [ "$status" -eq 1 ]
+  [[ "$(borders_line)" == *"failed"*"could not recolour the borders"* ]] || false
 }
 
 chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
