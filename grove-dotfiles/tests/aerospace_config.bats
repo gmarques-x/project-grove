@@ -1,13 +1,15 @@
 #!/usr/bin/env bats
-# config/aerospace/aerospace.toml against the AeroSpace spec (§4–§5), read
-# back with Python's tomllib (Homebrew's python3; macOS's 3.9 has no tomllib).
+# config/aerospace/aerospace.base.toml (settings and rules) and
+# config/grove-keys/keys.toml (bindings) against the AeroSpace spec (§4–§5),
+# read back with Python's tomllib (Homebrew's python3; macOS's 3.9 has no tomllib).
 # shellcheck disable=SC2016
 
 load helpers
 
 setup() {
   grove_test_setup
-  AS_TOML="$GROVE_ROOT/config/aerospace/aerospace.toml"
+  AS_TOML="$GROVE_ROOT/config/aerospace/aerospace.base.toml"
+  KEYS_TOML="$GROVE_ROOT/config/grove-keys/keys.toml"
   AS_PY="${GROVE_TEST_PYTHON:-/opt/homebrew/bin/python3}"
   [ -x "$AS_PY" ] || skip "no python3 with tomllib"
 }
@@ -21,12 +23,26 @@ r = eval(sys.argv[2])
 print(r if isinstance(r, str) else json.dumps(r))' "$AS_TOML" "$1"
 }
 
-main_key() { as_q "c['mode']['main']['binding'].get('$1')"; }
-service_key() { as_q "c['mode']['service']['binding'].get('$1')"; }
+# keys_q EXPR: the same, with k = the parsed keys.toml (bindings live there).
+keys_q() {
+  "$AS_PY" -I -c '
+import sys, tomllib, json
+k = tomllib.load(open(sys.argv[1], "rb"))
+r = eval(sys.argv[2])
+print(r if isinstance(r, str) else json.dumps(r))' "$KEYS_TOML" "$1"
+}
+
+main_key() { keys_q "k['aerospace']['main'].get('$1')"; }
+service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
 
 @test "aerospace: parses as TOML" {
   [ -f "$AS_TOML" ]
   as_q '"ok"'
+  [ "$(keys_q '"ok"')" = ok ]
+}
+
+@test "aerospace: the base has no key bindings, grove-keys renders them" {
+  [ "$(as_q "'mode' in c")" = false ]
 }
 
 @test "aerospace: starts at login and starts borders" {
@@ -71,7 +87,7 @@ service_key() { as_q "c['mode']['service']['binding'].get('$1')"; }
 
 @test "aerospace: only workspaces 1-9, none kept when empty" {
   [ "$(as_q "'persistent-workspaces' in c")" = false ]
-  [ "$(as_q "all(t in '123456789' and len(t) == 1 for m in c['mode'].values() for v in m['binding'].values() if isinstance(v, str) and v.split()[0] in ('workspace', 'move-node-to-workspace') for t in [v.split()[-1]])")" = true ]
+  [ "$(keys_q "all(t in '123456789' and len(t) == 1 for m in k['aerospace'].values() for v in m.values() if isinstance(v, str) and v.split()[0] in ('workspace', 'move-node-to-workspace') for t in [v.split()[-1]])")" = true ]
   [ "$(as_q "all(r['run'].split()[-1] in list('123456789') for r in c['on-window-detected'] if r['run'].startswith('move-node-to-workspace'))")" = true ]
 }
 
@@ -88,9 +104,9 @@ service_key() { as_q "c['mode']['service']['binding'].get('$1')"; }
   [ "$(as_q "all(r['if'].get('during-aerospace-startup') is False for r in c['on-window-detected'] if r['run'].startswith('move-node-to-workspace'))")" = true ]
 }
 
-@test "aerospace: System Settings, Grove Themes and Finder float, also at startup" {
+@test "aerospace: System Settings, Grove Themes, Grove Keys and Finder float, also at startup" {
   local id
-  for id in com.apple.systempreferences com.projectgrove.themes com.apple.finder; do
+  for id in com.apple.systempreferences com.projectgrove.themes com.projectgrove.keys com.apple.finder; do
     [ "$(as_q "[(r['run'], 'during-aerospace-startup' in r['if']) for r in c['on-window-detected'] if r['if'].get('app-id') == '$id']")" = '[["layout floating", false]]' ] || { echo "$id"; false; }
   done
 }

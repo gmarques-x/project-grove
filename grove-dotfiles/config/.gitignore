@@ -16,6 +16,7 @@
 !/vscode/
 !/borders/
 !/aerospace/
+/aerospace/aerospace.toml
 !/grove-keys/
 !/starship.toml.tmpl
 !/starship-plain.toml.tmpl

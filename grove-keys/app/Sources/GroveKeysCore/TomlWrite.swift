@@ -31,14 +31,14 @@ extension TomlDocument {
         !s.isEmpty && s.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || (allowHyphen && $0 == "-")) }
     }
 
-    private static func keyText(_ key: String) -> String {
+    static func keyText(_ key: String) -> String {
         // All-digit keys (workspace numbers) are quoted: `"1" = "main"`.
         isBare(key, allowHyphen: true) && !key.allSatisfy(\.isNumber) ? key : quoted(key)
     }
 
     /// Names after the first (a mode, a host name) are quoted when they hold
     /// anything but letters, digits and underscores, as in `[monitors."Mac-Air"]`.
-    private static func headerPart(_ part: String, first: Bool) -> String {
+    static func headerPart(_ part: String, first: Bool) -> String {
         isBare(part, allowHyphen: first) ? part : quoted(part)
     }
 
@@ -57,7 +57,7 @@ extension TomlDocument {
         return out + "\""
     }
 
-    private static func valueText(_ v: TomlValue) -> String {
+    static func valueText(_ v: TomlValue) -> String {
         switch v {
         case .string(let s): return quoted(s)
         case .array(let items): return "[" + items.map(quoted).joined(separator: ", ") + "]"

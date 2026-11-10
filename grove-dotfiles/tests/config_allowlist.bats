@@ -108,7 +108,14 @@ setup() { grove_test_setup; }
   git -C "$GROVE_ROOT" check-ignore -q config/borders/bordersrc
 }
 
-@test "the AeroSpace config is tracked" {
+@test "the AeroSpace base config is tracked and the rendered one is ignored" {
+  run git -C "$GROVE_ROOT" check-ignore -q config/aerospace/aerospace.base.toml
+  [ "$status" -ne 0 ]
   run git -C "$GROVE_ROOT" check-ignore -q config/aerospace/aerospace.toml
+  [ "$status" -eq 0 ]
+}
+
+@test "the Grove Keys keys.toml is tracked" {
+  run git -C "$GROVE_ROOT" check-ignore -q config/grove-keys/keys.toml
   [ "$status" -ne 0 ]
 }

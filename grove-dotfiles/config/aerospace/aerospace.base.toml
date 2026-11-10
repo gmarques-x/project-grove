@@ -1,0 +1,152 @@
+# AeroSpace, the tiling window manager at the core of Project Grove's desktop.
+# Spec: grove-dotfiles/docs/specs/2026-11-10-aerospace-design.md. Built on
+# AeroSpace's default config (0.21). This is the base: settings and window
+# rules only. Shortcuts live in grove-keys/keys.toml; Grove Keys renders both
+# into aerospace.toml, which is generated and untracked.
+
+config-version = 2
+
+start-at-login = true
+# JankyBorders in the current scheme's colours (rendered by grove-themes).
+after-startup-command = ['exec-and-forget /bin/sh ~/.config/borders/bordersrc']
+
+enable-normalization-flatten-containers = true
+enable-normalization-opposite-orientation-for-nested-containers = true
+accordion-padding = 30
+default-root-container-layout = 'tiles'
+default-root-container-orientation = 'auto'
+on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
+automatically-unhide-macos-hidden-apps = false
+key-mapping.preset = 'qwerty'
+
+# No persistent-workspaces: a workspace exists only while it has a window (or
+# is focused), so the bar can show just the ones in use.
+
+# The top gap grows when SketchyBar arrives.
+gaps.inner.horizontal = 8
+gaps.inner.vertical = 8
+gaps.outer.left = 8
+gaps.outer.bottom = 8
+gaps.outer.top = 8
+gaps.outer.right = 8
+
+# Floating apps, also for windows already open when AeroSpace starts.
+[[on-window-detected]]
+if.app-id = 'com.apple.systempreferences'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.projectgrove.themes'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.projectgrove.keys'
+run = 'layout floating'
+
+[[on-window-detected]]
+if.app-id = 'com.apple.finder'
+run = 'layout floating'
+
+# Pinned apps: new windows go to their workspace; windows already open when
+# AeroSpace starts stay where they are. A rule for an app that isn't installed
+# does nothing.
+
+[[on-window-detected]] # Ghostty
+if.app-id = 'com.mitchellh.ghostty'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 1'
+
+[[on-window-detected]] # Claude
+if.app-id = 'com.anthropic.claudefordesktop'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 2'
+
+[[on-window-detected]] # Google Chrome
+if.app-id = 'com.google.Chrome'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 3'
+
+[[on-window-detected]] # VS Code
+if.app-id = 'com.microsoft.VSCode'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 4'
+
+[[on-window-detected]] # Messages
+if.app-id = 'com.apple.MobileSMS'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # FaceTime
+if.app-id = 'com.apple.FaceTime'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Mail
+if.app-id = 'com.apple.mail'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Slack
+if.app-id = 'com.tinyspeck.slackmacgap'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Discord
+if.app-id = 'com.hnc.Discord'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # WhatsApp
+if.app-id = 'net.whatsapp.WhatsApp'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Microsoft Teams
+if.app-id = 'com.microsoft.teams2'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Telegram
+if.app-id = 'ru.keepcoder.Telegram'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Signal
+if.app-id = 'org.whispersystems.signal-desktop'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Zoom
+if.app-id = 'us.zoom.xos'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 5'
+
+[[on-window-detected]] # Music
+if.app-id = 'com.apple.Music'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]] # Podcasts
+if.app-id = 'com.apple.podcasts'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]] # TV
+if.app-id = 'com.apple.TV'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]] # Spotify
+if.app-id = 'com.spotify.client'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]] # IINA
+if.app-id = 'com.colliderli.iina'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
+
+[[on-window-detected]] # VLC
+if.app-id = 'org.videolan.vlc'
+if.during-aerospace-startup = false
+run = 'move-node-to-workspace 6'
