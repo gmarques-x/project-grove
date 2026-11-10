@@ -34,3 +34,37 @@ vsc_json() { sed '/^[[:space:]]*\/\//d' "$1"; }
   [ "$(printf '%s\n' "$want" | wc -l)" -eq 17 ]
   [ "$got" = "$want" ] || { diff <(echo "$want") <(echo "$got"); false; }
 }
+
+VSC_ICONS_DIR=config/vscode/grove-icons
+SETI_JSON="/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/theme-seti/icons/vs-seti-icon-theme.json"
+
+@test "vscode: every icon has a palette color" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" pal bad
+  pal="$(sed -n 's/^[a-z_0-9]* *= *\(#[0-9A-Fa-f]\{6\}\).*/\1/p' "$GROVE_ROOT/theme/everforest-dark-medium" | tr a-f A-F)"
+  [ "$(jq '[.iconDefinitions[] | select(.fontColor == null)] | length' "$t")" -eq 0 ]
+  bad="$(jq -r '.iconDefinitions[].fontColor' "$t" | tr a-f A-F | sort -u | grep -vxF "$pal" || true)"
+  [ -z "$bad" ] || { echo "not in the palette: $bad"; false; }
+}
+
+@test "vscode: Grove Icons keeps every Seti icon" {
+  [ -f "$SETI_JSON" ] || skip "VS Code not installed"
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json"
+  [ "$(jq '.iconDefinitions | length' "$t")" -eq "$(jq '.iconDefinitions | length' "$SETI_JSON")" ]
+  [ "$(jq 'has("light")' "$t")" = false ]
+}
+
+@test "vscode: the icon theme points at its files" {
+  local d="$GROVE_ROOT/$VSC_ICONS_DIR" p f
+  p="$(jq -r '.contributes.iconThemes[0].path' "$d/package.json")"
+  [ -f "$d/$p" ]
+  f="$(jq -r '.fonts[0].src[0].path' "$d/$p")"
+  [ "$(cd "$(dirname "$d/$p")" && cd "$(dirname "$f")" && pwd -P)/$(basename "$f")" = "$(cd "$d" && pwd -P)/seti.woff" ]
+  [ -f "$d/seti.woff" ]
+}
+
+@test "vscode: NOTICE credits Seti UI and Microsoft" {
+  local n="$GROVE_ROOT/$VSC_ICONS_DIR/NOTICE"
+  grep -q "Seti UI" "$n"
+  grep -q "Microsoft Corporation" "$n"
+  grep -q "MIT" "$n"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "grove-icons",
+  "displayName": "Grove Icons",
+  "description": "VS Code's Seti icons in Everforest colors",
+  "publisher": "grove",
+  "version": "1.0.0",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "contributes": {
+    "iconThemes": [
+      {
+        "id": "grove-icons",
+        "label": "Grove Icons",
+        "path": "./grove-icon-theme.json"
+      }
+    ]
+  }
+}
