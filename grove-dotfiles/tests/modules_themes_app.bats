@@ -38,6 +38,7 @@ echo "$*" >> "$BATS_TEST_TMPDIR/launchctl-args"
 case "$1" in
   print) [ -e "$BATS_TEST_TMPDIR/loaded" ] ;;
   bootstrap) touch "$BATS_TEST_TMPDIR/loaded" ;;
+  bootout) rm -f "$BATS_TEST_TMPDIR/loaded" ;;
   *) : ;;
 esac'
   export GROVE_SWIFT="$BATS_TEST_TMPDIR/stubs/swift"
@@ -144,11 +145,24 @@ ta_ready() {
 @test "themes-app: apply restarts a running app" {
   load_module
   touch "$BATS_TEST_TMPDIR/loaded"
+  _ta_agent_plist > "$AGENT"
   run apply
   [ "$status" -eq 0 ]
   grep -q "^kickstart -k gui/$UID_/com.projectgrove.themes\$" "$BATS_TEST_TMPDIR/launchctl-args"
   run grep -q '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args"
   [ "$status" -ne 0 ]
+}
+
+@test "themes-app: apply reloads a loaded agent whose plist changed" {
+  load_module
+  touch "$BATS_TEST_TMPDIR/loaded"
+  echo old > "$AGENT"
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$AGENT")" = "$(_ta_agent_plist)" ]
+  grep -q "^bootout gui/$UID_/com.projectgrove.themes\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  grep -q "^bootstrap gui/$UID_ $AGENT\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  [ "$(grep -n '^bootout' "$BATS_TEST_TMPDIR/launchctl-args" | cut -d: -f1)" -lt "$(grep -n '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args" | cut -d: -f1)" ]
 }
 
 @test "themes-app: a failed build leaves the installed app and stamp" {

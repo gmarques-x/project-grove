@@ -97,7 +97,7 @@ _ta_iconset() {
 }
 
 apply() {
-  local src app tmp log stage rc=0 domain
+  local src app tmp log stage rc=0 domain changed
   src="$(_ta_src)"
   app="$(_ta_app)"
   domain="$(_ta_domain)"
@@ -136,13 +136,18 @@ apply() {
   rm -rf "$tmp"
   _ta_source_hash > "$(_ta_stamp)" || return 1
 
+  # launchd keeps the definition it loaded, so a changed plist needs a bootout
+  # and bootstrap; an unchanged one only needs the process restarted.
+  changed=1
+  [ -f "$(_ta_agent)" ] && [ "$(cat "$(_ta_agent)")" = "$(_ta_agent_plist)" ] && changed=0
   _ta_agent_plist > "$(_ta_agent)" || return 1
-  if _ta_loaded; then
+  if _ta_loaded && [ "$changed" -eq 0 ]; then
     "$(_ta_launchctl)" kickstart -k "$domain/$_TA_LABEL" >/dev/null 2>&1 || {
       grove_fail "could not restart Grove Themes"
       return 1
     }
   else
+    _ta_loaded && "$(_ta_launchctl)" bootout "$domain/$_TA_LABEL" >/dev/null 2>&1
     "$(_ta_launchctl)" bootstrap "$domain" "$(_ta_agent)" >/dev/null 2>&1 || {
       grove_fail "could not start Grove Themes at login (launchctl bootstrap)"
       return 1
