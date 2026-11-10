@@ -65,6 +65,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `97-themes-app` | Grove Themes in the menu bar: builds the app, installs it to ~/Applications and starts it at login |
+| `98-aerospace` | AeroSpace tiles the desktop: pinned workspaces, Option shortcuts and JankyBorders in the scheme's colours (Accessibility is a manual step) |
 
 **Chrome** is themed by an unpacked extension that grove-themes renders to `~/.config/chrome-theme`; load it once (see `grove-themes/README.md`).
 

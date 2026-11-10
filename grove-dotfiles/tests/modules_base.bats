@@ -251,6 +251,11 @@ INST
   done
 }
 
+@test "the Brewfile installs AeroSpace and JankyBorders" {
+  grep -qx 'cask "nikitabobko/tap/aerospace"' "$GROVE_ROOT/Brewfile"
+  grep -qx 'brew "FelixKratz/formulae/borders"' "$GROVE_ROOT/Brewfile"
+}
+
 @test "the Brewfile installs fastfetch, not macchina" {
   grep -qx 'brew "fastfetch"' "$GROVE_ROOT/Brewfile"
   run grep -q macchina "$GROVE_ROOT/Brewfile"
