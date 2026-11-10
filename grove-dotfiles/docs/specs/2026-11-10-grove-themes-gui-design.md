@@ -5,13 +5,13 @@
 
 ## 1. Goal
 
-A small native Mac app, Grove Themes, puts the six Everforest schemes one click away. A tree icon in the menu bar opens a dropdown of six scheme tiles; "Open Grove Themes…" opens a gallery window with bigger previews and a log of recent switches. The app looks like Project Grove by wearing whichever scheme is on. All switching is done by the `grove-themes` CLI; the app only shows and asks.
+A small native Mac app, Grove Themes, puts the six Everforest schemes one click away. A tree icon in the menu bar opens a dropdown of six scheme tiles; "Open Grove Themes…" opens a gallery window with bigger previews. The app looks like Project Grove by wearing whichever scheme is on. All switching is done by the `grove-themes` CLI; the app only shows and asks.
 
 **Success looks like this:**
 - After `grove install`, the tree is in the menu bar, and it's there again after logging out and in.
 - One click on a tile switches the desktop, and the dropdown shows the result line ("Switched to Light Soft at 13:12 · 11 updated now, yazi next launch").
 - The dropdown and the window recolour themselves to the new scheme, also when the switch was made from the terminal.
-- The gallery's log shows the last five switches, made from the app or the terminal, with each step's result.
+- The dropdown's status line shows the last switch, made from the app or the terminal, with any step that needs you or failed in red.
 - `grove check` reports `97-themes-app` ok.
 
 ## 2. Decisions
@@ -20,7 +20,7 @@ A small native Mac app, Grove Themes, puts the six Everforest schemes one click 
 | --- | --- | --- |
 | Shape | Menu bar dropdown + a window opened from it | Chosen by the user (first spec's interview). |
 | Look | **Follows the scheme** ("look B"): the dropdown and window use the current scheme's colours (bg0, bg1, bg2, bg3, fg, grey1, the accents) and JetBrains Mono; the app recolours on every switch | Chosen by the user from three mockups (field-notes paper, follows the scheme, native macOS). |
-| Window layout | **Gallery**: six scheme cards (3 × 2), each a small desktop; a log of recent switches below | Chosen by the user over a list-and-preview layout. |
+| Window layout | **Gallery**: six scheme cards (3 × 2), each a small desktop, and nothing else (the log stays in the CLI: `grove-themes log`) | Chosen by the user over a list-and-preview layout. |
 | App icon | The branding board's icon (paper square, camo pine, forest), cut from `Project_Grove_Branding.png` and committed as `grove-themes/app/Resources/AppIcon.png`; the large sizes are upscaled from its 288 px | Chosen by the user over a flat drawn tree. A higher-resolution original can replace the PNG later. |
 | Menu bar icon | A small template pine (the logo's shape), so macOS draws it in the menu bar's own colour | Menu bar icons are monochrome by convention. |
 | Start | At login, by a LaunchAgent grove writes; no Dock icon (`LSUIElement`) | Chosen by the user. |
@@ -51,7 +51,7 @@ A Swift package with two targets:
 
 **Dropdown** (about 320 pt wide): the pine, "Grove Themes" and the current scheme's name; two labelled rows (Dark, Light) of three tiles (Hard, Medium, Soft), each tile drawn in its scheme's bg0 with "Aa" in its fg and five accent dots; a tick and a green border on the current one. Clicking a tile runs `set <scheme> --json`: that tile shows a spinner and the others are disabled until it returns. Under the tiles, the status line of the last switch; a step that needs you or failed shows in red with its message. Then "Open Grove Themes…" and "Quit".
 
-**Gallery window** (about 760 × 560 pt): six cards in a 3 × 2 grid, each a small desktop (the scheme's bg0 with the Grove lockup in its ink, and a terminal snippet in bg1 with prompt colours), the current one with a green border and "● on". Each card's scheme name is styled exactly like the dropdown's current-scheme line under "Grove Themes": the same size, regular weight, fg at 75% opacity (one shared text style in the code, so the two can't drift apart). Clicking a card switches, as in the dropdown. Below, the log: the last five switches, each with the time, the scheme and chips ("11 now", "yazi next launch", "needs you: …", "failed: …"); clicking a chip shows that step's message.
+**Gallery window** (about 760 × 380 pt): six cards in a 3 × 2 grid, each a small desktop (the scheme's bg0 with the Grove lockup in its ink, and a terminal snippet in bg1 with prompt colours), the current one with a green border and "● on". Each card's scheme name is styled exactly like the dropdown's current-scheme line under "Grove Themes": the same size, regular weight, fg at 75% opacity (one shared text style in the code, so the two can't drift apart). Clicking a card switches, as in the dropdown. No log: the switch log is `grove-themes log`, and the dropdown keeps its status line.
 
 **Errors:** no CLI at the path → the dropdown and window show "grove-themes isn't installed. Run grove install." and the tiles are disabled; unreadable JSON → "grove-themes gave an answer the app couldn't read" plus the first line of its output; `set` exit 1 → the switch is shown as done (the configs were written) with the failed steps in red; exit 2 → the message from stderr.
 

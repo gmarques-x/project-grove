@@ -1,7 +1,8 @@
 import GroveThemesCore
 import SwiftUI
 
-/// The "Grove Themes" window: six desktop cards and the switch log.
+/// The "Grove Themes" window: the six desktop cards (the switch log stays in
+/// the CLI, `grove-themes log`; the dropdown keeps the status line).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
 
@@ -28,11 +29,11 @@ struct GalleryView: View {
                         }
                     }
                 }
-                LogView(entries: Array(model.switches.prefix(5)))
             }
             .padding(18)
         }
-        .frame(minWidth: 640, minHeight: 460)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(minWidth: 640, minHeight: 320)
         .font(GroveFont.mono(12))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0))

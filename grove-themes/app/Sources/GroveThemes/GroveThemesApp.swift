@@ -44,6 +44,6 @@ struct GroveThemesApp: App {
             GalleryView()
                 .environment(model)
         }
-        .defaultSize(width: 760, height: 560)
+        .defaultSize(width: 760, height: 380)
     }
 }
