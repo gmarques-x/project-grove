@@ -49,7 +49,12 @@ _gt_json_list() { # words -> "a", "b"
   printf '%s' "$out"
 }
 
-_gt_json_esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' '; }
+_gt_json_esc() {
+  local tab cr
+  tab="$(printf '\t')"; cr="$(printf '\r')"
+  printf '%s' "$1" | tr '\n' ' ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e "s/$tab/\\\\t/g" -e "s/$cr/\\\\r/g" \
+    | LC_ALL=C tr -d '\000-\010\013\014\016-\037\177'
+}
 
 _gt_unknown() {
   echo "grove-themes: unknown scheme: $1" >&2

@@ -13,6 +13,10 @@ gt_log_append() {
   file="$(_gt_log_file)"
   ts="$(date +%Y-%m-%dT%H:%M:%S%z | sed 's/\([0-9][0-9]\)$/:\1/')"
   mkdir -p "$GROVE_STATE" || return 1
+  # a cut-off earlier write leaves no newline; don't glue this entry onto it
+  if [ -s "$file" ] && [ "$(tail -c 1 "$file" | wc -l | tr -d ' ')" -eq 0 ]; then
+    echo >> "$file" || return 1
+  fi
   printf '{"time": "%s", "scheme": "%s", "exit": %s, "steps": [%s]}\n' \
     "$ts" "$scheme" "$code" "$steps" >> "$file" || return 1
   if ! { tail -n "$GT_LOG_KEEP" "$file" > "$file.tmp" && mv "$file.tmp" "$file"; }; then
@@ -27,6 +31,7 @@ gt_log_read() {
   local n="${1:-5}" file
   file="$(_gt_log_file)"
   [ -f "$file" ] || return 0
-  grep '^{"time": "' "$file" | grep ']}$' | tail -n "$n" | sed '1!G;h;$!d'
+  grep '^{"time": "' "$file" | grep ']}$' \
+    | awk '{ if (index(substr($0, 2), "{\"time\": \"") == 0) print }' | tail -n "$n" | sed '1!G;h;$!d'
   return 0
 }

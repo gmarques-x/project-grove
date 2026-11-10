@@ -94,3 +94,38 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq '.entries | length')" -eq 1 ]
   [ "$(printf '%s' "$output" | jq -r '.entries[0].scheme')" = light-soft ]
 }
+
+@test "control characters, quotes and backslashes in a step message stay valid JSON" {
+  export GROVE_STATE="$HOME/st	a\"te\\x"
+  LOG="$GROVE_STATE/theme-log.jsonl"
+  run "$CLI" set dark-medium
+  [ "$status" -eq 0 ]
+  echo "# my edit" >> "$GROVE_ROOT/config/ghostty/config"
+  run "$CLI" set dark-hard --json
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e . > /dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.steps[0].message')" == "backed up edited ghostty/config to $GROVE_STATE/backup/"* ]] || false
+  run "$CLI" log --json -n 1
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e . > /dev/null
+  [[ "$(printf '%s' "$output" | jq -r '.entries[0].steps[0].message')" == *"st	a\"te\\x"* ]] || false
+}
+
+@test "a log cut off without a newline doesn't swallow the next entry" {
+  mkdir -p "$GROVE_STATE"
+  printf '%s' '{"time": "2026-11-10T13:10:04+00:00", "scheme": "dark-hard", "exit": 0, "steps": [{"name": "conf' > "$LOG"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  run "$CLI" log --json
+  [ "$status" -eq 0 ]
+  printf '%s' "$output" | jq -e . > /dev/null
+  [ "$(printf '%s' "$output" | jq '.entries | length')" -eq 1 ]
+  [ "$(printf '%s' "$output" | jq -r '.entries[0].scheme')" = dark-soft ]
+}
+
+@test "log rejects a line with a second entry glued on" {
+  mkdir -p "$GROVE_STATE"
+  printf '%s\n' '{"time": "a", "scheme": "dark-hard", "exit": 0, "steps": [{"name": "c{"time": "b", "scheme": "dark-soft", "exit": 0, "steps": []}' > "$LOG"
+  run "$CLI" log --json
+  [ "$output" = '{"entries": []}' ]
+}
