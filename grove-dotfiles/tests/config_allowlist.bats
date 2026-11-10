@@ -93,3 +93,11 @@ setup() { grove_test_setup; }
   [ "$status" -ne 0 ] || false
   [ -n "$(git -C "$GROVE_ROOT" ls-files config/zsh/conf.d/99-theme.zsh)" ] || false
 }
+
+@test "inside chrome-theme only the manifest template is tracked" {
+  git -C "$GROVE_ROOT" check-ignore -q "config/chrome-theme/Cached Theme.pak" || false
+  git -C "$GROVE_ROOT" check-ignore -q config/chrome-theme/anything-else || false
+  run git -C "$GROVE_ROOT" check-ignore -q config/chrome-theme/manifest.json.tmpl
+  [ "$status" -ne 0 ]
+  [ "$(git -C "$GROVE_ROOT" ls-files config/chrome-theme)" = "config/chrome-theme/manifest.json.tmpl" ]
+}

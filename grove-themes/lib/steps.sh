@@ -99,12 +99,29 @@ gt_step_accent() {
   fi
 }
 
+# _gt_copy_backup FILE: cp -p FILE to $GROVE_STATE/backup/$GROVE_RUN_ID/<path
+# relative to $HOME, or absolute minus the "/">, with a ".N" suffix when that
+# exists (as grove_backup does). Prints the backup path; FILE stays in place.
+_gt_copy_backup() {
+  local src="$1" rel dest n=0
+  case "$src" in
+    "${HOME%/}"/*) rel="${src#"${HOME%/}"/}" ;;
+    *) rel="${src#/}" ;;
+  esac
+  dest="${GROVE_STATE:?}/backup/${GROVE_RUN_ID:-$(date +%Y%m%d-%H%M%S)}/$rel"
+  while [ -e "$dest" ] || [ -L "$dest" ]; do
+    n=$((n + 1))
+    dest="${GROVE_STATE}/backup/${GROVE_RUN_ID:-$(date +%Y%m%d-%H%M%S)}/$rel.$n"
+  done
+  mkdir -p "$(dirname "$dest")" && cp -p "$src" "$dest" && printf '%s\n' "$dest"
+}
+
 # gt_step_wallpaper SCHEME: the scheme's picture on every screen and Space.
 # osascript changes the visible Spaces at once; the rest live in macOS's
 # wallpaper store, which wallpaper_store.py rewrites (backed up first) before
 # WallpaperAgent is restarted. Seams: GROVE_WALLPAPER_STORE, GROVE_KILLALL.
 gt_step_wallpaper() {
-  local dir file store lib msg tmp
+  local dir file store lib msg backup
   dir="${GROVE_WALLPAPER_DIR:-${GROVE_ROOT:?}/../grove-wallpapers}"
   file="$dir/wallpaper-project-grove-$1.png"
   store="${GROVE_WALLPAPER_STORE:-$HOME/Library/Application Support/com.apple.wallpaper/Store/Index.plist}"
@@ -126,15 +143,9 @@ OSA
     _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: no wallpaper store at $store"
     return 0
   fi
-  # grove_backup moves the store aside, so keep a copy to put back.
-  tmp="$store.grove-tmp"
-  if ! cp -p "$store" "$tmp" 2>/dev/null; then
-    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: could not copy the wallpaper store"
-    return 0
-  fi
-  if ! _gt_backup "$store" >/dev/null 2>&1 || ! mv "$tmp" "$store"; then
-    [ -e "$store" ] || mv "$tmp" "$store" 2>/dev/null
-    rm -f "$tmp"
+  # Copy (never move) the store into the backup folder, where grove_backup
+  # would put it, so the helper's atomic replace is the only change to it.
+  if ! backup="$(_gt_copy_backup "$store")"; then
     _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: could not back up the wallpaper store"
     return 0
   fi
@@ -142,6 +153,6 @@ OSA
     "${GROVE_KILLALL:-killall}" WallpaperAgent >/dev/null 2>&1 || true
     _gt_line wallpaper live "$1 on every Space"
   else
-    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: $(printf '%s' "$msg" | tr '\n\t' '  ')"
+    _gt_line wallpaper live "$1 on the visible Spaces; other Spaces couldn't be updated: $(printf '%s' "$msg" | tr '\n\t' '  ') (backup: $backup)"
   fi
 }

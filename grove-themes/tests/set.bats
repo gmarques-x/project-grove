@@ -183,10 +183,40 @@ chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
   grep -qx 'killall WallpaperAgent' "$CALLS"
 }
 
+@test "wallpaper: a failing helper names the backup in the message" {
+  local lib2="$BATS_TEST_TMPDIR/lib2"
+  gt_make_store "$GROVE_WALLPAPER_STORE"
+  cp -R "$GT_ROOT/lib" "$lib2"
+  printf 'import sys\nprint("boom")\nsys.exit(1)\n' > "$lib2/wallpaper_store.py"
+  run bash -c '. "$1/render.sh"; . "$1/state.sh"; . "$1/steps.sh"; gt_step_wallpaper dark-soft' _ "$lib2"
+  [[ "$output" == *"on the visible Spaces; other Spaces couldn't be updated: boom (backup: $GROVE_STATE/backup/"* ]] || false
+}
+
 @test "wallpaper: a missing store leaves the visible Spaces done, no restart" {
   run "$CLI" set light-soft
   [ "$status" -eq 0 ]
   [[ "$output" == *"light-soft on the visible Spaces; other Spaces couldn't be updated: "* ]] || false
   run grep -q killall "$CALLS"
   [ "$status" -ne 0 ]
+}
+
+@test "wallpaper: the store stays in place while the helper runs; the backup equals the old store" {
+  local lib2="$BATS_TEST_TMPDIR/lib2" b
+  gt_make_store "$GROVE_WALLPAPER_STORE"
+  cp -p "$GROVE_WALLPAPER_STORE" "$BATS_TEST_TMPDIR/before.plist"
+  ino="$(stat -f %i "$GROVE_WALLPAPER_STORE")"
+  cp -R "$GT_ROOT/lib" "$lib2"
+  mv "$lib2/wallpaper_store.py" "$lib2/real_store.py"
+  cat > "$lib2/wallpaper_store.py" <<PY
+import os, runpy, sys
+open("$BATS_TEST_TMPDIR/seen", "w").write("present %d" % os.stat(sys.argv[1]).st_ino if os.path.isfile(sys.argv[1]) else "missing")
+sys.argv[0] = "$lib2/real_store.py"
+runpy.run_path("$lib2/real_store.py", run_name="__main__")
+PY
+  run bash -c '. "$1/render.sh"; . "$1/state.sh"; . "$1/steps.sh"; gt_step_wallpaper dark-soft' _ "$lib2"
+  [[ "$output" == *"dark-soft on every Space"* ]] || false
+  [ "$(cat "$BATS_TEST_TMPDIR/seen")" = "present $ino" ]
+  b="$(find "$GROVE_STATE/backup" -name Index.plist)"
+  [ -n "$b" ]
+  cmp "$b" "$BATS_TEST_TMPDIR/before.plist"
 }
