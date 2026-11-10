@@ -19,6 +19,9 @@ gt_test_setup() {
   export GROVE_KILL="$BATS_TEST_TMPDIR/stubs/kill"
   export GROVE_PS="$BATS_TEST_TMPDIR/stubs/ps"
   export GROVE_WALLPAPER_DIR="$BATS_TEST_TMPDIR/wallpapers"
+  # Never the real Chrome: not installed unless a test says otherwise.
+  export GROVE_CHROME_APP="$BATS_TEST_TMPDIR/no-chrome.app"
+  export GROVE_CHROME_DIR="$BATS_TEST_TMPDIR/chrome-data"
   mkdir -p "$GROVE_WALLPAPER_DIR"
   for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
     : > "$GROVE_WALLPAPER_DIR/wallpaper-project-grove-$s.png"

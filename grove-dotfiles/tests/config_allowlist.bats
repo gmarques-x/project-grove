@@ -76,7 +76,7 @@ setup() { grove_test_setup; }
 
 @test "generated files are ignored, templates are tracked" {
   local f
-  for f in ghostty/config starship.toml starship-plain.toml fastfetch/config.jsonc \
+  for f in chrome-theme/manifest.json ghostty/config starship.toml starship-plain.toml fastfetch/config.jsonc \
            eza/theme.yml yazi/theme.toml yazi/init.lua vscode/settings.json \
            zsh/conf.d/40-tools.zsh zsh/conf.d/85-autosuggest.zsh \
            zsh/conf.d/95-fetch.zsh zsh/conf.d/98-highlight.zsh; do

@@ -108,6 +108,21 @@ scheme_hexes() {
   done
 }
 
+@test "every scheme's Chrome theme RGB arrays are that scheme's palette colours" {
+  local s out c hex missing
+  # shellcheck source=/dev/null
+  . "$GROVE_ROOT/../grove-themes/lib/render.sh"
+  for s in $SCHEMES; do
+    out="$BATS_TEST_TMPDIR/$s-chrome"
+    mkdir -p "$out"
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$GROVE_ROOT/config/chrome-theme/manifest.json.tmpl" "$out/manifest.json" || false
+    hex="$(jq -r '.theme.colors[] | map(.) | @sh' "$out/manifest.json" | while read -r r g b; do printf '#%02X%02X%02X\n' "$r" "$g" "$b"; done | sort -u)"
+    [ -n "$hex" ] || { echo "$s: no colours"; false; }
+    missing="$(comm -23 <(printf '%s\n' "$hex") <(scheme_hexes "$s"))"
+    [ -z "$missing" ] || { echo "$s: not in its palette: $missing"; false; }
+  done
+}
+
 @test "configs that aren't templates use only Dark Medium colours" {
   local missing
   missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/vscode/grove-icons/grove-icon-theme.json" \

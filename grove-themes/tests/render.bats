@@ -67,8 +67,9 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
 @test "gt_values lists palette entries then computed names" {
   run gt_values dark-hard "$PALETTES"
   [ "${lines[0]}" = "$(printf 'fg\t#D3C6A1')" ]
-  [ "${#lines[@]}" -eq 7 ]
-  [ "${lines[6]}" = "$(printf 'fetch_image\tgrove.png')" ]
+  [ "${#lines[@]}" -eq 8 ]
+  [ "${lines[3]}" = "$(printf 'fg_rgb\t211, 198, 161')" ]
+  [ "${lines[7]}" = "$(printf 'fetch_image\tgrove.png')" ]
 }
 
 @test "gt_templates lists *.tmpl relative and sorted" {
@@ -89,4 +90,13 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
   run /bin/bash -c 'set -euo pipefail; source "$1/lib/render.sh"; gt_render_file dark-hard "$2" "$3" "$4" || echo "rc=$?"' _ "$GT_ROOT" "$PALETTES" "$BATS_TEST_TMPDIR/u.tmpl" "$BATS_TEST_TMPDIR/out2"
   [[ "$output" == *"unknown name: nope"*"rc=1"* ]] || false
   [ ! -e "$BATS_TEST_TMPDIR/out2" ]
+}
+
+@test "every #RRGGBB value also gets a name_rgb in decimal" {
+  mkdir -p "$BATS_TEST_TMPDIR/p"
+  printf 'bg0 = #2D353B\nwhite = #FFFFFF\nzero = #000000\nnote = notahex\n' > "$BATS_TEST_TMPDIR/p/everforest-dark-medium"
+  printf '{{bg0_rgb}}|{{white_rgb}}|{{zero_rgb}}\n' > "$BATS_TEST_TMPDIR/t.tmpl"
+  gt_render_file dark-medium "$BATS_TEST_TMPDIR/p" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
+  [ "$(cat "$BATS_TEST_TMPDIR/out")" = "45, 53, 59|255, 255, 255|0, 0, 0" ]
+  [ -z "$(gt_values dark-medium "$BATS_TEST_TMPDIR/p" | awk -F"\t" '$1 == "note_rgb"')" ]
 }

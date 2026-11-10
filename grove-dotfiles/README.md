@@ -66,6 +66,8 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `97-themes-app` | Grove Themes in the menu bar: builds the app, installs it to ~/Applications and starts it at login |
 
+**Chrome** is themed by an unpacked extension that grove-themes renders to `~/.config/chrome-theme`; load it once (see `grove-themes/README.md`).
+
 ## Fonts
 
 | Role | Font | Used for | License |

@@ -16,12 +16,17 @@ gt_valid() {
 }
 
 # gt_values SCHEME PALETTE_DIR: name<TAB>value lines, palette entries first,
-# then appearance, contrast, vscode_theme, fetch_image.
+# then name_rgb ("R, G, B" in decimal) for each #RRGGBB entry, then appearance,
+# contrast, vscode_theme, fetch_image.
 gt_values() {
-  local scheme="$1" dir="$2" tab appearance contrast vscode image
+  local scheme="$1" dir="$2" tab appearance contrast vscode image name hex
   tab="$(printf '\t')"
   sed -n "s/^[[:space:]]*\\([a-z0-9_][a-z0-9_]*\\)[[:space:]]*=[[:space:]]*\\([^[:space:]][^[:space:]]*\\)[[:space:]]*\$/\\1${tab}\\2/p" \
     "$dir/everforest-$scheme" || return 1
+  sed -n "s/^[[:space:]]*\\([a-z0-9_][a-z0-9_]*\\)[[:space:]]*=[[:space:]]*#\\([0-9A-Fa-f]\\{6\\}\\)[[:space:]]*\$/\\1 \\2/p" \
+    "$dir/everforest-$scheme" | while read -r name hex; do
+    printf '%s_rgb\t%d, %d, %d\n' "$name" "$((16#${hex:0:2}))" "$((16#${hex:2:2}))" "$((16#${hex:4:2}))"
+  done
   appearance="${scheme%%-*}"
   contrast="${scheme#*-}"
   if [ "$appearance" = light ]; then

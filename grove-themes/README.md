@@ -19,6 +19,10 @@ The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grov
 
 Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (`{"time", "scheme", "exit", "steps"}`, the last 50 kept). `log` prints it newest first, one `<time> <scheme> exit=<n>` line per switch, or `{"entries": [...]}` with `--json`; damaged lines are skipped.
 
+## Chrome (one-time setup)
+
+Chrome can't be themed by policy on macOS, so Grove renders an unpacked theme extension to `~/.config/chrome-theme`. Load it once: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and pick `~/.config/chrome-theme` (⌘⇧. shows hidden folders in the picker). After that, `grove-themes set` rewrites its colours, and Chrome picks them up the next time it starts. Until the theme is loaded, `set` reports `chrome` as needs-you.
+
 Tests: `bats tests`.
 
 ## The menu bar app

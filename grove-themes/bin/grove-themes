@@ -158,7 +158,7 @@ cmd_set() {
   lines="configs$tab$result$tab$(printf '%s' "$msg" | tr '\n' ' ')"
   if [ "$result" != failed ]; then
     lines="$lines
-$(gt_step_ghostty; gt_step_zsh; gt_step_static
+$(gt_step_ghostty; gt_step_zsh; gt_step_static; gt_step_chrome; gt_step_yazi
       gt_step_appearance "$scheme"; gt_step_accent "$scheme"; gt_step_wallpaper "$scheme")"
   fi
   while IFS="$tab" read -r name res text; do

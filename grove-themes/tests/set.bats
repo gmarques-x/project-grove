@@ -131,5 +131,68 @@ gt_copy_config() {
   run "$CLI" set --json dark-soft
   [ "$status" -eq 0 ]
   names="$(printf '%s' "$output" | grep -o '"name": "[a-z]*"' | sed 's/"name": //' | tr -d '"\n' )"
-  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodeyazi""appearanceaccentwallpaper" ]
+  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodechromeyazi""appearanceaccentwallpaper" ]
+}
+
+# chrome_fixture: a fake installed Chrome with a Default and a "Profile 1" folder.
+chrome_fixture() {
+  export GROVE_CHROME_APP="$BATS_TEST_TMPDIR/Google Chrome.app"
+  export GROVE_CHROME_DIR="$BATS_TEST_TMPDIR/chrome-data"
+  mkdir -p "$GROVE_CHROME_APP" "$GROVE_CHROME_DIR/Default" "$GROVE_CHROME_DIR/Profile 1"
+  printf '{"other": "x"}\n' > "$GROVE_CHROME_DIR/Default/Preferences"
+  printf '{"other": "y"}\n' > "$GROVE_CHROME_DIR/Profile 1/Secure Preferences"
+}
+
+chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
+
+@test "chrome: not installed is live, not a problem" {
+  export GROVE_CHROME_APP="$BATS_TEST_TMPDIR/nope.app"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$(chrome_line)" == *"live"*"Chrome not installed"* ]] || false
+}
+
+@test "chrome: theme not loaded needs you" {
+  chrome_fixture
+  run "$CLI" set dark-soft
+  [ "$status" -eq 1 ]
+  [[ "$(chrome_line)" == *"needs-you"*"load ~/.config/chrome-theme once in chrome://extensions (Developer mode on, Load unpacked)"* ]] || false
+}
+
+@test "chrome: loaded by the ~/.config path is next-launch" {
+  chrome_fixture
+  printf '{"extensions": {"settings": {"abc": {"path": "%s/.config/chrome-theme"}}}}\n' "$HOME" > "$GROVE_CHROME_DIR/Profile 1/Secure Preferences"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$(chrome_line)" == *"next-launch"*"Chrome takes the new colours the next time it starts"* ]] || false
+}
+
+@test "chrome: loaded by the resolved real path is next-launch" {
+  chrome_fixture
+  mkdir -p "$BATS_TEST_TMPDIR/real/chrome-theme" "$HOME/.config"
+  rmdir "$HOME/.config"
+  ln -s "$BATS_TEST_TMPDIR/real" "$HOME/.config"
+  real="$(cd -P "$HOME/.config/chrome-theme" && pwd)"
+  printf '{"path": "%s"}\n' "$real" > "$GROVE_CHROME_DIR/Default/Preferences"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 0 ]
+  [[ "$(chrome_line)" == *"next-launch"* ]] || false
+}
+
+@test "chrome: a longer path that merely starts with the folder's path is not loaded" {
+  chrome_fixture
+  printf '{"path": "%s/.config/chrome-theme-old"}\n' "$HOME" > "$GROVE_CHROME_DIR/Default/Preferences"
+  run "$CLI" set dark-soft
+  [ "$status" -eq 1 ]
+  [[ "$(chrome_line)" == *"needs-you"* ]] || false
+}
+
+@test "chrome: the step never modifies Chrome's files" {
+  chrome_fixture
+  printf '{"path": "%s/.config/chrome-theme"}\n' "$HOME" > "$GROVE_CHROME_DIR/Default/Preferences"
+  before="$(cd "$GROVE_CHROME_DIR" && find . -type f -exec cksum {} + | LC_ALL=C sort; find . | LC_ALL=C sort)"
+  run "$CLI" set dark-soft
+  run "$CLI" set dark-hard
+  after="$(cd "$GROVE_CHROME_DIR" && find . -type f -exec cksum {} + | LC_ALL=C sort; find . | LC_ALL=C sort)"
+  [ "$before" = "$after" ]
 }

@@ -11,8 +11,9 @@ setup() {
   PALETTES="$GROVE_ROOT/theme"
 }
 
-# The twelve generated files, one per line.
-GENERATED="eza/theme.yml
+# The thirteen generated files, one per line.
+GENERATED="chrome-theme/manifest.json
+eza/theme.yml
 fastfetch/config.jsonc
 ghostty/config
 starship-plain.toml
@@ -25,7 +26,7 @@ zsh/conf.d/85-autosuggest.zsh
 zsh/conf.d/95-fetch.zsh
 zsh/conf.d/98-highlight.zsh"
 
-@test "the templates are the twelve colour-carrying configs" {
+@test "the templates are the thirteen colour-carrying configs" {
   local want
   want="$(printf '%s\n' "$GENERATED" | sed 's/$/.tmpl/' | LC_ALL=C sort)"
   [ "$(gt_templates "$GROVE_ROOT/config")" = "$want" ] || { diff <(echo "$want") <(gt_templates "$GROVE_ROOT/config"); false; }
@@ -53,7 +54,7 @@ zsh/conf.d/98-highlight.zsh"
       n=$((n + 1))
     done
   done
-  [ "$n" -eq 72 ]
+  [ "$n" -eq 78 ]
 }
 
 @test "the Dark Medium render is today's config" {
@@ -81,5 +82,36 @@ zsh/conf.d/98-highlight.zsh"
   grove_copy_tracked_config "$d"
   for f in $GENERATED; do
     cmp "$GROVE_ROOT/tests/fixtures/dark-medium/$f" "$d/$f" || false
+  done
+}
+
+# chrome_color SCHEME KEY: the manifest's colour array as "R, G, B" text.
+chrome_color() {
+  jq -r --arg k "$2" '.theme.colors[$k] | map(tostring) | join(", ")' "$BATS_TEST_TMPDIR/$1/chrome-theme/manifest.json"
+}
+
+# palette_rgb SCHEME NAME: the palette's #RRGGBB as "R, G, B" decimal.
+palette_rgb() {
+  local hex
+  hex="$(sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*#\\([0-9A-Fa-f]*\\).*/\\1/p" "$PALETTES/everforest-$1")"
+  printf '%d, %d, %d' "$((16#${hex:0:2}))" "$((16#${hex:2:2}))" "$((16#${hex:4:2}))"
+}
+
+@test "the Chrome theme manifest is valid JSON for every scheme, with the mapped palette colours" {
+  local s k want
+  for s in $(gt_schemes); do
+    mkdir -p "$BATS_TEST_TMPDIR/$s/chrome-theme"
+    gt_render_file "$s" "$PALETTES" "$GROVE_ROOT/config/chrome-theme/manifest.json.tmpl" "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json" || false
+    jq -e '.manifest_version == 3 and .name == "Grove" and .version == "1.0" and .theme.properties.ntp_logo_alternate == 1' \
+      "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json" >/dev/null || { echo "$s: manifest"; false; }
+    for k in "frame bg_dim" "frame_inactive bg_dim" "frame_incognito bg_dim" "frame_incognito_inactive bg_dim" \
+             "toolbar bg0" "ntp_background bg0" "tab_text fg" "bookmark_text fg" "ntp_text fg" "toolbar_text fg" \
+             "omnibox_text fg" "tab_background_text grey1" "tab_background_text_inactive grey1" \
+             "toolbar_button_icon grey2" "omnibox_background bg1" "ntp_link green" "button_background bg1"; do
+      set -- $k
+      want="$(palette_rgb "$s" "$2")"
+      [ "$(chrome_color "$s" "$1")" = "$want" ] || { echo "$s $1: got $(chrome_color "$s" "$1"), want $want ($2)"; false; }
+    done
+    [ "$(jq '.theme.colors | length' "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json")" -eq 17 ] || false
   done
 }

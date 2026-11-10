@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Grove",
+  "version": "1.0",
+  "description": "Project Grove's Everforest theme, rendered by grove-themes.",
+  "theme": {
+    "colors": {
+      "frame": [35, 42, 46],
+      "frame_inactive": [35, 42, 46],
+      "frame_incognito": [35, 42, 46],
+      "frame_incognito_inactive": [35, 42, 46],
+      "toolbar": [45, 53, 59],
+      "ntp_background": [45, 53, 59],
+      "tab_text": [211, 198, 170],
+      "bookmark_text": [211, 198, 170],
+      "ntp_text": [211, 198, 170],
+      "toolbar_text": [211, 198, 170],
+      "omnibox_text": [211, 198, 170],
+      "tab_background_text": [133, 146, 137],
+      "tab_background_text_inactive": [133, 146, 137],
+      "toolbar_button_icon": [157, 169, 160],
+      "omnibox_background": [52, 63, 68],
+      "ntp_link": [167, 192, 128],
+      "button_background": [52, 63, 68]
+    },
+    "properties": {
+      "ntp_logo_alternate": 1
+    }
+  }
+}
