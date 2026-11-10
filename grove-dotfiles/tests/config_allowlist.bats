@@ -87,3 +87,9 @@ setup() { grove_test_setup; }
     [ -n "$(git -C "$GROVE_ROOT" ls-files "config/$f.tmpl")" ] || { echo "not tracked: $f.tmpl"; false; }
   done
 }
+
+@test "the theme hook is tracked" {
+  run git -C "$GROVE_ROOT" check-ignore -q config/zsh/conf.d/99-theme.zsh
+  [ "$status" -ne 0 ] || false
+  [ -n "$(git -C "$GROVE_ROOT" ls-files config/zsh/conf.d/99-theme.zsh)" ] || false
+}

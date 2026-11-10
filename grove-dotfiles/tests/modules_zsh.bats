@@ -395,7 +395,26 @@ fetch_shell() {
   run tool_shell 'print -r -- $ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE; (( ${+ZSH_HIGHLIGHT_VERSION} )) && print highlight; print -r -- ${${(o)$(print -l $ZDOTDIR/conf.d/*.zsh(N:t))}[-1]}'
   [ "${lines[0]}" = "fg=#859289" ]
   [ "${lines[1]}" = "highlight" ]
-  [ "${lines[2]}" = "98-highlight.zsh" ]
+  [ "${lines[2]}" = "99-theme.zsh" ]
+}
+
+@test "an open shell picks up a new scheme at the next prompt" {
+  brew_prefix >/dev/null || skip "zsh plugins not installed"
+  local gt="$GROVE_ROOT/../grove-themes/bin/grove-themes" st="$BATS_TEST_TMPDIR/state"
+  mkdir -p "$st"
+  run tool_shell "a=\${ZSH_HIGHLIGHT_STYLES[command]}
+    GROVE_STATE='$st' '$gt' render --scheme light-soft --config '$GROVE_CONFIG' >/dev/null || print renderfail
+    print soft > '$st/theme'
+    _grove_theme_precmd; b=\${ZSH_HIGHLIGHT_STYLES[command]}
+    unset 'ZSH_HIGHLIGHT_STYLES[command]'
+    _grove_theme_precmd; c=\${ZSH_HIGHLIGHT_STYLES[command]-unset}
+    print light-soft > '$st/theme'
+    _grove_theme_precmd; d=\${ZSH_HIGHLIGHT_STYLES[command]}
+    print -r -- \"a=\$a\" \"b=\$b\" \"c=\$c\" \"d=\$d\"" GROVE_STATE="$st"
+  [[ "$output" != *renderfail* ]] || false
+  local last="${lines[${#lines[@]}-1]}"
+  [[ "$last" == "a=fg=#A7C080 b=fg=#A7C080 c=unset d=fg="* ]] || { echo "$last"; false; }
+  [[ "$last" != *"d=fg=#A7C080" ]] || false
 }
 
 @test "fzf keys are bound" {
