@@ -70,6 +70,7 @@ public struct HyperMachine: Sendable {
         switch event.kind {
         case .down:
             guard held else { return (.pass, []) }
+            if let repeated = pending[event.keyCode] { return (repeated, []) }
             used = true
             var effects: [HyperEffect] = []
             if sheetShown {

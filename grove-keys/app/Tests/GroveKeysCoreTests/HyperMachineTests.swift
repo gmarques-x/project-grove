@@ -115,4 +115,55 @@ import Testing
         var m = machine()
         #expect(m.handle(down(Self.a, 0)).0 == .pass)
     }
+
+    @Test func launcherRepeatLaunchesOnce() {
+        var m = machine(launch: ["t"])
+        _ = m.handle(down(Self.f18, 0))
+        #expect(m.handle(down(Self.t, 0.1)).1 == [.launch(key: "t")])
+        let (d, e) = m.handle(down(Self.t, 0.15))
+        #expect(d == .swallow)
+        #expect(e == [])
+    }
+
+    @Test func f18AutorepeatKeepsTiming() {
+        var m = machine()
+        _ = m.handle(down(Self.f18, 0))
+        #expect(m.handle(down(Self.f18, 0.05)).0 == .swallow)
+        #expect(m.handle(up(Self.f18, 0.1)).1 == [.postEscape])
+
+        var n = machine()
+        _ = n.handle(down(Self.f18, 0))
+        _ = n.handle(down(Self.f18, 0.3))
+        #expect(n.tick(now: 0.5) == [.showCheatSheet])
+    }
+
+    @Test func strayF18UpDoesNothing() {
+        var m = machine()
+        let (d, e) = m.handle(up(Self.f18, 0.1))
+        #expect(d == .swallow)
+        #expect(e == [])
+    }
+
+    @Test func resetWithPendingKeyPassesItsUp() {
+        var m = machine()
+        _ = m.handle(down(Self.f18, 0))
+        _ = m.handle(down(Self.one, 0.1))
+        _ = m.reset()
+        #expect(m.handle(up(Self.one, 0.2)).0 == .pass)
+    }
+
+    @Test func nonLauncherKeyStaysHyper() {
+        var m = machine(launch: ["t"])
+        _ = m.handle(down(Self.f18, 0))
+        let (d, e) = m.handle(down(Self.one, 0.1))
+        #expect(d == .passWithHyper)
+        #expect(e == [])
+    }
+
+    @Test func tickAfterUseDoesNothing() {
+        var m = machine()
+        _ = m.handle(down(Self.f18, 0))
+        _ = m.handle(down(Self.one, 0.1))
+        #expect(m.tick(now: 1.0) == [])
+    }
 }
