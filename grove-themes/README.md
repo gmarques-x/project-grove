@@ -20,3 +20,9 @@ The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grov
 Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (`{"time", "scheme", "exit", "steps"}`, the last 50 kept). `log` prints it newest first, one `<time> <scheme> exit=<n>` line per switch, or `{"entries": [...]}` with `--json`; damaged lines are skipped.
 
 Tests: `bats tests`.
+
+## The menu bar app
+
+`app/` is Grove Themes, a SwiftUI menu bar app that shows the six schemes in a dropdown and a gallery window and switches them by running `grove-themes set` (so it needs the CLI installed). It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable.
+
+`grove install themes-app` (module `97-themes-app`) builds it, assembles and ad hoc signs `~/Applications/Grove Themes.app` (no Dock icon; `Resources/Info.plist` sets `LSUIElement`) and starts it at login with the LaunchAgent `~/Library/LaunchAgents/com.projectgrove.themes.plist`. It rebuilds when the tracked files under `app/` change. The first switch from the app triggers macOS's Automation prompt; allow it once.
