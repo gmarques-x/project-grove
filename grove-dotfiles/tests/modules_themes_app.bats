@@ -1,4 +1,4 @@
-# shellcheck disable=SC2016,SC1090,SC1091,SC2154
+# shellcheck disable=SC2016,SC1090,SC1091,SC2154,SC2030,SC2031
 # 97-themes-app: builds Grove Themes, installs it and starts it at login,
 # against fake swift, codesign, iconutil, sips and launchctl and temp folders.
 load helpers
@@ -33,12 +33,25 @@ mkdir -p .build/release && printf "#!/bin/sh\n" > .build/release/GroveThemes && 
   stub codesign 'echo "$*" >> "$BATS_TEST_TMPDIR/codesign-args"'
   stub sips 'echo "$*" >> "$BATS_TEST_TMPDIR/sips-args"; while [ $# -gt 0 ]; do [ "$1" = --out ] && cp "$BATS_TEST_TMPDIR/stubs/sips" "$2"; shift; done'
   stub iconutil 'echo "$*" >> "$BATS_TEST_TMPDIR/iconutil-args"; while [ $# -gt 0 ]; do [ "$1" = -o ] && echo icns > "$2"; shift; done'
+  # FAKE_LINGER=N: after a bootout, print still finds the job N times (launchd
+  # finishes a bootout after launchctl returns), and a bootstrap meanwhile fails.
+  # FAKE_BOOTSTRAP_FAILS=N: the first N bootstraps fail.
   stub launchctl '
 echo "$*" >> "$BATS_TEST_TMPDIR/launchctl-args"
+linger="$BATS_TEST_TMPDIR/linger"
+fails="$BATS_TEST_TMPDIR/bootstrap-fails"
 case "$1" in
-  print) [ -e "$BATS_TEST_TMPDIR/loaded" ] ;;
-  bootstrap) touch "$BATS_TEST_TMPDIR/loaded" ;;
-  bootout) rm -f "$BATS_TEST_TMPDIR/loaded" ;;
+  print)
+    [ -e "$BATS_TEST_TMPDIR/loaded" ] && exit 0
+    n="$(cat "$linger" 2>/dev/null || echo 0)"
+    [ "$n" -gt 0 ] || exit 1
+    echo $((n - 1)) > "$linger" ;;
+  bootstrap)
+    [ "$(cat "$linger" 2>/dev/null || echo 0)" -eq 0 ] || exit 5
+    n="$(cat "$fails" 2>/dev/null || echo "${FAKE_BOOTSTRAP_FAILS:-0}")"
+    if [ "$n" -gt 0 ]; then echo $((n - 1)) > "$fails"; exit 5; fi
+    touch "$BATS_TEST_TMPDIR/loaded" ;;
+  bootout) rm -f "$BATS_TEST_TMPDIR/loaded"; echo "${FAKE_LINGER:-0}" > "$linger" ;;
   *) : ;;
 esac'
   export GROVE_SWIFT="$BATS_TEST_TMPDIR/stubs/swift"
@@ -166,6 +179,36 @@ ta_ready() {
   grep -q "^bootout gui/$UID_/com.projectgrove.themes\$" "$BATS_TEST_TMPDIR/launchctl-args"
   grep -q "^bootstrap gui/$UID_ $AGENT\$" "$BATS_TEST_TMPDIR/launchctl-args"
   [ "$(grep -n '^bootout' "$BATS_TEST_TMPDIR/launchctl-args" | cut -d: -f1)" -lt "$(grep -n '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args" | cut -d: -f1)" ]
+}
+
+@test "themes-app: apply waits for a bootout to finish before bootstrapping" {
+  load_module
+  touch "$BATS_TEST_TMPDIR/loaded"
+  echo old > "$AGENT"
+  export FAKE_LINGER=3
+  run apply
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/loaded" ]
+  # bootout, then print until the job is gone (3 lingering + 1 that fails), then one bootstrap.
+  [ "$(cut -d' ' -f1 "$BATS_TEST_TMPDIR/launchctl-args" | sed 1,/^bootout/d | tr '\n' ' ')" = "print print print print bootstrap " ]
+}
+
+@test "themes-app: apply retries a bootstrap that fails once" {
+  load_module
+  export FAKE_BOOTSTRAP_FAILS=1
+  run apply
+  [ "$status" -eq 0 ]
+  [ -e "$BATS_TEST_TMPDIR/loaded" ]
+  [ "$(grep -c "^bootstrap gui/$UID_ $AGENT\$" "$BATS_TEST_TMPDIR/launchctl-args")" -eq 2 ]
+}
+
+@test "themes-app: apply fails when bootstrap keeps failing" {
+  load_module
+  export FAKE_BOOTSTRAP_FAILS=5
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"launchctl bootstrap"* ]] || false
+  [ "$(grep -c '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args")" -eq 2 ]
 }
 
 @test "themes-app: a failed build leaves the installed app and stamp" {

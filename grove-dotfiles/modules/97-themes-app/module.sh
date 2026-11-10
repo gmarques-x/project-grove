@@ -66,6 +66,23 @@ XML
 
 _ta_loaded() { "$(_ta_launchctl)" print "$(_ta_domain)/$_TA_LABEL" >/dev/null 2>&1; }
 
+# _ta_wait_gone: launchd can still hold the job for a moment after bootout
+# returns, and a bootstrap then fails; wait up to about 2 s for it to go.
+_ta_wait_gone() {
+  local n=0
+  while _ta_loaded && [ "$n" -lt 20 ]; do
+    sleep 0.1
+    n=$((n + 1))
+  done
+}
+
+# _ta_bootstrap: load the agent, trying once more after a pause.
+_ta_bootstrap() {
+  "$(_ta_launchctl)" bootstrap "$(_ta_domain)" "$(_ta_agent)" >/dev/null 2>&1 && return 0
+  sleep 0.5
+  "$(_ta_launchctl)" bootstrap "$(_ta_domain)" "$(_ta_agent)" >/dev/null 2>&1
+}
+
 check() {
   local stamp
   if ! command -v "$(_ta_swift)" >/dev/null 2>&1; then
@@ -147,8 +164,11 @@ apply() {
       return 1
     }
   else
-    _ta_loaded && "$(_ta_launchctl)" bootout "$domain/$_TA_LABEL" >/dev/null 2>&1
-    "$(_ta_launchctl)" bootstrap "$domain" "$(_ta_agent)" >/dev/null 2>&1 || {
+    if _ta_loaded; then
+      "$(_ta_launchctl)" bootout "$domain/$_TA_LABEL" >/dev/null 2>&1
+      _ta_wait_gone
+    fi
+    _ta_bootstrap || {
       grove_fail "could not start Grove Themes at login (launchctl bootstrap)"
       return 1
     }
