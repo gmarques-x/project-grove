@@ -75,6 +75,7 @@ gt_copy_config() {
   run "$CLI" set light-soft
   [ "$status" -eq 1 ]
   [[ "$output" == *Automation* ]] || false
+  [[ "$output" == *"allow Grove Themes or your terminal to control System Events (System Settings > Privacy & Security > Automation), then switch again"* ]] || false
   grep -qx 'defaults write -g AppleAccentColor -int 3' "$CALLS"
   grep -q 'kill -USR2 101' "$CALLS"
   run "$CLI" set --json light-soft

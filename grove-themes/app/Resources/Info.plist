@@ -13,5 +13,6 @@
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>Grove Themes switches macOS between light and dark and sets the wallpaper to match your scheme.</string>
 </dict>
 </plist>

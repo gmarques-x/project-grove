@@ -134,6 +134,9 @@ ta_ready() {
   [ -f "$APP/Contents/Resources/AppIcon.icns" ]
   [ "$(plutil -extract CFBundleIdentifier raw "$APP/Contents/Info.plist")" = com.projectgrove.themes ]
   [ "$(plutil -extract LSUIElement raw "$APP/Contents/Info.plist")" = true ]
+  # The CLI child's Apple events count as the app's: without this key macOS
+  # refuses them without asking.
+  [ "$(plutil -extract NSAppleEventsUsageDescription raw "$APP/Contents/Info.plist")" = "Grove Themes switches macOS between light and dark and sets the wallpaper to match your scheme." ]
   grep -q -- "^--force --sign - .*/Grove Themes.app$" "$BATS_TEST_TMPDIR/codesign-args"
   [ "$(cat "$GROVE_STATE/themes-app.stamp")" = "$(_ta_source_hash)" ]
   [ "$(cat "$AGENT")" = "$(_ta_agent_plist)" ]

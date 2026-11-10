@@ -9,7 +9,7 @@
 # $GROVE_ROOT/../grove-wallpapers), GROVE_KILL (default the kill builtin; a
 # PATH stub cannot shadow a builtin). osascript and defaults come from PATH.
 
-GT_AUTOMATION_HINT="allow your terminal to control System Events (System Settings > Privacy & Security > Automation), then run grove-themes set again"
+GT_AUTOMATION_HINT="allow Grove Themes or your terminal to control System Events (System Settings > Privacy & Security > Automation), then switch again"
 
 _gt_line() { printf '%s\t%s\t%s\n' "$1" "$2" "$3"; }
 
