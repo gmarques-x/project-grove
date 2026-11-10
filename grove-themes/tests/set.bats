@@ -64,10 +64,21 @@ gt_copy_config() {
   grep -qx 'defaults write -g AppleHighlightColor -string 0.917647 0.929412 0.784314 Other' "$CALLS"
 }
 
+@test "the wallpaper path is clean, the same text 85-macos-wallpaper checks for" {
+  local clean
+  clean="$(cd "$GROVE_WALLPAPER_DIR" && pwd -P)"
+  export GROVE_WALLPAPER_DIR="$GROVE_WALLPAPER_DIR/../$(basename "$GROVE_WALLPAPER_DIR")"
+  run "$CLI" set light-soft
+  [ "$status" -eq 0 ]
+  grep -q "^osascript - $clean/wallpaper-project-grove-light-soft.png\$" "$CALLS"
+  run grep -q '/\.\./' "$CALLS"
+  [ "$status" -ne 0 ]
+}
+
 @test "set puts the scheme's wallpaper on every screen" {
   run "$CLI" set light-soft
   [ "$status" -eq 0 ]
-  grep -q "^osascript - $GROVE_WALLPAPER_DIR/wallpaper-project-grove-light-soft.png\$" "$CALLS"
+  grep -q "^osascript - $(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-project-grove-light-soft.png\$" "$CALLS"
   grep -q 'set picture of every desktop' "$CALLS"
 }
 
@@ -187,7 +198,7 @@ chrome_line() { printf '%s\n' "$output" | grep '^chrome '; }
   run "$CLI" set light-soft
   [ "$status" -eq 0 ]
   [[ "$output" == *"light-soft on every Space"* ]] || false
-  [ "$(gt_store_urls "$GROVE_WALLPAPER_STORE" | sort -u)" = "file://$GROVE_WALLPAPER_DIR/wallpaper-project-grove-light-soft.png" ]
+  [ "$(gt_store_urls "$GROVE_WALLPAPER_STORE" | sort -u)" = "file://$(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-project-grove-light-soft.png" ]
   [ "$(gt_store_idle "$GROVE_WALLPAPER_STORE" | sort -u)" = "com.apple.wallpaper.choice.aerials:idle" ]
   [ -n "$(find "$GROVE_STATE/backup" -name Index.plist)" ]
   grep -qx 'killall -KILL WallpaperAgent' "$CALLS"

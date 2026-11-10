@@ -128,6 +128,8 @@ _gt_copy_backup() {
 gt_step_wallpaper() {
   local dir file store lib msg backup
   dir="${GROVE_WALLPAPER_DIR:-${GROVE_ROOT:?}/../grove-wallpapers}"
+  # A clean path (no ".."), the same text 85-macos-wallpaper compares against.
+  dir="$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")"
   file="$dir/wallpaper-project-grove-$1.png"
   store="${GROVE_WALLPAPER_STORE:-$HOME/Library/Application Support/com.apple.wallpaper/Store/Index.plist}"
   lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
