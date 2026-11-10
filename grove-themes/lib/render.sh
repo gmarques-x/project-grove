@@ -26,7 +26,7 @@ gt_values() {
   contrast="${scheme#*-}"
   if [ "$appearance" = light ]; then
     vscode="Everforest Light"
-    image="grove-light.png"
+    image="grove-light-$contrast.png"
   else
     vscode="Everforest Dark"
     image="grove.png"

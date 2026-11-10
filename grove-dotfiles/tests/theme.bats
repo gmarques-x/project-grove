@@ -245,19 +245,26 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)'
   [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 426 yes " ]
 }
 
-@test "the light image matches the dark one's shape" {
-  local f="$GROVE_ROOT/config/fastfetch/grove-light.png"
-  [ -f "$f" ] || false
-  [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 426 yes " ]
+@test "each light scheme has its own image, the dark one's shape; the old grove-light.png is gone" {
+  local c f
+  for c in hard medium soft; do
+    f="$GROVE_ROOT/config/fastfetch/grove-light-$c.png"
+    [ -f "$f" ] || { echo "missing $f"; false; }
+    [ "$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$f" | awk 'NR > 1 { print $2 }' | tr '\n' ' ')" = "1004 426 yes " ] || { echo "$f"; false; }
+  done
+  [ ! -e "$GROVE_ROOT/config/fastfetch/grove-light.png" ] || false
+  [ -z "$(git -C "$GROVE_ROOT" ls-files config/fastfetch/grove-light.png)" ] || false
 }
 
-@test "the fetch check tests the image the scheme shows: grove.png dark, grove-light.png light" {
-  local d="$BATS_TEST_TMPDIR/fetch"
+@test "the fetch check tests the image the scheme shows: grove.png dark, grove-light-<contrast>.png light" {
+  local d="$BATS_TEST_TMPDIR/fetch" c
   . "$GROVE_ROOT/../grove-themes/lib/render.sh"
   gt_render_file dark-medium "$GROVE_ROOT/theme" "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh.tmpl" "$d-dark" || false
-  gt_render_file light-medium "$GROVE_ROOT/theme" "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh.tmpl" "$d-light" || false
   grep -q '\[\[ -r "\$dir/grove.png" \]\]' "$d-dark" || false
-  grep -q '\[\[ -r "\$dir/grove-light.png" \]\]' "$d-light" || false
+  for c in hard medium soft; do
+    gt_render_file "light-$c" "$GROVE_ROOT/theme" "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh.tmpl" "$d-light-$c" || false
+    grep -q "\\[\\[ -r \"\\\$dir/grove-light-$c.png\" \\]\\]" "$d-light-$c" || { cat "$d-light-$c"; false; }
+  done
 }
 
 # render_prompt FILE: the prompt Starship draws in a temp git repo, colors stripped.

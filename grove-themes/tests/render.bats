@@ -13,9 +13,22 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
 @test "render fills the computed names" {
   printf '{{appearance}}|{{contrast}}|{{vscode_theme}}|{{fetch_image}}\n' > "$BATS_TEST_TMPDIR/t.tmpl"
   gt_render_file light-soft "$PALETTES" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
-  [ "$(cat "$BATS_TEST_TMPDIR/out")" = "light|soft|Everforest Light|grove-light.png" ]
+  [ "$(cat "$BATS_TEST_TMPDIR/out")" = "light|soft|Everforest Light|grove-light-soft.png" ]
   gt_render_file dark-hard "$PALETTES" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
   [ "$(cat "$BATS_TEST_TMPDIR/out")" = "dark|hard|Everforest Dark|grove.png" ]
+}
+
+@test "fetch_image: grove.png for every dark scheme, grove-light-<contrast>.png for each light one" {
+  local s want
+  for s in $(gt_schemes); do
+    case "$s" in
+      dark-*) want=grove.png ;;
+      *) want="grove-light-${s#light-}.png" ;;
+    esac
+    [ "$(gt_values "$s" "$PALETTES" | awk -F"\t" '$1 == "fetch_image" { print $2 }')" = "$want" ] || { echo "$s"; false; }
+  done
+  [ "$(gt_values light-hard "$PALETTES" | awk -F"\t" '$1 == "fetch_image" { print $2 }')" = grove-light-hard.png ]
+  [ "$(gt_values light-medium "$PALETTES" | awk -F"\t" '$1 == "fetch_image" { print $2 }')" = grove-light-medium.png ]
 }
 
 @test "values with & / and backslash render literally" {
