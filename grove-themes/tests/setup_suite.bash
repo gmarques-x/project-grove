@@ -12,7 +12,6 @@ setup_suite() {
   export GROVE_ROOT="$base/no-grove-root"
   export GROVE_WALLPAPER_DIR="$base/wallpapers"
   export GROVE_CHROME_APP="$base/no-chrome.app"
-  export GROVE_CHROME_DIR="$base/chrome-data"
   mkdir -p "$HOME" "$base/stubs" "$GROVE_WALLPAPER_DIR"
   for c in osascript defaults kill ps; do
     printf '#!/bin/bash\ncat > /dev/null 2>&1 < /dev/null; exit 0\n' > "$base/stubs/$c"

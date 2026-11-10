@@ -21,7 +21,7 @@ Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (
 
 ## Chrome (one-time setup)
 
-Chrome can't be themed by policy on macOS, so Grove renders an unpacked theme extension to `~/.config/chrome-theme`. Load it once: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and pick `~/.config/chrome-theme` (⌘⇧. shows hidden folders in the picker). After that, `grove-themes set` rewrites its colours, and Chrome picks them up the next time it starts. Until the theme is loaded, `set` reports `chrome` as needs-you.
+Chrome can't be themed by policy on macOS, so Grove renders an unpacked theme extension to `~/.config/chrome-theme`. Load it once: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and pick `~/.config/chrome-theme` (⌘⇧. shows hidden folders in the picker). After that, `grove-themes set` rewrites its colours, and Chrome picks them up the next time it starts. Each scheme has its own extension version (`1.0.N`), so Chrome rebuilds its cached theme on every switch. `set` can't tell whether the theme is loaded (macOS keeps Chrome's profile private), so it reports `chrome` as next-launch whenever the theme was rendered.
 
 Tests: `bats tests`.
 

@@ -7,8 +7,7 @@
 # next-prompt, next-launch, needs-you, failed.
 # Seams: GROVE_PS (default ps), GROVE_WALLPAPER_DIR (default
 # $GROVE_ROOT/../grove-wallpapers), GROVE_CHROME_APP (default
-# /Applications/Google Chrome.app), GROVE_CHROME_DIR (default
-# ~/Library/Application Support/Google/Chrome), GROVE_KILL (default the kill builtin; a
+# /Applications/Google Chrome.app), GROVE_KILL (default the kill builtin; a
 # PATH stub cannot shadow a builtin). osascript and defaults come from PATH.
 
 GT_AUTOMATION_HINT="allow Grove Themes or your terminal to control System Events (System Settings > Privacy & Security > Automation), then switch again"
@@ -52,31 +51,15 @@ gt_step_static() {
   _gt_line vscode live "watches its settings"
 }
 
-# gt_step_chrome: the theme extension is loaded when a profile's Preferences
-# or Secure Preferences holds the theme folder's path as a quoted string.
-# Read only; Chrome's files are never written.
+# gt_step_chrome: Chrome's profile can't be read without Full Disk Access, so
+# this only checks that the theme was rendered.
 gt_step_chrome() {
-  local app dir folder real f found=0
-  app="${GROVE_CHROME_APP:-/Applications/Google Chrome.app}"
-  dir="${GROVE_CHROME_DIR:-$HOME/Library/Application Support/Google/Chrome}"
-  if [ ! -d "$app" ]; then
+  if [ ! -d "${GROVE_CHROME_APP:-/Applications/Google Chrome.app}" ]; then
     _gt_line chrome live "Chrome not installed"
-    return 0
-  fi
-  folder="$HOME/.config/chrome-theme"
-  real="$(cd -P "$folder" 2>/dev/null && pwd)" || real="$folder"
-  for f in "$dir/Default/Preferences" "$dir/Default/Secure Preferences" \
-    "$dir"/Profile\ */Preferences "$dir"/Profile\ */Secure\ Preferences; do
-    [ -f "$f" ] || continue
-    if grep -qF -e "\"$folder\"" -e "\"$real\"" "$f" 2>/dev/null; then
-      found=1
-      break
-    fi
-  done
-  if [ "$found" -eq 1 ]; then
-    _gt_line chrome next-launch "Chrome takes the new colours the next time it starts"
+  elif [ -f "${GROVE_ROOT:?}/config/chrome-theme/manifest.json" ]; then
+    _gt_line chrome next-launch "Chrome takes the new colours the next time it starts (load ~/.config/chrome-theme once in chrome://extensions if you haven't)"
   else
-    _gt_line chrome needs-you "load ~/.config/chrome-theme once in chrome://extensions (Developer mode on, Load unpacked)"
+    _gt_line chrome failed "the Chrome theme wasn't rendered"
     return 1
   fi
 }

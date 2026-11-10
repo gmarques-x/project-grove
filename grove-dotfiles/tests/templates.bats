@@ -98,11 +98,12 @@ palette_rgb() {
 }
 
 @test "the Chrome theme manifest is valid JSON for every scheme, with the mapped palette colours" {
-  local s k want
+  local s k want n=0
   for s in $(gt_schemes); do
+    n=$((n + 1))
     mkdir -p "$BATS_TEST_TMPDIR/$s/chrome-theme"
     gt_render_file "$s" "$PALETTES" "$GROVE_ROOT/config/chrome-theme/manifest.json.tmpl" "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json" || false
-    jq -e '.manifest_version == 3 and .name == "Grove" and .version == "1.0" and .theme.properties.ntp_logo_alternate == 1' \
+    jq -e --arg v "1.0.$n" '.manifest_version == 3 and .name == "Grove" and .version == $v and .theme.properties.ntp_logo_alternate == 1' \
       "$BATS_TEST_TMPDIR/$s/chrome-theme/manifest.json" >/dev/null || { echo "$s: manifest"; false; }
     for k in "frame bg_dim" "frame_inactive bg_dim" "frame_incognito bg_dim" "frame_incognito_inactive bg_dim" \
              "toolbar bg0" "ntp_background bg0" "tab_text fg" "bookmark_text fg" "ntp_text fg" "toolbar_text fg" \

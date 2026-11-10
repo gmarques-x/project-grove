@@ -67,9 +67,10 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
 @test "gt_values lists palette entries then computed names" {
   run gt_values dark-hard "$PALETTES"
   [ "${lines[0]}" = "$(printf 'fg\t#D3C6A1')" ]
-  [ "${#lines[@]}" -eq 8 ]
+  [ "${#lines[@]}" -eq 9 ]
   [ "${lines[3]}" = "$(printf 'fg_rgb\t211, 198, 161')" ]
   [ "${lines[7]}" = "$(printf 'fetch_image\tgrove.png')" ]
+  [ "${lines[8]}" = "$(printf 'chrome_version\t1.0.1')" ]
 }
 
 @test "gt_templates lists *.tmpl relative and sorted" {
@@ -99,4 +100,12 @@ setup() { gt_test_setup; gt_toy_palettes; source "$GT_ROOT/lib/render.sh"; }
   gt_render_file dark-medium "$BATS_TEST_TMPDIR/p" "$BATS_TEST_TMPDIR/t.tmpl" "$BATS_TEST_TMPDIR/out"
   [ "$(cat "$BATS_TEST_TMPDIR/out")" = "45, 53, 59|255, 255, 255|0, 0, 0" ]
   [ -z "$(gt_values dark-medium "$BATS_TEST_TMPDIR/p" | awk -F"\t" '$1 == "note_rgb"')" ]
+}
+
+@test "chrome_version is 1.0.N, N the scheme's position" {
+  local s n=0
+  for s in $(gt_schemes); do
+    n=$((n + 1))
+    [ "$(gt_values "$s" "$PALETTES" | awk -F"\t" '$1 == "chrome_version" { print $2 }')" = "1.0.$n" ] || { echo "$s"; false; }
+  done
 }
