@@ -44,6 +44,10 @@ struct GroveThemesApp: App {
             GalleryView()
                 .environment(model)
         }
-        .defaultSize(width: 760, height: 380)
+        // Seamless, like Ghostty: no title bar or title, the scheme's bg0 up to
+        // the top edge, the window buttons over it; sized to fit the cards.
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(width: GalleryView.width, height: GalleryView.height)
     }
 }

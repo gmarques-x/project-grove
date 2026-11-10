@@ -5,38 +5,47 @@ import SwiftUI
 /// the CLI, `grove-themes log`; the dropdown keeps the status line).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
+    /// The window fits the cards: 760 wide, as tall as they need (≈ 404 pt:
+    /// 46 above, two rows of ≈ 164, 12 between, 18 below), never shorter, so it
+    /// keeps its size while the first `list` loads or the CLI is missing.
+    static let width: CGFloat = 760
+    static let height: CGFloat = 404
+    static let buttonsClearance: CGFloat = 28
 
     var body: some View {
         let theme = model.currentColors
         let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let error = model.error {
-                    Text(error.message)
-                        .font(GroveFont.mono(12))
-                        .foregroundStyle(Color(theme.red))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(model.schemes(dark: true) + model.schemes(dark: false), id: \.self) { scheme in
-                        if let colors = model.colors(for: scheme) {
-                            SchemeCard(scheme: scheme, colors: colors,
-                                       isCurrent: scheme == model.list?.current,
-                                       isBusy: model.busyScheme == scheme) {
-                                Task { await model.switchTo(scheme) }
-                            }
-                            .disabled(model.switchingDisabled)
+        VStack(alignment: .leading, spacing: 16) {
+            if let error = model.error {
+                Text(error.message)
+                    .font(GroveFont.mono(12))
+                    .foregroundStyle(Color(theme.red))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(model.schemes(dark: true) + model.schemes(dark: false), id: \.self) { scheme in
+                    if let colors = model.colors(for: scheme) {
+                        SchemeCard(scheme: scheme, colors: colors,
+                                   isCurrent: scheme == model.list?.current,
+                                   isBusy: model.busyScheme == scheme) {
+                            Task { await model.switchTo(scheme) }
                         }
+                        .disabled(model.switchingDisabled)
                     }
                 }
             }
-            .padding(18)
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .frame(minWidth: 640, minHeight: 320)
+        // No title bar (GroveThemesApp): the content runs to the window's top
+        // edge, and the extra 28 pt keep the cards clear of the window buttons.
+        .padding(18)
+        .padding(.top, Self.buttonsClearance)
+        .frame(width: Self.width, alignment: .top)
+        .frame(minHeight: Self.height, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
         .font(GroveFont.mono(12))
         .foregroundStyle(Color(theme.fg))
-        .background(Color(theme.bg0))
+        .background(Color(theme.bg0).ignoresSafeArea())
+        .background(WindowAccessor { $0.isMovableByWindowBackground = true })
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
         .task { await model.refreshRetryingWhileNotInstalled() }
