@@ -21,7 +21,7 @@ It clones this repo to `~/Developer/project-grove` and runs `grove install`. Rea
 | Folder | What it is |
 | --- | --- |
 | [`grove-dotfiles/`](grove-dotfiles/) | The `grove` installer and every config it links into `~/.config`: Ghostty, zsh, Starship, git, SSH, bat, eza, yazi and fastfetch, plus Homebrew packages, fonts and Finder settings. |
-| [`grove-wallpapers/`](grove-wallpapers/) | Desktop wallpapers in the same palette, 2880 × 1864: the Grove logo and lettering centred on each Everforest scheme's background. `grove-terminal.png` is Dark Medium `#2D353B`, the terminal's background. The others: `-dark-hard` `#272E33`, `-dark-soft` `#333C43`, and `-light-hard` `#FFFBEF`, `-light-medium` `#FDF6E3`, `-light-soft` `#F3EAD3`, where the lockup is in the branding's dark ink. |
+| [`grove-wallpapers/`](grove-wallpapers/) | Desktop wallpapers in the same palette, 2880 × 1864: the Grove logo and lettering centred on each Everforest scheme's background, named `wallpaper-project-grove-<scheme>.png`: `dark-medium` `#2D353B` (the terminal's background, set by the installer), `dark-hard` `#272E33`, `dark-soft` `#333C43`, and `light-hard` `#FFFBEF`, `light-medium` `#FDF6E3`, `light-soft` `#F3EAD3`, where the lockup is in the branding's dark ink. |
 
 More pieces will grow here over time.
 

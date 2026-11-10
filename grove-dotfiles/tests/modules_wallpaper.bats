@@ -14,7 +14,7 @@ load_module() {
 
 setup() {
   grove_test_setup
-  WANT="$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers/grove-terminal.png"
+  WANT="$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers/wallpaper-project-grove-dark-medium.png"
   printf '%s\n' /System/Library/Desktop\ Pictures/Sequoia.heic /System/Library/Desktop\ Pictures/Sequoia.heic \
     > "$BATS_TEST_TMPDIR/desktops"
   stub osascript '
@@ -32,7 +32,7 @@ fi'
 }
 
 @test "wallpaper: the picture is tracked in grove-wallpapers" {
-  git -C "$GROVE_ROOT/.." ls-files --error-unmatch grove-wallpapers/grove-terminal.png
+  git -C "$GROVE_ROOT/.." ls-files --error-unmatch grove-wallpapers/wallpaper-project-grove-dark-medium.png
 }
 
 @test "wallpaper: about names it" {
@@ -71,7 +71,7 @@ fi'
   load_module
   run check
   [ "$status" -eq 1 ]
-  [[ "$output" == *"$BATS_TEST_TMPDIR/nowhere/grove-terminal.png"* ]]
+  [[ "$output" == *"$BATS_TEST_TMPDIR/nowhere/wallpaper-project-grove-dark-medium.png"* ]]
 }
 
 @test "wallpaper: needs you when System Events can't be controlled" {

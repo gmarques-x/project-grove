@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# 85-macos-wallpaper: every screen shows grove-wallpapers/grove-terminal.png,
+# 85-macos-wallpaper: every screen shows grove-wallpapers/wallpaper-project-grove-dark-medium.png,
 # read straight from the repo (the installer clones all of project-grove).
 # macOS sets only the Space each screen is showing; other Spaces are a manual step.
 # Tests point GROVE_WALLPAPER_DIR elsewhere and fake osascript.
@@ -8,7 +8,7 @@ about() { echo "Desktop wallpaper"; }
 
 _wp_file() {
   local dir="${GROVE_WALLPAPER_DIR:-$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers}"
-  printf '%s/grove-terminal.png' "$dir"
+  printf '%s/wallpaper-project-grove-dark-medium.png' "$dir"
 }
 
 # _wp_pictures: each screen's picture path, one per line.
