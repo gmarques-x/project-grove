@@ -125,6 +125,17 @@ exit 0'
   [ "$(cat "$BATS_TEST_TMPDIR/as-fails")" = 0 ]
 }
 
+@test "aerospace: an unattended apply (GROVE_YES=1) doesn't wait for Accessibility" {
+  export GROVE_YES=1 FAKE_SPANS=0 FAKE_AS_RC=1
+  run check
+  [ "$status" -eq 3 ]
+  run timeout 10 bash -c '. "$1"; for f in "$2"/lib/*.sh; do . "$f"; done; . "$3"; apply' _ /dev/null "$GROVE_ROOT" "$GROVE_ROOT/modules/98-aerospace/module.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allow AeroSpace under Accessibility"* ]] || false
+  run grep -q 'Privacy_Accessibility' "$CALLS"
+  [ "$status" -ne 0 ]
+}
+
 @test "aerospace: apply fails without aerospace" {
   export GROVE_AEROSPACE="$BATS_TEST_TMPDIR/missing/aerospace"
   run apply

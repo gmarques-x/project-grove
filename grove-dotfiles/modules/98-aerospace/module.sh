@@ -68,6 +68,12 @@ apply() {
     done
   fi
   if ! _as_allowed; then
+    # Unattended (grove install --yes): say what's needed and move on; the
+    # next grove check reports needs you.
+    if [ "${GROVE_YES:-0}" = "1" ]; then
+      grove_note "$_AS_HINT, then run grove install aerospace"
+      return 0
+    fi
     open "$_AS_PANE" >/dev/null 2>&1 || true
     grove_info "$_AS_HINT"
     until _as_allowed; do
