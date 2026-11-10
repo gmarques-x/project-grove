@@ -94,7 +94,8 @@ gt_copy_config() {
   [[ "$output" == *"backed up edited ghostty/config to "* ]] || false
   dest="$(printf '%s\n' "$output" | sed -n 's/.*backed up edited ghostty\/config to //p')"
   grep -q '# my edit' "$dest"
-  ! grep -q '# my edit' "$GROVE_ROOT/config/ghostty/config"
+  run grep -q '# my edit' "$GROVE_ROOT/config/ghostty/config"
+  [ "$status" -ne 0 ]
   run "$CLI" set dark-soft
   [[ "$output" != *"backed up"* ]] || false
 }
