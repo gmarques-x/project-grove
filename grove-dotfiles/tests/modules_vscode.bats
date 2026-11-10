@@ -2,7 +2,48 @@
 # 95-vscode: the settings file, Grove Icons, and the module against a fake `code`.
 load helpers
 
-setup() { grove_test_setup; }
+VSC_MODULE=95-vscode
+
+load_module() {
+  local f
+  for f in "$GROVE_ROOT"/lib/*.sh; do . "$f"; done
+  MODULE_DIR="$GROVE_ROOT/modules/$VSC_MODULE"
+  . "$MODULE_DIR/module.sh"
+}
+
+# The fake code: logs its arguments, lists $BATS_TEST_TMPDIR/extensions, and
+# "installs" by adding lines there. FAKE_CODE_FAIL=1 acts like an offline Mac.
+setup() {
+  grove_test_setup
+  : > "$BATS_TEST_TMPDIR/extensions"
+  stub code '
+echo "$*" >> "$BATS_TEST_TMPDIR/code-args"
+ex="$BATS_TEST_TMPDIR/extensions"
+case "$1" in
+  --list-extensions) cat "$ex" ;;
+  --install-extension)
+    if [ -n "$FAKE_CODE_FAIL" ]; then echo "Failed Installing Extensions: $2" >&2; exit 1; fi
+    case "$2" in
+      *.vsix)
+        cp "$2" "$BATS_TEST_TMPDIR/last.vsix"
+        v=$(unzip -p "$2" extension/package.json | sed -n "s/.*\"version\": *\"\([^\"]*\)\".*/\1/p")
+        grep -v "^grove.grove-icons@" "$ex" > "$ex.new"; mv "$ex.new" "$ex"
+        echo "grove.grove-icons@$v" >> "$ex" ;;
+      *) echo "$2@0.3.0" >> "$ex" ;;
+    esac ;;
+esac'
+  export GROVE_CODE="$BATS_TEST_TMPDIR/stubs/code"
+  export GROVE_VSCODE_USER="$BATS_TEST_TMPDIR/Application Support/Code/User"
+  SETTINGS="$GROVE_VSCODE_USER/settings.json"
+  ICONS_VERSION="$(jq -r .version "$GROVE_CONFIG/vscode/grove-icons/package.json")"
+}
+
+# vsc_ready: the settings linked and both extensions installed at today's versions.
+vsc_ready() {
+  mkdir -p "$GROVE_VSCODE_USER"
+  ln -s "$GROVE_CONFIG/vscode/settings.json" "$SETTINGS"
+  printf 'sainnhe.everforest@0.3.0\ngrove.grove-icons@%s\n' "$ICONS_VERSION" > "$BATS_TEST_TMPDIR/extensions"
+}
 
 # vsc_json FILE: FILE without its // comment lines, so jq can read it.
 vsc_json() { sed '/^[[:space:]]*\/\//d' "$1"; }
@@ -67,4 +108,70 @@ SETI_JSON="/Applications/Visual Studio Code.app/Contents/Resources/app/extension
   grep -q "Seti UI" "$n"
   grep -q "Microsoft Corporation" "$n"
   grep -q "MIT" "$n"
+}
+
+@test "vscode: about names it" {
+  load_module
+  run about
+  [ "$output" = "VS Code: Everforest, Grove Icons, JetBrains Mono" ]
+}
+
+@test "vscode: failed without the code command" {
+  unset GROVE_CODE
+  rm "$BATS_TEST_TMPDIR/stubs/code"
+  export PATH="$BATS_TEST_TMPDIR/stubs:/usr/bin:/bin" GROVE_BREW="$BATS_TEST_TMPDIR/nobrew/brew"
+  load_module
+  run check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"grove install homebrew"* ]]
+}
+
+@test "vscode: finds code next to brew" {
+  unset GROVE_CODE
+  mkdir -p "$BATS_TEST_TMPDIR/brew/bin"
+  mv "$BATS_TEST_TMPDIR/stubs/code" "$BATS_TEST_TMPDIR/brew/bin/code"
+  export PATH="$BATS_TEST_TMPDIR/stubs:/usr/bin:/bin" GROVE_BREW="$BATS_TEST_TMPDIR/brew/bin/brew"
+  vsc_ready
+  load_module
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "vscode: needs work when settings aren't linked" {
+  vsc_ready
+  rm "$SETTINGS"
+  load_module
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "vscode: needs work without Everforest" {
+  vsc_ready
+  printf 'grove.grove-icons@%s\n' "$ICONS_VERSION" > "$BATS_TEST_TMPDIR/extensions"
+  load_module
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "vscode: needs work when Grove Icons is another version" {
+  vsc_ready
+  load_module
+  printf 'sainnhe.everforest@0.3.0\ngrove.grove-icons@0.9.0\n' > "$BATS_TEST_TMPDIR/extensions"
+  run check
+  [ "$status" -eq 3 ]
+  printf 'sainnhe.everforest@0.3.0\ngrove.grove-icons@9.9.9\n' > "$BATS_TEST_TMPDIR/extensions"
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "vscode: ok when everything is in place" {
+  vsc_ready
+  load_module
+  run check
+  [ "$status" -eq 0 ]
+  ! grep -q -- --install-extension "$BATS_TEST_TMPDIR/code-args"
+}
+
+@test "vscode: the README lists the module" {
+  grep -q '^| `95-vscode` |' "$GROVE_ROOT/README.md"
 }
