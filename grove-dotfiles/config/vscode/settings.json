@@ -1,0 +1,36 @@
+{
+  // Project Grove · VS Code. Every color comes from theme/everforest-dark-medium
+  // (tests/theme.bats checks). Changes made in VS Code's settings screen land here.
+  "workbench.colorTheme": "Everforest Dark",
+  "workbench.iconTheme": "grove-icons",
+  "everforest.darkContrast": "medium",
+
+  "editor.fontFamily": "JetBrains Mono",
+  "editor.fontSize": 12,
+  "editor.fontLigatures": true,
+  "terminal.integrated.fontFamily": "JetBrains Mono",
+  "terminal.integrated.fontSize": 12,
+
+  // Ghostty's palette (config/ghostty/config): bright black is grey1.
+  "workbench.colorCustomizations": {
+    "[Everforest Dark]": {
+      "terminal.foreground": "#D3C6AA",
+      "terminal.ansiBlack": "#475258",
+      "terminal.ansiRed": "#E67E80",
+      "terminal.ansiGreen": "#A7C080",
+      "terminal.ansiYellow": "#DBBC7F",
+      "terminal.ansiBlue": "#7FBBB3",
+      "terminal.ansiMagenta": "#D699B6",
+      "terminal.ansiCyan": "#83C092",
+      "terminal.ansiWhite": "#D3C6AA",
+      "terminal.ansiBrightBlack": "#859289",
+      "terminal.ansiBrightRed": "#E67E80",
+      "terminal.ansiBrightGreen": "#A7C080",
+      "terminal.ansiBrightYellow": "#DBBC7F",
+      "terminal.ansiBrightBlue": "#7FBBB3",
+      "terminal.ansiBrightMagenta": "#D699B6",
+      "terminal.ansiBrightCyan": "#83C092",
+      "terminal.ansiBrightWhite": "#D3C6AA"
+    }
+  }
+}
