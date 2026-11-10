@@ -5,7 +5,15 @@ grove_test_setup() {
   export GROVE_ROOT
   export HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$HOME" "$BATS_TEST_TMPDIR/stubs"
-  export GROVE_CONFIG="$GROVE_ROOT/config"
+  # Never the live config (~/.config points at it): a copy of the tracked and
+  # generated files, so a test that forgets its own GROVE_CONFIG and runs an
+  # apply writes here. Tests that need an empty or custom one set their own.
+  export GROVE_CONFIG="$BATS_TEST_TMPDIR/grove-config"
+  if [ -n "${GROVE_RENDERED:-}" ] && [ -d "$GROVE_RENDERED" ]; then
+    cp -Rp "$GROVE_RENDERED" "$GROVE_CONFIG" || return 1
+  else
+    grove_copy_tracked_config "$GROVE_CONFIG" || return 1
+  fi
   export GROVE_STATE="$HOME/.local/state/grove"
   export GROVE_LOCAL="$HOME/.config/grove/local.env"
   export GROVE_RUN_ID=test
