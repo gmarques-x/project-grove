@@ -9,12 +9,13 @@ commands:
   list                           the six schemes, the current one marked
   current                        the current scheme's name
   set SCHEME                     switch to SCHEME
+  log [-n N]                     the last N switches (default 5), newest first
   render [--scheme S] [--config DIR]
                                  write the configs (default: current scheme,
                                  $GROVE_ROOT/config)
 
 options:
-  --json   machine-readable output on list, current and set
+  --json   machine-readable output on list, current, set and log
 U
 }
 
@@ -39,6 +40,8 @@ export GROVE_STATE="${GROVE_STATE:-$HOME/.local/state/grove}"
 . "$GT_ROOT/lib/state.sh"
 # shellcheck source=/dev/null
 . "$GT_ROOT/lib/steps.sh"
+# shellcheck source=/dev/null
+. "$GT_ROOT/lib/log.sh"
 
 _gt_json_list() { # words -> "a", "b"
   local out="" s
@@ -55,12 +58,35 @@ _gt_unknown() {
   exit 2
 }
 
+# _gt_palette_json SCHEME: {"name": ..., "appearance": ..., "colors": {...}}
+_gt_palette_json() {
+  local s="$1" tab name val colors="" sep="" app="" vals c title
+  tab="$(printf '\t')"
+  vals="$(gt_values "$s" "$GROVE_ROOT/theme")" || return 1
+  for c in bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple; do
+    val="$(printf '%s\n' "$vals" | while IFS="$tab" read -r name val; do
+      [ "$name" = "$c" ] && { printf '%s' "$val"; break; }
+    done)"
+    colors="$colors$sep\"$c\": \"$val\""
+    sep=", "
+  done
+  app="$(printf '%s\n' "$vals" | while IFS="$tab" read -r name val; do
+    [ "$name" = appearance ] && { printf '%s' "$val"; break; }
+  done)"
+  title="$(printf '%s' "$s" | awk -F- '{ for (i = 1; i <= NF; i++) printf "%s%s%s", (i > 1 ? " " : ""), toupper(substr($i, 1, 1)), substr($i, 2) }')"
+  printf '{"name": "%s", "appearance": "%s", "colors": {%s}}' "$title" "$app" "$colors"
+}
+
 cmd_list() {
-  local json="$1" cur s
+  local json="$1" cur s pal="" sep=""
   cur="$(gt_current)"
   if [ "$json" = 1 ]; then
+    for s in $(gt_schemes); do
+      pal="$pal$sep\"$s\": $(_gt_palette_json "$s")" || exit 1
+      sep=", "
+    done
     # shellcheck disable=SC2046
-    printf '{"current": "%s", "schemes": [%s]}\n' "$cur" "$(_gt_json_list $(gt_schemes))"
+    printf '{"current": "%s", "schemes": [%s], "palettes": {%s}}\n' "$cur" "$(_gt_json_list $(gt_schemes))" "$pal"
     return 0
   fi
   for s in $(gt_schemes); do
@@ -72,6 +98,29 @@ cmd_current() {
   local json="$1" cur
   cur="$(gt_current)"
   if [ "$json" = 1 ]; then printf '{"current": "%s"}\n' "$cur"; else echo "$cur"; fi
+}
+
+cmd_log() {
+  local json="$1" n=5 lines entry sep="" out="" l
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -n) [ $# -ge 2 ] || { _gt_usage >&2; exit 2; }; n="$2"; shift 2 ;;
+      *) _gt_usage >&2; exit 2 ;;
+    esac
+  done
+  case "$n" in ''|*[!0-9]*) _gt_usage >&2; exit 2 ;; esac
+  lines="$(gt_log_read "$n")"
+  [ -n "$lines" ] || { [ "$json" = 1 ] && echo '{"entries": []}'; exit 0; }
+  if [ "$json" = 1 ]; then
+    while IFS= read -r l; do out="$out$sep$l"; sep=", "; done <<< "$lines"
+    printf '{"entries": [%s]}\n' "$out"
+  else
+    while IFS= read -r l; do
+      entry="$(printf '%s' "$l" | sed -n 's/^{"time": "\([^"]*\)", "scheme": "\([^"]*\)", "exit": \([0-9]*\),.*/\1 \2 exit=\3/p')"
+      [ -z "$entry" ] || echo "$entry"
+    done <<< "$lines"
+  fi
 }
 
 cmd_render() {
@@ -109,13 +158,13 @@ $(gt_step_ghostty; gt_step_zsh; gt_step_static
   fi
   while IFS="$tab" read -r name res text; do
     case "$res" in failed|needs-you) rc=1 ;; esac
-    if [ "$json" = 1 ]; then
-      out="$out$sep$(printf '{"name": "%s", "result": "%s", "message": "%s"}' "$name" "$res" "$(_gt_json_esc "$text")")"
-      sep=", "
-    else
+    out="$out$sep$(printf '{"name": "%s", "result": "%s", "message": "%s"}' "$name" "$res" "$(_gt_json_esc "$text")")"
+    sep=", "
+    if [ "$json" != 1 ]; then
       printf '%-11s %-12s %s\n' "$name" "$res" "$text"
     fi
   done <<< "$lines"
+  [ "$result" = failed ] || gt_log_append "$scheme" "$rc" "$out" 2>/dev/null || true
   if [ "$json" = 1 ]; then
     printf '{"scheme": "%s", "steps": [%s]}\n' "$scheme" "$out"
   elif [ "$result" != failed ]; then
@@ -140,6 +189,7 @@ case "$cmd" in
   list) [ $# -eq 0 ] || { _gt_usage >&2; exit 2; }; cmd_list "$json" ;;
   current) [ $# -eq 0 ] || { _gt_usage >&2; exit 2; }; cmd_current "$json" ;;
   set) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_set "$json" "${1:-}" ;;
+  log) cmd_log "$json" "$@" ;;
   render) cmd_render "$@" ;;
   *) _gt_usage >&2; exit 2 ;;
 esac

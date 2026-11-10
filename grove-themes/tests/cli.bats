@@ -34,7 +34,7 @@ gt_copy_config() {
 @test "list --json gives current and schemes" {
   run "$CLI" list --json
   [ "$status" -eq 0 ]
-  [ "$output" = '{"current": "dark-medium", "schemes": ["dark-hard", "dark-medium", "dark-soft", "light-hard", "light-medium", "light-soft"]}' ]
+  [ "$(printf '%s' "$output" | jq -c '[.current, .schemes]')" = '["dark-medium",["dark-hard","dark-medium","dark-soft","light-hard","light-medium","light-soft"]]' ]
 }
 
 @test "current defaults to dark-medium" {
@@ -129,4 +129,18 @@ gt_copy_config() {
   [ "$status" -eq 2 ]
   run "$CLI" render --scheme light-pink
   [ "$status" -eq 2 ]
+}
+
+@test "list --json has every scheme's palette" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq '.palettes | keys | length')" -eq 6 ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["dark-medium"].name')" = "Dark Medium" ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["dark-medium"].appearance')" = dark ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["dark-medium"].colors.bg0')" = "#2D353B" ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["dark-medium"].colors.green')" = "#A7C080" ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].appearance')" = light ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].colors.bg0')" = "#F3EAD3" ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","fg","green","grey1","orange","purple","red","yellow"]' ]
 }
