@@ -9,7 +9,7 @@
 - `project-grove/grove-themes/` holds the bash CLI: `lib/render.sh` (templates → files), `lib/steps.sh` (app refreshes), `bin/grove-themes` (commands).
 - grove-dotfiles uses it: `05-config` renders, `70-zsh` links the command, `85-macos-wallpaper` follows the current scheme.
 
-**Tech Stack:** bash 3.2, sed, bats-core 1.14, shellcheck 0.11, `osascript`, `defaults`, `ps`/`kill`, Python 3 + Pillow/numpy only for the private one-off scripts in `artifacts/`.
+**Tech Stack:** bash 3.2, sed, bats-core 1.14, shellcheck 0.11, `osascript`, `defaults`, `ps`/`kill`, Python 3 + Pillow/numpy only for private one-off scripts (not in the repo).
 
 **Spec:** `grove-dotfiles/docs/specs/2026-11-10-grove-themes-design.md` (§4 palettes, §5 templates, §6 CLI, §7 set, §8 tests).
 
@@ -23,7 +23,7 @@
 - Bats assertions: `[[ … ]] || false`, never a bare `[[ ]]` or `! cmd` mid-test (they don't fail a test; macOS also has `/usr/bin/apply`).
 - Tests copy only git-tracked config: `git add` new tracked files before running them.
 - Ghostty reload (spike done 2026-11-10): Ghostty 1.4.0 macOS handles `SIGUSR2` by reloading its config (log: "reloading configuration in response to SIGUSR2"). `pgrep` can't see the process from this shell: find PIDs with `ps -axo pid=,comm=` lines ending in `/Ghostty.app/Contents/MacOS/ghostty`.
-- `artifacts/` stays private: the conversion and image scripts live there and are never committed.
+- The conversion and image scripts stay private (not in the repo) and are never committed.
 - Commits signed, ending `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Don't push.
 
 ## Review Focus
@@ -45,7 +45,7 @@ Rulings made while planning (the executor carries them; the user sees them at ha
 **Files:**
 - Create: `theme/everforest-{dark-hard,dark-soft,light-hard,light-medium,light-soft}`
 - Modify: `theme/everforest-dark-medium` (add `term0`–`term15`)
-- Create: `tests/fixtures/everforest-upstream.txt` (lines `scheme name #HEX`, every background and foreground value of all six schemes, copied from `artifacts/everforest-palette.json`)
+- Create: `tests/fixtures/everforest-upstream.txt` (lines `scheme name #HEX`, every background and foreground value of all six schemes, copied from the upstream Everforest palette (verified against the plugin source))
 - Modify: `tests/theme.bats`
 
 **Interfaces:**
@@ -93,7 +93,7 @@ Rulings made while planning (the executor carries them; the user sees them at ha
 ### Task 3: Configs become templates
 
 **Files:**
-- Create: `config/<path>.tmpl` for the 12 files in spec §5, via `artifacts/grove-themes/convert.py` (private, not committed)
+- Create: `config/<path>.tmpl` for the 12 files in spec §5, via a private one-off conversion script (not committed)
 - Create: `tests/fixtures/dark-medium/<path>` (today's 12 files, verbatim)
 - Delete from git (kept on disk, now generated): the 12 config files; Modify: `config/.gitignore` (ignore them, keep `*.tmpl` tracked)
 - Create: `tests/setup_suite.bash`; Modify: `tests/helpers.bash`, `tests/theme.bats`, `tests/modules_vscode.bats`, `tests/config_allowlist.bats`, and every test that reads a now-generated file
@@ -109,7 +109,7 @@ Rulings made while planning (the executor carries them; the user sees them at ha
   - `the Dark Medium render is today's config` — for each fixture, `cmp` with the render.
   - `generated files are ignored, templates are tracked` (config_allowlist) — `git check-ignore` true for `config/ghostty/config`, false for `config/ghostty/config.tmpl`, same for all 12.
 - [ ] **Step 2: Run** `bats tests/templates.bats tests/config_allowlist.bats` — Expected: fail.
-- [ ] **Step 3: Convert.** `convert.py` replaces each Dark Medium hex by its palette name (case-insensitive; no two names share a hex), terminal slots by `termN` (Ghostty `palette = N=`, VS Code `terminal.ansi*` in slot order), `window-theme = dark` → `{{appearance}}`, the fastfetch logo `grove.png` → `{{fetch_image}}`, VS Code's `Everforest Dark` (theme and the `[Everforest Dark]` key) → `{{vscode_theme}}`, `"everforest.darkContrast": "medium"` → both `"everforest.darkContrast": "{{contrast}}"` and `"everforest.lightContrast": "{{contrast}}"`. It prints any hex it couldn't name; the list must be empty. Copy today's files to the fixtures first. **The VS Code fixture gains the `lightContrast` line** (Ruling: spec §5 writes both keys; the byte-for-byte test compares against the fixture with that one added line).
+- [ ] **Step 3: Convert.** The conversion script replaces each Dark Medium hex by its palette name (case-insensitive; no two names share a hex), terminal slots by `termN` (Ghostty `palette = N=`, VS Code `terminal.ansi*` in slot order), `window-theme = dark` → `{{appearance}}`, the fastfetch logo `grove.png` → `{{fetch_image}}`, VS Code's `Everforest Dark` (theme and the `[Everforest Dark]` key) → `{{vscode_theme}}`, `"everforest.darkContrast": "medium"` → both `"everforest.darkContrast": "{{contrast}}"` and `"everforest.lightContrast": "{{contrast}}"`. It prints any hex it couldn't name; the list must be empty. Copy today's files to the fixtures first. **The VS Code fixture gains the `lightContrast` line** (Ruling: spec §5 writes both keys; the byte-for-byte test compares against the fixture with that one added line).
 - [ ] **Step 4: Rewire tests:** `setup_suite.bash` builds `GROVE_RENDERED`; `grove_copy_tracked_config` renders after copying; replace reads of generated files (`$GROVE_ROOT/config/<generated>`, `$GROVE_CONFIG/vscode/settings.json` …) with `$GROVE_RENDERED/…`; theme.bats's palette test checks the templates' rendered output for every scheme against that scheme's palette.
 - [ ] **Step 5: Stage** `git rm --cached` the 12 generated files, `git add` templates, fixtures, `.gitignore`, tests.
 - [ ] **Step 6: Run** `bats tests` and `bats ../grove-themes/tests` — Expected: all pass; `git status` shows no untracked generated files; the live `~/.config` files are byte-identical to before (`cmp` against the fixtures).
@@ -201,12 +201,12 @@ Rulings made while planning (the executor carries them; the user sees them at ha
 ### Task 7: fastfetch's Grove image for light schemes
 
 **Files:**
-- Create: `config/fastfetch/grove-light.png` (tracked) via `artifacts/grove-themes/fetch_light.py` (private)
+- Create: `config/fastfetch/grove-light.png` (tracked) via a private one-off image script (not committed)
 - Test: `tests/theme.bats`
 
 - [ ] **Step 1: Failing test** `the light image matches the dark one's shape` — `grove-light.png` exists and `sips -g pixelWidth -g pixelHeight -g hasAlpha` reports 1004, 426, yes (same as `grove.png`).
 - [ ] **Step 2: Run** `bats tests/theme.bats` — Expected: fails.
-- [ ] **Step 3: Make it** with `fetch_light.py`: the same recolor as `artifacts/wallpapers/make.py` (ink `#27332A`, camo toward the light bg), alpha kept from `grove.png`. Look at it on `#FDF6E3` before committing.
+- [ ] **Step 3: Make it** with the image script: the same recolor as the light wallpapers (ink `#27332A`, camo toward the light bg), alpha kept from `grove.png`. Look at it on `#FDF6E3` before committing.
 - [ ] **Step 4: Run** `bats tests` — Expected: all pass.
 - [ ] **Step 5: Commit** `fastfetch: the Grove image in dark ink for light schemes`
 

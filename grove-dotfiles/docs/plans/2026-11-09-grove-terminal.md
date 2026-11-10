@@ -28,7 +28,7 @@
   - Default domain: `com.apple.dock`.
   - Default CLI: `/Applications/Ghostty.app/Contents/MacOS/ghostty`.
   - The app check uses `GROVE_GHOSTTY_APP`, default `/Applications/Ghostty.app`.
-- **Private material:** `artifacts/` and `.recording/` are never committed or referenced from tracked files.
+- **Private material:** Private working files (gitignored) are never committed or referenced from tracked files.
 - **Commits:** signed (already configured). Each message ends with `Co-Authored-By: <model that wrote it> <noreply@anthropic.com>`.
 - **Verification:** run tests with `bats grove-dotfiles/tests` from `project-grove/`, and `shellcheck -x` every changed bash file.
 

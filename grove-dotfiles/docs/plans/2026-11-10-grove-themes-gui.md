@@ -22,7 +22,7 @@
 - The app never writes configs or settings. CLI path `~/.local/bin/grove-themes`, overridable with env `GROVE_THEMES_CLI`. State file `${GROVE_STATE:-~/.local/state/grove}/theme`.
 - Look B: every colour in the views comes from the current scheme's palette (from `list --json`); fonts `JetBrains Mono` (fallback `.monospaced`). The card scheme name and the dropdown's current-scheme line share one text style.
 - Bundle id and agent label `com.projectgrove.themes`; app `~/Applications/Grove Themes.app`, executable `GroveThemes`; agent `~/Library/LaunchAgents/com.projectgrove.themes.plist`; stamp `$GROVE_STATE/themes-app.stamp`.
-- `artifacts/` and `.recording/` are never committed. `grove-themes/app/.build/` is gitignored.
+- Private working files (gitignored) are never committed. `grove-themes/app/.build/` is gitignored.
 - Commits signed, ending `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Don't push.
 
 ## Review Focus
@@ -139,7 +139,7 @@ Rulings made while planning:
 **Files:**
 - Create: `grove-dotfiles/modules/97-themes-app/module.sh`, `grove-themes/app/Resources/{AppIcon.png,Info.plist}`, `grove-dotfiles/tests/modules_themes_app.bats`
 - Modify: `grove-dotfiles/README.md` (row after 95-vscode: `` | `97-themes-app` | Grove Themes in the menu bar: builds the app, installs it to ~/Applications and starts it at login | ``), `grove-themes/README.md` (the app)
-- `AppIcon.png`: copy of `artifacts/grove-themes/gui-mockups/icon-branding.png` (288 × 288, rounded, from the branding board — approved by the user for the repo)
+- `AppIcon.png`: the icon cut from the Project Grove branding board (288 × 288, rounded, from the branding board — approved by the user for the repo)
 
 **Interfaces:**
 - Consumes: the Swift package (Tasks 2–3), `Info.plist` with `CFBundleIdentifier com.projectgrove.themes`, `CFBundleName Grove Themes`, `CFBundleExecutable GroveThemes`, `CFBundleIconFile AppIcon`, `LSUIElement true`, `LSMinimumSystemVersion 14.0`, `CFBundleShortVersionString 1.0`.

@@ -38,7 +38,7 @@ You pick one of the six Everforest schemes (Dark or Light, each Hard, Medium or 
 
 ## 4. Palettes (`grove-dotfiles/theme/`)
 
-- Six files `everforest-<dark|light>-<hard|medium|soft>`, same format as today's `everforest-dark-medium` (`name = #RRGGBB`), values from upstream (`artifacts/everforest-palette.json`, verified against the plugin source). Each has every upstream background and foreground name.
+- Six files `everforest-<dark|light>-<hard|medium|soft>`, same format as today's `everforest-dark-medium` (`name = #RRGGBB`), values from upstream (verified against the plugin source). Each has every upstream background and foreground name.
 - **Grove additions** in every file:
   - `fill`: `#596763` in the dark schemes (as today), the scheme's `bg5` in the light ones.
   - Terminal roles `term0`…`term15`, upstream's mapping: black = `bg3` (dark) / `fg` (light), red, green, yellow, blue, magenta = purple, cyan = aqua, white = `fg` (dark) / `bg3` (light); bright 8–15 equal 0–7, except `term8` = `grey1` (Grove's readable bright black).
@@ -48,7 +48,7 @@ You pick one of the six Everforest schemes (Dark or Light, each Hard, Medium or 
 
 - **Which files** (every config with a `#RRGGBB` today): `ghostty/config`, `starship.toml`, `starship-plain.toml`, `fastfetch/config.jsonc`, `eza/theme.yml`, `yazi/theme.toml`, `yazi/init.lua`, `vscode/settings.json`, `zsh/conf.d/{40-tools,85-autosuggest,95-fetch,98-highlight}.zsh`.
 - **Template:** the same file with `.tmpl` added (`ghostty/config.tmpl`), each colour written `{{name}}` (`{{bg0}}`). Values that are not colours but change with the scheme use names too: `{{appearance}}` (`dark`/`light`, Ghostty's `window-theme`), `{{fetch_image}}` (`grove.png` for the dark schemes, `grove-light-<contrast>.png` for the light ones), `{{vscode_theme}}` (`Everforest Dark` / `Everforest Light`, also used for the `[{{vscode_theme}}]` block of terminal colours) and `{{contrast}}` (`hard`/`medium`/`soft`, written to both `everforest.darkContrast` and `everforest.lightContrast`).
-- **Conversion** (once, by a script kept in `artifacts/`): each Dark Medium hex is replaced by its palette name. Terminal slots (Ghostty `palette = N=`, VS Code `terminal.ansi*`) use `term0`–`term15`. A hex that matches several names (e.g. `#D3C6AA` is `fg`, `statusline2` and terminal white) takes the one the slot means; the script lists every such case for review, and the Dark Medium render test proves the result.
+- **Conversion** (once, by a private script, not in the repo): each Dark Medium hex is replaced by its palette name. Terminal slots (Ghostty `palette = N=`, VS Code `terminal.ansi*`) use `term0`–`term15`. A hex that matches several names (e.g. `#D3C6AA` is `fg`, `statusline2` and terminal white) takes the one the slot means; the script lists every such case for review, and the Dark Medium render test proves the result.
 - **Rendering:** `grove-themes` replaces every `{{name}}` with the scheme's value. An unknown name is an error, and nothing is written.
 - **Generated files** go to today's paths (`config/ghostty/config`, …) and are gitignored; only the `.tmpl` files are tracked. `config/.gitignore` and the tests that check tracked files change to match.
 - **First render:** `05-config` checks that every generated file exists and equals a render of the current scheme (rendered into a temp folder, so check changes nothing), and its apply runs `grove-themes render`. A fresh clone gets its config files before any app module looks for them.
