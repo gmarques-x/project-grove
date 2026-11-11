@@ -44,4 +44,58 @@ import Testing
         #expect([GroveRadius.inline, GroveRadius.control, GroveRadius.card, GroveRadius.window] == [4, 6, 10, 16])
         #expect(GroveSpace.scale == [2, 4, 8, 12, 16, 24])
     }
+
+    // MARK: FocusRing
+
+    func key(_ code: UInt16, _ characters: String = "", command: Bool = false, control: Bool = false,
+             option: Bool = false) -> FocusRing.Event {
+        .key(code: code, characters: characters, command: command, control: control, option: option)
+    }
+
+    @Test func aWindowOpensWithoutAFocusRing() {
+        #expect(!FocusRing().shown)
+    }
+
+    @Test func tabAndTheArrowsShowTheRing() {
+        for code: UInt16 in [48, 123, 124, 125, 126] {
+            var ring = FocusRing()
+            ring.handle(key(code))
+            #expect(ring.shown)
+        }
+        var ring = FocusRing()
+        ring.handle(key(48, "\u{19}"))  // ⇧Tab
+        #expect(ring.shown)
+        ring = FocusRing()
+        ring.handle(key(38, "j", control: true))
+        #expect(ring.shown)
+        ring = FocusRing()
+        ring.handle(key(38, "\n", control: true))  // Ctrl+J as its control character
+        #expect(ring.shown)
+    }
+
+    @Test func typingAndShortcutsDoNotShowTheRing() {
+        var ring = FocusRing()
+        ring.handle(key(38, "j"))
+        ring.handle(key(36, "\r"))
+        ring.handle(key(49, " "))
+        ring.handle(key(53, "\u{1B}"))
+        ring.handle(key(18, "1", command: true))
+        ring.handle(key(48, "\t", option: true))  // AeroSpace's ⌥Tab
+        ring.handle(key(123, command: true))
+        ring.handle(key(0, "a", control: true))
+        #expect(!ring.shown)
+    }
+
+    @Test func aClickOrClosingTheWindowHidesTheRing() {
+        var ring = FocusRing()
+        ring.handle(key(48))
+        ring.handle(key(38, "j"))  // typing keeps it
+        #expect(ring.shown)
+        ring.handle(.mouseDown)
+        #expect(!ring.shown)
+        ring.handle(key(125))
+        #expect(ring.shown)
+        ring.handle(.windowClosed)
+        #expect(!ring.shown)
+    }
 }

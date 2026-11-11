@@ -58,6 +58,10 @@ struct WindowView: View {
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())
         .background(WindowAccessor { $0.isMovableByWindowBackground = true })
+        // No focus ring on the first tab button when the window opens (macOS
+        // puts one there with "Keyboard navigation" on): only once Tab or an
+        // arrow is pressed, and gone again on a click.
+        .keyboardFocusRing()
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
     }

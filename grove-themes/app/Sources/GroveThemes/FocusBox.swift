@@ -52,12 +52,17 @@ struct KeyboardNavigation: ViewModifier {
                 }
             }
             .background(WindowAccessor { [focus, host, hasKeysBinding = $hasKeys] window in
-                host.wrappedValue.attach(window, onMouseDown: {
-                    focus.wrappedValue.hide()
-                }, onKeyChange: { isKey in
-                    focus.wrappedValue.hide()
-                    if isKey { hasKeysBinding.wrappedValue = true }
-                })
+                host.wrappedValue.attach(window) { event in
+                    switch event {
+                    case .keyDown:
+                        break
+                    case .mouseDown, .resignedKey, .willClose:
+                        focus.wrappedValue.hide()
+                    case .becameKey:
+                        focus.wrappedValue.hide()
+                        hasKeysBinding.wrappedValue = true
+                    }
+                }
             })
             .onAppear {
                 focus.wrappedValue.hide()
@@ -100,52 +105,5 @@ extension View {
         modifier(KeyboardNavigation(focus: focus, current: list?.current ?? "", logos: list?.logos ?? [],
                                     wallpapers: list?.wallpapers ?? [], schemesDisabled: schemesDisabled,
                                     activate: activate))
-    }
-}
-
-/// The window a view is in, watched for mouse clicks and key changes.
-@MainActor
-final class HostWindow {
-    private weak var window: NSWindow?
-    // `nonisolated(unsafe)` for `deinit` only, which SwiftUI runs on the main
-    // thread when the view goes (the gallery window closed).
-    private nonisolated(unsafe) var monitor: Any?
-    private nonisolated(unsafe) var observers: [NSObjectProtocol] = []
-
-    deinit {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        observers.forEach(NotificationCenter.default.removeObserver)
-    }
-
-    func attach(_ window: NSWindow, onMouseDown: @escaping @MainActor () -> Void,
-                onKeyChange: @escaping @MainActor (_ isKey: Bool) -> Void) {
-        guard window !== self.window else { return }
-        detach()
-        self.window = window
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) {
-            [weak window] event in
-            if let window, event.window === window {
-                MainActor.assumeIsolated { onMouseDown() }
-            }
-            return event
-        }
-        let names: [(Notification.Name, Bool)] = [
-            (NSWindow.didBecomeKeyNotification, true),
-            (NSWindow.didResignKeyNotification, false),
-            (NSWindow.willCloseNotification, false),
-        ]
-        observers = names.map { name, isKey in
-            NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { _ in
-                MainActor.assumeIsolated { onKeyChange(isKey) }
-            }
-        }
-    }
-
-    func detach() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        observers.forEach(NotificationCenter.default.removeObserver)
-        observers = []
-        window = nil
     }
 }

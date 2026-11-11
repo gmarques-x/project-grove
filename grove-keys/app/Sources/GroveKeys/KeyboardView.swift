@@ -21,12 +21,17 @@ struct KeyboardView: View {
     @Environment(\.theme) private var theme
     @Environment(\.dismissWindow) private var dismissWindow
     @FocusState private var hasKeys: Bool
+    /// False until the keyboard is used to move, and after a click (`keyboardFocusRing`).
+    @Environment(\.focusRingShown) private var ringShown
 
     // `State` used directly: no SwiftUI macros with the Command Line Tools.
     private var layerID = State<String?>(initialValue: nil)
     private var focused = State<String?>(initialValue: nil)
     private var showFocus = State(initialValue: false)
     private var editing = State<EditTarget?>(initialValue: nil)
+    private var host = State(initialValue: HostWindow())
+    /// The keys were taken for this opening of the window.
+    private var tookKeys = State(initialValue: false)
 
     /// Inside the window margins; the grid takes its own padding out of this.
     static let keyboardWidth: CGFloat = WindowView.width - 44
@@ -65,6 +70,28 @@ struct KeyboardView: View {
         .focused($hasKeys)
         .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
         .onAppear { hasKeys = true }
+        // A click anywhere in the window hides the box, as it hides the focus ring.
+        .onChange(of: ringShown) { _, shown in
+            if !shown { showFocus.wrappedValue = false }
+        }
+        // `onAppear` is too early in a window that is still opening: with
+        // "Keyboard navigation" on, macOS then gives the keys to the first
+        // tab button and the arrows do nothing. Taken again once the window
+        // is key, once for each opening.
+        .background(WindowAccessor { [host, tookKeys, keys = $hasKeys] window in
+            host.wrappedValue.attach(window) { event in
+                switch event {
+                case .becameKey:
+                    guard !tookKeys.wrappedValue else { return }
+                    tookKeys.wrappedValue = true
+                    DispatchQueue.main.async { keys.wrappedValue = true }
+                case .willClose:
+                    tookKeys.wrappedValue = false
+                case .mouseDown, .keyDown, .resignedKey:
+                    break
+                }
+            }
+        })
         .onChange(of: model.layers) { _, _ in
             // A key that no longer exists (an edit elsewhere) closes its editor.
             if let target = editing.wrappedValue, !layers.contains(where: { $0.id == target.layerID }) {
