@@ -10,15 +10,17 @@ final class GlobalMenu: NSObject, NSMenuDelegate {
 
     private let source: any MenuSource
     private let appName: String
+    private let pid: pid_t
 
-    private init(source: any MenuSource, appName: String) {
+    private init(source: any MenuSource, appName: String, pid: pid_t) {
         self.source = source
         self.appName = appName
+        self.pid = pid
     }
 
     /// The top of `app`'s menu bar (Apple, App, File, …) as a menu.
     static func menu(for pid: pid_t, appName: String) -> NSMenu {
-        let global = GlobalMenu(source: AXMenuSource(pid: pid), appName: appName)
+        let global = GlobalMenu(source: AXMenuSource(pid: pid), appName: appName, pid: pid)
         current = global
         let menu = PathMenu(path: MenuPath(steps: []))
         menu.delegate = global
@@ -71,10 +73,13 @@ final class GlobalMenu: NSObject, NSMenuDelegate {
 
     @objc private func press(_ sender: NSMenuItem) {
         guard let box = sender.representedObject as? PathBox else { return }
-        let source = self.source, path = box.path
-        // After the menu closes, so the app is in front again for the press.
+        let source = self.source, path = box.path, pid = self.pid
+        // After the menu closes, with the app brought forward first.
         DispatchQueue.main.async {
-            if !source.press(path) {
+            let pressed = MenuPress.run(path, in: source) {
+                NSRunningApplication(processIdentifier: pid)?.activate()
+            }
+            if !pressed {
                 NSLog("Grove Keys: menu item gone: %@", path.steps.map(\.title).joined(separator: " › "))
             }
         }

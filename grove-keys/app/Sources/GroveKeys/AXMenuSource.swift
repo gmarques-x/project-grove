@@ -48,18 +48,8 @@ struct AXMenuSource: MenuSource {
         let app = AXUIElementCreateApplication(pid)
         guard let bar = Self.value(app, kAXMenuBarAttribute) else { return nil }
         // swiftlint:disable:next force_cast
-        var container = bar as! AXUIElement
-        var found: AXUIElement?
-        for (n, step) in path.steps.enumerated() {
-            let equal = Self.children(container).filter { (Self.string($0, kAXTitleAttribute) ?? "") == step.title }
-            guard step.index < equal.count else { return nil }
-            found = equal[step.index]
-            if n < path.steps.count - 1 {
-                guard let next = Self.children(equal[step.index]).first else { return nil }
-                container = next
-            }
-        }
-        return found
+        return path.resolve(in: bar as! AXUIElement, title: { Self.string($0, kAXTitleAttribute) },
+                            children: { Self.children($0) })
     }
 
     private static func value(_ element: AXUIElement, _ name: String) -> AnyObject? {

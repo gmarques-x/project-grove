@@ -115,3 +115,34 @@ public enum MenuShortcut {
         return text + key
     }
 }
+
+extension MenuPath {
+    /// The element at this path in a tree shaped like Accessibility's: a menu
+    /// bar's children are its items, and an item's first child is its menu.
+    /// Each step matches by title, then by its index among equal titles. Nil
+    /// when a step is missing, renamed, or has no menu to walk into.
+    public func resolve<E>(in root: E, title: (E) -> String?, children: (E) -> [E]) -> E? {
+        guard !steps.isEmpty else { return nil }
+        var container = root
+        var found: E?
+        for (n, step) in steps.enumerated() {
+            let equal = children(container).filter { (title($0) ?? "") == step.title }
+            guard step.index < equal.count else { return nil }
+            found = equal[step.index]
+            if n < steps.count - 1 {
+                guard let menu = children(equal[step.index]).first else { return nil }
+                container = menu
+            }
+        }
+        return found
+    }
+}
+
+/// Choosing a Global Menu item: the app is brought forward first, because a
+/// menu action goes to the active app's key window (Grove Keys may be in front).
+public enum MenuPress {
+    public static func run(_ path: MenuPath, in source: any MenuSource, activate: () -> Void) -> Bool {
+        activate()
+        return source.press(path)
+    }
+}
