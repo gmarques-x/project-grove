@@ -23,11 +23,18 @@ sketchybar --default label.font="$TEXT" label.color="$FG" icon.font="$TEXT" icon
 
 sketchybar --add event aerospace_workspace_change
 
+# sep NAME SIDE: a bg3 bar between groups, the same as the one before the app.
+sep() {
+  sketchybar --add item "$1" "$2" \
+    --set "$1" icon="│" icon.color="$BG3" icon.padding_left=4 icon.padding_right=4 label.drawing=off
+}
+
 # Left: the Grove tree, the workspaces, the front app.
 sketchybar --add item grove left \
   --set grove background.image="$PINE_ICON" background.image.scale=0.5 background.drawing=on \
-    width=20 icon.drawing=off label.drawing=off \
+    width=18 padding_left=4 padding_right=4 icon.drawing=off label.drawing=off \
     click_script="open -b com.projectgrove.themes"
+sep sep.l1 left
 
 for n in 1 2 3 4 5 6 7 8 9; do
   sketchybar --add item "ws.$n" left \
@@ -49,20 +56,30 @@ sketchybar --add item keys right \
   --set keys icon="⌘" icon.color="$GREY2" label.drawing=off script="$P/keys.sh" update_freq=30 \
     click_script="open grovekeys://menu"
 
+sep sep.r1 right
+
 sketchybar --add item clock right \
   --set clock label.font="$BOLD" icon.drawing=off script="$P/clock.sh" update_freq=10
+
+sep sep.r2 right
 
 sketchybar --add item volume right \
   --set volume icon="vol" icon.color="$YELLOW" script="$P/volume.sh" \
   --subscribe volume volume_change
 
+sep sep.r3 right
+
 sketchybar --add item wifi right \
   --set wifi icon="wifi" icon.color="$BLUE" script="$P/wifi.sh" update_freq=60 \
   --subscribe wifi wifi_change
 
+sep sep.r4 right
+
 sketchybar --add item battery right \
   --set battery icon="▮" icon.color="$GREEN" script="$P/battery.sh" update_freq=60 \
   --subscribe battery power_source_change system_woke
+
+sep sep.r5 right
 
 sketchybar --add item net.up right \
   --set net.up icon="↑" icon.color="$ORANGE" \
@@ -81,6 +98,8 @@ for i in 1 2 3 4 5; do
   sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$GREY2" drawing=off
 done
 
+sep sep.r6 right
+
 sketchybar --add item mem right \
   --set mem icon="mem" icon.color="$AQUA"
 
@@ -88,7 +107,7 @@ sketchybar --add item cpu right \
   --set cpu icon="cpu" icon.color="$AQUA" script="$P/cpu.sh" update_freq=4
 
 # The floating bar: one bracket behind every item.
-sketchybar --add bracket bar grove '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \
+sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \
   --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BG3" background.drawing=on
 
 sketchybar --update
