@@ -11,12 +11,13 @@ setup() {
   PALETTES="$GROVE_ROOT/theme"
 }
 
-# The fourteen generated files, one per line.
+# The fifteen generated files, one per line.
 GENERATED="borders/bordersrc
 chrome-theme/manifest.json
 eza/theme.yml
 fastfetch/config.jsonc
 ghostty/config
+sketchybar/colors.sh
 starship-plain.toml
 starship.toml
 vscode/settings.json
@@ -27,7 +28,7 @@ zsh/conf.d/85-autosuggest.zsh
 zsh/conf.d/95-fetch.zsh
 zsh/conf.d/98-highlight.zsh"
 
-@test "the templates are the fourteen colour-carrying configs" {
+@test "the templates are the fifteen colour-carrying configs" {
   local want
   want="$(printf '%s\n' "$GENERATED" | sed 's/$/.tmpl/' | LC_ALL=C sort)"
   [ "$(gt_templates "$GROVE_ROOT/config")" = "$want" ] || { diff <(echo "$want") <(gt_templates "$GROVE_ROOT/config"); false; }
@@ -55,7 +56,7 @@ zsh/conf.d/98-highlight.zsh"
       n=$((n + 1))
     done
   done
-  [ "$n" -eq 84 ]
+  [ "$n" -eq 90 ]
 }
 
 @test "the Dark Medium render is today's config" {

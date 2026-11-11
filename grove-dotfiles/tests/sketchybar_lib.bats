@@ -28,6 +28,16 @@ setup() {
   [ "$(sb_rate -5)" = "—" ]
 }
 
+@test "sb_bytes: B, KB, MB (one decimal under 100), GB (one decimal)" {
+  [ "$(sb_bytes 0)" = "0 B" ]
+  [ "$(sb_bytes 2048)" = "2 KB" ]
+  [ "$(sb_bytes 1907949)" = "1.8 MB" ]
+  [ "$(sb_bytes 9322838)" = "8.9 MB" ]
+  [ "$(sb_bytes 187654321)" = "179 MB" ]
+  [ "$(sb_bytes 2456789012)" = "2.3 GB" ]
+  [ "$(sb_bytes x)" = "—" ]
+}
+
 @test "sb_rate_delta: bytes over seconds; a counter that went down or is missing is —" {
   [ "$(sb_rate_delta 1000 3048 2)" = "1 KB/s" ]
   [ "$(sb_rate_delta 0 2516582 2)" = "1.2 MB/s" ]
@@ -84,6 +94,12 @@ setup() {
 @test "sb_workspaces: the numbers in use, space-separated" {
   [ "$(sb_workspaces < "$FX/workspaces.txt")" = "1 3 5" ]
   [ "$(sb_workspaces < "$FX/workspaces-none.txt")" = "" ]
+}
+
+@test "sb_pct: a whole number gets %, anything else is —" {
+  [ "$(sb_pct 52)" = "52%" ]
+  [ "$(sb_pct —)" = "—" ]
+  [ "$(sb_pct "")" = "—" ]
 }
 
 @test "lib.sh passes shellcheck" {

@@ -19,6 +19,19 @@ sb_rate() {
   fi
 }
 
+# sb_bytes BYTES: "512 B", "2 KB", "8.9 MB" (one decimal under 100 MB),
+# "179 MB", "2.3 GB" (one decimal).
+sb_bytes() {
+  local n="$1"
+  case "$n" in '' | *[!0-9]*) echo "$SB_NONE"; return ;; esac
+  awk -v n="$n" 'BEGIN {
+    if (n < 1024) printf "%d B\n", n
+    else if (n < 1048576) printf "%d KB\n", (n + 512) / 1024
+    else if (n < 1073741824) { m = n / 1048576; if (m < 100) printf "%.1f MB\n", m; else printf "%d MB\n", m + 0.5 }
+    else printf "%.1f GB\n", n / 1073741824
+  }'
+}
+
 # sb_rate_delta OLD NEW SECONDS: the rate between two byte counters; a counter
 # that went down (an interface change, a reset) or a missing value is "—".
 sb_rate_delta() {
@@ -106,4 +119,9 @@ sb_top_apps() {
 # sb_workspaces < `aerospace list-workspaces …`: the names, space-separated.
 sb_workspaces() {
   awk 'NF { printf "%s%s", sep, $1; sep = " " } END { if (sep != "") print "" }'
+}
+
+# sb_pct VALUE: "52%" for a whole number, "—" otherwise.
+sb_pct() {
+  case "$1" in '' | *[!0-9]*) echo "$SB_NONE" ;; *) echo "$1%" ;; esac
 }

@@ -1,0 +1,16 @@
+#!/bin/bash
+# Grove bar colours for dark-medium, rendered by grove-themes
+# (0xAARRGGBB, the palette's _argb values). Sourced by sketchybarrc and plugins.
+# shellcheck disable=SC2034
+export BG0=0xff2D353B
+export BG1=0xff343F44
+export BG3=0xff475258
+export FG=0xffD3C6AA
+export GREY2=0xff9DA9A0
+export GREEN=0xffA7C080
+export AQUA=0xff83C092
+export BLUE=0xff7FBBB3
+export ORANGE=0xffE69875
+export YELLOW=0xffDBBC7F
+export RED=0xffE67E80
+export PINE_ICON="$CONFIG_DIR/icons/pine-dark.png"

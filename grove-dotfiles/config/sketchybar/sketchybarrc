@@ -1,0 +1,94 @@
+#!/bin/bash
+# Grove bar: SketchyBar as the top bar. A 48 pt strip in the desktop's colour
+# (bg0) sits above the menu bar (topmost=on), so macOS's auto-hidden menu bar
+# never shows; one bracket draws the floating bar (32 pt, radius 10, bg3
+# border) behind every item. Spec: docs/specs/2026-11-11-sketchybar-design.md.
+# Colours come from colors.sh (rendered by grove-themes); plugins/ fill the items.
+
+# Tests point SB_PATH at a fake sketchybar.
+export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar}"
+export CONFIG_DIR
+# shellcheck source=/dev/null
+. "$CONFIG_DIR/colors.sh"
+P="$CONFIG_DIR/plugins"
+TEXT="JetBrains Mono:Regular:13.0"
+BOLD="JetBrains Mono:SemiBold:13.0"
+
+sketchybar --bar height=48 color="$BG0" topmost=on sticky=on position=top \
+  padding_left=18 padding_right=18 shadow=off
+
+sketchybar --default label.font="$TEXT" label.color="$FG" icon.font="$TEXT" icon.color="$FG" \
+  padding_left=5 padding_right=5 icon.padding_right=6
+
+sketchybar --add event aerospace_workspace_change
+
+# Left: the Grove tree, the workspaces, the front app.
+sketchybar --add item grove left \
+  --set grove background.image="$PINE_ICON" background.image.scale=0.5 background.drawing=on \
+    width=20 icon.drawing=off label.drawing=off \
+    click_script="open -b com.projectgrove.themes"
+
+for n in 1 2 3 4 5 6 7 8 9; do
+  sketchybar --add item "ws.$n" left \
+    --set "ws.$n" label="$n" label.color="$GREY2" label.padding_left=7 label.padding_right=7 \
+      icon.drawing=off padding_left=1 padding_right=1 drawing=off \
+      background.color="$GREEN" background.height=20 background.corner_radius=5 background.drawing=off \
+      click_script="aerospace workspace $n"
+done
+sketchybar --set ws.1 script="$P/workspaces.sh" update_freq=30 \
+  --subscribe ws.1 aerospace_workspace_change front_app_switched
+
+sketchybar --add item front_app left \
+  --set front_app label.font="$BOLD" icon="│" icon.color="$BG3" script="$P/front_app.sh" \
+  --subscribe front_app front_app_switched
+
+# Right (the first added is the rightmost): Grove Keys, clock, volume, Wi-Fi,
+# battery, network, memory, CPU.
+sketchybar --add item keys right \
+  --set keys icon="⌘" icon.color="$GREY2" label.drawing=off script="$P/keys.sh" update_freq=30 \
+    click_script="open grovekeys://menu"
+
+sketchybar --add item clock right \
+  --set clock label.font="$BOLD" icon.drawing=off script="$P/clock.sh" update_freq=10
+
+sketchybar --add item volume right \
+  --set volume icon="vol" icon.color="$YELLOW" script="$P/volume.sh" \
+  --subscribe volume volume_change
+
+sketchybar --add item wifi right \
+  --set wifi icon="wifi" icon.color="$BLUE" script="$P/wifi.sh" update_freq=60 \
+  --subscribe wifi wifi_change
+
+sketchybar --add item battery right \
+  --set battery icon="▮" icon.color="$GREEN" script="$P/battery.sh" update_freq=60 \
+  --subscribe battery power_source_change system_woke
+
+sketchybar --add item net.up right \
+  --set net.up icon="↑" icon.color="$ORANGE" \
+    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
+
+sketchybar --add item net.down right \
+  --set net.down icon="↓" icon.color="$BLUE" script="$P/net.down.sh" update_freq=2 \
+    popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
+    popup.background.border_width=1 popup.background.border_color="$BG3" \
+    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
+
+for i in 1 2 3 4; do
+  sketchybar --add item "net.total.$i" popup.net.down --set "net.total.$i" icon.drawing=off drawing=off
+done
+for i in 1 2 3 4 5; do
+  sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$GREY2" drawing=off
+done
+
+sketchybar --add item mem right \
+  --set mem icon="mem" icon.color="$AQUA"
+
+sketchybar --add item cpu right \
+  --set cpu icon="cpu" icon.color="$AQUA" script="$P/cpu.sh" update_freq=4
+
+# The floating bar: one bracket behind every item.
+sketchybar --add bracket bar grove '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \
+  --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BG3" background.drawing=on
+
+sketchybar --update
