@@ -158,7 +158,8 @@ cmd_logo() {
   fi
   case " $(gt_logos) " in *" $name "*) ;; *) _gt_usage >&2; exit 2 ;; esac
   scheme="$(gt_current)"
-  GROVE_FETCH_LOGO="$name" gt_render_all "$scheme" "$GROVE_ROOT/config" || exit 1
+  # Render notes (backed-up hand edits) go to stderr: stdout stays the answer.
+  GROVE_FETCH_LOGO="$name" gt_render_all "$scheme" "$GROVE_ROOT/config" >&2 || exit 1
   tmp="$GROVE_STATE/fetch-logo.tmp"
   if ! { mkdir -p "$GROVE_STATE" && echo "$name" > "$tmp" && mv -f "$tmp" "$GROVE_STATE/fetch-logo"; }; then
     echo "grove-themes: could not write $GROVE_STATE/fetch-logo" >&2

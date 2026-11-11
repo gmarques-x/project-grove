@@ -207,3 +207,13 @@ gt_copy_config() {
   run "$CLI" set light-medium
   grep -q 'avatar-light-medium.png' "$GROVE_ROOT/config/fastfetch/config.jsonc"
 }
+
+@test "logo --json prints only JSON when a hand-edited config is backed up" {
+  mkdir -p "$GROVE_STATE"; echo dark-medium > "$GROVE_STATE/theme"
+  "$CLI" logo grove
+  echo "# my edit" >> "$GROVE_ROOT/config/ghostty/config"
+  run --separate-stderr "$CLI" logo avatar --json
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"logo": "avatar"}' ]
+  [[ "$stderr" == *"backed up edited ghostty/config to "* ]] || false
+}
