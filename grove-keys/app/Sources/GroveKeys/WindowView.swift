@@ -46,9 +46,7 @@ struct WindowView: View {
             case .keyboard:
                 KeyboardView(model: model)
             case .bindings:
-                Text("The Bindings tab is still being built.")
-                    .foregroundStyle(Color(theme.grey1))
-                    .frame(maxWidth: .infinity, minHeight: 300)
+                BindingsView(model: model)
             }
         }
         .frame(width: Self.width, alignment: .top)

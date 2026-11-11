@@ -1,0 +1,568 @@
+import AppKit
+import GroveKeysCore
+import GroveThemesCore
+import SwiftUI
+
+/// The Bindings tab (spec §7, mockup §2): keys.toml as grouped rows. Left:
+/// Hyper key, Launchers, Monitors; right: one group per AeroSpace mode. Rows
+/// are recorder · action · remove; runs of 1…9 fold until "Show all". Every
+/// change goes through `AppModel.edit` (refused, and the controls disabled,
+/// while keys.toml is unread or has an error).
+struct BindingsView: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.theme) private var theme
+    @StateObject private var recorder = ShortcutRecorder()
+    @FocusState private var draftFocused: Bool
+
+    /// A recording that hit a shortcut already in use, waiting for Replace / Cancel.
+    struct PendingClash {
+        var row: String
+        /// Nil for a new row (the draft).
+        var from: BindingSlot?
+        var to: BindingSlot
+        var clashes: [BindingSlot]
+    }
+
+    /// A row being added: its group ("launch" or a mode) and, once recorded, its slot.
+    struct Draft {
+        var group: String
+        var slot: BindingSlot?
+        var replacing: [BindingSlot] = []
+        var text = ""
+    }
+
+    /// The app picker (the Keyboard tab's editor on a Hyper key), and the row it opens on.
+    struct AppPick: Identifiable {
+        var anchor: String
+        var target: EditTarget
+        var id: String { anchor }
+    }
+
+    // `State` used directly: no SwiftUI macros with the Command Line Tools.
+    private var expanded = State<Set<String>>(initialValue: [])
+    private var clash = State<PendingClash?>(initialValue: nil)
+    private var draft = State<Draft?>(initialValue: nil)
+    private var appPick = State<AppPick?>(initialValue: nil)
+
+    static let height: CGFloat = 620
+
+    init(model: AppModel) {
+        self.model = model
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !model.canEdit, model.redLine == nil {
+                Text("keys.toml isn't loaded yet")
+                    .foregroundStyle(Color(theme.grey1))
+                    .padding(.horizontal, 22)
+            }
+            ScrollView {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(spacing: 16) {
+                        HyperGroup(model: model)
+                        launchers
+                        MonitorsView(model: model)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    VStack(spacing: 16) {
+                        ForEach(model.keys.modes.map(\.name), id: \.self) { mode in
+                            modeGroup(mode)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .disabled(!model.canEdit)
+                .padding(.horizontal, 22)
+                .padding(.top, 6)
+                .padding(.bottom, 22)
+            }
+        }
+        .frame(height: Self.height)
+        .onDisappear { recorder.cancel() }
+        .onChange(of: model.canEdit) { _, can in
+            if !can { recorder.cancel(); clash.wrappedValue = nil }
+        }
+    }
+
+    // MARK: Launchers
+
+    private var launchers: some View {
+        let keys = model.keys
+        let conflicts = Layers.conflictingLaunchKeys(keys)
+        let hyper = model.layers.first { $0.id == "hyper" }
+        return BindingsGroup(title: "Launchers", note: "Hyper + key") {
+            VStack(spacing: 2) {
+                ForEach(keys.launch.map(\.key), id: \.self) { key in
+                    let row = "launch:" + key
+                    let binding = hyper?.bindings[key]
+                    let missing = binding?.missingApp ?? false
+                    let slot = BindingSlot.launcher(key: key)
+                    RowView(
+                        shortcut: Self.launcherSymbols(key), recording: recorder.recording == row,
+                        recordable: true, conflict: conflicts.contains(key) ? "Also a ⌃⌥⇧⌘ AeroSpace binding · the launcher wins" : nil,
+                        onRecord: { record(row: row, from: slot, launcher: true, mode: "main") },
+                        onRemove: { model.edit { $0.remove([slot]) } }
+                    ) {
+                        Button { pickApp(anchor: row, key: key) } label: {
+                            HStack(spacing: 6) {
+                                Text(binding?.label ?? key)
+                                    .strikethrough(missing)
+                                    .foregroundStyle(Color(missing ? theme.grey1 : theme.fg))
+                                if missing {
+                                    Text("not installed").font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1))
+                                }
+                            }
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(missing ? "\(binding?.label ?? key) is not installed" : "Choose another app")
+                        .popover(item: pickBinding(row), arrowEdge: .bottom) { popover($0) }
+                    }
+                    clashLine(row)
+                }
+                if let d = draft.wrappedValue, d.group == "launch" {
+                    let row = "draft:launch"
+                    RowView(shortcut: "record", recording: recorder.recording == row, recordable: true, conflict: nil,
+                            onRecord: { record(row: row, from: nil, launcher: true, mode: "main") },
+                            onRemove: { cancelDraft() }) {
+                        Text("choose an app").foregroundStyle(Color(theme.grey1))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    clashLine(row)
+                }
+            }
+            addButton("+ Add launcher", group: "launch")
+                .popover(item: pickBinding("add:launch"), arrowEdge: .bottom) { popover($0) }
+        }
+    }
+
+    private static func launcherSymbols(_ key: String) -> String {
+        Shortcut(modifiers: Set(Modifier.allCases), key: key).symbols
+    }
+
+    private func pickApp(anchor: String, key: String) {
+        appPick.wrappedValue = AppPick(anchor: anchor, target: EditTarget(layerID: "hyper", shortcut: "hyper-" + key))
+    }
+
+    private func pickBinding(_ anchor: String) -> Binding<AppPick?> {
+        Binding(
+            get: { appPick.wrappedValue?.anchor == anchor ? appPick.wrappedValue : nil },
+            set: { if $0 == nil, appPick.wrappedValue?.anchor == anchor { appPick.wrappedValue = nil } })
+    }
+
+    private func popover(_ pick: AppPick) -> some View {
+        KeyEditorPopover(model: model, target: pick.target, layerTitle: "Hyper")
+            .environment(\.theme, theme)
+            .preferredColorScheme(theme.colorScheme)
+    }
+
+    // MARK: Modes
+
+    private func modeGroup(_ mode: String) -> some View {
+        let bindings = model.keys.modes.first { $0.name == mode }?.bindings ?? []
+        let open = expanded.wrappedValue.contains(mode)
+        let rows = BindingRows.rows(mode: bindings, folded: !open)
+        let canFold = BindingRows.rows(mode: bindings, folded: true).count < bindings.count
+        let conflicts = mode == "main" ? Layers.conflictingAerospaceKeys(model.keys) : []
+        return BindingsGroup(title: "AeroSpace · \(mode)", note: bindings.count == 1 ? "1 binding" : "\(bindings.count) bindings") {
+            VStack(spacing: 2) {
+                ForEach(rows, id: \.keys) { r in
+                    let row = "mode:\(mode):" + r.keys[0]
+                    let slot = BindingSlot.binding(mode: mode, key: r.keys[0])
+                    RowView(
+                        shortcut: r.shortcuts, recording: recorder.recording == row, recordable: r.count == 1,
+                        conflict: r.keys.contains(where: conflicts.contains) ? "Hyper + this key opens a launcher, so this binding never fires" : nil,
+                        onRecord: { record(row: row, from: slot, launcher: false, mode: mode) },
+                        onRemove: { model.edit { $0.remove(r.keys.map { .binding(mode: mode, key: $0) }) } }
+                    ) {
+                        if r.count > 1 {
+                            HStack(spacing: 6) {
+                                Text(r.action).lineLimit(1)
+                                Text("\(r.count) rows").font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .help("Show all to change one of them; − removes all \(r.count)")
+                        } else {
+                            CommandField(text: r.action) { text in
+                                model.edit { $0.setCommand(slot, text) }
+                            }
+                            .id(r.action)
+                        }
+                    }
+                    clashLine(row)
+                }
+                if let d = draft.wrappedValue, d.group == mode {
+                    draftRow(d, mode: mode)
+                }
+            }
+            if canFold || open {
+                Button {
+                    if open { expanded.wrappedValue.remove(mode) } else { expanded.wrappedValue.insert(mode) }
+                } label: {
+                    Text(open ? "Fold runs of 1…9" : "Show all \(bindings.count) · runs of 1…9 fold into one row")
+                        .font(GroveFont.mono(11.5))
+                        .foregroundStyle(Color(theme.grey1))
+                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            addButton("+ Add binding", group: mode)
+        }
+    }
+
+    private func draftRow(_ d: Draft, mode: String) -> some View {
+        let row = "draft:" + mode
+        let shortcut: String = if case .binding(_, let key) = d.slot { Shortcut(aerospace: key)?.symbols ?? key } else { "" }
+        return VStack(spacing: 2) {
+            RowView(shortcut: shortcut.isEmpty ? "record" : shortcut, recording: recorder.recording == row,
+                    recordable: true, conflict: nil,
+                    onRecord: { record(row: row, from: nil, launcher: false, mode: mode) },
+                    onRemove: { cancelDraft() }) {
+                TextField(mode == "main" ? "command, e.g. workspace 1" : "command, mode main", text: Binding(
+                    get: { draft.wrappedValue?.text ?? "" },
+                    set: { draft.wrappedValue?.text = $0 }))
+                    .textFieldStyle(.plain)
+                    .focused($draftFocused)
+                    .onSubmit { saveDraft() }
+            }
+            clashLine(row)
+            if d.slot == nil, recorder.recording != row, clash.wrappedValue?.row != row {
+                hint("Click the first box and press the shortcut")
+            } else if d.slot != nil {
+                hint("↩ saves · a, b runs both")
+            }
+        }
+    }
+
+    // MARK: Recording
+
+    private func record(row: String, from: BindingSlot?, launcher: Bool, mode: String) {
+        clash.wrappedValue = nil
+        if recorder.recording == row { recorder.cancel(); return }
+        recorder.start(row, onRecord: { shortcut in
+            let to = BindingSlot.recorded(shortcut, launcher: launcher, mode: mode)
+            let clashes = model.keys.clashes(to, except: from)
+            if clashes.isEmpty {
+                commit(from: from, to: to, replacing: [])
+            } else {
+                clash.wrappedValue = PendingClash(row: row, from: from, to: to, clashes: clashes)
+            }
+        }, onCancel: {
+            // Esc on a new row with nothing recorded drops it.
+            if from == nil, draft.wrappedValue?.slot == nil { draft.wrappedValue = nil }
+        })
+    }
+
+    private func commit(from: BindingSlot?, to: BindingSlot, replacing: [BindingSlot]) {
+        clash.wrappedValue = nil
+        if let from {
+            model.edit { $0.move(from, to: to, replacing: replacing) }
+            return
+        }
+        switch to {
+        case .launcher(let key):
+            // The app picker writes it; choosing an app replaces what the key did.
+            draft.wrappedValue = nil
+            pickApp(anchor: "add:launch", key: key)
+        case .binding:
+            draft.wrappedValue?.slot = to
+            draft.wrappedValue?.replacing = replacing
+            draftFocused = true
+            if let d = draft.wrappedValue, BindingRows.value(fromText: d.text) != nil { saveDraft() }
+        }
+    }
+
+    private func saveDraft() {
+        guard let d = draft.wrappedValue, let slot = d.slot, BindingRows.value(fromText: d.text) != nil else { return }
+        model.edit { $0.add(slot, command: d.text, replacing: d.replacing) }
+        draft.wrappedValue = nil
+    }
+
+    private func cancelDraft() {
+        if recorder.recording?.hasPrefix("draft:") == true { recorder.cancel() }
+        if clash.wrappedValue?.row.hasPrefix("draft:") == true { clash.wrappedValue = nil }
+        draft.wrappedValue = nil
+    }
+
+    private func addButton(_ title: String, group: String) -> some View {
+        Button {
+            let row = "draft:" + group
+            draft.wrappedValue = Draft(group: group)
+            record(row: row, from: nil, launcher: group == "launch", mode: group == "launch" ? "main" : group)
+        } label: {
+            Text(title)
+                .font(GroveFont.mono(12))
+                .foregroundStyle(Color(theme.green))
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Clash prompt
+
+    @ViewBuilder
+    private func clashLine(_ row: String) -> some View {
+        if let c = clash.wrappedValue, c.row == row {
+            HStack(spacing: 10) {
+                Text("\(describe(c.to)) already: " + c.clashes.map(action).joined(separator: "; "))
+                    .foregroundStyle(Color(theme.orange))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                small("Replace", primary: true) { commit(from: c.from, to: c.to, replacing: c.clashes) }
+                small("Cancel", primary: false) { clash.wrappedValue = nil }
+            }
+            .font(GroveFont.mono(11.5))
+            .padding(.horizontal, 6).padding(.vertical, 4)
+        }
+    }
+
+    private func describe(_ slot: BindingSlot) -> String {
+        switch slot {
+        case .launcher(let key): return Self.launcherSymbols(key)
+        case .binding(_, let key): return Shortcut(aerospace: key)?.symbols ?? key
+        }
+    }
+
+    /// What a clashing entry does now: "workspace 1", "opens Ghostty".
+    private func action(_ slot: BindingSlot) -> String {
+        switch slot {
+        case .launcher(let key):
+            let id = model.keys.launch.first { $0.key == key }?.bundleID ?? key
+            return "opens " + (Launcher.appName(bundleID: id) ?? id)
+        case .binding(let mode, let key):
+            let entries = (model.keys.modes.first { $0.name == mode }?.bindings ?? []).filter { $0.key == key }
+            return BindingRows.rows(mode: entries, folded: false).first?.action ?? key
+        }
+    }
+
+    private func small(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(GroveFont.mono(11.5, .semibold))
+                .foregroundStyle(Color(primary ? theme.bg0 : theme.fg))
+                .padding(.horizontal, 9).padding(.vertical, 3)
+                .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func hint(_ text: String) -> some View {
+        Text(text)
+            .font(GroveFont.mono(11))
+            .foregroundStyle(Color(theme.grey1))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+    }
+}
+
+/// A rounded bg1 group with a small-caps title and a note on the right.
+struct BindingsGroup<Content: View>: View {
+    let title: String
+    let note: String
+    @ViewBuilder let content: Content
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title.uppercased())
+                    .font(GroveFont.mono(11, .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(Color(theme.grey1))
+                Spacer()
+                Text(note).font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1).opacity(0.8))
+            }
+            content
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+/// One row: recorder pill (128 pt) · action · conflict mark · remove.
+private struct RowView<Action: View>: View {
+    let shortcut: String
+    let recording: Bool
+    let recordable: Bool
+    /// The orange mark's tooltip, when the row is in a launcher/Hyper clash.
+    let conflict: String?
+    let onRecord: () -> Void
+    let onRemove: () -> Void
+    @ViewBuilder let action: Action
+    @Environment(\.theme) private var theme
+    private var hover = State(initialValue: false)
+
+    init(shortcut: String, recording: Bool, recordable: Bool, conflict: String?,
+         onRecord: @escaping () -> Void, onRemove: @escaping () -> Void, @ViewBuilder action: () -> Action) {
+        self.shortcut = shortcut
+        self.recording = recording
+        self.recordable = recordable
+        self.conflict = conflict
+        self.onRecord = onRecord
+        self.onRemove = onRemove
+        self.action = action()
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            RecorderPill(text: shortcut, recording: recording, enabled: recordable, action: onRecord)
+                .help(recordable ? "Click, then press the new shortcut · esc cancels" : "Show all to change one of them")
+                .frame(width: 128, alignment: .leading)
+            action
+                .font(GroveFont.mono(12))
+            if let conflict {
+                Circle().fill(Color(theme.orange)).frame(width: 7, height: 7).help(conflict)
+            }
+            Button(action: onRemove) {
+                Text("−").foregroundStyle(Color(theme.grey1)).frame(width: 18).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Remove")
+        }
+        .padding(.horizontal, 6).padding(.vertical, 5)
+        .background(hover.wrappedValue || recording ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        .onHover { hover.wrappedValue = $0 }
+    }
+}
+
+/// A row's action as editable text: Return saves, blank is not written.
+private struct CommandField: View {
+    let text: String
+    let onCommit: (String) -> Void
+    private var draft: State<String>
+
+    init(text: String, onCommit: @escaping (String) -> Void) {
+        self.text = text
+        self.onCommit = onCommit
+        draft = State(initialValue: text)
+    }
+
+    var body: some View {
+        TextField("command", text: draft.projectedValue)
+            .textFieldStyle(.plain)
+            .lineLimit(1)
+            .help("AeroSpace syntax · a, b runs both · ↩ saves")
+            .onSubmit {
+                if BindingRows.value(fromText: draft.wrappedValue) == nil {
+                    draft.wrappedValue = text
+                } else {
+                    onCommit(draft.wrappedValue)
+                }
+            }
+    }
+}
+
+/// Hyper key: on/off, what a tap sends, the two timings (spec §5).
+private struct HyperGroup: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let h = model.keys.hyper
+        BindingsGroup(title: "Hyper key", note: "Caps Lock") {
+            setting("Hyper on") {
+                Toggle("", isOn: Binding(get: { h.enabled }, set: { on in update { $0.enabled = on } }))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(Color(theme.green))
+                    .labelsHidden()
+            }
+            setting("Tap alone sends") {
+                Menu {
+                    Button("Escape") { update { $0.tap = .escape } }
+                    Button("None") { update { $0.tap = .none } }
+                } label: {
+                    pill(h.tap == .escape ? "Escape ▾" : "None ▾")
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            setting("A tap is shorter than") {
+                MsField(value: h.tapMs) { ms in update { $0.tapMs = ms } }.id(h.tapMs)
+            }
+            setting("Cheat sheet after holding") {
+                MsField(value: h.cheatsheetMs) { ms in update { $0.cheatsheetMs = ms } }.id(h.cheatsheetMs)
+                    .help("0 = no cheat sheet")
+            }
+        }
+    }
+
+    private func update(_ change: @escaping (inout HyperSettings) -> Void) {
+        model.edit { keys in
+            var h = keys.hyper
+            change(&h)
+            keys.setHyper(h)
+        }
+    }
+
+    private func setting<V: View>(_ title: String, @ViewBuilder _ control: () -> V) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            control()
+        }
+        .font(GroveFont.mono(12))
+        .padding(.horizontal, 6).padding(.vertical, 4)
+    }
+
+    private func pill(_ text: String) -> some View {
+        Text(text)
+            .font(GroveFont.mono(11.5))
+            .foregroundStyle(Color(theme.fg))
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(theme.bg3), lineWidth: 1))
+    }
+}
+
+/// "200 ms": a whole number ≥ 0; written on Return or when focus leaves,
+/// otherwise put back. A bad value turns the border red and isn't written.
+private struct MsField: View {
+    let value: Int
+    let onCommit: (Int) -> Void
+    @Environment(\.theme) private var theme
+    @FocusState private var focused: Bool
+    private var text: State<String>
+
+    init(value: Int, onCommit: @escaping (Int) -> Void) {
+        self.value = value
+        self.onCommit = onCommit
+        text = State(initialValue: String(value))
+    }
+
+    var body: some View {
+        let valid = HyperSettings.milliseconds(text.wrappedValue) != nil
+        HStack(spacing: 4) {
+            TextField("", text: text.projectedValue)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 44)
+                .focused($focused)
+                .onSubmit(commit)
+            Text("ms").foregroundStyle(Color(theme.grey1))
+        }
+        .font(GroveFont.mono(11.5))
+        .padding(.horizontal, 9).padding(.vertical, 3)
+        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(valid ? theme.bg3 : theme.red), lineWidth: 1))
+        .help(valid ? "Milliseconds · ↩ saves" : "A whole number of milliseconds, 0 or more")
+        .onChange(of: focused) { _, now in if !now { commit() } }
+    }
+
+    private func commit() {
+        if let ms = HyperSettings.milliseconds(text.wrappedValue) {
+            if ms != value { onCommit(ms) } else { text.wrappedValue = String(value) }
+        } else {
+            text.wrappedValue = String(value)
+        }
+    }
+}

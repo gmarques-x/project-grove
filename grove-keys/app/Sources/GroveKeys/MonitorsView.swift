@@ -1,0 +1,89 @@
+import AppKit
+import GroveKeysCore
+import GroveThemesCore
+import SwiftUI
+
+/// The Monitors group (spec §7, §10, mockup §2): this Mac's
+/// `[monitors."<LocalHostName>"]`, a menu per workspace 1–9.
+struct MonitorsView: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.theme) private var theme
+    // `State` used directly: no SwiftUI macros with the Command Line Tools.
+    private var displays = State(initialValue: Displays.current())
+
+    init(model: AppModel) {
+        self.model = model
+    }
+
+    var body: some View {
+        let host = model.host
+        let saved = host.isEmpty ? [] : model.keys.monitors(host: host)
+        let targets = Dictionary(saved.map { ($0.workspace, $0.target) }, uniquingKeysWith: { a, _ in a })
+        let choices = Monitors.choices(displays: displays.wrappedValue, current: saved.map(\.target))
+        BindingsGroup(title: "Monitors", note: host.isEmpty ? "this Mac" : "this Mac · \(host)") {
+            HStack(spacing: 8) {
+                Circle().fill(Color(theme.green)).frame(width: 7, height: 7)
+                Text(connected)
+            }
+            .font(GroveFont.mono(11.5))
+            .foregroundStyle(Color(theme.grey1))
+            .padding(.horizontal, 6)
+            if host.isEmpty {
+                note("Can't read this Mac's name (scutil --get LocalHostName), so monitors can't be set.")
+            } else {
+                if saved.isEmpty { note("Not set for this Mac yet") }
+                HStack(spacing: 6) {
+                    ForEach(1...9, id: \.self) { n in
+                        cell(n, target: targets[String(n)], choices: choices, host: host)
+                    }
+                }
+            }
+            note("Each workspace: main · secondary · built-in · a display name. Saved only for this Mac.")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+            displays.wrappedValue = Displays.current()
+        }
+    }
+
+    private var connected: String {
+        let names = displays.wrappedValue
+        guard let first = names.first else { return "Connected now: none" }
+        return "Connected now: " + ([first + " (main)"] + names.dropFirst()).joined(separator: ", ")
+    }
+
+    private func cell(_ n: Int, target: String?, choices: [String], host: String) -> some View {
+        Menu {
+            ForEach(choices, id: \.self) { choice in
+                Button {
+                    model.edit { $0.setMonitor(host: host, workspace: String(n), target: choice) }
+                } label: {
+                    if choice == target { Label(choice, systemImage: "checkmark") } else { Text(choice) }
+                }
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Text(String(n)).font(GroveFont.mono(13, .semibold)).foregroundStyle(Color(theme.green))
+                Text((target ?? "main") + " ▾")
+                    .font(GroveFont.mono(10))
+                    .foregroundStyle(Color(theme.grey1))
+                    .lineLimit(1).truncationMode(.middle)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6).padding(.horizontal, 2)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .help(target.map { "Workspace \(n) → \($0)" } ?? "Workspace \(n): not set (main screen)")
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(GroveFont.mono(11.5))
+            .foregroundStyle(Color(theme.grey1))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+    }
+}

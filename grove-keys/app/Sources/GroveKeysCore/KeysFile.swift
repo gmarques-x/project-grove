@@ -91,6 +91,13 @@ public struct KeysFile: Equatable, Sendable {
         set(["monitors", host], workspace, .string(target))
     }
 
+    /// Renames an entry where it stands, keeping its value and comments.
+    mutating func rename(_ path: [String], _ key: String, to newKey: String) {
+        guard let s = document.sections.firstIndex(where: { $0.path == path }),
+              let e = document.sections[s].entries.firstIndex(where: { $0.key == key }) else { return }
+        document.sections[s].entries[e].key = newKey
+    }
+
     private mutating func set(_ path: [String], _ key: String, _ value: TomlValue) {
         let s = sectionIndex(path)
         if let e = document.sections[s].entries.firstIndex(where: { $0.key == key }) {
