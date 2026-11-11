@@ -115,6 +115,16 @@ setup() {
   [ "$(sb_workspaces < "$FX/workspaces-none.txt")" = "" ]
 }
 
+@test "sb_ws_apps: each app once per workspace, numbered slots, six at most" {
+  local out
+  out="$(printf '1|com.google.Chrome|50\n1 | com.mitchellh.ghostty | 27\n1|com.google.Chrome|51\n2|com.google.Chrome|52\nx|bad|1\n1||9\n' | sb_ws_apps)"
+  [ "$out" = "1 1 com.google.Chrome 50
+1 2 com.mitchellh.ghostty 27
+2 1 com.google.Chrome 52" ]
+  out="$(for i in 1 2 3 4 5 6 7 8; do echo "3|app.n$i|$i"; done | sb_ws_apps | wc -l | tr -d ' ')"
+  [ "$out" = 6 ]
+}
+
 @test "sb_pct: a whole number gets %, anything else is —" {
   [ "$(sb_pct 52)" = "52%" ]
   [ "$(sb_pct —)" = "—" ]

@@ -66,7 +66,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |
 | `97-themes-app` | Grove Themes in the menu bar: builds the app, installs it to ~/Applications and starts it at login |
-| `98-aerospace` | AeroSpace tiles the desktop: pinned workspaces, Option shortcuts and JankyBorders in the scheme's colours (Accessibility is a manual step) |
+| `98-aerospace` | AeroSpace tiles the desktop: numbered workspaces, Option shortcuts and JankyBorders in the scheme's colours (Accessibility is a manual step) |
 | `99-sketchybar` | The Grove top bar: SketchyBar (trusted felixkratz/formulae tap) as a floating bar on a strip that hides the auto-hidden menu bar; workspaces, the front app and system status in the scheme's colours |
 
 **Chrome** is themed by an unpacked extension that grove-themes renders to `~/.config/chrome-theme`; load it once (see `grove-themes/README.md`).

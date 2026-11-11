@@ -91,20 +91,10 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
 @test "aerospace: only workspaces 1-9, none kept when empty" {
   [ "$(as_q "'persistent-workspaces' in c")" = false ]
   [ "$(keys_q "all(t in '123456789' and len(t) == 1 for m in k['aerospace'].values() for v in m.values() if isinstance(v, str) and v.split()[0] in ('workspace', 'move-node-to-workspace') for t in [v.split()[-1]])")" = true ]
-  [ "$(as_q "all(r['run'].split()[-1] in list('123456789') for r in c['on-window-detected'] if r['run'].startswith('move-node-to-workspace'))")" = true ]
 }
 
-@test "aerospace: every pinned app has its workspace, and only new windows move" {
-  local pair id n
-  for pair in \
-    com.mitchellh.ghostty:1 com.anthropic.claudefordesktop:2 com.google.Chrome:3 com.microsoft.VSCode:4 \
-    com.apple.MobileSMS:5 com.apple.FaceTime:5 com.apple.mail:5 com.tinyspeck.slackmacgap:5 com.hnc.Discord:5 \
-    net.whatsapp.WhatsApp:5 com.microsoft.teams2:5 ru.keepcoder.Telegram:5 org.whispersystems.signal-desktop:5 us.zoom.xos:5 \
-    com.apple.Music:6 com.apple.podcasts:6 com.apple.TV:6 com.spotify.client:6 com.colliderli.iina:6 org.videolan.vlc:6; do
-    id="${pair%:*}" n="${pair##*:}"
-    [ "$(as_q "[r['run'] for r in c['on-window-detected'] if r['if'].get('app-id') == '$id']")" = "[\"move-node-to-workspace $n\"]" ] || { echo "$id"; false; }
-  done
-  [ "$(as_q "all(r['if'].get('during-aerospace-startup') is False for r in c['on-window-detected'] if r['run'].startswith('move-node-to-workspace'))")" = true ]
+@test "aerospace: no app is pinned to a workspace; windows open where you are" {
+  [ "$(as_q "[r['run'] for r in c['on-window-detected'] if 'workspace' in r['run']]")" = "[]" ]
 }
 
 @test "aerospace: System Settings, Grove Themes, Grove Keys and Finder float, also at startup" {

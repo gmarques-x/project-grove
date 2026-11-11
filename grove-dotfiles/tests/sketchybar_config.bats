@@ -84,19 +84,25 @@ rc() {
   [ "$status" -eq 0 ]
   left="$(calls | grep -oE -- '--add item [a-z_.0-9]+ left' | awk '{print $3}' | tr '\n' ' ')"
   right="$(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}' | tr '\n' ' ')"
-  [ "$left" = "grove sep.l1 ws.1 ws.2 ws.3 ws.4 ws.5 ws.6 ws.7 ws.8 ws.9 front_app " ] || { echo "$left"; false; }
+  local want="grove sep.l1 " n
+  for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 sep.ws.$n "; done
+  [ "$left" = "${want}front_app " ] || { echo "$left"; false; }
   [ "$right" = "clock sep.r1 volume sep.r2 wifi sep.r3 battery sep.r4 net.up net.down sep.r5 mem cpu sep.r6 " ] || { echo "$right"; false; }
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
 }
 
-@test "sketchybar: separators are a bg3 bar, the same as the one before the app" {
+@test "sketchybar: separators are a bg3 bar; each workspace ends with one, hidden until it's in use" {
   rc
   local n
-  for n in sep.l1 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
+  for n in 1 2 3 4 5 6 7 8 9; do
+    calls | grep -qx -- "--set sep.ws.$n drawing=off" || { echo "sep.ws.$n"; false; }
+  done
+  for n in sep.l1 sep.ws.1 sep.ws.9 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
     calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BG3")" || { echo "$n"; false; }
   done
-  calls | grep -q -- '--set front_app .*icon=│'
+  # The app's name follows the last workspace's separator: none of its own.
+  calls | grep -q -- '--set front_app .*icon.drawing=off'
 }
 
 @test "sketchybar: values have fixed widths, so the separators never move" {
@@ -129,7 +135,7 @@ rc() {
 
 @test "sketchybar: the pine button is 52 pt wide, the tree centred in it" {
   rc
-  calls | grep -qE -- '--set grove .*icon.width=18 icon.padding_left=17 icon.padding_right=17 '
+  calls | grep -qE -- '--set grove .*icon.width=18 .*width=52 align=center '
 }
 
 @test "sketchybar: clickable items subscribe to hover" {
@@ -172,6 +178,24 @@ rc() {
   plugin workspaces FOCUSED=3
   [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on"* ]] || false
   [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off"* ]] || false
+}
+
+@test "workspaces: each one shows its apps' icons, once per app, then a separator" {
+  fake aerospace 'case "$*" in
+    *--focused*) echo 1 ;;
+    *list-windows*) printf "1|com.google.Chrome|50\n1|com.mitchellh.ghostty|27\n1|com.google.Chrome|51\n2|com.microsoft.VSCode|60\n" ;;
+    *) printf "1\n2\n" ;;
+  esac'
+  plugin workspaces
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 1 ]
+  [[ "$(calls)" == *"--set ws.1.1 drawing=on icon.background.image=app.com.google.Chrome click_script=aerospace focus --window-id 50"* ]] || false
+  [[ "$(calls)" == *"--set ws.1.2 drawing=on icon.background.image=app.com.mitchellh.ghostty click_script=aerospace focus --window-id 27"* ]] || false
+  [[ "$(calls)" == *"--set ws.1.3 drawing=off"* ]] || false
+  [[ "$(calls)" == *"--set ws.2.1 drawing=on icon.background.image=app.com.microsoft.VSCode"* ]] || false
+  [[ "$(calls)" == *"--set sep.ws.1 drawing=on"* ]] || false
+  [[ "$(calls)" == *"--set sep.ws.2 drawing=on"* ]] || false
+  [[ "$(calls)" == *"--set ws.3 drawing=off --set sep.ws.3 drawing=off --set ws.3.1 drawing=off"* ]] || false
 }
 
 @test "workspaces: without AeroSpace every workspace is hidden" {

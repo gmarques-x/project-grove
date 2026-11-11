@@ -147,6 +147,15 @@ sb_workspaces() {
   awk 'NF { printf "%s%s", sep, $1; sep = " " } END { if (sep != "") print "" }'
 }
 
+# sb_ws_apps < `aerospace list-windows --all --format '%{workspace}|%{app-bundle-id}|%{window-id}'`:
+# one line per app and workspace, "WORKSPACE SLOT BUNDLE-ID WINDOW-ID": each app
+# once per workspace (its first window), in AeroSpace's order, six at most.
+sb_ws_apps() {
+  awk -F '|' '{ for (i = 1; i <= NF; i++) gsub(/^ +| +$/, "", $i) }
+    $1 ~ /^[1-9]$/ && $2 ~ /^[A-Za-z0-9._-]+$/ && $3 ~ /^[0-9]+$/ && !seen[$1 FS $2]++ {
+      k = ++count[$1]; if (k <= 6) print $1, k, $2, $3 }'
+}
+
 # sb_pct VALUE: "52%" for a whole number, "—" otherwise.
 sb_pct() {
   case "$1" in '' | *[!0-9]*) echo "$SB_NONE" ;; *) echo "$1%" ;; esac

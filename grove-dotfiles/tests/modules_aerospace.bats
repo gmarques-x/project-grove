@@ -154,5 +154,5 @@ exit 0'
 }
 
 @test "aerospace: the README lists the module" {
-  grep -qF '| `98-aerospace` | AeroSpace tiles the desktop: pinned workspaces, Option shortcuts and JankyBorders in the scheme'"'"'s colours (Accessibility is a manual step) |' "$GROVE_ROOT/README.md"
+  grep -qF '| `98-aerospace` | AeroSpace tiles the desktop: numbered workspaces, Option shortcuts and JankyBorders in the scheme'"'"'s colours (Accessibility is a manual step) |' "$GROVE_ROOT/README.md"
 }

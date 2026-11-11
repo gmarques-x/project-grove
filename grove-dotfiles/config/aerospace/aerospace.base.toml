@@ -11,8 +11,8 @@ start-at-login = true
 after-startup-command = ['exec-and-forget /bin/sh ~/.config/borders/bordersrc']
 # The Grove bar (SketchyBar) redraws its workspaces at once on every change.
 exec-on-workspace-change = ['/bin/bash', '-c', '/opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change FOCUSED=$AEROSPACE_FOCUSED_WORKSPACE']
-# Moving a window to another workspace, or a pinned app opening there, changes
-# focus but not the workspace: refresh the bar then too.
+# A window opening, closing or moving to another workspace changes focus but
+# not the workspace: refresh the bar (its app icons) then too.
 on-focus-changed = ['exec-and-forget /opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change']
 
 enable-normalization-flatten-containers = true
@@ -56,106 +56,5 @@ run = 'layout floating'
 if.app-id = 'com.apple.finder'
 run = 'layout floating'
 
-# Pinned apps: new windows go to their workspace; windows already open when
-# AeroSpace starts stay where they are. A rule for an app that isn't installed
-# does nothing.
-
-[[on-window-detected]] # Ghostty
-if.app-id = 'com.mitchellh.ghostty'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 1'
-
-[[on-window-detected]] # Claude
-if.app-id = 'com.anthropic.claudefordesktop'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 2'
-
-[[on-window-detected]] # Google Chrome
-if.app-id = 'com.google.Chrome'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 3'
-
-[[on-window-detected]] # VS Code
-if.app-id = 'com.microsoft.VSCode'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 4'
-
-[[on-window-detected]] # Messages
-if.app-id = 'com.apple.MobileSMS'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # FaceTime
-if.app-id = 'com.apple.FaceTime'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Mail
-if.app-id = 'com.apple.mail'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Slack
-if.app-id = 'com.tinyspeck.slackmacgap'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Discord
-if.app-id = 'com.hnc.Discord'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # WhatsApp
-if.app-id = 'net.whatsapp.WhatsApp'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Microsoft Teams
-if.app-id = 'com.microsoft.teams2'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Telegram
-if.app-id = 'ru.keepcoder.Telegram'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Signal
-if.app-id = 'org.whispersystems.signal-desktop'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Zoom
-if.app-id = 'us.zoom.xos'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 5'
-
-[[on-window-detected]] # Music
-if.app-id = 'com.apple.Music'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
-
-[[on-window-detected]] # Podcasts
-if.app-id = 'com.apple.podcasts'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
-
-[[on-window-detected]] # TV
-if.app-id = 'com.apple.TV'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
-
-[[on-window-detected]] # Spotify
-if.app-id = 'com.spotify.client'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
-
-[[on-window-detected]] # IINA
-if.app-id = 'com.colliderli.iina'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
-
-[[on-window-detected]] # VLC
-if.app-id = 'org.videolan.vlc'
-if.during-aerospace-startup = false
-run = 'move-node-to-workspace 6'
+# No app is pinned to a workspace: a window opens on the workspace in front and
+# is moved from there (Option+Shift+number).

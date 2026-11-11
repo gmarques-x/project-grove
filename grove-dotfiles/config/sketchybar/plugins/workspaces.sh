@@ -1,5 +1,6 @@
 #!/bin/bash
-# Grove bar · workspaces ws.1…ws.9: the ones in use drawn, the focused one a green pill.
+# Grove bar · workspaces ws.1…ws.9: the ones in use drawn, the focused one a green pill,
+# each followed by its apps' icons (ws.N.1…6) and a separator (sep.ws.N).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -21,7 +22,15 @@ used="$( { sb_timeout 2 aerospace list-workspaces --monitor all --empty no 2>/de
 focused="${FOCUSED:-$( { sb_timeout 2 aerospace list-workspaces --focused 2>/dev/null || true; } | sb_workspaces)}"
 # The focused workspace shows even while it's empty (AeroSpace keeps it).
 [ -n "$focused" ] && used="$used $focused"
+apps="$( { sb_timeout 2 aerospace list-windows --all --format '%{workspace}|%{app-bundle-id}|%{window-id}' 2>/dev/null || true; } | sb_ws_apps)"
 args=()
+shown=" "
+while read -r n k bundle wid; do
+  [ -n "$wid" ] || continue
+  [[ " $used " == *" $n "* ]] || continue
+  args+=(--set "ws.$n.$k" drawing=on icon.background.image="app.$bundle" click_script="aerospace focus --window-id $wid")
+  shown+="$n.$k "
+done <<< "$apps"
 for n in 1 2 3 4 5 6 7 8 9; do
   if [[ " $used " == *" $n "* ]]; then
     if [ "$n" = "$focused" ]; then
@@ -29,8 +38,12 @@ for n in 1 2 3 4 5 6 7 8 9; do
     else
       args+=(--set "ws.$n" drawing=on background.drawing=off label.color="$GREY2")
     fi
+    args+=(--set "sep.ws.$n" drawing=on)
   else
-    args+=(--set "ws.$n" drawing=off)
+    args+=(--set "ws.$n" drawing=off --set "sep.ws.$n" drawing=off)
   fi
+  for k in 1 2 3 4 5 6; do
+    [[ "$shown" == *" $n.$k "* ]] || args+=(--set "ws.$n.$k" drawing=off)
+  done
 done
 "$SB" "${args[@]}"
