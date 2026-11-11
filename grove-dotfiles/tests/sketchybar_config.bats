@@ -49,7 +49,7 @@ ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; f
 }
 
 @test "sketchybar: colours only come from colors.sh" {
-  ! grep -rnE '0x[0-9A-Fa-f]{8}' "$SB" --include='*.sh' --include=sketchybarrc | grep -v '^.*/colors.sh.tmpl:'
+  ! grep -rnE '0x[0-9A-Fa-f]{8}' "$SB" --include='*.sh' --include=sketchybarrc | grep -vE '/colors\.sh(\.tmpl)?:'
 }
 
 @test "sketchybar: colors.sh renders every colour for all six schemes" {
