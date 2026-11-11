@@ -79,4 +79,47 @@ final class Counter: @unchecked Sendable {
         await settle()
         #expect(hits.count == 1)
     }
+
+    @Test func ignoresSeveralOwnWrites() async throws {
+        let dir = try tempDir()
+        let file = dir.appendingPathComponent("keys.toml")
+        try Data("a\n".utf8).write(to: file)
+        let hits = Counter()
+        let w = FileWatcher(file: file) { hits.hit() }
+        w.start()
+        defer { w.stop() }
+        w.ignoreNextChange(contents: Data("one\n".utf8))
+        w.ignoreNextChange(contents: Data("two\n".utf8))
+        try renameSave("one\n", into: file)
+        await settle()
+        try renameSave("two\n", into: file)
+        await settle()
+        #expect(hits.count == 0)
+        try renameSave("theirs\n", into: file)
+        await wait { hits.count >= 1 }
+        await settle()
+        #expect(hits.count == 1)
+    }
+
+    /// Two own writes seen as one change: the first is dropped with the second,
+    /// so a later hand edit back to it still counts.
+    @Test func coalescedOwnWritesLeaveNothingBehind() async throws {
+        let dir = try tempDir()
+        let file = dir.appendingPathComponent("keys.toml")
+        try Data("a\n".utf8).write(to: file)
+        let hits = Counter()
+        let w = FileWatcher(file: file) { hits.hit() }
+        w.start()
+        defer { w.stop() }
+        w.ignoreNextChange(contents: Data("one\n".utf8))
+        w.ignoreNextChange(contents: Data("two\n".utf8))
+        try renameSave("one\n", into: file)
+        try renameSave("two\n", into: file)
+        await settle()
+        #expect(hits.count == 0)
+        try renameSave("one\n", into: file)
+        await wait { hits.count >= 1 }
+        await settle()
+        #expect(hits.count == 1)
+    }
 }

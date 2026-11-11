@@ -13,7 +13,8 @@ public final class FileWatcher: @unchecked Sendable {
     private var fileSource: DispatchSourceFileSystemObject?
     private var started = false
     private var last = Stamp()
-    private var ignore: Data?
+    /// The app's own writes not seen yet, oldest first.
+    private var ignore: [Data] = []
     private var pending = false
 
     public init(file: URL, onChange: @escaping @Sendable () -> Void) {
@@ -39,9 +40,11 @@ public final class FileWatcher: @unchecked Sendable {
         queue.sync { cancelAll() }
     }
 
-    /// The next change whose contents equal `contents` is skipped, once.
+    /// A change whose contents equal `contents` is skipped, once. Several can
+    /// be pending (one per write in flight); when one is seen, those queued
+    /// before it are dropped too (their writes were overtaken).
     public func ignoreNextChange(contents: Data) {
-        queue.async { self.ignore = contents }
+        queue.async { self.ignore.append(contents) }
     }
 
     // Everything below runs on `queue`.
@@ -88,7 +91,10 @@ public final class FileWatcher: @unchecked Sendable {
         let now = stamp()
         guard now != last else { return }
         last = now
-        if let skip = ignore, skip == now.data { ignore = nil; return }
+        if let data = now.data, let i = ignore.firstIndex(of: data) {
+            ignore.removeSubrange(...i)
+            return
+        }
         onChange()
     }
 }

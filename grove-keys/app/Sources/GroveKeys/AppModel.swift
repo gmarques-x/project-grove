@@ -3,6 +3,7 @@ import Combine
 import Foundation
 import GroveKeysCore
 import GroveThemesCore
+import os
 
 /// The app's one model: keys.toml as last applied, the save path, the Hyper
 /// engine and the Caps Lock mapping. The mapping is on only while both
@@ -10,6 +11,7 @@ import GroveThemesCore
 @MainActor
 final class AppModel: ObservableObject {
     static let shared = AppModel()
+    private static let log = Logger(subsystem: "com.projectgrove.keys", category: "app")
 
     @Published private(set) var keys: KeysFile
     @Published private(set) var layers: [Layer] = []
@@ -47,6 +49,13 @@ final class AppModel: ObservableObject {
     private var engineSettings: HyperSettings?
     private var engineLaunchKeys: Set<String> = []
     private var lastState: KeysState?
+    /// The last keys.toml the save path accepted (the defaults until then).
+    private var lastGood: KeysFile
+    /// keys.toml on disk has an error with a line number: edits are refused.
+    private var keysInvalid = false
+    /// The newest edit, and how many edits are still saving.
+    private var pendingKeys: KeysFile?
+    private var pendingEdits = 0
 
     private init() {
         let environment = ProcessInfo.processInfo.environment
@@ -58,7 +67,9 @@ final class AppModel: ObservableObject {
         themes = GroveThemesClient(runner: ProcessRunner(path: cli))
         stateURL = KeysState.url(environment: environment, home: home)
         themeStateURL = StatePath.url(environment: environment, home: home)
-        keys = try! KeysFile(text: "")  // the defaults, until the first run answers
+        let defaults = try! KeysFile(text: "")  // until the first run answers
+        keys = defaults
+        lastGood = defaults
         engine = HyperEngine(
             onEffect: { effect in AppModel.shared.perform(effect) },
             onFailure: { AppModel.shared.tapKeptStopping() })
@@ -91,7 +102,7 @@ final class AppModel: ObservableObject {
         themeWatcher?.start()
         refreshColors()
 
-        enqueue { [pipeline] in await pipeline.run() }
+        enqueue(edit: false) { [pipeline] in await pipeline.run() }
         writeState()
     }
 
@@ -131,13 +142,21 @@ final class AppModel: ObservableObject {
 
     // MARK: Editing and the file
 
-    /// Mutate, write keys.toml, run the save path, publish the result.
+    /// Mutate, write keys.toml, run the save path, publish the result. The
+    /// change shows at once; edits made while earlier ones are still saving
+    /// build on them. Refused while keys.toml on disk is invalid, so a broken
+    /// hand edit is never overwritten (the red line stays up).
     func edit(_ change: (inout KeysFile) -> Void) {
-        var next = keys
+        guard !keysInvalid else { return }
+        let base = pendingKeys ?? keys
+        var next = base
         change(&next)
-        guard next != keys else { return }
+        guard next != base else { return }
+        pendingKeys = next
+        pendingEdits += 1
+        publish(next)
         watcher?.ignoreNextChange(contents: Data(next.document.serialized().utf8))
-        enqueue { [pipeline, next] in
+        enqueue(edit: true) { [pipeline, next] in
             do { try await pipeline.write(next) } catch {
                 return .keysInvalid(TomlError(line: 0, message: "cannot write keys.toml: \(error.localizedDescription)"))
             }
@@ -146,24 +165,32 @@ final class AppModel: ObservableObject {
     }
 
     /// Runs one after another, in the order asked.
-    private func enqueue(_ work: @escaping @Sendable () async -> SaveResult) {
+    private func enqueue(edit: Bool, _ work: @escaping @Sendable () async -> SaveResult) {
         let previous = saving
         saving = Task {
             await previous?.value
             let result = await work()
-            apply(result)
+            apply(result, edit: edit)
         }
     }
 
-    private func apply(_ result: SaveResult) {
+    private func apply(_ result: SaveResult, edit: Bool) {
+        if edit { pendingEdits -= 1 }
         switch result {
         case .applied(let k), .unchanged(let k), .aerospaceRejected(let k, _):
-            keys = k
-        case .keysInvalid:
-            break  // the last good config keeps running
+            lastGood = k
+            keysInvalid = false
+        case .keysInvalid(let error):
+            // A line number means keys.toml itself is broken; a missing file or a
+            // failed write does not block edits.
+            keysInvalid = error.line > 0
+        }
+        // While edits are still saving, the screen keeps showing the newest one.
+        if pendingEdits == 0 {
+            pendingKeys = nil
+            publish(lastGood)
         }
         saveLine = result.redLine
-        layers = Layers.build(from: keys) { Launcher.appName(bundleID: $0) }
         if !loaded {
             loaded = true
             let watcher = FileWatcher(file: paths.keys) {
@@ -175,8 +202,13 @@ final class AppModel: ObservableObject {
         reconcile()
     }
 
+    private func publish(_ new: KeysFile) {
+        if new != keys { keys = new }
+        layers = Layers.build(from: keys) { Launcher.appName(bundleID: $0) }
+    }
+
     private func fileChanged() {
-        enqueue { [pipeline] in await pipeline.run() }
+        enqueue(edit: false) { [pipeline] in await pipeline.run() }
     }
 
     private func refreshColors() {
@@ -278,6 +310,8 @@ final class AppModel: ObservableObject {
         do {
             try state.write(to: stateURL)
             lastState = state
-        } catch {}
+        } catch {
+            Self.log.error("cannot write \(self.stateURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
