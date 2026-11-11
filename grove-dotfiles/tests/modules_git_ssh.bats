@@ -53,7 +53,21 @@ load_agent() {
   [ "$status" -eq 3 ]
 }
 
-@test "ssh needs work when the key isn't in the agent" {
+@test "ssh is ok after a restart: not in the agent, but apply stored it in the Keychain" {
+  load_module 40-ssh
+  make_key
+  run apply
+  [ "$status" -eq 0 ]
+  rm -f "$BATS_TEST_TMPDIR/agent"
+  run check
+  [ "$status" -eq 0 ]
+  # A different key needs its own ssh-add.
+  rm "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_ed25519.pub"; make_key
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "ssh needs work when the key isn't in the agent and was never stored" {
   load_module 40-ssh
   make_key
   mkdir -p "$HOME/.ssh"; ln -s "$GROVE_CONFIG/ssh/config" "$HOME/.ssh/config"

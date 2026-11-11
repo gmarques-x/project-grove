@@ -1,8 +1,11 @@
 # One-line prompt: a bar of blocks (user, folder, git, time) joined by arrows,
 # with rounded ends, then ❯. Nerd Font glyphs are drawn by Ghostty; Terminal.app
 # uses starship-plain.toml. Colors: theme/everforest-dark-medium.
+# The green→yellow and yellow→orange arrows sit either side of the git block, so
+# they join folder → git → time in a repo and, with no git block between them,
+# form the two-arrow fade into the time. The git block has no arrow of its own.
 add_newline = true
-format = """[](fg:#83C092)$username$directory$git_branch$git_status[](fg:#A7C080 bg:#DBBC7F)[](fg:#DBBC7F bg:#E69875)$time[](fg:#E69875) $character"""
+format = """[](fg:#83C092)$username$directory[](fg:#A7C080 bg:#DBBC7F)$git_branch$git_status[](fg:#DBBC7F bg:#E69875)$time[](fg:#E69875) $character"""
 
 [username]
 show_always = true
@@ -19,7 +22,7 @@ format = "[](fg:#83C092 bg:#A7C080)[ $path]($style)[$read_only]($read_only_st
 [git_branch]
 style = "bg:#DBBC7F fg:#2D353B"
 symbol = " "
-format = "[](fg:#A7C080 bg:#DBBC7F)[ $symbol$branch ]($style)"
+format = "[ $symbol$branch ]($style)"
 
 [git_status]
 style = "bg:#DBBC7F fg:#2D353B"

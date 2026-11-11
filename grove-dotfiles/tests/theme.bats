@@ -155,6 +155,11 @@ ghostty_value() {
   [ "$(ghostty_value palette | cut -d= -f1 | sort -n | tr '\n' ' ')" = "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 " ]
 }
 
+# fzf's ⌥C and zsh's ⌥B/⌥F need Alt; the Portuguese layout's [ ] { } | @ need right ⌥.
+@test "ghostty treats left Option as Alt and leaves right Option to the layout" {
+  [ "$(ghostty_value macos-option-as-alt)" = "left" ]
+}
+
 @test "ghostty validates the config" {
   local g="${GROVE_GHOSTTY:-/Applications/Ghostty.app/Contents/MacOS/ghostty}"
   [ -x "$g" ] || skip "Ghostty not installed"
@@ -282,11 +287,21 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)'
   done
 }
 
-# render_prompt FILE: the prompt Starship draws in a temp git repo, colors stripped.
+# render_prompt FILE [plain]: the prompt Starship draws in a temp git repo (or,
+# with `plain`, in a temp folder outside any repo), colors stripped.
 render_prompt() {
   local r="$BATS_TEST_TMPDIR/repo"
-  mkdir -p "$r" && git -C "$r" init -q -b main && touch "$r/new"
+  if [ "${2:-}" = plain ]; then
+    r="$BATS_TEST_TMPDIR/folder"; mkdir -p "$r"
+  else
+    mkdir -p "$r" && git -C "$r" init -q -b main && touch "$r/new"
+  fi
   (cd "$r" && env STARSHIP_CONFIG="$1" /opt/homebrew/bin/starship prompt --status 0) | sed $'s/\033\\[[0-9;]*m//g; s/%{//g; s/%}//g' | sed '/^$/d'
+}
+
+# arrows TEXT: how many U+E0B0 arrows TEXT has.
+arrows() {
+  printf '%s' "$1" | LC_ALL=C grep -o $'\xee\x82\xb0' | wc -l | tr -d ' '
 }
 
 @test "the prompt bar reads user, folder, git, time, joined by arrows with rounded ends" {
@@ -295,6 +310,28 @@ render_prompt() {
   local me; me="$(id -un)" A=$'\xee\x82\xb0'
   [[ "$output" =~ ^$'\xee\x82\xb6'.*$me\ $A\ .*repo\ $A\ .*main\ .*\?.*$A.*[0-9]{2}:[0-9]{2}\ $'\xee\x82\xb4'\ \ ?❯ ]] || { echo "$output"; false; }
   [[ "$output" == *$'\xef\x85\xb9'* ]] || false   # U+F179 before the user
+}
+
+@test "in a repo the bar has one arrow per join: user, folder, git, time" {
+  [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
+  run render_prompt "$GROVE_RENDERED/starship.toml"
+  local A=$'\xee\x82\xb0'
+  [ "$(arrows "$output")" -eq 3 ] || { echo "$output"; false; }
+  [[ "$output" != *"$A$A"* ]] || { echo "$output"; false; }
+  # after the git block, only the arrow into the time
+  [ "$(arrows "${output#*main}")" -eq 1 ] || { echo "$output"; false; }
+}
+
+@test "outside a repo a two-arrow fade (green, yellow, orange) leads from the folder into the time" {
+  [ -x /opt/homebrew/bin/starship ] || skip "starship not installed"
+  run render_prompt "$GROVE_RENDERED/starship.toml" plain
+  local A=$'\xee\x82\xb0'
+  [ "$(arrows "$output")" -eq 3 ] || { echo "$output"; false; }
+  [[ "$output" == *"folder $A$A "* ]] || { echo "$output"; false; }
+  # the fade's colors: green on yellow, then yellow on orange
+  local raw="$BATS_TEST_TMPDIR/folder"
+  raw="$(cd "$raw" && env STARSHIP_CONFIG="$GROVE_RENDERED/starship.toml" /opt/homebrew/bin/starship prompt --status 0)"
+  [[ "$raw" == *"48;2;219;188;127;38;2;167;192;128m"*"$A"*"48;2;230;152;117;38;2;219;188;127m"*"$A"* ]] || false
 }
 
 @test "the prompt has no duration or exit-code blocks" {

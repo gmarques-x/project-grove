@@ -288,6 +288,64 @@ login_shell() {
   [[ "$output" == *'${EDITOR:-vim}'* ]] || false
 }
 
+# editor_shell [VAR=value...]: what a plain zsh (zshenv only) has for EDITOR and
+# VISUAL, with no Homebrew (GROVE_BREW) unless the test gives one.
+editor_shell() {
+  load_module 70-zsh
+  [ -L "$HOME/.config" ] || ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  env -i HOME="$HOME" PATH=/usr/bin:/bin GROVE_BREW=/nonexistent/brew "$@" /bin/zsh -c 'print -r -- "$EDITOR|$VISUAL"'
+}
+
+@test "the editor is VS Code when code is installed, vim over ssh or without it" {
+  local b="$BATS_TEST_TMPDIR/codebin"
+  mkdir -p "$b"; printf '#!/bin/sh\n' > "$b/code"; chmod +x "$b/code"
+  run editor_shell PATH="$b:/usr/bin:/bin"
+  [ "$output" = "code --wait|code --wait" ]
+  # a new window's first shell: Homebrew's folder isn't on the PATH yet
+  run editor_shell GROVE_BREW="$b/brew"
+  [ "$output" = "$b/code --wait|$b/code --wait" ]
+  run editor_shell PATH="$b:/usr/bin:/bin" SSH_CONNECTION="10.0.0.1 1 10.0.0.2 22"
+  [ "$output" = "vim|vim" ]
+  run editor_shell PATH="$b:/usr/bin:/bin" SSH_TTY=/dev/ttys001
+  [ "$output" = "vim|vim" ]
+  run editor_shell
+  [ "$output" = "vim|vim" ]
+}
+
+@test "the editor is vi when vim is missing, and values already set win" {
+  local b="$BATS_TEST_TMPDIR/vibin"
+  mkdir -p "$b"; ln -s /bin/zsh "$b/zsh"
+  run editor_shell PATH="$b"
+  [ "$output" = "vi|vi" ]
+  run editor_shell EDITOR=nano
+  [ "$output" = "nano|nano" ]
+  run editor_shell VISUAL=nano
+  [ "$output" = "vim|nano" ]
+}
+
+@test "zshenv starts no other program" {
+  # with an empty PATH any command it ran would fail and say so
+  load_module 70-zsh
+  ln -s "$GROVE_CONFIG" "$HOME/.config"
+  apply >/dev/null
+  run env -i HOME="$HOME" PATH= /bin/zsh -c 'print ok'
+  [ "$status" -eq 0 ]
+  [ "$output" = ok ]
+  run grep -vnE '^[[:space:]]*#|^[^`]*$' "$GROVE_ROOT/config/zsh/.zshenv"
+  [ "$status" -eq 1 ] || { echo "$output"; false; }
+  run grep -nF '$(' "$GROVE_ROOT/config/zsh/.zshenv"
+  [ "$status" -eq 1 ] || { echo "$output"; false; }
+}
+
+@test "login shells leave the ssh key to ssh's own config" {
+  # no ssh-add at every login: UseKeychain and AddKeysToAgent load the key on first use
+  run grep -n 'ssh-add' "$GROVE_ROOT/config/zsh/.zprofile"
+  [ "$status" -eq 1 ] || { echo "$output"; false; }
+  grep -qE '^[[:space:]]*UseKeychain yes' "$GROVE_ROOT/config/ssh/config"
+  grep -qE '^[[:space:]]*AddKeysToAgent yes' "$GROVE_ROOT/config/ssh/config"
+}
+
 # fetch_shell [VAR=value...]: an interactive zsh on a real terminal (via script),
 # FETCH_COLS wide (default 160), with a fake fastfetch that prints FETCH and its
 # arguments, running `print -r -- "fetched=$GROVE_FETCHED"`.
@@ -421,6 +479,16 @@ fetch_shell() {
   brew_prefix >/dev/null || skip "zsh plugins not installed"
   run tool_shell "bindkey '^R'"
   [[ "$output" == *fzf-* ]] || false
+  # ⌥C arrives as Esc c (Ghostty: macos-option-as-alt = left)
+  run tool_shell "bindkey '^[c'"
+  [[ "$output" == *'"^[c" fzf-cd-widget'* ]] || { echo "$output"; false; }
+}
+
+@test "a pasted command with a # comment runs without the comment" {
+  run alias_shell 'print one # two'
+  [ "$output" = one ]
+  run alias_shell '[[ -o interactive_comments ]] && print on'
+  [ "$output" = on ]
 }
 
 @test "shell tool files are quiet without their tools" {
@@ -497,8 +565,8 @@ pty_alias_shell() {
 @test "ls, ll and lt expand as in the spec, with icons in Ghostty" {
   [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
   run alias_shell 'alias ll; alias ls; alias lt' TERM_PROGRAM=ghostty
-  [[ "${lines[0]}" == *"eza -la --group-directories-first --sort=name --git --icons=auto"* ]] || false
-  [[ "${lines[1]}" == *"eza -l --group-directories-first --sort=name --git --icons=auto"* ]] || false
+  [[ "${lines[0]}" == *"_grove_ls -la --group-directories-first --sort=name --git --icons=auto"* ]] || false
+  [[ "${lines[1]}" == *"_grove_ls -l --group-directories-first --sort=name --git --icons=auto"* ]] || false
   [[ "${lines[2]}" == *"eza --tree --level=2 --group-directories-first --icons=auto"* ]] || false
 }
 
@@ -531,9 +599,85 @@ pty_alias_shell() {
   [ "$(printf '%s\n' "${lines[@]}" | grep -v 'fzf\|zle' | awk 'NF { print $NF }' | tr '\n' ' ')" = "Cdir zdir A.txt b.txt " ]
 }
 
+# sorted_listing: a folder with files of known sizes and dates (and a subfolder,
+# the oldest). Prints its path.
+#   name   size  modified
+#   sub    -     2019
+#   big    3000  2020
+#   mid    300   2021
+#   small  2     2022
+sorted_listing() {
+  local d="$BATS_TEST_TMPDIR/sorted"
+  mkdir -p "$d/sub"
+  head -c 3000 /dev/zero > "$d/big"; head -c 300 /dev/zero > "$d/mid"; printf 'xx' > "$d/small"
+  touch -t 201901010000 "$d/sub"; touch -t 202001010000 "$d/big"
+  touch -t 202101010000 "$d/mid"; touch -t 202201010000 "$d/small"
+  printf '%s\n' "$d"
+}
+
+# listed_names: the last word of each line of $output (the names of a long
+# listing, or rc=N), on one line.
+listed_names() {
+  printf '%s\n' "${lines[@]}" | grep -v 'fzf\|zle' | awk 'NF { print $NF }' | tr '\n' ' '
+}
+
+@test "ls -t lists newest first, and -ltr, -lrt and -t -r oldest first, as ls does" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d; d="$(sorted_listing)"
+  run pty_alias_shell "cd '$d' && ls -t; print rc=\$?"
+  [ "$(listed_names)" = "small mid big sub rc=0 " ] || { echo "$output"; false; }
+  local flags
+  for flags in -ltr -lrt '-t -r' '-l -tr'; do
+    run pty_alias_shell "cd '$d' && ls $flags; print rc=\$?"
+    [ "$(listed_names)" = "sub big mid small rc=0 " ] || { echo "$flags: $output"; false; }
+  done
+}
+
+@test "ls -lS lists largest first and -lSr smallest first" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d; d="$(sorted_listing)"
+  run pty_alias_shell "cd '$d' && ls -lS big mid small; print rc=\$?"
+  [ "$(listed_names)" = "big mid small rc=0 " ] || { echo "$output"; false; }
+  run pty_alias_shell "cd '$d' && ls -lSr big mid small; print rc=\$?"
+  [ "$(listed_names)" = "small mid big rc=0 " ] || { echo "$output"; false; }
+  # the whole folder, in the real ls's order (the subfolder by its own size)
+  run pty_alias_shell "cd '$d' && ls -lS; print rc=\$?; command ls -S | tr '\\n' ' '"
+  local real="${lines[${#lines[@]}-1]}"
+  [ "$(printf '%s\n' "${lines[@]:0:${#lines[@]}-1}" | grep -v 'fzf\|zle' | awk 'NF { print $NF }' | tr '\n' ' ')" = "${real% } rc=0 " ] || { echo "$output"; false; }
+}
+
+@test "ls -ltrh, ll -tr and a time sort of a named folder work; -r alone reverses the names" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d; d="$(sorted_listing)"
+  # eza's -h is a header row
+  run pty_alias_shell "cd '$d' && ls -ltrh; print rc=\$?"
+  [ "$(listed_names)" = "Name sub big mid small rc=0 " ] || { echo "$output"; false; }
+  run pty_alias_shell "cd / && ll -tr '$d'; print rc=\$?"
+  [ "$(listed_names)" = "sub big mid small rc=0 " ] || { echo "$output"; false; }
+  run pty_alias_shell "cd / && ls -t '$d'; print rc=\$?"
+  [ "$(listed_names)" = "small mid big sub rc=0 " ] || { echo "$output"; false; }
+  run pty_alias_shell "cd '$d' && ls -r; print rc=\$?"
+  [ "$(listed_names)" = "sub small mid big rc=0 " ] || { echo "$output"; false; }
+}
+
+@test "ls passes eza's own options and anything after -- unchanged" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d; d="$(sorted_listing)"
+  touch "$d/-t"
+  run pty_alias_shell "cd '$d' && ls --sort=size --time=modified big small; print rc=\$?; ls -s size big small; print rc=\$?; ls -- -t; print rc=\$?"
+  [ "$(listed_names)" = "small big rc=0 small big rc=0 -t rc=0 " ] || { echo "$output"; false; }
+}
+
+@test "\\ls and command ls are still the real ls" {
+  [ -x /opt/homebrew/bin/eza ] || skip "eza not installed"
+  local d; d="$(sorted_listing)"
+  run pty_alias_shell "cd '$d' && \\ls -tr | tr '\\n' ' '; print; command ls -S | tr '\\n' ' '; print; whence -w ls"
+  [ "$(printf '%s\n' "${lines[@]}" | grep -v 'fzf\|zle' | sed 's/ *$//')" = "$(printf 'sub big mid small\nbig mid sub small\nls: alias')" ] || { echo "$output"; false; }
+}
+
 @test "the aliases are absent when eza and bat are missing" {
-  ALIAS_PATH=/usr/bin:/bin run alias_shell 'alias ls || print none; alias cat || print none'
-  [ "$output" = "$(printf 'none\nnone')" ]
+  ALIAS_PATH=/usr/bin:/bin run alias_shell 'alias ls || print none; alias cat || print none; (( $+functions[_grove_ls] )) || print none'
+  [ "$output" = "$(printf 'none\nnone\nnone')" ]
 }
 
 # fake_yazi DIR: a yazi on PATH that "quits in" DIR by writing it to --cwd-file.

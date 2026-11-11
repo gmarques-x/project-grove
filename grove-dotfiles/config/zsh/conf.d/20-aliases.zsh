@@ -8,10 +8,50 @@ alias cls='clear && GROVE_FETCHED= exec zsh -l'                  # clear and rel
 # Listings: folders first, then files, each A→Z ignoring case. Icons only where
 # the terminal can draw them (not Terminal.app). The originals stay as \ls, \cat.
 if (( $+commands[eza] )); then
+  # ls and ll go through _grove_ls, which is eza taking ls's everyday sort flags,
+  # alone or bundled (-ltr, -lrt, -ltrh): -t newest first, -S largest first, -r
+  # the other way round. eza itself means --time=FIELD by -t and --blocksize by
+  # -S (use those long names, or eza directly) and sorts oldest and smallest
+  # first, hence the --reverse when -r is absent. Sorted by time or size, the
+  # listing is a single run as in ls, not folders first. All else goes to eza as
+  # typed, and nothing after `--` is touched.
+  _grove_ls() {
+    local -a opts rest
+    local a c kept sort="" rev=0
+    while (( $# )); do
+      a="$1"
+      [[ "$a" == -- ]] && break
+      shift
+      # A bundle of one-letter flags with t, r or S in it, and none of eza's
+      # flags that take a value (-s, -L, -I, -w), whose value could hold them.
+      if [[ "$a" == -[trS[:alnum:]@]* && "${a#-}" != *[^[:alnum:]@]* && "$a" == *[trS]* && "$a" != *[sLIw]* ]]; then
+        kept=-
+        for c in ${(s::)a#-}; do
+          case "$c" in
+            t) sort=modified ;;
+            S) sort=size ;;
+            r) rev=1 ;;
+            *) kept+="$c" ;;
+          esac
+        done
+        [[ "$kept" == - ]] || opts+=("$kept")
+      else
+        opts+=("$a")
+      fi
+    done
+    rest=("$@")
+    if [[ -n "$sort" ]]; then
+      opts=("${(@)opts:#--group-directories-first}" "--sort=$sort")
+      (( rev )) || opts+=(--reverse)
+    elif (( rev )); then
+      opts+=(--reverse)
+    fi
+    command eza "${opts[@]}" "${rest[@]}"
+  }
   _grove_icons=(--icons=auto)
   [[ "$TERM_PROGRAM" == Apple_Terminal ]] && _grove_icons=()
-  alias ls="eza -l --group-directories-first --sort=name --git ${_grove_icons[*]}"   # long listing
-  alias ll="eza -la --group-directories-first --sort=name --git ${_grove_icons[*]}"  # ls plus hidden files
+  alias ls="_grove_ls -l --group-directories-first --sort=name --git ${_grove_icons[*]}"   # long listing
+  alias ll="_grove_ls -la --group-directories-first --sort=name --git ${_grove_icons[*]}"  # ls plus hidden files
   alias lt="eza --tree --level=2 --group-directories-first ${_grove_icons[*]}"       # two-level tree
   unset _grove_icons
 fi

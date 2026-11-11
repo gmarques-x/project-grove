@@ -43,4 +43,9 @@ window-height = 40
 keybind = global:ctrl+grave_accent=toggle_quick_terminal
 quick-terminal-position = top
 
+# Left ⌥ is Alt, so fzf's ⌥C (folders) and zsh's ⌥B/⌥F (word left/right) work.
+# On the Portuguese layout Ghostty leaves this off and ⌥C types "ç". Right ⌥
+# stays as it is, for [ ] { } | @ on this layout.
+macos-option-as-alt = left
+
 shell-integration = zsh
