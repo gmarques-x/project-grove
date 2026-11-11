@@ -50,11 +50,15 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
   [ "$(as_q "c['after-startup-command']")" = '["exec-and-forget /bin/sh ~/.config/borders/bordersrc"]' ]
 }
 
-@test "aerospace: gaps are 8; windows start where the Grove bar's 48 pt strip ends" {
+@test "aerospace: gaps are 8; windows start 3 pt below the Grove bar's 48 pt strip" {
   [ "$(as_q "[c['gaps']['inner'][k] for k in ('horizontal', 'vertical')] + [c['gaps']['outer'][k] for k in ('left', 'right', 'bottom')]")" = "[8, 8, 8, 8, 8]" ]
-  # 48 where the menu bar reserves nothing; on the built-in screen macOS keeps
-  # 37.5 pt for the notch even when the menu bar hides, so 11 more is ~48.
-  [ "$(as_q "c['gaps']['outer']['top']")" = '[{"monitor": {"built-in": 11}}, 48]' ]
+  # The 3 pt keep a top-row window's border (width 5, ~2.5 pt outside the
+  # window) clear of the opaque strip. 51 where the menu bar reserves nothing;
+  # on the built-in screen macOS keeps 37.5 pt for the notch even when the
+  # menu bar hides, so 14 more is ~51.
+  [ "$(as_q "c['gaps']['outer']['top']")" = '[{"monitor": {"built-in": 14}}, 51]' ]
+  # The border width the 3 pt are sized for.
+  grep -q ' width=5.0 ' "$GROVE_ROOT/config/borders/bordersrc.tmpl"
 }
 
 @test "aerospace: Option shortcuts" {

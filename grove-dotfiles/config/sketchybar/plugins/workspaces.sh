@@ -18,6 +18,13 @@ case "${SENDER:-}" in
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
+# An app or workspace switch closes the open popup (the clock's or the
+# network's). Here because this is the one plugin that gets both events;
+# first, so the popup doesn't wait for AeroSpace's answers.
+case "${SENDER:-}" in
+  front_app_switched | aerospace_workspace_change) sb_popup_close ;;
+esac
+
 used="$( { sb_timeout 2 aerospace list-workspaces --monitor all --empty no 2>/dev/null || true; } | sb_workspaces)"
 focused="${FOCUSED:-$( { sb_timeout 2 aerospace list-workspaces --focused 2>/dev/null || true; } | sb_workspaces)}"
 # The focused workspace shows even while it's empty (AeroSpace keeps it).

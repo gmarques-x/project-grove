@@ -102,12 +102,57 @@ setup() {
   [ "${#lines[@]}" -eq 2 ]
 }
 
-@test "sb_top_apps: the N largest by in + out, process ids dropped" {
+@test "sb_top_apps: the N largest by in + out, tab-separated, process ids dropped" {
   run sb_top_apps 3 < "$FX/nettop.csv"
-  [ "${lines[0]}" = "mDNSResponder 9322838 1907949" ]
-  [ "${lines[1]}" = "exchangesyncd 637014 64154" ]
-  [ "${lines[2]}" = "apsd 137341 492814" ]
+  [ "${lines[0]}" = "mDNSResponder"$'\t'"9322838"$'\t'"1907949" ]
+  [ "${lines[2]}" = "exchangesyncd"$'\t'"637014"$'\t'"64154" ]
   [ "${#lines[@]}" -eq 3 ]
+}
+
+@test "sb_top_apps: a name with spaces (or a comma) stays whole" {
+  run sb_top_apps 3 < "$FX/nettop.csv"
+  [ "${lines[1]}" = "Google Chrome H"$'\t'"2126350"$'\t'"76220" ]
+  [ "$(printf ',bytes_in,bytes_out,\nAcme, Inc Helper.12,5,7,\n' | sb_top_apps 5)" = "Acme, Inc Helper"$'\t'"5"$'\t'"7" ]
+  [ "$(printf ',bytes_in,bytes_out,\n' | sb_top_apps 5)" = "" ]
+}
+
+@test "locale: a decimal-comma, Portuguese locale changes neither numbers nor dates" {
+  locale -a | grep -qx 'pt_PT.UTF-8' || skip "no pt_PT.UTF-8 locale"
+  # The locale does change both without lib.sh, so the test means something.
+  [ "$(LC_ALL=pt_PT.UTF-8 awk 'BEGIN { printf "%.1f", 1.2 }')" = "1,2" ]
+  local lib="$GROVE_ROOT/config/sketchybar/lib.sh" how
+  for how in LC_ALL LANG; do
+    run env -i "$how=pt_PT.UTF-8" /bin/bash -c '. "$1"; sb_rate 1258291; sb_bytes 9322838; sb_bytes 2456789012; printf "100 pages of page size of 16384\nPages active: 300000.\nPages wired down: 200000.\nPages occupied by compressor: 318000.\n" | sb_mem 25769803776; date -j -f %Y-%m-%d 2026-11-11 "+%a %-d %b"; echo "${LC_ALL:-unset}"' _ "$lib"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "1.2M" ] || { echo "$how: ${lines[0]}"; false; }
+    [ "${lines[1]}" = "8.9 MB" ]
+    [ "${lines[2]}" = "2.3 GB" ]
+    [ "${lines[3]}" = "52" ]
+    [ "${lines[4]}" = "Wed 11 Nov" ] || { echo "$how: ${lines[4]}"; false; }
+    [ "${lines[5]}" = "unset" ]
+  done
+}
+
+@test "sb_popup_open: the item whose popup is open, nothing when none is" {
+  SB_POPUP="$BATS_TEST_TMPDIR/popup"
+  [ "$(sb_popup_open)" = "" ]
+  echo net.down > "$SB_POPUP"
+  [ "$(sb_popup_open)" = "net.down" ]
+  echo 'x; rm -rf y' > "$SB_POPUP"
+  [ "$(sb_popup_open)" = "" ]
+}
+
+@test "sb_popup_close: closes the open popup and forgets it; nothing to run when none is open" {
+  SB_POPUP="$BATS_TEST_TMPDIR/popup"
+  SB="$BATS_TEST_TMPDIR/sketchybar"
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s"\n' "$BATS_TEST_TMPDIR/calls" > "$SB"
+  chmod +x "$SB"
+  sb_popup_close
+  [ ! -e "$BATS_TEST_TMPDIR/calls" ]
+  echo clock > "$SB_POPUP"
+  sb_popup_close
+  [ "$(cat "$BATS_TEST_TMPDIR/calls")" = "--set clock popup.drawing=off" ]
+  [ ! -e "$SB_POPUP" ]
 }
 
 @test "sb_workspaces: the numbers in use, space-separated" {

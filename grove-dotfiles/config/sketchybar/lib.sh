@@ -5,6 +5,21 @@
 
 SB_NONE="—"
 
+# Numbers and dates read the same whatever the Mac's region: macOS awk follows
+# LC_NUMERIC (a decimal-comma locale prints "1,2M"), date and cal follow
+# LC_TIME (Portuguese day names). LC_ALL would win over both, so it steps down
+# to LANG first, which keeps the text encoding.
+if [ -n "${LC_ALL:-}" ]; then
+  export LANG="$LC_ALL" LC_CTYPE="$LC_ALL"
+  unset LC_ALL
+fi
+export LC_NUMERIC=C LC_TIME=C
+
+# The open popup: its item's name is kept in this file (missing: none open),
+# so closing it on an app or workspace switch costs one file test, no query.
+# sketchybarrc removes it, as a reload closes every popup.
+SB_POPUP="${TMPDIR:-/tmp}/grove-sketchybar-popup"
+
 # sb_rate BYTES_PER_SECOND: compact, at most 5 characters so the bar's slot
 # never moves: "512B", "84K", "1.2M" (one decimal under 10), "12M", "1.0G".
 sb_rate() {
@@ -133,13 +148,37 @@ sb_totals() {
   }'
 }
 
-# sb_top_apps N < `nettop -P -L 1 -x -J bytes_in,bytes_out`: the N largest
-# "app in out" by in + out (the ".pid" suffix dropped).
+# sb_top_apps N < `nettop -P -L 1 -x -n -J bytes_in,bytes_out` (CSV, each row
+# "name.pid,in,out,"): the N largest by in + out, one "app<TAB>in<TAB>out"
+# each, the ".pid" suffix dropped. Tabs, because a name can have spaces
+# ("Google Chrome H"); the two counters are taken from the row's end.
 sb_top_apps() {
-  awk -F ',' -v n="$1" 'NR > 1 && $1 != "" {
-    name = $1; sub(/\.[0-9]+$/, "", name)
-    print ($2 + $3), name, $2, $3
-  }' | sort -rn -k1,1 | head -n "$1" | awk '{ print $2, $3, $4 }'
+  awk -v OFS='\t' '{
+    sub(/,$/, "")
+    if (!match($0, /,[0-9]+,[0-9]+$/)) next
+    name = substr($0, 1, RSTART - 1); sub(/\.[0-9]+$/, "", name)
+    if (name == "") next
+    split(substr($0, RSTART + 1), b, ",")
+    print b[1] + b[2], name, b[1], b[2]
+  }' | sort -t "$(printf '\t')" -rn -k1,1 | head -n "$1" | cut -f 2-
+}
+
+# sb_popup_open: the item whose popup is open, nothing when none is.
+sb_popup_open() {
+  local item=""
+  [ -f "$SB_POPUP" ] && read -r item < "$SB_POPUP"
+  case "$item" in *[!a-z0-9._]*) item="" ;; esac
+  echo "$item"
+}
+
+# sb_popup_close: close the open popup, if any (one sketchybar call; nothing
+# is run when none is open). Uses the plugin's $SB.
+sb_popup_close() {
+  [ -e "$SB_POPUP" ] || return 0
+  local item
+  item="$(sb_popup_open)"
+  rm -f "$SB_POPUP"
+  [ -z "$item" ] || "${SB:-sketchybar}" --set "$item" popup.drawing=off
 }
 
 # sb_workspaces < `aerospace list-workspaces …`: the names, space-separated.

@@ -36,6 +36,12 @@ plugin() {
     "$@" /bin/bash "$CFG/plugins/$name.sh"
 }
 
+# click ITEM: a click on an item with a popup, as its click_script runs.
+click() {
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME="$1" SENDER=mouse.clicked \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" /bin/bash "$CFG/plugins/popup.sh" "$1"
+}
+
 calls() { cat "$CALLS" 2>/dev/null; }
 ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi; }
 
@@ -70,7 +76,7 @@ ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; f
 
 # rc: run sketchybarrc against the fake sketchybar (one recorded line per call).
 rc() {
-  run env -i HOME="$HOME" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" /bin/bash "$CFG/sketchybarrc"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" /bin/bash "$CFG/sketchybarrc"
 }
 
 @test "sketchybar: no Grove Keys glyph on the right (it lives in the pine's menu)" {
@@ -274,7 +280,15 @@ rc() {
   [ "$(ncalls)" -eq 1 ]
   [[ "$(calls)" == *"--set net.total.1 drawing=on label=en0  ↓ 2.3 GB  ↑ 179 MB"* ]] || false
   [[ "$(calls)" == *"--set net.app.1 drawing=on label=mDNSResponder  ↓ 8.9 MB  ↑ 1.8 MB"* ]] || false
+  [[ "$(calls)" == *"--set net.app.2 drawing=on label=Google Chrome H  ↓ 2.0 MB  ↑ 74 KB"* ]] || false
   [[ "$(calls)" == *"--set net.app.5 drawing=on"* ]] || false
+}
+
+@test "network popup: nettop is asked not to resolve names (-n), or it outlasts its 2 s" {
+  fake netstat 'cat "'"$FX"'/netstat.txt"'
+  fake nettop 'case " $* " in *" -n "*) cat "'"$FX"'/nettop.csv" ;; *) exit 1 ;; esac'
+  plugin network_popup
+  [[ "$(calls)" == *"--set net.app.1 drawing=on label=mDNSResponder"* ]] || false
 }
 
 @test "network popup: a nettop that fails says top apps unavailable" {
@@ -352,16 +366,96 @@ rc() {
   fake cal 'printf "   November 2026\nSu Mo Tu We Th Fr Sa\n 1  2  3  4  5  6  7\n 8  9 10 11 12 13 14\n"'
   plugin clock_popup
   [ "$(ncalls)" -eq 1 ]
-  [[ "$(calls)" == *"--set cal.1 drawing=on label=   November 2026"* ]] || false
-  [[ "$(calls)" == *"--set cal.4 drawing=on label= 8  9 10 11 12 13 14"* ]] || false
+  # Leading spaces are no-break spaces (SketchyBar would cut the row's end otherwise).
+  local nb=$'\xc2\xa0'
+  [[ "$(calls)" == *"--set cal.1 drawing=on label=$nb$nb${nb}November 2026"* ]] || false
+  [[ "$(calls)" == *"--set cal.4 drawing=on label=${nb}8  9 10 11 12 13 14"* ]] || false
   [[ "$(calls)" == *"--set cal.5 drawing=off"* ]] || false
   [[ "$(calls)" == *"--set cal.8 drawing=off"* ]] || false
 }
 
-@test "clock: a click toggles the calendar popup" {
+@test "clock: under a Portuguese locale the day and month stay English" {
+  locale -a | grep -qx 'pt_PT.UTF-8' || skip "no pt_PT.UTF-8 locale"
+  plugin clock LC_ALL=pt_PT.UTF-8
+  calls | grep -qE -- '^--set clock label=(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [0-9]+ (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)  [0-9]{2}:[0-9]{2}$' || { calls; false; }
+}
+
+@test "popups: a click on the clock or either network rate goes to popup.sh" {
   rc
-  calls | grep -qE -- '--set clock .*click_script=sketchybar --set clock popup.drawing=toggle; .*/plugins/clock_popup.sh'
+  calls | grep -qE -- '--set clock .*click_script=[^ ]*/plugins/popup.sh clock( |$)'
+  calls | grep -qE -- '--set net.up .*click_script=[^ ]*/plugins/popup.sh net.down( |$)'
+  calls | grep -qE -- '--set net.down .*click_script=[^ ]*/plugins/popup.sh net.down( |$)'
   calls | grep -qE -- '--add item cal.1 popup.clock'
+  calls | grep -qE -- '--add item net.app.1 popup.net.down'
+  # Nothing toggles a popup directly: that would show it before it's filled.
+  ! grep -q 'popup.drawing=toggle' "$SB/sketchybarrc" "$SB"/plugins/*.sh
+}
+
+@test "popups: a reload forgets the open popup" {
+  echo clock > "$BATS_TEST_TMPDIR/grove-sketchybar-popup"
+  rc
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/grove-sketchybar-popup" ]
+}
+
+@test "popups: a click fills the popup, then shows it; a second click closes it without filling" {
+  fake cal 'printf "   November 2026\nSu Mo Tu We Th Fr Sa\n"'
+  click clock
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 2 ]
+  [[ "$(calls | sed -n 1p)" == "--set cal.1 drawing=on label="*"November 2026"* ]] || false
+  [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=on" ]
+  : > "$CALLS"
+  click clock
+  [ "$(calls)" = "--set clock popup.drawing=off" ]
+  : > "$CALLS"
+  click clock
+  [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=on" ]
+}
+
+@test "popups: opening one closes the other" {
+  fake cal 'echo "   November 2026"'
+  fake netstat 'cat "'"$FX"'/netstat.txt"'
+  fake nettop 'cat "'"$FX"'/nettop.csv"'
+  click clock
+  : > "$CALLS"
+  click net.down
+  [ "$(ncalls)" -eq 2 ]
+  [[ "$(calls | sed -n 1p)" == "--set net.total.1 drawing=on"* ]] || false
+  [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=off --set net.down popup.drawing=on" ]
+  : > "$CALLS"
+  click clock
+  [ "$(calls | sed -n 2p)" = "--set net.down popup.drawing=off --set clock popup.drawing=on" ]
+}
+
+@test "popups: an item without a popup does nothing" {
+  click volume
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 0 ]
+}
+
+@test "popups: an app switch or a workspace change closes the open one, a timed refresh doesn't" {
+  fake aerospace 'case "$*" in *--focused*) echo 1 ;; *) printf "1\n" ;; esac'
+  fake cal 'echo "   November 2026"'
+  local sender
+  for sender in front_app_switched aerospace_workspace_change; do
+    click clock
+    : > "$CALLS"
+    plugin workspaces SENDER="$sender"
+    [ "$(calls | sed -n 1p)" = "--set clock popup.drawing=off" ] || { echo "$sender"; calls; false; }
+    [ "$(ncalls)" -eq 2 ]
+    # Closed: the next switch has nothing to close.
+    : > "$CALLS"
+    plugin workspaces SENDER="$sender"
+    [ "$(ncalls)" -eq 1 ]
+    [[ "$(calls)" != *"popup.drawing"* ]] || false
+  done
+  click clock
+  : > "$CALLS"
+  plugin workspaces SENDER=routine
+  [[ "$(calls)" != *"popup.drawing"* ]] || false
+  plugin workspaces
+  [[ "$(calls)" != *"popup.drawing"* ]] || false
 }
 
 @test "sketchybar: the pine opens the grove menu, the app name the app's menus" {

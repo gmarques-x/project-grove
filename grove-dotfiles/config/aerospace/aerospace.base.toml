@@ -27,16 +27,17 @@ key-mapping.preset = 'qwerty'
 # No persistent-workspaces: a workspace exists only while it has a window (or
 # is focused), so the bar can show just the ones in use.
 
-# The top gap clears the Grove bar: its 48 pt strip + 8.
 gaps.inner.horizontal = 8
 gaps.inner.vertical = 8
 gaps.outer.left = 8
 gaps.outer.bottom = 8
-# Windows start where the Grove bar's 48 pt strip ends, 8 pt below its
-# floating bar (the same as the gaps between windows): 48 where the menu bar
-# reserves nothing; the built-in screen keeps 37.5 pt for the notch even when
-# the menu bar hides, so it needs only 11 more.
-gaps.outer.top = [{ monitor."built-in" = 11 }, 48]
+# Windows start 3 pt below the Grove bar's 48 pt strip: the strip is opaque
+# and above everything, and a window's border (borders, width 5) reaches about
+# 2.5 pt outside the window, so a top-row window right at the strip's edge has
+# its top border covered. 51 where the menu bar reserves nothing; the built-in
+# screen keeps 37.5 pt for the notch even when the menu bar hides, so it needs
+# only 14 more.
+gaps.outer.top = [{ monitor."built-in" = 14 }, 51]
 gaps.outer.right = 8
 
 # Floating apps, also for windows already open when AeroSpace starts.

@@ -11,6 +11,8 @@ CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar}"
 export CONFIG_DIR
 # shellcheck source=/dev/null
 . "$CONFIG_DIR/colors.sh"
+# shellcheck source-path=SCRIPTDIR source=lib.sh
+. "$CONFIG_DIR/lib.sh"
 P="$CONFIG_DIR/plugins"
 TEXT="JetBrains Mono:Regular:13.0"
 # Fixed label widths keep the separators still as values change: JetBrains
@@ -29,6 +31,8 @@ sketchybar --default label.font="$TEXT" label.color="$FG" icon.font="$TEXT" icon
   padding_left=5 padding_right=5 icon.padding_right=6
 
 sketchybar --add event aerospace_workspace_change
+# A reload closes every popup: forget the one plugins/popup.sh had open.
+rm -f "$SB_POPUP"
 
 # sep NAME SIDE: a bg3 bar between groups.
 sep() {
@@ -60,6 +64,7 @@ for n in 1 2 3 4 5 6 7 8 9; do
   sep "sep.ws.$n" left
   sketchybar --set "sep.ws.$n" drawing=off
 done
+# workspaces.sh also closes the open popup on these two events.
 sketchybar --set ws.1 script="$P/workspaces.sh" update_freq=30 \
   --subscribe ws.1 aerospace_workspace_change front_app_switched
 
@@ -70,11 +75,14 @@ sketchybar --add item front_app left \
 
 # Right (the first added is the rightmost): clock, volume, Wi-Fi, battery,
 # network, memory, CPU. Grove Keys lives in the pine's menu.
+# A click on the clock or the network rates goes to plugins/popup.sh: it fills
+# the popup, shows it and closes the other; a second click, an app switch or
+# a workspace change closes it.
 sketchybar --add item clock right \
   --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off padding_right=14 "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
     popup.background.border_width=1 popup.background.border_color="$BG3" \
-    click_script="sketchybar --set clock popup.drawing=toggle; $P/clock_popup.sh" \
+    click_script="$P/popup.sh clock" \
   --subscribe clock mouse.entered mouse.exited
 for i in 1 2 3 4 5 6 7 8; do
   sketchybar --add item "cal.$i" popup.clock --set "cal.$i" icon.drawing=off drawing=off
@@ -102,14 +110,14 @@ sep sep.r4 right
 
 sketchybar --add item net.up right \
   --set net.up icon="↑" icon.color="$ORANGE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/hover.sh" \
-    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh" \
+    click_script="$P/popup.sh net.down" \
   --subscribe net.up mouse.entered mouse.exited
 
 sketchybar --add item net.down right \
   --set net.down icon="↓" icon.color="$BLUE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/net.down.sh" update_freq=2 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
     popup.background.border_width=1 popup.background.border_color="$BG3" \
-    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh" \
+    click_script="$P/popup.sh net.down" \
   --subscribe net.down mouse.entered mouse.exited
 
 for i in 1 2 3 4; do

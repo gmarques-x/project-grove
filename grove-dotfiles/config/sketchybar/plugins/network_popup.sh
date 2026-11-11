@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · the network popup: each interface's totals since boot (net.total.1…4) and the top five apps (net.app.1…5); nettop gets 2 s.
+# Grove bar · the network popup's rows: each interface's totals since boot (net.total.1…4) and the top five apps (net.app.1…5); nettop gets 2 s. plugins/popup.sh runs it before showing the popup.
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -25,13 +25,14 @@ while read -r name tin tout; do
   args+=(--set "net.total.$i" drawing=on label="$name  ↓ $(sb_bytes "$tin")  ↑ $(sb_bytes "$tout")")
 done <<< "$(netstat -ibn 2>/dev/null | sb_totals)"
 for ((j = i + 1; j <= 4; j++)); do args+=(--set "net.total.$j" drawing=off); done
-apps="$(sb_timeout 2 nettop -P -L 1 -x -J bytes_in,bytes_out 2>/dev/null | sb_top_apps 5)"
+# -n: no name lookups. With them nettop takes 5 s here, over its limit; without, 10 ms.
+apps="$(sb_timeout 2 nettop -P -L 1 -x -n -J bytes_in,bytes_out 2>/dev/null | sb_top_apps 5)"
 i=0
 if [ -z "$apps" ]; then
   i=1
   args+=(--set net.app.1 drawing=on label="top apps unavailable")
 else
-  while read -r name ain aout; do
+  while IFS=$'\t' read -r name ain aout; do
     i=$((i + 1))
     args+=(--set "net.app.$i" drawing=on label="$name  ↓ $(sb_bytes "$ain")  ↑ $(sb_bytes "$aout")")
   done <<< "$apps"
