@@ -115,6 +115,42 @@ import Testing
         #expect(BindingRows.value(fromText: " , ") == nil)
     }
 
+    /// A bare or shift-only key in main would be taken from every app.
+    @Test func mainNeedsCtrlAltOrCmd() throws {
+        #expect(Shortcut(aerospace: "alt-1")!.isSafeForMain)
+        #expect(Shortcut(aerospace: "ctrl-q")!.isSafeForMain)
+        #expect(Shortcut(aerospace: "cmd-shift-q")!.isSafeForMain)
+        #expect(Shortcut(aerospace: "hyper-t")!.isSafeForMain)
+        #expect(!Shortcut(aerospace: "q")!.isSafeForMain)
+        #expect(!Shortcut(aerospace: "shift-q")!.isSafeForMain)
+        #expect(BindingSlot.binding(mode: "main", key: "alt-q").isSafe)
+        #expect(!BindingSlot.binding(mode: "main", key: "shift-q").isSafe)
+        #expect(BindingSlot.binding(mode: "service", key: "q").isSafe)
+        #expect(BindingSlot.launcher(key: "q").isSafe)
+
+        // Core refuses them too.
+        var f = try shipped()
+        let before = f
+        f.add(.binding(mode: "main", key: "q"), command: "close", replacing: [])
+        f.move(.binding(mode: "main", key: "alt-h"), to: .binding(mode: "main", key: "shift-h"), replacing: [])
+        #expect(f == before)
+        f.add(.binding(mode: "service", key: "q"), command: "close", replacing: [])
+        #expect(f.modes[1].bindings.last?.key == "q")
+    }
+
+    /// The launcher Replace path (the app picker's `assign`) removes the
+    /// clashing Hyper binding, spelled out or not, and overwrites a launcher.
+    @Test func launcherReplaceRemovesTheHyperBinding() throws {
+        var f = try shipped()
+        f.setBinding(mode: "main", key: "cmd-ctrl-alt-shift-g", value: .string("workspace 3"))
+        #expect(f.clashes(.launcher(key: "g"), except: nil) == [.binding(mode: "main", key: "cmd-ctrl-alt-shift-g")])
+        f.assign(.launcher(bundleID: "com.mitchellh.ghostty"), layerID: "hyper", shortcut: "hyper-g")
+        #expect(f.clashes(.launcher(key: "g"), except: nil) == [.launcher(key: "g")])
+        #expect(!f.modes[0].bindings.contains { $0.key == "cmd-ctrl-alt-shift-g" })
+        f.assign(.launcher(bundleID: "com.google.Chrome"), layerID: "hyper", shortcut: "hyper-g")
+        #expect(f.launch.map(\.bundleID) == ["com.google.Chrome"])
+    }
+
     @Test func millisecondFields() {
         #expect(HyperSettings.milliseconds("200") == 200)
         #expect(HyperSettings.milliseconds(" 0 ") == 0)

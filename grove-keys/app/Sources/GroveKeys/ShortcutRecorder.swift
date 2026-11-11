@@ -16,8 +16,10 @@ final class ShortcutRecorder: ObservableObject {
     private var onRecord: ((Shortcut) -> Void)?
     private var onCancel: (() -> Void)?
 
+    /// A recording already running on another row is cancelled (its
+    /// `onCancel` runs), so an empty new row doesn't linger.
     func start(_ row: String, onRecord: @escaping (Shortcut) -> Void, onCancel: @escaping () -> Void = {}) {
-        stop()
+        if recording != nil { cancel() }
         recording = row
         self.onRecord = onRecord
         self.onCancel = onCancel

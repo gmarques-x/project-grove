@@ -41,6 +41,8 @@ struct BindingsView: View {
     // `State` used directly: no SwiftUI macros with the Command Line Tools.
     private var expanded = State<Set<String>>(initialValue: [])
     private var clash = State<PendingClash?>(initialValue: nil)
+    /// The row whose last press was a bare or shift-only key in main (still recording).
+    private var unsafeRow = State<String?>(initialValue: nil)
     private var draft = State<Draft?>(initialValue: nil)
     private var appPick = State<AppPick?>(initialValue: nil)
 
@@ -242,9 +244,17 @@ struct BindingsView: View {
 
     private func record(row: String, from: BindingSlot?, launcher: Bool, mode: String) {
         clash.wrappedValue = nil
+        unsafeRow.wrappedValue = nil
         if recorder.recording == row { recorder.cancel(); return }
         recorder.start(row, onRecord: { shortcut in
             let to = BindingSlot.recorded(shortcut, launcher: launcher, mode: mode)
+            // A main-mode key without ⌃, ⌥ or ⌘ would be taken from every app:
+            // ignore the press and keep recording.
+            guard to.isSafe else {
+                record(row: row, from: from, launcher: launcher, mode: mode)
+                unsafeRow.wrappedValue = row
+                return
+            }
             let clashes = model.keys.clashes(to, except: from)
             if clashes.isEmpty {
                 commit(from: from, to: to, replacing: [])
@@ -252,8 +262,11 @@ struct BindingsView: View {
                 clash.wrappedValue = PendingClash(row: row, from: from, to: to, clashes: clashes)
             }
         }, onCancel: {
-            // Esc on a new row with nothing recorded drops it.
-            if from == nil, draft.wrappedValue?.slot == nil { draft.wrappedValue = nil }
+            // Esc (or another row starting) on this new row with nothing
+            // recorded drops it.
+            if from == nil, let d = draft.wrappedValue, "draft:" + d.group == row, d.slot == nil {
+                draft.wrappedValue = nil
+            }
         })
     }
 
@@ -265,7 +278,11 @@ struct BindingsView: View {
         }
         switch to {
         case .launcher(let key):
-            // The app picker writes it; choosing an app replaces what the key did.
+            // The app picker writes it with `assign(.launcher)`, which removes
+            // the clashing hyper- binding (spelled out or not) and overwrites a
+            // launcher on the key: `replacing` is applied there (tested in
+            // BindingsEditTests.launcherReplaceRemovesTheHyperBinding). Closing
+            // the picker without an app changes nothing.
             draft.wrappedValue = nil
             pickApp(anchor: "add:launch", key: key)
         case .binding:
@@ -291,6 +308,8 @@ struct BindingsView: View {
     private func addButton(_ title: String, group: String) -> some View {
         Button {
             let row = "draft:" + group
+            // Cancel first, so the old recording's cancel can't drop the new draft.
+            recorder.cancel()
             draft.wrappedValue = Draft(group: group)
             record(row: row, from: nil, launcher: group == "launch", mode: group == "launch" ? "main" : group)
         } label: {
@@ -307,6 +326,10 @@ struct BindingsView: View {
 
     @ViewBuilder
     private func clashLine(_ row: String) -> some View {
+        if unsafeRow.wrappedValue == row, recorder.recording == row {
+            hint("Main-mode shortcuts need ⌃, ⌥ or ⌘")
+                .foregroundStyle(Color(theme.orange))
+        }
         if let c = clash.wrappedValue, c.row == row {
             HStack(spacing: 10) {
                 Text("\(describe(c.to)) already: " + c.clashes.map(action).joined(separator: "; "))
@@ -432,10 +455,12 @@ private struct RowView<Action: View>: View {
     }
 }
 
-/// A row's action as editable text: Return saves, blank is not written.
+/// A row's action as editable text: written on Return or when focus leaves,
+/// only if changed; blank is put back.
 private struct CommandField: View {
     let text: String
     let onCommit: (String) -> Void
+    @FocusState private var focused: Bool
     private var draft: State<String>
 
     init(text: String, onCommit: @escaping (String) -> Void) {
@@ -449,120 +474,18 @@ private struct CommandField: View {
             .textFieldStyle(.plain)
             .lineLimit(1)
             .help("AeroSpace syntax · a, b runs both · ↩ saves")
-            .onSubmit {
-                if BindingRows.value(fromText: draft.wrappedValue) == nil {
-                    draft.wrappedValue = text
-                } else {
-                    onCommit(draft.wrappedValue)
-                }
-            }
-    }
-}
-
-/// Hyper key: on/off, what a tap sends, the two timings (spec §5).
-private struct HyperGroup: View {
-    @ObservedObject var model: AppModel
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        let h = model.keys.hyper
-        BindingsGroup(title: "Hyper key", note: "Caps Lock") {
-            setting("Hyper on") {
-                Toggle("", isOn: Binding(get: { h.enabled }, set: { on in update { $0.enabled = on } }))
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .tint(Color(theme.green))
-                    .labelsHidden()
-            }
-            setting("Tap alone sends") {
-                Menu {
-                    Button("Escape") { update { $0.tap = .escape } }
-                    Button("None") { update { $0.tap = .none } }
-                } label: {
-                    pill(h.tap == .escape ? "Escape ▾" : "None ▾")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-            }
-            setting("A tap is shorter than") {
-                MsField(value: h.tapMs) { ms in update { $0.tapMs = ms } }.id(h.tapMs)
-            }
-            setting("Cheat sheet after holding") {
-                MsField(value: h.cheatsheetMs) { ms in update { $0.cheatsheetMs = ms } }.id(h.cheatsheetMs)
-                    .help("0 = no cheat sheet")
-            }
-        }
-    }
-
-    private func update(_ change: @escaping (inout HyperSettings) -> Void) {
-        model.edit { keys in
-            var h = keys.hyper
-            change(&h)
-            keys.setHyper(h)
-        }
-    }
-
-    private func setting<V: View>(_ title: String, @ViewBuilder _ control: () -> V) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            control()
-        }
-        .font(GroveFont.mono(12))
-        .padding(.horizontal, 6).padding(.vertical, 4)
-    }
-
-    private func pill(_ text: String) -> some View {
-        Text(text)
-            .font(GroveFont.mono(11.5))
-            .foregroundStyle(Color(theme.fg))
-            .padding(.horizontal, 9).padding(.vertical, 3)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(theme.bg3), lineWidth: 1))
-    }
-}
-
-/// "200 ms": a whole number ≥ 0; written on Return or when focus leaves,
-/// otherwise put back. A bad value turns the border red and isn't written.
-private struct MsField: View {
-    let value: Int
-    let onCommit: (Int) -> Void
-    @Environment(\.theme) private var theme
-    @FocusState private var focused: Bool
-    private var text: State<String>
-
-    init(value: Int, onCommit: @escaping (Int) -> Void) {
-        self.value = value
-        self.onCommit = onCommit
-        text = State(initialValue: String(value))
-    }
-
-    var body: some View {
-        let valid = HyperSettings.milliseconds(text.wrappedValue) != nil
-        HStack(spacing: 4) {
-            TextField("", text: text.projectedValue)
-                .textFieldStyle(.plain)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 44)
-                .focused($focused)
-                .onSubmit(commit)
-            Text("ms").foregroundStyle(Color(theme.grey1))
-        }
-        .font(GroveFont.mono(11.5))
-        .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(valid ? theme.bg3 : theme.red), lineWidth: 1))
-        .help(valid ? "Milliseconds · ↩ saves" : "A whole number of milliseconds, 0 or more")
-        .onChange(of: focused) { _, now in if !now { commit() } }
+            .focused($focused)
+            .onSubmit(commit)
+            .onChange(of: focused) { _, now in if !now { commit() } }
     }
 
     private func commit() {
-        if let ms = HyperSettings.milliseconds(text.wrappedValue) {
-            if ms != value { onCommit(ms) } else { text.wrappedValue = String(value) }
+        let typed = draft.wrappedValue
+        guard typed != text else { return }
+        if BindingRows.value(fromText: typed) == nil {
+            draft.wrappedValue = text
         } else {
-            text.wrappedValue = String(value)
+            onCommit(typed)
         }
     }
 }

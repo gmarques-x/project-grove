@@ -8,12 +8,24 @@ public enum BindingSlot: Hashable, Sendable {
 
     /// Where a recorded shortcut goes: a launcher row takes the key alone
     /// (Hyper is implied), a binding row the whole shortcut.
+    /// False for a main-mode binding without ⌃, ⌥ or ⌘ (see `Shortcut.isSafeForMain`).
+    public var isSafe: Bool {
+        guard case .binding(let mode, let key) = self, mode == "main" else { return true }
+        return Shortcut(aerospace: key)?.isSafeForMain ?? false
+    }
+
     public static func recorded(_ shortcut: Shortcut, launcher: Bool, mode: String) -> BindingSlot {
         launcher ? .launcher(key: shortcut.key) : .binding(mode: mode, key: shortcut.aerospace)
     }
 }
 
 extension Shortcut {
+    /// A main-mode binding is live in every app: without ⌃, ⌥ or ⌘ (a bare or
+    /// shift-only key) AeroSpace would take that key from typing everywhere.
+    public var isSafeForMain: Bool {
+        !modifiers.isDisjoint(with: [.ctrl, .alt, .cmd])
+    }
+
     // NSEvent.ModifierFlags raw values (Core doesn't import AppKit).
     private static let flagBits: [(UInt, Modifier)] = [
         (1 << 17, .shift), (1 << 18, .ctrl), (1 << 19, .alt), (1 << 20, .cmd),
@@ -108,9 +120,10 @@ extension KeysFile {
     }
 
     /// Gives an entry a new shortcut where it stands, after removing what it
-    /// replaces. Launchers move to launchers, bindings within their mode.
+    /// replaces. Launchers move to launchers, bindings within their mode; an
+    /// unsafe main-mode shortcut changes nothing.
     public mutating func move(_ from: BindingSlot, to: BindingSlot, replacing: [BindingSlot]) {
-        guard from != to else { return }
+        guard from != to, to.isSafe else { return }
         remove(replacing.filter { $0 != from })
         switch (from, to) {
         case (.launcher(let a), .launcher(let b)):
@@ -122,9 +135,11 @@ extension KeysFile {
         }
     }
 
-    /// A new binding from the row's text ("a, b" is a list); blank adds nothing.
+    /// A new binding from the row's text ("a, b" is a list); blank, or an
+    /// unsafe main-mode shortcut, adds nothing.
     public mutating func add(_ slot: BindingSlot, command: String, replacing: [BindingSlot]) {
-        guard case .binding(let mode, let key) = slot, let value = BindingRows.value(fromText: command) else { return }
+        guard case .binding(let mode, let key) = slot, slot.isSafe,
+              let value = BindingRows.value(fromText: command) else { return }
         remove(replacing.filter { $0 != slot })
         setBinding(mode: mode, key: key, value: value)
     }
