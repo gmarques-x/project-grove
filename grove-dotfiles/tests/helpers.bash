@@ -4,6 +4,9 @@ grove_test_setup() {
   GROVE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
   export GROVE_ROOT
   export HOME="$BATS_TEST_TMPDIR/home"
+  # Modules and the apps read ~/.config through XDG_CONFIG_HOME when it's set
+  # (it points at the live config here), so a test must not inherit it.
+  unset XDG_CONFIG_HOME
   mkdir -p "$HOME" "$BATS_TEST_TMPDIR/stubs"
   # Never the live config (~/.config points at it): a copy of the tracked and
   # generated files, so a test that forgets its own GROVE_CONFIG and runs an

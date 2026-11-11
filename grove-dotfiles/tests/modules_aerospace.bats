@@ -34,6 +34,9 @@ exit 0'
   export GROVE_PS=fakeps GROVE_POLL_SECONDS=0 GROVE_START_SECONDS=0
   export FAKE_PS=/Applications/AeroSpace.app/Contents/MacOS/AeroSpace
   export GROVE_BREW="$BATS_TEST_TMPDIR/nobrew/brew"
+  # grove-keys renders aerospace.toml (module 96); here it's already there.
+  mkdir -p "$HOME/.config/aerospace"
+  echo "# rendered" > "$HOME/.config/aerospace/aerospace.toml"
   load_module
 }
 
@@ -46,6 +49,13 @@ exit 0'
   [ "$status" -eq 0 ]
   run grep -E '^(defaults write|open)' "$CALLS"
   [ "$status" -ne 0 ]
+}
+
+@test "aerospace: check fails without aerospace.toml and names keys-app" {
+  rm "$HOME/.config/aerospace/aerospace.toml"
+  run check
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"AeroSpace has no config yet; run grove install keys-app"* ]] || false
 }
 
 @test "aerospace: check needs work without aerospace" {

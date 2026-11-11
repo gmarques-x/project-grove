@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # 98-aerospace: AeroSpace tiles the desktop and starts JankyBorders (its config
-# is config/aerospace/aerospace.toml, reached through 05-config's link).
+# is aerospace.toml, which Grove Keys renders from keys.toml and config/aerospace/
+# aerospace.base.toml; module 96-keys-app writes it).
 # Homebrew installs both. Seams: GROVE_AEROSPACE and GROVE_BORDERS (command
 # paths), GROVE_PS (default ps), GROVE_POLL_SECONDS, GROVE_START_SECONDS; defaults and open from PATH.
 
@@ -37,6 +38,10 @@ _as_running() {
 _as_allowed() { "$(_as_aerospace)" list-workspaces --focused >/dev/null 2>&1; }
 
 check() {
+  if [ ! -f "${XDG_CONFIG_HOME:-$HOME/.config}/aerospace/aerospace.toml" ]; then
+    grove_fail "AeroSpace has no config yet; run grove install keys-app"
+    return 1
+  fi
   _as_aerospace >/dev/null || return 3
   _as_borders >/dev/null || return 3
   _as_spans || return 3
