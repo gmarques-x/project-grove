@@ -27,18 +27,18 @@ struct SchemeTile: View {
                 Text(contrastName(scheme)).font(GroveFont.mono(10.5))
             }
             .foregroundStyle(Color(colors.fg))
-            .padding(8)
+            .padding(GroveSpace.s8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(colors.bg0), in: shape)
             .overlay(alignment: .topTrailing) {
                 if isBusy {
-                    ProgressView().controlSize(.small).padding(5)
+                    ProgressView().controlSize(.small).padding(GroveSpace.s4)
                 } else if isCurrent {
                     Text("✓")
                         .font(GroveFont.mono(11, .bold))
                         .foregroundStyle(Color(colors.fg))
                         .padding(.top, 6)
-                        .padding(.trailing, 7)
+                        .padding(.trailing, GroveSpace.s8)
                 }
             }
             .overlay {

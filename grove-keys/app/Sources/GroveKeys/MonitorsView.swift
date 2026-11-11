@@ -21,7 +21,7 @@ struct MonitorsView: View {
         let targets = Dictionary(saved.map { ($0.workspace, $0.target) }, uniquingKeysWith: { a, _ in a })
         let choices = Monitors.choices(displays: displays.wrappedValue, current: saved.map(\.target))
         BindingsGroup(title: "Monitors", note: "this Mac") {
-            HStack(spacing: 8) {
+            HStack(spacing: GroveSpace.s8) {
                 Circle().fill(Color(theme.green)).frame(width: 7, height: 7)
                 Text(connected)
             }
@@ -66,9 +66,9 @@ struct MonitorsView: View {
                     .lineLimit(1).truncationMode(.middle)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6).padding(.horizontal, 2)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-            .lightOutline(cornerRadius: 6)
+            .padding(.vertical, 6).padding(.horizontal, GroveSpace.s2)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control)
             .contentShape(Rectangle())
         }
         .menuStyle(.button)
@@ -82,6 +82,6 @@ struct MonitorsView: View {
             .font(GroveFont.mono(11.5))
             .foregroundStyle(theme.quiet)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 6).padding(.vertical, 2)
+            .padding(.horizontal, 6).padding(.vertical, GroveSpace.s2)
     }
 }

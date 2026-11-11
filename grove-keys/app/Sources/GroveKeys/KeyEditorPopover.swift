@@ -124,8 +124,8 @@ struct KeyEditorPopover: View {
             segment("None", .none, enabled: model.canEdit)
         }
         .padding(3)
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-        .lightOutline(cornerRadius: 7)
+        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+        .lightOutline(cornerRadius: GroveRadius.control)
     }
 
     private func segment(_ title: String, _ value: Kind, enabled: Bool) -> some View {
@@ -137,9 +137,9 @@ struct KeyEditorPopover: View {
             Text(title)
                 .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 5))
-                .lightOutline(cornerRadius: 5, when: on)
+                .padding(.vertical, GroveSpace.s4)
+                .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                .lightOutline(cornerRadius: GroveRadius.control, when: on)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -157,11 +157,11 @@ struct KeyEditorPopover: View {
         return VStack(alignment: .leading, spacing: 6) {
             TextField("Search apps", text: search.projectedValue)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 9).padding(.vertical, 7)
-                .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(theme.line, lineWidth: 1))
+                .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s8)
+                .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: GroveSpace.s2) {
                     ForEach(shown) { app in
                         option(app.name, detail: app.bundleID == current ? "current" : "",
                                on: app.bundleID == current) {
@@ -171,14 +171,14 @@ struct KeyEditorPopover: View {
                     if shown.isEmpty {
                         Text(apps.wrappedValue.isEmpty ? "Looking for apps…" : "No app matches")
                             .foregroundStyle(theme.quiet)
-                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
                     }
                 }
-                .padding(4)
+                .padding(GroveSpace.s4)
             }
             .frame(height: 180)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-            .lightOutline(cornerRadius: 7)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control)
         }
         .task {
             // Once per popover: the list stays while switching segments.
@@ -193,7 +193,7 @@ struct KeyEditorPopover: View {
     // MARK: AeroSpace
 
     private var aerospace: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: GroveSpace.s8) {
             if !commandAllowed {
                 theme.marked("Main-mode shortcuts need ⌃, ⌥ or ⌘", theme.orange)
                     .font(GroveFont.mono(11))
@@ -204,9 +204,9 @@ struct KeyEditorPopover: View {
 
     private var commandList: some View {
         let current: String? = if case .aerospace(let c) = action { c } else { nil }
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: GroveSpace.s8) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
+                LazyVStack(alignment: .leading, spacing: GroveSpace.s2) {
                     ForEach(CommandCatalog.entries, id: \.template) { entry in
                         let command = CommandCatalog.command(template: entry.template, key: key)
                         option(entry.title, detail: entry.template.hasSuffix(" N") ? String(command.split(separator: " ").last ?? "") : "",
@@ -217,11 +217,11 @@ struct KeyEditorPopover: View {
                     }
                     option("Custom command…", detail: "", on: false) { fieldFocused = true }
                 }
-                .padding(4)
+                .padding(GroveSpace.s4)
             }
             .frame(height: 170)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-            .lightOutline(cornerRadius: 7)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control)
             HStack {
                 TextField("workspace 1", text: text.projectedValue)
                     .textFieldStyle(.plain)
@@ -229,9 +229,9 @@ struct KeyEditorPopover: View {
                     .onSubmit { set(.aerospace(command: text.wrappedValue)) }
                 Text("AeroSpace syntax · ↩ saves").foregroundStyle(theme.quiet).font(GroveFont.mono(11))
             }
-            .padding(.horizontal, 9).padding(.vertical, 7)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(theme.line, lineWidth: 1))
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s8)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
         }
     }
 
@@ -244,9 +244,9 @@ struct KeyEditorPopover: View {
                 Spacer()
                 Text(detail).foregroundStyle(theme.quiet).lineLimit(1)
             }
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(on ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 5))
-            .lightOutline(cornerRadius: 5, when: on)
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
+            .background(on ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control, when: on)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

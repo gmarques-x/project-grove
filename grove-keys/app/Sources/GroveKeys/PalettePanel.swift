@@ -96,14 +96,14 @@ private struct PaletteView: View {
             FilterField(text: palette.query, placeholder: "Type to find a row", theme: theme,
                         onChange: { palette.query = $0 }, onMove: palette.move,
                         onReturn: palette.runSelection, onEscape: { palette.close() })
-                .padding(.horizontal, 16)
+                .padding(.horizontal, GroveSpace.s16)
                 .frame(height: 46)
             Rectangle().fill(theme.line).frame(height: 1)
             if palette.results.isEmpty {
                 Text("No row matches")
                     .foregroundStyle(theme.quiet)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, GroveSpace.s16)
                     .frame(height: Self.rowHeight + 12)
             } else {
                 rows(theme)
@@ -134,7 +134,7 @@ private struct PaletteView: View {
     /// "Appearance › Dark Medium": the way there quiet, the row's own title in fg.
     private func row(_ entry: PaletteEntry, selected: Bool, _ theme: ThemeColors) -> some View {
         let way = entry.path.dropLast().map { $0 + " › " }.joined()
-        return HStack(spacing: 8) {
+        return HStack(spacing: GroveSpace.s8) {
             (Text(way).foregroundStyle(theme.quiet) + Text(entry.title).foregroundStyle(Color(theme.fg)))
                 .lineLimit(1)
             Spacer(minLength: 0)

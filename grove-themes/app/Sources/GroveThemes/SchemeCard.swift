@@ -15,9 +15,9 @@ struct SchemeCard: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 10)
+        let shape = RoundedRectangle(cornerRadius: GroveRadius.card)
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: GroveSpace.s8) {
                 desktop
                 HStack(alignment: .firstTextBaseline) {
                     Text(StatusText.displayName(scheme)).modifier(SchemeNameStyle())
@@ -39,7 +39,7 @@ struct SchemeCard: View {
         .buttonStyle(.plain)
         .focusable(false)
         .focusEffectDisabled()
-        .focusBox(isFocused, cornerRadius: 10, outset: 5)
+        .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
     }
 
     private var desktop: some View {

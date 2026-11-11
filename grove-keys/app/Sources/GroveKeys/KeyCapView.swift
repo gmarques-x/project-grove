@@ -42,21 +42,21 @@ struct KeyCapView: View {
         .padding(.horizontal, compact ? 4 : 6).padding(.vertical, compact ? 0 : 5)
         .frame(width: width, height: height, alignment: .leading)
         .background {
-            let shape = RoundedRectangle(cornerRadius: 7)
+            let shape = RoundedRectangle(cornerRadius: GroveRadius.control)
             ZStack {
                 shape.fill(baseColor)
                 if let tint, !held, !isModifier { shape.fill(tint.opacity(0.16)) }
             }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 7).strokeBorder(border(tint), lineWidth: 1)
+            RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(border(tint), lineWidth: 1)
         }
         .overlay(alignment: .topTrailing) {
             if binding?.conflict == true {
                 Circle().fill(Color(theme.orange)).frame(width: 6, height: 6).padding(5)
             }
         }
-        .focusBox(focused, cornerRadius: 7, outset: 3)
+        .focusBox(focused, cornerRadius: GroveRadius.control, outset: 3)
         .help(help)
     }
 

@@ -63,10 +63,10 @@ struct ChoiceCard: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 10)
+        let shape = RoundedRectangle(cornerRadius: GroveRadius.card)
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 6)
+            VStack(alignment: .leading, spacing: GroveSpace.s8) {
+                RoundedRectangle(cornerRadius: GroveRadius.control)
                     .fill(Color(theme.bg1))
                     .frame(height: 96)
                     .overlay {
@@ -76,8 +76,8 @@ struct ChoiceCard: View {
                                 .padding(margin)
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .lightOutline(cornerRadius: 6)
+                    .clipShape(RoundedRectangle(cornerRadius: GroveRadius.control))
+                    .lightOutline(cornerRadius: GroveRadius.control)
                 HStack(alignment: .firstTextBaseline) {
                     Text(choiceName(name)).modifier(SchemeNameStyle())
                     Spacer(minLength: 4)
@@ -98,7 +98,7 @@ struct ChoiceCard: View {
         .buttonStyle(.plain)
         .focusable(false)
         .focusEffectDisabled()
-        .focusBox(isFocused, cornerRadius: 10, outset: 5)
+        .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
     }
 }
 
@@ -112,7 +112,7 @@ struct ChoicePill: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 6)
+        let shape = RoundedRectangle(cornerRadius: GroveRadius.control)
         Button(action: action) {
             HStack(spacing: 6) {
                 if isBusy {
@@ -131,7 +131,7 @@ struct ChoicePill: View {
         .buttonStyle(.plain)
         .focusable(false)
         .focusEffectDisabled()
-        .focusBox(isFocused, cornerRadius: 6, outset: 3)
+        .focusBox(isFocused, cornerRadius: GroveRadius.control, outset: 3)
     }
 }
 

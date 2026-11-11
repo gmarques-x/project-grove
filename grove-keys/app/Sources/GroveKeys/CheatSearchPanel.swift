@@ -146,7 +146,7 @@ private struct CheatSearchView: View {
 
     private func card(_ theme: ThemeColors) -> some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
+            HStack(spacing: GroveSpace.s12) {
                 FilterField(text: sheet.query, placeholder: "Type to find a key", theme: theme,
                             onChange: { sheet.query = $0 }, onMove: sheet.move,
                             onReturn: sheet.runSelection, onEscape: sheet.close)
@@ -155,14 +155,14 @@ private struct CheatSearchView: View {
                     .foregroundStyle(theme.quiet)
                     .fixedSize()
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, GroveSpace.s16)
             .frame(height: 46)
             Rectangle().fill(theme.line).frame(height: 1)
             let columns = [sheet.results.filter { !$0.fixed }, sheet.results.filter(\.fixed)].filter { !$0.isEmpty }
             if columns.isEmpty {
                 Text("No key matches")
                     .foregroundStyle(theme.quiet)
-                    .padding(16)
+                    .padding(GroveSpace.s16)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 HStack(alignment: .top, spacing: 0) {
@@ -185,8 +185,8 @@ private struct CheatSearchView: View {
                             .font(GroveFont.mono(11, .semibold))
                             .foregroundStyle(theme.quiet)
                             .padding(.horizontal, 10)
-                            .padding(.top, 12)
-                            .padding(.bottom, 4)
+                            .padding(.top, GroveSpace.s12)
+                            .padding(.bottom, GroveSpace.s4)
                         ForEach(section.rows) { row in
                             self.row(row, selected: row.id == sheet.selection, theme)
                                 .id(row.id)
@@ -194,7 +194,7 @@ private struct CheatSearchView: View {
                     }
                 }
                 .padding(.horizontal, 6)
-                .padding(.bottom, 8)
+                .padding(.bottom, GroveSpace.s8)
             }
             .frame(maxWidth: .infinity)
             // A row of the other column isn't here, and nothing scrolls.
@@ -212,10 +212,10 @@ private struct CheatSearchView: View {
                 .font(GroveFont.mono(11.5, .medium))
                 .foregroundStyle(Color(theme.fg))
                 .lineLimit(1)
-                .padding(.horizontal, 7)
+                .padding(.horizontal, GroveSpace.s8)
                 .frame(height: 20)
-                .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 6))
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(theme.capLine(dark: theme.bg2), lineWidth: 1))
+                .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.capLine(dark: theme.bg2), lineWidth: 1))
                 .frame(width: Self.keysWidth, alignment: .leading)
             Text(row.text)
                 .foregroundStyle(Color(theme.fg))

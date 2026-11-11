@@ -49,7 +49,7 @@ struct KeyboardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: GroveSpace.s16) {
             layerPicker
             if let layer = current {
                 keyboard(layer)
@@ -76,27 +76,27 @@ struct KeyboardView: View {
     // MARK: Layer picker
 
     private var layerPicker: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: GroveSpace.s4) {
             Text("LAYER")
                 .font(GroveFont.mono(10.5))
                 .tracking(1)
                 .foregroundStyle(theme.quiet)
-                .padding(.trailing, 8)
+                .padding(.trailing, GroveSpace.s8)
             ForEach(layers) { layer in
                 let on = layer.id == current?.id
                 Button {
                     layerID.wrappedValue = layer.id
                     editing.wrappedValue = nil
                 } label: {
-                    HStack(spacing: 5) {
+                    HStack(spacing: GroveSpace.s4) {
                         Text(layer.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                         Text(String(layer.bindings.count))
                             .font(GroveFont.mono(10))
                             .foregroundStyle(theme.quiet(dark: 0.8))
                     }
-                    .padding(.horizontal, 12).padding(.vertical, 5)
-                    .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 6))
-                    .lightOutline(cornerRadius: 6, when: on)
+                    .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s4)
+                    .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                    .lightOutline(cornerRadius: GroveRadius.control, when: on)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -148,8 +148,8 @@ struct KeyboardView: View {
                     Text("NOT ON THE KEYBOARD")
                         .font(GroveFont.mono(10.5)).tracking(1)
                         .foregroundStyle(theme.quiet)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8, alignment: .leading), count: 4),
-                              alignment: .leading, spacing: 4) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GroveSpace.s8, alignment: .leading), count: 4),
+                              alignment: .leading, spacing: GroveSpace.s4) {
                         ForEach(rows, id: \.key) { binding in
                             extraRow(binding, layer: layer)
                         }
@@ -168,12 +168,12 @@ struct KeyboardView: View {
         let target = EditTarget(layerID: layer.id, shortcut: shortcut)
         let tint = theme.named(binding.kind.tint)
         return Button { editing.wrappedValue = target } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: GroveSpace.s8) {
                 Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
                     .font(GroveFont.mono(11.5))
-                    .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 5))
-                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(theme.line, lineWidth: 1))
+                    .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+                    .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                    .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
                 // The kind's colour: on the label in dark; in light, where it
                 // can't be read as text, on a legend swatch before an fg label.
                 if theme.isLight {
@@ -210,8 +210,8 @@ struct KeyboardView: View {
     /// `outlined`: a background colour's swatch, which needs its outline in light.
     private func swatch(_ color: RGB, _ text: String, outlined: Bool = false) -> some View {
         HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 3).fill(Color(color)).frame(width: 10, height: 10)
-                .lightOutline(cornerRadius: 3, when: outlined)
+            RoundedRectangle(cornerRadius: GroveRadius.inline).fill(Color(color)).frame(width: 10, height: 10)
+                .lightOutline(cornerRadius: GroveRadius.inline, when: outlined)
             Text(text)
         }
     }

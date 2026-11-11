@@ -55,16 +55,16 @@ struct HyperGroup: View {
             control()
         }
         .font(GroveFont.mono(12))
-        .padding(.horizontal, 6).padding(.vertical, 4)
+        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
     }
 
     private func pill(_ text: String) -> some View {
         Text(text)
             .font(GroveFont.mono(11.5))
             .foregroundStyle(Color(theme.fg))
-            .padding(.horizontal, 9).padding(.vertical, 3)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(theme.line, lineWidth: 1))
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
     }
 }
 
@@ -85,7 +85,7 @@ private struct MsField: View {
 
     var body: some View {
         let valid = HyperSettings.milliseconds(text.wrappedValue) != nil
-        HStack(spacing: 4) {
+        HStack(spacing: GroveSpace.s4) {
             TextField("", text: text.projectedValue)
                 .textFieldStyle(.plain)
                 .multilineTextAlignment(.trailing)
@@ -95,9 +95,9 @@ private struct MsField: View {
             Text("ms").foregroundStyle(theme.quiet)
         }
         .font(GroveFont.mono(11.5))
-        .padding(.horizontal, 9).padding(.vertical, 3)
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(valid ? theme.line : Color(theme.red), lineWidth: 1))
+        .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+        .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(valid ? theme.line : Color(theme.red), lineWidth: 1))
         .help(valid ? "Milliseconds · ↩ saves" : "A whole number of milliseconds, 0 or more")
         .onChange(of: focused) { _, now in if !now { commit() } }
     }

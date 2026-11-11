@@ -34,7 +34,7 @@ struct WindowView: View {
                         .foregroundStyle(theme.ink(theme.red))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
                         .background(Color(theme.red).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
                         .lightOutline(cornerRadius: 8, accent: theme.red)
                 }
@@ -65,15 +65,15 @@ struct WindowView: View {
     private func header(_ theme: ThemeColors) -> some View {
         HStack(spacing: 0) {
             Text("Grove Keys").font(GroveFont.lockup(15))
-            HStack(spacing: 4) {
+            HStack(spacing: GroveSpace.s4) {
                 ForEach(Array(Tab.allCases.enumerated()), id: \.element) { i, t in
                     let on = tab.wrappedValue == t
                     Button { tab.wrappedValue = t } label: {
                         Text(t.rawValue)
                             .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
-                            .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 6))
-                            .lightOutline(cornerRadius: 6, when: on)
+                            .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s4)
+                            .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                            .lightOutline(cornerRadius: GroveRadius.control, when: on)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -85,7 +85,7 @@ struct WindowView: View {
             .lightOutline(cornerRadius: 8)
             .padding(.leading, 22)
             Spacer()
-            HStack(spacing: 8) {
+            HStack(spacing: GroveSpace.s8) {
                 Circle().fill(Color(statusDot(theme))).frame(width: 7, height: 7)
                 Text(status)
             }
@@ -127,20 +127,20 @@ private struct PermissionBanner: View {
                 .font(GroveFont.mono(11.5))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12).padding(.vertical, 8)
+        .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
         .background(Color(theme.yellow).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
         .lightOutline(cornerRadius: 8, accent: theme.orange)
     }
 
     private func line(_ text: String, _ url: URL) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: GroveSpace.s12) {
             Text(text).foregroundStyle(theme.ink(theme.orange)).fontWeight(.semibold)
             Button { NSWorkspace.shared.open(url) } label: {
                 Text("Open Settings")
                     .font(GroveFont.mono(11.5, .semibold))
                     .foregroundStyle(Color(theme.onAccent))
                     .padding(.horizontal, 10).padding(.vertical, 3)
-                    .background(Color(theme.orange), in: RoundedRectangle(cornerRadius: 6))
+                    .background(Color(theme.orange), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             }
             .buttonStyle(.plain)
         }

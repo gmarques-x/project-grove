@@ -12,16 +12,16 @@ struct DropdownView: View {
 
     var body: some View {
         let theme = model.currentColors
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: GroveSpace.s12) {
             header(theme)
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: GroveSpace.s8) {
                 row("DARK", model.schemes(dark: true), theme)
                 row("LIGHT", model.schemes(dark: false), theme)
             }
             if let list = model.list {
                 VStack(alignment: .leading, spacing: 6) {
                     ChoiceRowLabel(title: "TERMINAL LOGO")
-                    HStack(spacing: 8) {
+                    HStack(spacing: GroveSpace.s8) {
                         ForEach(list.logos, id: \.self) { logo in
                             ChoicePill(name: logo, isCurrent: logo == list.logo,
                                        isBusy: model.busyLogo == logo,
@@ -34,7 +34,7 @@ struct DropdownView: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     ChoiceRowLabel(title: "WALLPAPER")
-                    HStack(spacing: 8) {
+                    HStack(spacing: GroveSpace.s8) {
                         ForEach(list.wallpapers, id: \.self) { wallpaper in
                             ChoicePill(name: wallpaper, isCurrent: wallpaper == list.wallpaper,
                                        isBusy: model.busyWallpaper == wallpaper,
@@ -46,13 +46,13 @@ struct DropdownView: View {
                     }
                 }
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: GroveSpace.s2) {
                 MenuRow(title: "Open Grove Themes…", isFocused: focus.wrappedValue.focused == .openWindow) {
                     run(.openWindow)
                 }
                 MenuRow(title: "Quit", isFocused: focus.wrappedValue.focused == .quit) { run(.quit) }
             }
-            .padding(.top, 8)
+            .padding(.top, GroveSpace.s8)
             .overlay(alignment: .top) {
                 Rectangle().fill(theme.softLine(dark: 0.18)).frame(height: 1)
             }
@@ -91,7 +91,7 @@ struct DropdownView: View {
             PineShape()
                 .fill(Color(theme.green))
                 .frame(width: 26, height: 26)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: GroveSpace.s2) {
                 Text("Grove Themes").font(GroveFont.mono(15, .bold))
                 if let list = model.list {
                     Text(StatusText.displayName(list.current)).modifier(SchemeNameStyle())
@@ -106,7 +106,7 @@ struct DropdownView: View {
                 .font(GroveFont.mono(10))
                 .tracking(0.8)
                 .foregroundStyle(theme.quiet)
-            HStack(spacing: 8) {
+            HStack(spacing: GroveSpace.s8) {
                 ForEach(schemes, id: \.self) { scheme in
                     if let colors = model.colors(for: scheme) {
                         SchemeTile(scheme: scheme, colors: colors,
@@ -138,14 +138,14 @@ private struct MenuRow: View {
             Text(title)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background(hovering.wrappedValue ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                .padding(.vertical, GroveSpace.s4)
+                .background(hovering.wrappedValue ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .focusable(false)
         .focusEffectDisabled()
-        .focusBox(isFocused, cornerRadius: 5, outset: 0)
+        .focusBox(isFocused, cornerRadius: GroveRadius.control, outset: 0)
         .onHover { hovering.wrappedValue = $0 }
     }
 }

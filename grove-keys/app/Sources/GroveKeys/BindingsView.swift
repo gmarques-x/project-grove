@@ -61,14 +61,14 @@ struct BindingsView: View {
                     .padding(.horizontal, 22)
             }
             ScrollView {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(spacing: 16) {
+                HStack(alignment: .top, spacing: GroveSpace.s16) {
+                    VStack(spacing: GroveSpace.s16) {
                         HyperGroup(model: model)
                         launchers
                         MonitorsView(model: model)
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
-                    VStack(spacing: 16) {
+                    VStack(spacing: GroveSpace.s16) {
                         ForEach(model.keys.modes.map(\.name), id: \.self) { mode in
                             modeGroup(mode)
                         }
@@ -95,7 +95,7 @@ struct BindingsView: View {
         let conflicts = Layers.conflictingLaunchKeys(keys)
         let hyper = model.layers.first { $0.id == "hyper" }
         return BindingsGroup(title: "Launchers", note: "Hyper + key") {
-            VStack(spacing: 2) {
+            VStack(spacing: GroveSpace.s2) {
                 ForEach(keys.launch.map(\.key), id: \.self) { key in
                     let row = "launch:" + key
                     let binding = hyper?.bindings[key]
@@ -171,7 +171,7 @@ struct BindingsView: View {
         let canFold = BindingRows.rows(mode: bindings, folded: true).count < bindings.count
         let conflicts = mode == "main" ? Layers.conflictingAerospaceKeys(model.keys) : []
         return BindingsGroup(title: "AeroSpace · \(mode)", note: bindings.count == 1 ? "1 binding" : "\(bindings.count) bindings") {
-            VStack(spacing: 2) {
+            VStack(spacing: GroveSpace.s2) {
                 ForEach(rows, id: \.keys) { r in
                     let row = "mode:\(mode):" + r.keys[0]
                     let slot = BindingSlot.binding(mode: mode, key: r.keys[0])
@@ -208,7 +208,7 @@ struct BindingsView: View {
                     Text(open ? "Fold runs of 1…9" : "Show all \(bindings.count) · runs of 1…9 fold into one row")
                         .font(GroveFont.mono(11.5))
                         .foregroundStyle(theme.quiet)
-                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -220,7 +220,7 @@ struct BindingsView: View {
     private func draftRow(_ d: Draft, mode: String) -> some View {
         let row = "draft:" + mode
         let shortcut: String = if case .binding(_, let key) = d.slot { Shortcut(aerospace: key)?.symbols ?? key } else { "" }
-        return VStack(spacing: 2) {
+        return VStack(spacing: GroveSpace.s2) {
             RowView(shortcut: shortcut.isEmpty ? "record" : shortcut, recording: recorder.recording == row,
                     recordable: true, conflict: nil,
                     onRecord: { record(row: row, from: nil, launcher: false, mode: mode) },
@@ -317,7 +317,7 @@ struct BindingsView: View {
             // "+ Add …": all green in dark; in light the + keeps the green.
             (Text("+").foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
                 .font(GroveFont.mono(12))
-                .padding(.horizontal, 6).padding(.vertical, 4)
+                .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -340,7 +340,7 @@ struct BindingsView: View {
                 small("Cancel", primary: false) { clash.wrappedValue = nil }
             }
             .font(GroveFont.mono(11.5))
-            .padding(.horizontal, 6).padding(.vertical, 4)
+            .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
         }
     }
 
@@ -368,9 +368,9 @@ struct BindingsView: View {
             Text(title)
                 .font(GroveFont.mono(11.5, .semibold))
                 .foregroundStyle(Color(primary ? theme.onAccent : theme.fg))
-                .padding(.horizontal, 9).padding(.vertical, 3)
-                .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: 6))
-                .lightOutline(cornerRadius: 6, when: !primary)
+                .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+                .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+                .lightOutline(cornerRadius: GroveRadius.control, when: !primary)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -393,7 +393,7 @@ struct BindingsGroup<Content: View>: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: GroveSpace.s8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title.uppercased())
                     .font(GroveFont.mono(11, .semibold))
@@ -404,10 +404,10 @@ struct BindingsGroup<Content: View>: View {
             }
             content
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 14).padding(.vertical, GroveSpace.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 10))
-        .lightOutline(cornerRadius: 10)
+        .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+        .lightOutline(cornerRadius: GroveRadius.card)
     }
 }
 
@@ -451,8 +451,8 @@ private struct RowView<Action: View>: View {
             .buttonStyle(.plain)
             .help("Remove")
         }
-        .padding(.horizontal, 6).padding(.vertical, 5)
-        .background(hover.wrappedValue || recording ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+        .background(hover.wrappedValue || recording ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .onHover { hover.wrappedValue = $0 }
     }
 }

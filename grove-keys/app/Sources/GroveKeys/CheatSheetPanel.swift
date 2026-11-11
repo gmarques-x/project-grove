@@ -60,7 +60,7 @@ struct CheatSheetView: View {
         let layer = model.layers.first { $0.id == "hyper" } ?? Layer(id: "hyper", title: "Hyper")
         ZStack {
             theme.scrim
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: GroveSpace.s12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Hyper")
                         .font(GroveFont.lockup(17))
@@ -75,7 +75,7 @@ struct CheatSheetView: View {
                                focused: false, width: width, height: height)
                 }
             }
-            .padding(16)
+            .padding(GroveSpace.s16)
             .frame(width: Self.cardWidth)
             .sheetCard(theme)
         }
@@ -89,8 +89,8 @@ extension View {
     /// The card of the cheat sheets and the palette, on the scrim: bg0 a
     /// little see-through, a `border` outline, a shadow.
     func sheetCard(_ theme: ThemeColors) -> some View {
-        background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(theme.line, lineWidth: 1))
+        background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: GroveRadius.window))
+            .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(theme.line, lineWidth: 1))
             .shadow(color: theme.cardShadow, radius: 30, y: 15)
     }
 }

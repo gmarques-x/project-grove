@@ -19,14 +19,14 @@ struct GalleryView: View {
 
     var body: some View {
         let theme = model.currentColors
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
-        VStack(alignment: .leading, spacing: 16) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: GroveSpace.s12), count: 3)
+        VStack(alignment: .leading, spacing: GroveSpace.s16) {
             if let error = model.error {
                 theme.marked(error.message, theme.red)
                     .font(GroveFont.mono(12))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            LazyVGrid(columns: columns, spacing: 12) {
+            LazyVGrid(columns: columns, spacing: GroveSpace.s12) {
                 ForEach(model.schemes(dark: true) + model.schemes(dark: false), id: \.self) { scheme in
                     if let colors = model.colors(for: scheme) {
                         SchemeCard(scheme: scheme, colors: colors,
@@ -40,9 +40,9 @@ struct GalleryView: View {
                 }
             }
             if let list = model.list {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     ChoiceRowLabel(title: "TERMINAL LOGO")
-                    HStack(spacing: 12) {
+                    HStack(spacing: GroveSpace.s12) {
                         ForEach(list.logos, id: \.self) { logo in
                             ChoiceCard(name: logo, image: logoImage(logo, scheme: list.current),
                                        isCurrent: logo == list.logo,
@@ -54,9 +54,9 @@ struct GalleryView: View {
                         }
                     }
                 }
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     ChoiceRowLabel(title: "WALLPAPER")
-                    HStack(spacing: 12) {
+                    HStack(spacing: GroveSpace.s12) {
                         ForEach(list.wallpapers, id: \.self) { wallpaper in
                             ChoiceCard(name: wallpaper, image: wallpaperImage(wallpaper, scheme: list.current),
                                        isCurrent: wallpaper == list.wallpaper,
