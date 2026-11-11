@@ -47,9 +47,9 @@ public enum KeyboardLayout {
          Cap(name: "down", legend: "↓", stacked: true), key("right", "→")],
     ]
 
-    /// Key names AeroSpace knows that have no cap here (Escape sits in the
-    /// function row); the Keyboard tab lists their bindings under the keyboard.
-    public static let offKeyboard: Set<String> = ["esc"]
+    /// Every cap's key name. Bindings on other keys (Escape sits in the
+    /// function row) are listed under the keyboard.
+    public static let names: Set<String> = Set(rows.flatMap { $0 }.compactMap(\.name))
 
     /// The modifiers a layer holds, from its `Layers` id: "hyper", "alt",
     /// "alt-shift", "ctrl-alt"…, "none", "mode:<name>" (none held).

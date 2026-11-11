@@ -30,8 +30,12 @@ extension KeysFile {
            let id = launch.first(where: { $0.key == key })?.bundleID {
             return .launcher(bundleID: id)
         }
+        return aerospaceAction(layerID: layerID, shortcut: shortcut) ?? .none
+    }
+
+    private func aerospaceAction(layerID: String, shortcut: String) -> KeyAction? {
         let mode = KeyboardLayout.mode(layerID: layerID)
-        guard let key = entryKey(mode: mode, shortcut: shortcut), let v = value(mode: mode, key: key) else { return .none }
+        guard let key = entryKey(mode: mode, shortcut: shortcut), let v = value(mode: mode, key: key) else { return nil }
         switch v {
         case .string(let s): return .aerospace(command: s)
         case .array(let items):
@@ -39,6 +43,15 @@ extension KeysFile {
         case .int(let n): return .aerospace(command: String(n))
         case .bool(let b): return .aerospace(command: String(b))
         }
+    }
+
+    /// On a Hyper key, what `assign` would remove: the `hyper-` binding when
+    /// a launcher is chosen, the launcher when an AeroSpace command is. Nil
+    /// when there is nothing of the other kind (and outside Hyper).
+    public func replaced(byLauncher: Bool, layerID: String, shortcut: String) -> KeyAction? {
+        guard let key = launcherKey(layerID: layerID, shortcut: shortcut) else { return nil }
+        if byLauncher { return aerospaceAction(layerID: layerID, shortcut: shortcut) }
+        return launch.first { $0.key == key }.map { .launcher(bundleID: $0.bundleID) }
     }
 
     /// The keys.toml line the key's action is saved as, for the editor's footer.

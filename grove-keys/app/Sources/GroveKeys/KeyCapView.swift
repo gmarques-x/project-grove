@@ -16,22 +16,25 @@ struct KeyCapView: View {
 
     var body: some View {
         let tint = binding.map { Color(theme.named($0.missingApp ? "grey1" : $0.kind.tint)) }
-        VStack(alignment: .leading, spacing: 0) {
+        let layout = compact
+            ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+        layout {
             Text(legend)
-                .font(GroveFont.mono(10.5))
+                .font(GroveFont.mono(compact ? 10 : 10.5))
                 .foregroundStyle(legendColor)
                 .lineLimit(1)
+                .layoutPriority(1)
             Spacer(minLength: 0)
             if let binding, let tint {
                 Text(binding.label)
-                    .font(GroveFont.mono(11.5, .semibold))
+                    .font(GroveFont.mono(compact ? 10 : 11.5, .semibold))
                     .foregroundStyle(tint)
                     .strikethrough(binding.missingApp)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
         }
-        .padding(.horizontal, 6).padding(.vertical, height > 40 ? 5 : 3)
+        .padding(.horizontal, compact ? 4 : 6).padding(.vertical, compact ? 0 : 5)
         .frame(width: width, height: height, alignment: .leading)
         .background {
             let shape = RoundedRectangle(cornerRadius: 7)
@@ -51,6 +54,9 @@ struct KeyCapView: View {
         .focusBox(focused, cornerRadius: 7, outset: 3)
         .help(help)
     }
+
+    /// The half-height up and down caps: legend and label on one line.
+    private var compact: Bool { height < 40 }
 
     private var legendColor: Color {
         if held { return Color(theme.fg) }

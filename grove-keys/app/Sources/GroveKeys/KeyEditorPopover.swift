@@ -41,6 +41,21 @@ struct KeyEditorPopover: View {
     private var isHyper: Bool { target.layerID == "hyper" }
     private var mode: String { KeyboardLayout.mode(layerID: target.layerID) }
     private var key: String { Shortcut(aerospace: target.shortcut)?.key ?? target.shortcut }
+    /// On Hyper, choosing the other kind removes what the key does now.
+    private var replacedText: String? {
+        let byLauncher: Bool
+        switch kind.wrappedValue {
+        case .launcher: byLauncher = true
+        case .aerospace: byLauncher = false
+        case .none: return nil
+        }
+        switch model.keys.replaced(byLauncher: byLauncher, layerID: target.layerID, shortcut: target.shortcut) {
+        case .aerospace(let command): return "Choosing an app replaces \(command)"
+        case .launcher(let id): return "A command replaces \(Launcher.appName(bundleID: id) ?? id)"
+        case .some(.none), nil: return nil
+        }
+    }
+
     private var action: KeyAction { model.keys.action(layerID: target.layerID, shortcut: target.shortcut) }
 
     var body: some View {
@@ -69,6 +84,12 @@ struct KeyEditorPopover: View {
                 }
             }
             .disabled(!model.canEdit)
+            if let replaced = replacedText {
+                Text(replaced)
+                    .font(GroveFont.mono(11))
+                    .foregroundStyle(Color(theme.orange))
+                    .lineLimit(1)
+            }
             HStack {
                 if let line = model.keys.savedLine(layerID: target.layerID, shortcut: target.shortcut) {
                     Text("Saved as ") + Text(line).foregroundColor(Color(theme.fg))
@@ -153,6 +174,8 @@ struct KeyEditorPopover: View {
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
         }
         .task {
+            // Once per popover: the list stays while switching segments.
+            guard apps.wrappedValue.isEmpty else { return }
             let home = FileManager.default.homeDirectoryForCurrentUser
             apps.wrappedValue = await Task.detached {
                 InstalledApps.scan(folders: InstalledApps.standardFolders(home: home))

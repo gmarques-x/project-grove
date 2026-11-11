@@ -79,4 +79,19 @@ import Testing
         f.assign(.aerospace(command: "workspace 2"), layerID: "alt", shortcut: "alt-1")
         #expect(f.modes[0].bindings.first { $0.key == "alt-1" }?.value == .string("workspace 2"))
     }
+
+    /// What choosing the other kind on a Hyper key would remove, for the
+    /// editor's "Replaces …" line.
+    @Test func whatAssigningReplaces() throws {
+        var f = try shipped()
+        #expect(f.replaced(byLauncher: true, layerID: "hyper", shortcut: "hyper-t") == nil)
+        f.setBinding(mode: "main", key: "hyper-t", value: .string("workspace 1"))
+        #expect(f.replaced(byLauncher: true, layerID: "hyper", shortcut: "hyper-t") == .aerospace(command: "workspace 1"))
+        #expect(f.replaced(byLauncher: false, layerID: "hyper", shortcut: "hyper-t") == nil)
+        f.setLaunch(key: "t", bundleID: "com.mitchellh.ghostty")  // both: a hand-made conflict
+        #expect(f.replaced(byLauncher: false, layerID: "hyper", shortcut: "hyper-t") == .launcher(bundleID: "com.mitchellh.ghostty"))
+        #expect(f.replaced(byLauncher: true, layerID: "hyper", shortcut: "hyper-t") == .aerospace(command: "workspace 1"))
+        // Outside Hyper nothing is replaced.
+        #expect(f.replaced(byLauncher: false, layerID: "alt", shortcut: "alt-1") == nil)
+    }
 }

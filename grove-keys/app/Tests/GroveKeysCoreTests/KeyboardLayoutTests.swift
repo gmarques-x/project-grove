@@ -42,8 +42,8 @@ import Testing
     }
 
     /// Every bare key the shipped keys.toml binds has a cap, except Escape,
-    /// which a MacBook has in the function row; the Keyboard tab lists it
-    /// under the keyboard (mockup §1, Service's "esc reload").
+    /// which a MacBook has in the function row; the Keyboard tab lists keys
+    /// without a cap under the keyboard (mockup §1, Service's "esc reload").
     @Test func shippedKeysAreOnTheKeyboard() throws {
         let keys = try KeysFile(text: fixture("keys.toml"))
         let names = Set(caps.compactMap(\.name))
@@ -56,7 +56,6 @@ import Testing
         used.formUnion(keys.launch.map(\.key))
         #expect(!used.isEmpty)
         #expect(used.subtracting(names) == ["esc"])
-        #expect(KeyboardLayout.offKeyboard == ["esc"])
     }
 
     @Test func heldModifiersPerLayer() {
@@ -104,17 +103,22 @@ import Testing
         #expect(CommandCatalog.command(template: "focus left", key: "3") == "focus left")
     }
 
-    /// Every catalog command gets a fixed short label, not its first word.
+    /// Every catalog command gets its fixed short label and tint (on key 2).
     @Test func labelsComeFromTheTable() {
-        for e in CommandCatalog.entries {
-            let command = CommandCatalog.command(template: e.template, key: "2")
-            let (label, _) = CommandLabel.label(.string(command))
-            #expect(!label.isEmpty, "\(command)")
+        let expected: [(String, BindingKind)] = [
+            ("ws 2", .workspace), ("→ ws 2", .workspace),
+            ("← focus", .focusMove), ("↓ focus", .focusMove), ("↑ focus", .focusMove), ("→ focus", .focusMove),
+            ("← move", .focusMove), ("↓ move", .focusMove), ("↑ move", .focusMove), ("→ move", .focusMove),
+            ("resize −", .layout), ("resize +", .layout),
+            ("tiles", .layout), ("accordion", .layout), ("float/tile", .layout),
+            ("back & forth", .workspace), ("→ monitor", .workspace), ("service", .mode),
+            ("close", .other), ("reload", .mode), ("fullscreen", .layout),
+        ]
+        let got = CommandCatalog.entries.map {
+            CommandLabel.label(.string(CommandCatalog.command(template: $0.template, key: "2")))
         }
-        #expect(CommandLabel.label(.string("workspace 2")).0 == "ws 2")
-        #expect(CommandLabel.label(.string("close")).0 == "close")
-        // mockup §1: fullscreen is a layout key
-        #expect(CommandLabel.label(.string("fullscreen")) == ("fullscreen", .layout))
+        #expect(got.map(\.0) == expected.map(\.0))
+        #expect(got.map(\.1) == expected.map(\.1))
     }
 }
 

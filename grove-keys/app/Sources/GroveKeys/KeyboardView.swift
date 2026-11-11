@@ -143,11 +143,10 @@ struct KeyboardView: View {
             }
         }
         .padding(12)
-        .background {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(theme.bg0))
-                .overlay(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(theme.isDark ? 0.2 : 0.05)))
-        }
+        // The palette has no bg_dim: the well is bg0 with a bg1 rim, so the
+        // bg1 caps stand on it.
+        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(theme.bg1), lineWidth: 1))
     }
 
     @ViewBuilder
@@ -194,8 +193,7 @@ struct KeyboardView: View {
     /// Escape (the function row) and, in a mode, keys with modifiers
     /// ("alt-shift-h"): listed under the keyboard, not drawn on caps.
     private func extras(_ layer: Layer) -> some View {
-        let names = Set(KeyboardLayout.rows.flatMap { $0 }.compactMap(\.name))
-        let rows = layer.bindings.values.filter { !names.contains($0.key) }.sorted { $0.key < $1.key }
+        let rows = layer.bindings.values.filter { !KeyboardLayout.names.contains($0.key) }.sorted { $0.key < $1.key }
         return Group {
             if !rows.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
