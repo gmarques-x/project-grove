@@ -50,8 +50,11 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
   [ "$(as_q "c['after-startup-command']")" = '["exec-and-forget /bin/sh ~/.config/borders/bordersrc"]' ]
 }
 
-@test "aerospace: gaps are 8, the top 56 to clear the Grove bar's 48 pt strip" {
-  [ "$(as_q "[c['gaps']['inner'][k] for k in ('horizontal', 'vertical')] + [c['gaps']['outer'][k] for k in ('left', 'right', 'top', 'bottom')]")" = "[8, 8, 8, 8, 56, 8]" ]
+@test "aerospace: gaps are 8; the top clears the Grove bar's 48 pt strip + 8" {
+  [ "$(as_q "[c['gaps']['inner'][k] for k in ('horizontal', 'vertical')] + [c['gaps']['outer'][k] for k in ('left', 'right', 'bottom')]")" = "[8, 8, 8, 8, 8]" ]
+  # 56 where the menu bar reserves nothing; on the built-in screen macOS keeps
+  # 37.5 pt for the notch even when the menu bar hides, so 19 more is 56.
+  [ "$(as_q "c['gaps']['outer']['top']")" = '[{"monitor": {"built-in": 19}}, 56]' ]
 }
 
 @test "aerospace: Option shortcuts" {
