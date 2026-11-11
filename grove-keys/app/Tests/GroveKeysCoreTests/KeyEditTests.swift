@@ -94,4 +94,29 @@ import Testing
         // Outside Hyper nothing is replaced.
         #expect(f.replaced(byLauncher: false, layerID: "alt", shortcut: "alt-1") == nil)
     }
+
+    /// A main-mode AeroSpace binding without ⌃, ⌥ or ⌘ would take the key
+    /// from typing everywhere: the Keyboard tab refuses it, as Bindings does.
+    @Test func refusesUnsafeMainModeCommands() throws {
+        var f = try shipped()
+        let before = f
+        #expect(!KeysFile.canAssignCommand(layerID: "none", shortcut: "q"))
+        #expect(!KeysFile.canAssignCommand(layerID: "shift", shortcut: "shift-q"))
+        #expect(KeysFile.canAssignCommand(layerID: "alt", shortcut: "alt-q"))
+        #expect(KeysFile.canAssignCommand(layerID: "hyper", shortcut: "hyper-q"))
+        #expect(KeysFile.canAssignCommand(layerID: "mode:service", shortcut: "q"))
+        f.assign(.aerospace(command: "workspace 1"), layerID: "none", shortcut: "q")
+        f.assign(.aerospace(command: "workspace 1"), layerID: "shift", shortcut: "shift-q")
+        #expect(f == before)
+        f.assign(.aerospace(command: "workspace 1"), layerID: "alt", shortcut: "alt-q")
+        #expect(f.action(layerID: "alt", shortcut: "alt-q") == .aerospace(command: "workspace 1"))
+    }
+
+    /// An unsafe binding written by hand can still be cleared.
+    @Test func unsafeMainModeBindingCanBeRemoved() throws {
+        var f = try shipped()
+        f.setBinding(mode: "main", key: "q", value: .string("close"))
+        f.assign(.none, layerID: "none", shortcut: "q")
+        #expect(f.action(layerID: "none", shortcut: "q") == KeyAction.none)
+    }
 }

@@ -56,6 +56,11 @@ struct KeyEditorPopover: View {
         }
     }
 
+    /// A main-mode key without ⌃, ⌥ or ⌘ takes no AeroSpace command (as on the Bindings tab).
+    private var commandAllowed: Bool {
+        KeysFile.canAssignCommand(layerID: target.layerID, shortcut: target.shortcut)
+    }
+
     private var action: KeyAction { model.keys.action(layerID: target.layerID, shortcut: target.shortcut) }
 
     var body: some View {
@@ -186,6 +191,17 @@ struct KeyEditorPopover: View {
     // MARK: AeroSpace
 
     private var aerospace: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !commandAllowed {
+                Text("Main-mode shortcuts need ⌃, ⌥ or ⌘")
+                    .font(GroveFont.mono(11))
+                    .foregroundStyle(Color(theme.orange))
+            }
+            Group { commandList }.disabled(!commandAllowed)
+        }
+    }
+
+    private var commandList: some View {
         let current: String? = if case .aerospace(let c) = action { c } else { nil }
         return VStack(alignment: .leading, spacing: 8) {
             ScrollView {

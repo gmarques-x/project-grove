@@ -66,13 +66,61 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
         #expect(fake.dryRuns == 0 && fake.reloads == 0)
     }
 
-    @Test func missingBaseIsAFailure() async throws {
+    /// The base missing is a failure, but keys.toml was read: the result
+    /// carries it, so the app shows and edits the real file, not the defaults.
+    @Test func missingBaseIsAFailureThatCarriesTheKeys() async throws {
         let (paths, _) = try setUp()
         try FileManager.default.removeItem(at: paths.base)
         let result = await SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace()).run()
-        #expect(result == .keysInvalid(TomlError(line: 0, message: "aerospace.base.toml is missing")))
+        let keys = try KeysFile(text: try fixture("keys.toml"))
+        #expect(result == .baseMissing(keys))
+        #expect(result.keys == keys)
         #expect(result.redLine == "aerospace.base.toml is missing")
+        #expect(!result.blocksEdits)
         #expect(!FileManager.default.fileExists(atPath: paths.output.path))
+    }
+
+    @Test func missingKeysIsReportedAndDoesNotBlockEdits() async throws {
+        let (paths, _) = try setUp()
+        try FileManager.default.removeItem(at: paths.keys)
+        let result = await SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace()).run()
+        #expect(result == .keysInvalid(TomlError(line: 0, message: "keys.toml is missing")))
+        #expect(result.keysMissing)
+        #expect(!result.blocksEdits)
+        #expect(result.keys == nil)
+    }
+
+    /// keys.toml there but not UTF-8 (or not readable): never the defaults.
+    @Test func unreadableKeysBlocksEdits() async throws {
+        let (paths, _) = try setUp()
+        try Data([0x5b, 0xff, 0xfe, 0x5d, 0x0a]).write(to: paths.keys)
+        let result = await SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace()).run()
+        #expect(result == .keysInvalid(TomlError(line: 0, message: "keys.toml can't be read")))
+        #expect(result.redLine == "keys.toml can't be read")
+        #expect(result.blocksEdits)
+        #expect(!result.keysMissing)
+        #expect(!FileManager.default.fileExists(atPath: paths.output.path))
+    }
+
+    @Test func aLineErrorBlocksEditsAndAWriteErrorDoesNot() {
+        #expect(SaveResult.keysInvalid(TomlError(line: 3, message: "x")).blocksEdits)
+        #expect(!SaveResult.keysInvalid(TomlError(line: 0, message: "cannot write keys.toml: no")).blocksEdits)
+    }
+
+    /// The app's first run reloads AeroSpace even when the render on disk is
+    /// current: grove may have rendered it without AeroSpace reloading.
+    @Test func forceReloadReloadsAnUnchangedRender() async throws {
+        let (paths, _) = try setUp()
+        let fake = FakeAeroSpace()
+        let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: fake)
+        _ = await pipeline.run()
+        let result = await pipeline.run(forceReload: true)
+        guard case .applied = result else { Issue.record("\(result)"); return }
+        #expect(fake.dryRuns == 2)
+        #expect(fake.reloads == 2)
+        fake.running = false
+        _ = await pipeline.run(forceReload: true)
+        #expect(fake.reloads == 2)
     }
 
     @Test func rejectedRestoresOld() async throws {
@@ -125,6 +173,21 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
         let error = await pipeline.writeOverValid(keys)
         #expect(error?.line == 2)
         #expect(try String(contentsOf: paths.keys, encoding: .utf8) == broken)
+    }
+
+    @Test func writeOverValidRefusesAnUnreadableFile() async throws {
+        let (paths, _) = try setUp()
+        let bytes = Data([0x5b, 0xff, 0xfe, 0x5d, 0x0a])
+        try bytes.write(to: paths.keys)
+        let keys = try KeysFile(text: try fixture("keys.toml"))
+        let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace())
+        #expect(await pipeline.writeOverValid(keys) == TomlError(line: 0, message: "keys.toml can't be read"))
+        #expect(try Data(contentsOf: paths.keys) == bytes)
+        // Not readable at all (no permission): the same.
+        try fixture("keys.toml").write(to: paths.keys, atomically: true, encoding: .utf8)
+        chmod(paths.keys.path, 0o200)
+        defer { chmod(paths.keys.path, 0o644) }
+        #expect(await pipeline.writeOverValid(keys) == TomlError(line: 0, message: "keys.toml can't be read"))
     }
 
     @Test func writeOverValidWritesOverAValidOrMissingFile() async throws {

@@ -65,12 +65,20 @@ extension KeysFile {
         return TomlDocument.keyText(key) + " = " + TomlDocument.valueText(v)
     }
 
+    /// False when an AeroSpace command can't go on this key: a main-mode
+    /// binding without ⌃, ⌥ or ⌘ (the same rule as the Bindings tab, see
+    /// `BindingSlot.isSafe`). Launchers and None are always allowed.
+    public static func canAssignCommand(layerID: String, shortcut: String) -> Bool {
+        BindingSlot.binding(mode: KeyboardLayout.mode(layerID: layerID), key: shortcut).isSafe
+    }
+
     /// Sets what the key does; it does one thing, so a launcher replaces a
     /// `hyper-` binding on the same key and the other way round. A launcher
     /// outside the Hyper layer and a blank command change nothing. In a mode
     /// other than main a command is followed by "mode main", as the shipped
     /// service bindings are, unless it switches mode itself or the key was a
-    /// plain string before.
+    /// plain string before. A command on a key `canAssignCommand` refuses
+    /// changes nothing.
     public mutating func assign(_ action: KeyAction, layerID: String, shortcut: String) {
         let mode = KeyboardLayout.mode(layerID: layerID)
         let existing = entryKey(mode: mode, shortcut: shortcut)
@@ -85,7 +93,7 @@ extension KeysFile {
             if let existing { removeBinding(mode: mode, key: existing) }
         case .aerospace(let raw):
             let command = raw.trimmingCharacters(in: .whitespaces)
-            guard !command.isEmpty else { return }
+            guard !command.isEmpty, Self.canAssignCommand(layerID: layerID, shortcut: shortcut) else { return }
             if let launcher { removeLaunch(key: launcher) }
             let old = existing.flatMap { value(mode: mode, key: $0) }
             let wasString: Bool

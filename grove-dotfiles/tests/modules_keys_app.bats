@@ -77,6 +77,13 @@ case "$1" in
   bootout) rm -f "$BATS_TEST_TMPDIR/loaded"; echo "${FAKE_LINGER:-0}" > "$linger" ;;
   *) : ;;
 esac'
+  # AeroSpace: not running unless FAKE_AEROSPACE_RUNNING; never the real one.
+  stub fake-ps '[ -n "$FAKE_AEROSPACE_RUNNING" ] && echo "  412 /Applications/AeroSpace.app/Contents/MacOS/AeroSpace"; exit 0'
+  stub aerospace '
+echo "$*" >> "$BATS_TEST_TMPDIR/aerospace-args"
+if [ -n "$FAKE_RELOAD_FAIL" ]; then echo "unknown key foo" >&2; exit 1; fi'
+  export GROVE_PS="$BATS_TEST_TMPDIR/stubs/fake-ps"
+  export GROVE_AEROSPACE="$BATS_TEST_TMPDIR/stubs/aerospace"
   export GROVE_SWIFT="$BATS_TEST_TMPDIR/stubs/swift"
   export GROVE_CODESIGN="$BATS_TEST_TMPDIR/stubs/codesign"
   export GROVE_LAUNCHCTL="$BATS_TEST_TMPDIR/stubs/launchctl"
@@ -313,6 +320,41 @@ ka_ready() {
   grep -q -- '--render-aerospace' "$BATS_TEST_TMPDIR/groovekeys-args"
   # The rendered file is the one in ~/.config/aerospace, not a temp file.
   head -1 "$AEROSPACE_TOML" | grep -q '^# rendered'
+}
+
+@test "keys-app: apply reloads a running AeroSpace after rendering" {
+  load_module
+  export FAKE_AEROSPACE_RUNNING=1
+  # The render must be on disk before the reload.
+  stub aerospace 'head -1 "$HOME/.config/aerospace/aerospace.toml" > "$BATS_TEST_TMPDIR/seen"; echo "$*" >> "$BATS_TEST_TMPDIR/aerospace-args"'
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/aerospace-args")" = reload-config ]
+  [ "$(cat "$BATS_TEST_TMPDIR/seen")" = "# rendered" ]
+}
+
+@test "keys-app: apply leaves AeroSpace alone when it isn't running" {
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/aerospace-args" ]
+}
+
+@test "keys-app: apply notes a reload AeroSpace refused and still loads the app" {
+  load_module
+  export FAKE_AEROSPACE_RUNNING=1 FAKE_RELOAD_FAIL=1
+  run apply
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"AeroSpace didn't take the new config: unknown key foo"* ]] || false
+  grep -q '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args"
+}
+
+@test "keys-app: a bad keys.toml stops apply before any reload" {
+  load_module
+  export FAKE_AEROSPACE_RUNNING=1 FAKE_RENDER_FAIL=1
+  run apply
+  [ "$status" -eq 1 ]
+  [ ! -e "$BATS_TEST_TMPDIR/aerospace-args" ]
 }
 
 @test "keys-app: apply fails with the red line when keys.toml is bad" {

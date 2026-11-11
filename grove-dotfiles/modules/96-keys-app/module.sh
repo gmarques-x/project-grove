@@ -7,8 +7,9 @@
 # grove-themes/app (its package dependency), so check notices when the app is
 # out of date.
 # Tests point GROVE_SWIFT, GROVE_LAUNCHCTL, GROVE_CODESIGN, GROVE_HIDUTIL,
-# GROVE_APPS_DIR and GROVE_AGENTS_DIR at fakes and temp folders (GROVE_APP_SRC
-# and GROVE_THEMES_SRC at copies of the sources, because swift builds into them).
+# GROVE_AEROSPACE, GROVE_PS (as 98-aerospace's), GROVE_APPS_DIR and
+# GROVE_AGENTS_DIR at fakes and temp folders (GROVE_APP_SRC and
+# GROVE_THEMES_SRC at copies of the sources, because swift builds into them).
 
 about() { echo "Grove Keys in the menu bar"; }
 
@@ -27,6 +28,18 @@ _ka_keys_toml() { printf '%s/grove-keys/keys.toml' "$(_ka_config)"; }
 _ka_aerospace_toml() { printf '%s/aerospace/aerospace.toml' "$(_ka_config)"; }
 _ka_bin() { printf '%s/Contents/MacOS/GroveKeys' "$(_ka_app)"; }
 _ka_domain() { printf 'gui/%s' "$(id -u)"; }
+
+# _ka_aerospace: the aerospace CLI, found as 98-aerospace finds it.
+_ka_aerospace() {
+  if [ -n "${GROVE_AEROSPACE:-}" ]; then printf '%s' "$GROVE_AEROSPACE"; return 0; fi
+  command -v aerospace 2>/dev/null && return 0
+  printf '%s/aerospace' "$(dirname "${GROVE_BREW:-/opt/homebrew/bin/brew}")"
+}
+
+# _ka_aerospace_running: the same test as 98-aerospace's _as_running.
+_ka_aerospace_running() {
+  "${GROVE_PS:-ps}" -axo pid=,comm= 2>/dev/null | grep -q '/AeroSpace\.app/Contents/MacOS/AeroSpace$'
+}
 
 _ka_src() {
   if [ -n "${GROVE_APP_SRC:-}" ]; then printf '%s' "$GROVE_APP_SRC"; return 0; fi
@@ -262,6 +275,11 @@ apply() {
   if ! out="$("$(_ka_bin)" --render-aerospace 2>&1)"; then
     grove_fail "${out:-could not render aerospace.toml}"
     return 1
+  fi
+  # A running AeroSpace keeps the config it loaded until told to reload (the
+  # restarted app sees the render as current, so it would not change on its own).
+  if _ka_aerospace_running && ! out="$("$(_ka_aerospace)" reload-config 2>&1)"; then
+    grove_note "AeroSpace didn't take the new config: ${out:-aerospace reload-config failed}"
   fi
 
   # launchd keeps the definition it loaded, so a changed plist needs a bootout

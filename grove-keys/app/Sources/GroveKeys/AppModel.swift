@@ -27,7 +27,8 @@ final class AppModel: ObservableObject {
 
     /// The red line under the tabs and in the menu.
     var redLine: String? { engineLine ?? saveLine }
-    /// `edit` would be applied: keys.toml has been read and has no error.
+    /// `edit` would be applied: the first run has answered, and keys.toml has
+    /// no error and is readable (or doesn't exist yet).
     var canEdit: Bool { loaded && !keysInvalid }
     /// The menu glyph turns orange.
     var needsAttention: Bool { !permissions.granted || redLine != nil }
@@ -41,6 +42,8 @@ final class AppModel: ObservableObject {
     private let themeStateURL: URL
     private var engine: HyperEngine!
     private var watcher: FileWatcher?
+    /// aerospace.base.toml: a change there re-renders as a keys.toml change does.
+    private var baseWatcher: FileWatcher?
     private var themeWatcher: FileWatcher?
     private var keyboards: KeyboardWatcher?
     private var saving: Task<Void, Never>?
@@ -55,7 +58,12 @@ final class AppModel: ObservableObject {
     private var lastState: KeysState?
     /// The last keys.toml the save path accepted (the defaults until then).
     private var lastGood: KeysFile
-    /// keys.toml on disk has an error with a line number: edits are refused.
+    /// keys.toml has been parsed once, or isn't there at all (the defaults
+    /// stand in). Until then the engine and the mapping stay off, so a broken
+    /// file at launch never runs the defaults (Hyper on against `enabled = false`).
+    @Published private var keysKnown = false
+    /// keys.toml on disk has an error on a line, or is there but can't be
+    /// read: edits are refused (see `SaveResult.blocksEdits`).
     @Published private var keysInvalid = false
     /// The newest edit, and how many edits are still saving.
     private var pendingKeys: KeysFile?
@@ -107,7 +115,9 @@ final class AppModel: ObservableObject {
         themeWatcher?.start()
         refreshColors()
 
-        enqueue(edit: false) { [pipeline] in await pipeline.run() }
+        // The first run reloads AeroSpace even if the render is current:
+        // grove install may have rendered it without AeroSpace reloading.
+        enqueue(edit: false) { [pipeline] in await pipeline.run(forceReload: true) }
         writeState()
     }
 
@@ -118,6 +128,7 @@ final class AppModel: ObservableObject {
         stopEngine()
         pollTimer?.invalidate()
         watcher?.stop()
+        baseWatcher?.stop()
         writeState()
     }
 
@@ -182,15 +193,15 @@ final class AppModel: ObservableObject {
 
     private func apply(_ result: SaveResult, edit: Bool) {
         if edit { pendingEdits -= 1 }
-        switch result {
-        case .applied(let k), .unchanged(let k), .aerospaceRejected(let k, _):
+        if let k = result.keys {
             lastGood = k
-            keysInvalid = false
-        case .keysInvalid(let error):
-            // A line number means keys.toml itself is broken; a missing file or a
-            // failed write does not block edits.
-            keysInvalid = error.line > 0
+            keysKnown = true
+        } else if result.keysMissing {
+            keysKnown = true  // no file at all: the defaults are right
         }
+        // An error on a line, or a file that is there but can't be read, blocks
+        // edits; a missing file or a failed write does not.
+        keysInvalid = result.blocksEdits
         // While edits are still saving, the screen keeps showing the newest one.
         if pendingEdits == 0 {
             pendingKeys = nil
@@ -204,6 +215,11 @@ final class AppModel: ObservableObject {
             }
             watcher.start()
             self.watcher = watcher
+            let baseWatcher = FileWatcher(file: paths.base) {
+                Task { @MainActor in AppModel.shared.fileChanged() }
+            }
+            baseWatcher.start()
+            self.baseWatcher = baseWatcher
         }
         reconcile()
     }
@@ -230,7 +246,7 @@ final class AppModel: ObservableObject {
 
     /// Brings the tap and the mapping in line with the permissions, the file and Pause.
     private func reconcile() {
-        let want = loaded && permissions.granted && keys.hyper.enabled && !paused
+        let want = loaded && keysKnown && permissions.granted && keys.hyper.enabled && !paused
         if want {
             if engine.isRunning {
                 if engineSettings != keys.hyper || engineLaunchKeys != launchKeys {
