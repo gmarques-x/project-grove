@@ -20,7 +20,8 @@ _KA_IDENTITY="Grove Code Signing"
 
 _ka_swift() { printf '%s' "${GROVE_SWIFT:-swift}"; }
 _ka_launchctl() { printf '%s' "${GROVE_LAUNCHCTL:-launchctl}"; }
-_ka_codesign() { printf '%s' "${GROVE_CODESIGN:-codesign}"; }
+# The key's access list trusts /usr/bin/codesign by path, so use exactly that.
+_ka_codesign() { printf '%s' "${GROVE_CODESIGN:-/usr/bin/codesign}"; }
 _ka_security() { printf '%s' "${GROVE_SECURITY:-/usr/bin/security}"; }
 _ka_openssl() { printf '%s' "${GROVE_OPENSSL:-/usr/bin/openssl}"; }
 _ka_keychain() { printf '%s/Library/Keychains/login.keychain-db' "$HOME"; }
@@ -117,21 +118,43 @@ XML
 #   identifier com.projectgrove.keys and certificate leaf = H"<cert hash>"
 # which stays the same across rebuilds, so the permissions are granted once.
 
-# _ka_identity_hash: the SHA-1 of the "Grove Code Signing" identity, empty when
-# there's none. A self-signed certificate isn't trusted, so it never shows
-# under find-identity -v; this reads the full list.
+# _ka_identity_hash: the SHA-1 of a usable "Grove Code Signing" identity in
+# the login keychain, empty when there's none. A self-signed certificate isn't
+# trusted, so it never shows under find-identity -v; this reads the full list,
+# allows the one error a self-signed certificate shows (CSSMERR_TP_NOT_TRUSTED)
+# and skips rows that are expired, revoked or carry any other error.
 _ka_identity_hash() {
-  "$(_ka_security)" find-identity -p codesigning 2>/dev/null \
-    | awk -v n="\"$_KA_IDENTITY\"" '$1 ~ /^[0-9]+\)$/ && index($0, n) { print $2; exit }'
+  "$(_ka_security)" find-identity -p codesigning "$(_ka_keychain)" 2>/dev/null \
+    | awk -v n="\"$_KA_IDENTITY\"" '
+        $1 ~ /^[0-9]+\)$/ && index($0, n) {
+          if ($0 ~ /EXPIRED|REVOKED/) next
+          e = $0; gsub(/CSSMERR_TP_NOT_TRUSTED/, "", e)
+          if (e ~ /CSSMERR_/) next
+          print $2; exit
+        }'
 }
 
+# _ka_tool_fail WHAT LOG [HINT]: the red line, the tool's last lines, a hint, all
+# on stderr (it runs inside $(_ka_ensure_identity), whose stdout is the hash).
+_ka_tool_fail() {
+  grove_fail "$1 failed:"
+  tail -n 15 "$2" >&2
+  [ -z "${3:-}" ] || grove_note "$3" >&2
+}
+
+_KA_KEYCHAIN_HINT="unlock the login keychain and run grove install keys-app again"
+
 # _ka_create_identity: a self-signed code-signing certificate (10 years) and
-# its key, imported into the login keychain so that only codesign may use the
-# key without asking. The key, certificate and .p12 live in a temp folder that
-# is deleted afterwards.
-_ka_create_identity() {
-  local tmp pass rc=0
-  tmp="$(umask 077 && mktemp -d)" || return 1
+# its key, imported into the login keychain so that only /usr/bin/codesign may
+# use the key without asking. It runs in a subshell whose trap deletes the
+# temp folder (key, certificate, .p12) however it ends, interrupted included.
+# openssl reads the .p12 passphrase from the environment, not the command line.
+_ka_create_identity() (
+  umask 077
+  tmp="$(mktemp -d)" || exit 1
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'rm -rf "$tmp"; exit 1' INT TERM
+  log="$tmp/log"
   cat > "$tmp/cs.cnf" <<EOF
 [req]
 distinguished_name = dn
@@ -144,18 +167,23 @@ basicConstraints = critical,CA:false
 keyUsage = critical,digitalSignature
 extendedKeyUsage = critical,codeSigning
 EOF
-  pass="$("$(_ka_openssl)" rand -hex 16)" || rc=1
-  if [ "$rc" -eq 0 ]; then
-    "$(_ka_openssl)" req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/key.pem" -out "$tmp/cert.pem" \
-        -days 3650 -config "$tmp/cs.cnf" >/dev/null 2>&1 \
-      && "$(_ka_openssl)" pkcs12 -export -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -out "$tmp/id.p12" \
-        -passout "pass:$pass" -name "$_KA_IDENTITY" >/dev/null 2>&1 \
-      && "$(_ka_security)" import "$tmp/id.p12" -k "$(_ka_keychain)" -P "$pass" -T /usr/bin/codesign >/dev/null 2>&1 \
-      || rc=1
+  if ! GROVE_KA_P12_PASS="$("$(_ka_openssl)" rand -hex 16 2>"$log")"; then
+    _ka_tool_fail "openssl rand" "$log"; exit 1
   fi
-  rm -rf "$tmp"
-  return "$rc"
-}
+  export GROVE_KA_P12_PASS
+  if ! "$(_ka_openssl)" req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/key.pem" -out "$tmp/cert.pem" \
+      -days 3650 -config "$tmp/cs.cnf" >"$log" 2>&1; then
+    _ka_tool_fail "openssl req" "$log"; exit 1
+  fi
+  if ! "$(_ka_openssl)" pkcs12 -export -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -out "$tmp/id.p12" \
+      -passout env:GROVE_KA_P12_PASS -name "$_KA_IDENTITY" >"$log" 2>&1; then
+    _ka_tool_fail "openssl pkcs12" "$log"; exit 1
+  fi
+  if ! "$(_ka_security)" import "$tmp/id.p12" -k "$(_ka_keychain)" -P "$GROVE_KA_P12_PASS" \
+      -T /usr/bin/codesign >"$log" 2>&1; then
+    _ka_tool_fail "security import" "$log" "$_KA_KEYCHAIN_HINT"; exit 1
+  fi
+)
 
 # _ka_ensure_identity: print the identity's hash, making it first if needed.
 _ka_ensure_identity() {
@@ -331,10 +359,15 @@ apply() {
     cp "$src/.build/release/GroveKeys" "$stage/Contents/MacOS/GroveKeys" \
       && _ka_info_plist > "$stage/Contents/Info.plist" \
       && _ka_iconset "$(_ka_themes_src)/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
-      && "$(_ka_codesign)" --force --sign "$identity" "$stage" >/dev/null 2>&1 || rc=1
+      || rc=1
   fi
   if [ "$rc" -ne 0 ]; then
-    grove_fail "could not assemble or sign Grove Keys.app"
+    grove_fail "could not assemble Grove Keys.app"
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! "$(_ka_codesign)" --force --sign "$identity" "$stage" >"$tmp/sign.log" 2>&1; then
+    _ka_tool_fail "codesign" "$tmp/sign.log" "$_KA_KEYCHAIN_HINT"
     rm -rf "$tmp"
     return 1
   fi

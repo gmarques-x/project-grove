@@ -55,6 +55,7 @@ echo "$*" >> "$BATS_TEST_TMPDIR/swift-args"
 if [ -n "$FAKE_SWIFT_FAIL" ]; then echo "error: boom.swift:1: cannot find x" >&2; exit 1; fi
 mkdir -p .build/release && cp "$BATS_TEST_TMPDIR/fake-groovekeys" .build/release/GroveKeys && chmod +x .build/release/GroveKeys'
   stub codesign '
+if [ -n "$FAKE_SIGN_FAIL" ] && [ "$1" = --force ]; then echo "$3: errSecInternalComponent" >&2; exit 1; fi
 if [ "$1" = -dvv ]; then
   echo "Executable=$2/Contents/MacOS/GroveKeys" >&2
   case "$(cat "$BATS_TEST_TMPDIR/signed-with" 2>/dev/null)" in
@@ -68,24 +69,29 @@ echo "$*" >> "$BATS_TEST_TMPDIR/codesign-args"
 [ "$1" = --force ] && [ "$2" = --sign ] && echo "$3" > "$BATS_TEST_TMPDIR/signed-with"
 exit 0'
   KA_HASH=F68B51349BDD56C6A96FA6D0AAA8119A7B9F93B7
-  # security: find-identity lists the fake identity (untrusted, as a
-  # self-signed one is); import "adds" it and notes the folder the .p12 was in.
+  # security: find-identity lists the fake identities, one "HASH [ERROR]" line
+  # each in keychain-identity (the error is CSSMERR_TP_NOT_TRUSTED, as for a
+  # self-signed one, unless the line names another); import appends one and
+  # notes the folder the .p12 was in.
   stub security '
 echo "$*" >> "$BATS_TEST_TMPDIR/security-args"
 case "$1" in
   find-identity)
     printf "\nPolicy: Code Signing\n  Matching identities\n"
+    n=0
     if [ -s "$BATS_TEST_TMPDIR/keychain-identity" ]; then
-      printf "  1) %s \"Grove Code Signing\" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n" "$(cat "$BATS_TEST_TMPDIR/keychain-identity")"
-    else
-      printf "     0 identities found\n"
+      while read -r h err; do
+        n=$((n + 1))
+        printf "  %d) %s \"Grove Code Signing\" (%s)\n" "$n" "$h" "${err:-CSSMERR_TP_NOT_TRUSTED}"
+      done < "$BATS_TEST_TMPDIR/keychain-identity"
     fi
+    printf "     %d identities found\n" "$n"
     printf "\n  Valid identities only\n     0 valid identities found\n" ;;
   import)
     [ -f "$2" ] || exit 1
     dirname "$2" > "$BATS_TEST_TMPDIR/p12-dir"
-    [ -n "$FAKE_IMPORT_FAIL" ] && exit 1
-    echo F68B51349BDD56C6A96FA6D0AAA8119A7B9F93B7 > "$BATS_TEST_TMPDIR/keychain-identity" ;;
+    if [ -n "$FAKE_IMPORT_FAIL" ]; then echo "security: SecKeychainItemImport: User interaction is not allowed." >&2; exit 1; fi
+    echo F68B51349BDD56C6A96FA6D0AAA8119A7B9F93B7 >> "$BATS_TEST_TMPDIR/keychain-identity" ;;
 esac
 exit 0'
   # openssl: writes the files it is asked for and keeps a copy of the config.
@@ -524,7 +530,9 @@ ka_ready() {
   grep -qx 'CN = Grove Code Signing' "$BATS_TEST_TMPDIR/openssl.cnf"
   grep -qx 'keyUsage = critical,digitalSignature' "$BATS_TEST_TMPDIR/openssl.cnf"
   grep -qx 'extendedKeyUsage = critical,codeSigning' "$BATS_TEST_TMPDIR/openssl.cnf"
-  grep -q -- '^pkcs12 -export ' "$BATS_TEST_TMPDIR/openssl-args"
+  grep -q -- '^pkcs12 -export .*-passout env:GROVE_KA_P12_PASS ' "$BATS_TEST_TMPDIR/openssl-args"
+  run grep -q 'pass:' "$BATS_TEST_TMPDIR/openssl-args"
+  [ "$status" -ne 0 ]
   grep -q -- "^import .*\.p12 -k $HOME/Library/Keychains/login.keychain-db -P .* -T /usr/bin/codesign\$" "$BATS_TEST_TMPDIR/security-args"
   # The key, certificate and .p12 are gone.
   [ ! -e "$(cat "$BATS_TEST_TMPDIR/p12-dir")" ]
@@ -556,9 +564,55 @@ ka_ready() {
   run apply
   [ "$status" -eq 1 ]
   [[ "$output" == *"Grove Code Signing"* ]] || false
+  [[ "$output" == *"security import failed"* ]] || false
+  [[ "$output" == *"User interaction is not allowed."* ]] || false
+  [[ "$output" == *"unlock the login keychain and run grove install keys-app again"* ]] || false
   [ "$(cat "$APP/Contents/MacOS/GroveKeys")" = old ]
   [ ! -e "$(cat "$BATS_TEST_TMPDIR/p12-dir")" ]
   [ ! -e "$BATS_TEST_TMPDIR/codesign-args" ]
+}
+
+@test "keys-app: looks for the identity in the login keychain" {
+  ka_ready
+  run check
+  [ "$status" -eq 0 ]
+  grep -qx -- "find-identity -p codesigning $HOME/Library/Keychains/login.keychain-db" "$BATS_TEST_TMPDIR/security-args"
+}
+
+@test "keys-app: an expired identity is skipped and a new one made" {
+  load_module
+  echo "0123456789ABCDEF0123456789ABCDEF01234567 CSSMERR_TP_CERT_EXPIRED" > "$BATS_TEST_TMPDIR/keychain-identity"
+  [ -z "$(_ka_identity_hash)" ]
+  run apply
+  [ "$status" -eq 0 ]
+  grep -q '^import' "$BATS_TEST_TMPDIR/security-args"
+  grep -q -- "^--force --sign $KA_HASH .*/Grove Keys.app$" "$BATS_TEST_TMPDIR/codesign-args"
+}
+
+@test "keys-app: an identity with another error is skipped" {
+  load_module
+  echo "0123456789ABCDEF0123456789ABCDEF01234567 CSSMERR_TP_CERT_REVOKED" > "$BATS_TEST_TMPDIR/keychain-identity"
+  [ -z "$(_ka_identity_hash)" ]
+  echo "0123456789ABCDEF0123456789ABCDEF01234567 CSSMERR_TP_INVALID_CERTIFICATE" > "$BATS_TEST_TMPDIR/keychain-identity"
+  [ -z "$(_ka_identity_hash)" ]
+}
+
+@test "keys-app: a failed signature shows codesign's error and keeps the installed app" {
+  ka_ready
+  echo old > "$APP/Contents/MacOS/GroveKeys"
+  export FAKE_SIGN_FAIL=1
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"codesign failed"* ]] || false
+  [[ "$output" == *"errSecInternalComponent"* ]] || false
+  [[ "$output" == *"unlock the login keychain and run grove install keys-app again"* ]] || false
+  [ "$(cat "$APP/Contents/MacOS/GroveKeys")" = old ]
+}
+
+@test "keys-app: codesign defaults to /usr/bin/codesign" {
+  load_module
+  unset GROVE_CODESIGN
+  [ "$(_ka_codesign)" = /usr/bin/codesign ]
 }
 
 @test "keys-app: a failed build leaves the installed app and stamp" {
