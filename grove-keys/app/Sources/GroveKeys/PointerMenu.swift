@@ -53,7 +53,7 @@ final class PointerMenu: NSObject {
             return
         }
         if let action = row.action {
-            if !action.takesFocus(home: MenuRunner.home) { handBackAfterLink() }
+            if !action.takesFocus { handBackAfterLink() }
             MenuRunner.run(action, title: row.title)
         } else {
             popUpAtPointer(menu(of: row.children))
@@ -105,7 +105,7 @@ final class PointerMenu: NSObject {
                 entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
                 entry.submenu = appMenu()
             } else if let action = row.action {
-                entry = item(row.title, handsBack: !action.takesFocus(home: MenuRunner.home)) {
+                entry = item(row.title, handsBack: !action.takesFocus) {
                     MenuRunner.run(action, title: row.title)
                 }
                 if let command = row.checked { tests[row.id] = (entry, command) }

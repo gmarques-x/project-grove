@@ -63,9 +63,7 @@ enum Links {
         case .groveMenu: PointerMenu.shared.showGroveMenu()
         case .appMenu: PointerMenu.shared.showAppMenu()
         case .palette: PalettePanel.shared.toggle()
-        case .cheatSheet:
-            PointerMenu.shared.handBackAfterLink()
-            AppModel.shared.toggleCheatSheet()
+        case .cheatSheet: CheatSearchPanel.shared.toggle()
         }
     }
 }

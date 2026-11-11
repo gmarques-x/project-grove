@@ -228,16 +228,17 @@ import Testing
     }
 
     @Test func rowsThatBringAWindowForwardTakeFocus() {
-        #expect(!GroveMenuAction.run("x").takesFocus(home: home))
-        #expect(!GroveMenuAction.builtin(.lock).takesFocus(home: home))
-        #expect(GroveMenuAction.present("x").takesFocus(home: home))
-        #expect(GroveMenuAction.open("https://ghostty.org/docs").takesFocus(home: home))
-        #expect(GroveMenuAction.open("~/notes.md").takesFocus(home: home))
-        #expect(!GroveMenuAction.open("grovekeys://cheatsheet").takesFocus(home: home))
-        #expect(GroveMenuAction.keys(.open).takesFocus(home: home))
-        #expect(GroveMenuAction.keys(.restart).takesFocus(home: home))
-        #expect(!GroveMenuAction.keys(.cheatSheet).takesFocus(home: home))
-        #expect(!GroveMenuAction.keys(.pause).takesFocus(home: home))
+        #expect(!GroveMenuAction.run("x").takesFocus)
+        #expect(!GroveMenuAction.builtin(.lock).takesFocus)
+        #expect(GroveMenuAction.present("x").takesFocus)
+        #expect(GroveMenuAction.open("https://ghostty.org/docs").takesFocus)
+        #expect(GroveMenuAction.open("~/notes.md").takesFocus)
+        // The cheat sheet has a field to type in, as the palette.
+        #expect(GroveMenuAction.open("grovekeys://cheatsheet").takesFocus)
+        #expect(GroveMenuAction.keys(.open).takesFocus)
+        #expect(GroveMenuAction.keys(.restart).takesFocus)
+        #expect(GroveMenuAction.keys(.cheatSheet).takesFocus)
+        #expect(!GroveMenuAction.keys(.pause).takesFocus)
     }
 
     @Test func openTargetsAreLinksOrPaths() throws {

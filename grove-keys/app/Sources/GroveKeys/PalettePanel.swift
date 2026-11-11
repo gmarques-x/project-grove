@@ -7,12 +7,6 @@ import SwiftUI
 /// menu that does something, in a panel over the focused screen, filtered as
 /// you type. ↑/↓ move, Return runs the row and closes, Escape or a click
 /// outside the card closes.
-///
-/// The panel is non-activating and can be key, so it takes the keyboard
-/// without Grove Keys coming forward; `open` may bring Grove Keys forward all
-/// the same, so on closing the app that was in front is given the keyboard
-/// back, unless the row run brings a window forward itself or the palette
-/// closed because another app was clicked.
 @MainActor
 final class PalettePanel: ObservableObject {
     static let shared = PalettePanel()
@@ -26,75 +20,28 @@ final class PalettePanel: ObservableObject {
     @Published private(set) var checked: Set<String> = []
 
     private var entries: [PaletteEntry] = []
-    private var panel: KeyPanel?
-    private var handBackTo: pid_t?
-    private var observers: [NSObjectProtocol] = []
+    private let host = KeyPanelHost()
     /// Counts openings, so a test started by an earlier one ticks nothing.
     private var opening = 0
 
     func toggle() {
-        if panel == nil { open() } else { close() }
+        if host.isOpen { close() } else { open() }
     }
 
     private func open() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         entries = PointerMenu.shared.groveMenu().paletteEntries
         checked = []
         query = ""
-        // Grove Keys' own window in front: nothing to hand back.
-        handBackTo = NSApp.isActive ? nil : PointerMenu.shared.previousApp
+        guard host.open(PaletteView(palette: self, model: AppModel.shared)) else { return }
         opening += 1
         let opening = self.opening
         CheckedTests.run(entries.compactMap { entry in entry.checked.map { (id: entry.id, command: $0) } }) { [self] id in
             if opening == self.opening { checked.insert(id) }
         }
-
-        // Below the menu bar, as the cheat sheet.
-        let full = screen.frame
-        let frame = NSRect(x: full.minX, y: full.minY, width: full.width,
-                           height: max(0, screen.visibleFrame.maxY - full.minY))
-        let panel = KeyPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
-                             backing: .buffered, defer: false)
-        panel.level = .statusBar
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: PaletteView(palette: self, model: AppModel.shared))
-        panel.setFrame(frame, display: false)
-        panel.orderFrontRegardless()
-        panel.makeKey()
-        self.panel = panel
-
-        // Another window or app took the keyboard (a click elsewhere, ⌘Tab):
-        // the palette goes, and the keyboard stays where it went.
-        let center = NotificationCenter.default
-        for (name, object) in [(NSWindow.didResignKeyNotification, panel as Any?),
-                               (NSApplication.didResignActiveNotification, nil)] {
-            observers.append(center.addObserver(forName: name, object: object, queue: .main) { _ in
-                MainActor.assumeIsolated { PalettePanel.shared.close(handBack: false) }
-            })
-        }
-        // If macOS didn't give a background app's panel the keyboard, Grove
-        // Keys comes forward for it, as it does for the pointer menus.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [self] in
-            guard self.panel === panel, !panel.isKeyWindow else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-        }
     }
 
     func close(handBack: Bool = true) {
-        guard let panel else { return }
-        self.panel = nil
-        for observer in observers { NotificationCenter.default.removeObserver(observer) }
-        observers = []
-        panel.orderOut(nil)
-        if handBack, let handBackTo {
-            NSRunningApplication(processIdentifier: handBackTo)?.activate()
-        }
+        host.close(handBack: handBack)
     }
 
     func move(_ step: Int) {
@@ -108,7 +55,7 @@ final class PalettePanel: ObservableObject {
     }
 
     func run(_ entry: PaletteEntry) {
-        close(handBack: !entry.action.takesFocus(home: MenuRunner.home))
+        close(handBack: !entry.action.takesFocus)
         MenuRunner.run(entry.action, title: entry.title)
     }
 
@@ -116,11 +63,6 @@ final class PalettePanel: ObservableObject {
         results = PaletteFilter.filter(entries, query)
         selection = 0
     }
-}
-
-/// A borderless panel can't be key unless it says so.
-private final class KeyPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
 }
 
 /// The scrim and the card: the field, a line, the rows.
@@ -150,7 +92,9 @@ private struct PaletteView: View {
 
     private func card(_ theme: ThemeColors) -> some View {
         VStack(spacing: 0) {
-            PaletteField(palette: palette, theme: theme)
+            FilterField(text: palette.query, placeholder: "Type to find a row", theme: theme,
+                        onChange: { palette.query = $0 }, onMove: palette.move,
+                        onReturn: palette.runSelection, onEscape: { palette.close() })
                 .padding(.horizontal, 16)
                 .frame(height: 46)
             Rectangle().fill(theme.line).frame(height: 1)
@@ -165,9 +109,7 @@ private struct PaletteView: View {
             }
         }
         .frame(width: Self.cardWidth)
-        .background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(theme.line, lineWidth: 1))
-        .shadow(color: theme.cardShadow, radius: 30, y: 15)
+        .sheetCard(theme)
     }
 
     private func rows(_ theme: ThemeColors) -> some View {
@@ -205,64 +147,5 @@ private struct PaletteView: View {
         .lightOutline(cornerRadius: 8, when: selected)
         .contentShape(Rectangle())
         .onTapGesture { palette.run(entry) }
-    }
-}
-
-/// The palette's text field. AppKit's, so that it is the panel's first
-/// responder from the start and ↑/↓, Return and Escape reach the palette
-/// while the typing stays in the field.
-private struct PaletteField: NSViewRepresentable {
-    @ObservedObject var palette: PalettePanel
-    let theme: ThemeColors
-
-    func makeCoordinator() -> Coordinator { Coordinator(palette: palette) }
-
-    func makeNSView(context: Context) -> NSTextField {
-        let field = FirstResponderField()
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = GroveFont.monoNS(15)
-        field.usesSingleLineMode = true
-        field.lineBreakMode = .byTruncatingTail
-        field.delegate = context.coordinator
-        return field
-    }
-
-    func updateNSView(_ field: NSTextField, context: Context) {
-        if field.stringValue != palette.query { field.stringValue = palette.query }
-        field.textColor = NSColor(theme.fg)
-        field.placeholderAttributedString = NSAttributedString(string: "Type to find a row", attributes: [
-            .foregroundColor: NSColor(theme.dim), .font: GroveFont.monoNS(15),
-        ])
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, NSTextFieldDelegate {
-        private let palette: PalettePanel
-        init(palette: PalettePanel) { self.palette = palette }
-
-        func controlTextDidChange(_ note: Notification) {
-            guard let field = note.object as? NSTextField else { return }
-            palette.query = field.stringValue
-        }
-
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            switch selector {
-            case #selector(NSResponder.moveUp(_:)): palette.move(-1)
-            case #selector(NSResponder.moveDown(_:)): palette.move(1)
-            case #selector(NSResponder.insertNewline(_:)): palette.runSelection()
-            case #selector(NSResponder.cancelOperation(_:)): palette.close()
-            default: return false
-            }
-            return true
-        }
-    }
-}
-
-private final class FirstResponderField: NSTextField {
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        window?.makeFirstResponder(self)
     }
 }

@@ -31,7 +31,7 @@ enum MenuRunner {
         case .keys(.open):
             model.openMainWindow?()
             NSApp.activate(ignoringOtherApps: true)
-        case .keys(.cheatSheet): model.showCheatSheetFromMenu()
+        case .keys(.cheatSheet): CheatSearchPanel.shared.toggle()
         case .keys(.pause): model.togglePause()
         }
     }

@@ -9,7 +9,10 @@ import Testing
         let layers = Layers.build(from: try shipped()) { _ in "App" }
         #expect(layers.map(\.title) == ["Hyper", "Option", "Option+Shift", "Service"])
         #expect(layers.map(\.id) == ["hyper", "alt", "alt-shift", "mode:service"])
-        #expect(layers[0].bindings.isEmpty)
+        // No launchers ship; the Hyper layer holds the two links into the app.
+        #expect(layers[0].bindings.keys.sorted() == ["k", "space"])
+        #expect(layers[0].bindings["space"]?.source == .aerospace(mode: "main", key: "hyper-space"))
+        #expect(layers[0].bindings["k"]?.conflict == false)
         let option = layers[1].bindings
         #expect(option["1"]?.label == "ws 1")
         #expect(option["1"]?.kind == .workspace)

@@ -392,13 +392,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The cheat sheet panel (spec §7). The engine shows it for a hold;
-    /// the menu item shows it until the next key or click.
-    func showCheatSheet() { cheatSheet.show(untilInput: false) }
+    /// The Hyper layer over the screen while Caps Lock is held (spec §7).
+    func showCheatSheet() { cheatSheet.show() }
     func hideCheatSheet() { cheatSheet.hide() }
-    func showCheatSheetFromMenu() { cheatSheet.show(untilInput: true) }
-    /// `grovekeys://cheatsheet`: the menu item's sheet, or away with it.
-    func toggleCheatSheet() { cheatSheet.toggle() }
     private lazy var cheatSheet = CheatSheetPanel(model: self)
 
     // MARK: State file

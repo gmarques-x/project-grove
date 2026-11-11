@@ -354,19 +354,17 @@ extension GroveMenuAction {
         }
     }
 
-    /// The row brings a window forward itself, so the app that was in front
-    /// must not be given the keyboard back when the menu closes.
-    public func takesFocus(home: URL) -> Bool {
+    /// The row brings a window forward itself or takes the keyboard (the
+    /// cheat sheet, the palette), so the app that was in front must not be
+    /// given the keyboard back when the menu closes.
+    public var takesFocus: Bool {
         switch self {
         case .run, .builtin: return false
-        case .present: return true
-        case .open(let text):
-            // The cheat sheet floats over the front app and never takes its keys.
-            return OpenTarget(text, home: home) != .link(.cheatSheet)
+        case .present, .open: return true
         case .keys(let kind):
             switch kind {
-            case .accessibility, .inputMonitoring, .restart, .open: return true
-            case .cheatSheet, .pause: return false
+            case .accessibility, .inputMonitoring, .restart, .open, .cheatSheet: return true
+            case .pause: return false
             }
         }
     }
@@ -447,14 +445,35 @@ public enum PaletteFilter {
     /// matter), those whose own title starts with the text first; menu order
     /// otherwise. Nothing typed keeps them all.
     public static func filter(_ entries: [PaletteEntry], _ query: String) -> [PaletteEntry] {
-        let typed = fold(query).trimmingCharacters(in: .whitespaces)
+        let typed = TypedWords(query)
         guard !typed.isEmpty else { return entries }
-        let words = typed.split(separator: " ")
-        let matches = entries.filter { entry in
-            let text = fold(entry.text)
-            return words.allSatisfy { text.contains($0) }
-        }
-        return matches.filter { fold($0.title).hasPrefix(typed) } + matches.filter { !fold($0.title).hasPrefix(typed) }
+        let matches = entries.filter { typed.areAll(in: $0.text) }
+        return matches.filter { typed.start($0.title) } + matches.filter { !typed.start($0.title) }
+    }
+}
+
+/// What was typed into the palette's or the cheat sheet's field, as both
+/// match it: by words, whatever the case and the accents.
+public struct TypedWords: Sendable {
+    private let text: String
+    private let words: [Substring]
+
+    public init(_ query: String) {
+        text = Self.fold(query).trimmingCharacters(in: .whitespaces)
+        words = text.split(separator: " ")
+    }
+
+    public var isEmpty: Bool { text.isEmpty }
+
+    /// Every typed word is somewhere in `text`.
+    public func areAll(in text: String) -> Bool {
+        let text = Self.fold(text)
+        return words.allSatisfy { text.contains($0) }
+    }
+
+    /// `text` starts with what was typed, spaces and all.
+    public func start(_ text: String) -> Bool {
+        Self.fold(text).hasPrefix(self.text)
     }
 
     private static func fold(_ text: String) -> String {

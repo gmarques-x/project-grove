@@ -3,25 +3,21 @@ import GroveKeysCore
 import GroveThemesCore
 import SwiftUI
 
-/// The cheat sheet (spec §7, mockup §3): a borderless, non-activating panel
-/// over the focused screen with a dimmed backdrop and the Hyper layer drawn
-/// read-only. Shown by a Caps Lock hold it ignores the mouse and goes on
-/// `hide()`; shown from the menu it goes on the next key press or click.
-/// It never takes key focus from the front app.
+/// The cheat sheet shown while Caps Lock is held (spec §7, mockup §3): a
+/// borderless, non-activating panel over the focused screen with a dimmed
+/// backdrop and the Hyper layer drawn read-only. It ignores the mouse, never
+/// takes key focus from the front app, and goes on `hide()`. (The sheet to
+/// search in is `CheatSearchPanel`.)
 @MainActor
 final class CheatSheetPanel {
     private let model: AppModel
     private var panel: NSPanel?
-    private var monitors: [Any] = []
-    /// When a key or click last put the sheet away.
-    private var hiddenByInput: Date?
 
     init(model: AppModel) {
         self.model = model
     }
 
-    /// `untilInput`: the menu item's way, hidden by the next key or click.
-    func show(untilInput: Bool) {
+    func show() {
         hide()
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
@@ -41,45 +37,13 @@ final class CheatSheetPanel {
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: CheatSheetView(model: model, untilInput: untilInput))
+        panel.contentView = NSHostingView(rootView: CheatSheetView(model: model))
         panel.setFrame(frame, display: false)
         panel.orderFrontRegardless()
         self.panel = panel
-
-        if untilInput {
-            let mask: NSEvent.EventTypeMask = [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
-            if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-                Task { @MainActor in self?.hideForInput() }
-            }) { monitors.append(global) }
-            if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-                self?.hideForInput()
-                return event
-            }) { monitors.append(local) }
-        }
-    }
-
-    /// `grovekeys://cheatsheet`: shows the sheet as the menu item does, or
-    /// puts it away. When the hotkey's own key press has just hidden it, the
-    /// link that follows is that same "put away", not a new "show".
-    func toggle() {
-        if panel != nil {
-            hide()
-        } else if let hiddenByInput, Date().timeIntervalSince(hiddenByInput) < 0.5 {
-            self.hiddenByInput = nil
-        } else {
-            show(untilInput: true)
-        }
-    }
-
-    private func hideForInput() {
-        guard panel != nil else { return }
-        hiddenByInput = Date()
-        hide()
     }
 
     func hide() {
-        for monitor in monitors { NSEvent.removeMonitor(monitor) }
-        monitors = []
         panel?.orderOut(nil)
         panel = nil
     }
@@ -88,7 +52,6 @@ final class CheatSheetPanel {
 /// The card: "Hyper", the modifier line, the Hyper layer's keyboard.
 struct CheatSheetView: View {
     @ObservedObject var model: AppModel
-    let untilInput: Bool
     static let cardWidth: CGFloat = 820
 
     var body: some View {
@@ -102,7 +65,7 @@ struct CheatSheetView: View {
                         .font(GroveFont.lockup(17))
                         .foregroundStyle(Color(theme.fg))
                     Spacer()
-                    Text(untilInput ? "⌃⌥⇧⌘ · press any key to close" : "⌃⌥⇧⌘ · release Caps Lock to close")
+                    Text("⌃⌥⇧⌘ · release Caps Lock to close")
                         .font(GroveFont.mono(12))
                         .foregroundStyle(theme.quiet)
                 }
@@ -113,12 +76,20 @@ struct CheatSheetView: View {
             }
             .padding(16)
             .frame(width: Self.cardWidth)
-            .background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(theme.line, lineWidth: 1))
-            .shadow(color: theme.cardShadow, radius: 30, y: 15)
+            .sheetCard(theme)
         }
         .font(GroveFont.mono(12))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
+    }
+}
+
+extension View {
+    /// The card of the cheat sheets and the palette, on the scrim: bg0 a
+    /// little see-through, a `border` outline, a shadow.
+    func sheetCard(_ theme: ThemeColors) -> some View {
+        background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(theme.line, lineWidth: 1))
+            .shadow(color: theme.cardShadow, radius: 30, y: 15)
     }
 }

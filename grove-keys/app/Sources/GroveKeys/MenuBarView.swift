@@ -59,7 +59,7 @@ struct MenuBarView: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         .keyboardShortcut(",")
-        Button("Show cheat sheet") { model.showCheatSheetFromMenu() }
+        Button("Show cheat sheet") { CheatSearchPanel.shared.toggle() }
         Button(model.paused ? "Resume Hyper" : "Pause Hyper") { model.togglePause() }
         Divider()
         Button("Quit Grove Keys") { model.quit() }
