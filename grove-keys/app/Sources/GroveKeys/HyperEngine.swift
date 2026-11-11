@@ -16,6 +16,7 @@ final class HyperEngine {
     private let onEffect: @MainActor @Sendable (HyperEffect) -> Void
     private let onFailure: @MainActor @Sendable () -> Void
     private var session: TapSession?
+    private var layoutObserver: NSObjectProtocol?
 
     /// `onFailure`: re-enabling the tap failed three times in a minute; it is off now.
     init(onEffect: @escaping @MainActor @Sendable (HyperEffect) -> Void,
@@ -33,6 +34,14 @@ final class HyperEngine {
                                  onEffect: onEffect, onFailure: onFailure)
         guard session.start() else { return false }
         self.session = session
+        session.update(layout: TypingLayout.current())
+        if layoutObserver == nil {
+            // Another keyboard layout was chosen: the right Option types its characters now.
+            layoutObserver = DistributedNotificationCenter.default().addObserver(
+                forName: TypingLayout.changed, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.session?.update(layout: TypingLayout.current()) }
+            }
+        }
         return true
     }
 
@@ -59,6 +68,9 @@ private final class TapSession: @unchecked Sendable {
     private let onFailure: @MainActor @Sendable () -> Void
     private var machine: HyperMachine
     private var cheatsheetMs: Int
+    private var rightOption: RightOptionMode
+    /// Nil until the main thread hands one over, and for an input source without one.
+    private var layout: TypingLayout?
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
     private var timer: CFRunLoopTimer?
@@ -73,6 +85,7 @@ private final class TapSession: @unchecked Sendable {
          onFailure: @escaping @MainActor @Sendable () -> Void) {
         machine = HyperMachine(settings: settings, launchKeys: launchKeys)
         cheatsheetMs = settings.cheatsheetMs
+        rightOption = settings.rightOption
         self.onEffect = onEffect
         self.onFailure = onFailure
     }
@@ -137,7 +150,14 @@ private final class TapSession: @unchecked Sendable {
             removeTimer()
             machine = HyperMachine(settings: settings, launchKeys: launchKeys)
             cheatsheetMs = settings.cheatsheetMs
+            rightOption = settings.rightOption
         }
+    }
+
+    /// Main thread, which is where the layout has to be read.
+    func update(layout: TypingLayout?) {
+        guard let loop else { return }
+        onTapThread(loop) { [self] in self.layout = layout }
     }
 
     private func onTapThread(_ loop: CFRunLoop, _ block: @escaping () -> Void) {
@@ -168,6 +188,7 @@ private final class TapSession: @unchecked Sendable {
         perform(effects)
         switch disposition {
         case .pass:
+            typeRightOption(event, code)
             return Unmanaged.passUnretained(event)
         case .swallow:
             return nil
@@ -175,6 +196,25 @@ private final class TapSession: @unchecked Sendable {
             event.flags.formUnion(HyperEngine.hyperFlags)
             return Unmanaged.passUnretained(event)
         }
+    }
+
+    /// A key with only the right Option held becomes the character the layout
+    /// has there (⌥2 is @ on a Portuguese keyboard), in place: the same event
+    /// goes on without Option and with the character as its text, so no ⌥
+    /// hotkey (AeroSpace's `alt-2`) matches it and the app types it. Down,
+    /// repeats and up alike. A key that types nothing with Option (Tab, the
+    /// arrows, Delete) is left as the Option combo it is.
+    private func typeRightOption(_ event: CGEvent, _ code: UInt16) {
+        let flags = event.flags
+        guard RightOption.types(mode: rightOption, flags: flags.rawValue, disposition: .pass),
+              let text = layout?.optionText(
+                  keyCode: code, shift: flags.contains(.maskShift), capsLock: flags.contains(.maskAlphaShift),
+                  keyboardType: UInt32(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeyboardType))),
+              RightOption.isText(text)
+        else { return }
+        event.flags = CGEventFlags(rawValue: RightOption.withoutOption(flags.rawValue))
+        let units = Array(text.utf16)
+        event.keyboardSetUnicodeString(stringLength: units.count, unicodeString: units)
     }
 
     /// Re-enables at once. If the tap is still off it gives up at once; a

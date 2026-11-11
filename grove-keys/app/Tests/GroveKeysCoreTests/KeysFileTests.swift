@@ -62,6 +62,17 @@ import Testing
         #expect(f.document.serialized().contains("key = \"caps_lock\" # only"))
     }
 
+    @Test func rightOptionIsCharactersUnlessTheFileSaysShortcuts() throws {
+        #expect(try KeysFile(text: "[hyper]\ntap_ms = 200\n").hyper.rightOption == .characters)
+        var f = try KeysFile(text: "[hyper]\nright_option = \"shortcuts\" # both alike\n")
+        #expect(f.hyper.rightOption == .shortcuts)
+        var h = f.hyper
+        h.rightOption = .characters
+        f.setHyper(h)
+        #expect(f.hyper.rightOption == .characters)
+        #expect(f.document.serialized().contains("right_option = \"characters\" # both alike"))
+    }
+
     /// Monitors moved to monitors.toml. A `[monitors."<host>"]` table still
     /// in someone's keys.toml is an unknown table: not validated (the `3`),
     /// and written back as it was.
@@ -89,6 +100,8 @@ import Testing
         #expect(line("[hyper]\ncolor = \"red\"\n") == 2)
         #expect(line("\n[hyper]\ntap_ms = -5\n") == 3)
         #expect(line("[hyper]\nkey = \"right_shift\"\n") == 2)
+        #expect(line("[hyper]\nright_option = \"letters\"\n") == 2)
+        #expect(line("[hyper]\nright_option = true\n") == 2)
         #expect(line("[launch]\nt = 3\n") == 2)
         #expect(line("[aerospace.main]\na = 3\n") == 2)
     }

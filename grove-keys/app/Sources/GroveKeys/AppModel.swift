@@ -9,7 +9,8 @@ import os
 /// The app's one model: keys.toml and this Mac's monitors.toml as last
 /// applied, the save path, the Hyper engine and the Caps Lock mapping. The
 /// mapping is on only while both permissions are granted, the tap runs, and
-/// Hyper is enabled and not paused.
+/// Hyper is enabled and not paused. (The tap also runs with Hyper off or
+/// paused, for the right Option's characters.)
 @MainActor
 final class AppModel: ObservableObject {
     static let shared = AppModel()
@@ -76,6 +77,8 @@ final class AppModel: ObservableObject {
     /// What the running engine was given, so unrelated edits don't reset it mid-hold.
     private var engineSettings: HyperSettings?
     private var engineLaunchKeys: Set<String> = []
+    /// macOS kept stopping the tap: it stays off (with Hyper paused) until Resume Hyper.
+    private var tapGaveUp = false
     private var lastState: KeysState?
     /// The last keys.toml the save path accepted (the defaults until then).
     private var lastGood: KeysFile
@@ -180,7 +183,10 @@ final class AppModel: ObservableObject {
 
     func togglePause() {
         paused.toggle()
-        if !paused { engineLine = nil }
+        if !paused {
+            engineLine = nil
+            tapGaveUp = false
+        }
         reconcile()
     }
 
@@ -321,24 +327,42 @@ final class AppModel: ObservableObject {
 
     private var launchKeys: Set<String> { Set(keys.launch.map(\.key)) }
 
-    /// Brings the tap and the mapping in line with the permissions, the file and Pause.
+    /// What the tap is given: the file's settings, with Hyper off while paused.
+    private var tapSettings: HyperSettings {
+        var settings = keys.hyper
+        if paused { settings.enabled = false }
+        return settings
+    }
+
+    /// Brings the tap and the mapping in line with the permissions, the file
+    /// and Pause. The tap runs for Hyper or for the right Option's characters
+    /// (Pause Hyper stops Hyper, not those); the Caps Lock mapping only for Hyper.
     private func reconcile() {
-        let want = loaded && keysKnown && permissions.granted && keys.hyper.enabled && !paused
+        let settings = tapSettings
+        let ready = loaded && keysKnown && permissions.granted && !tapGaveUp
+        let want = ready && (settings.enabled || settings.rightOption == .characters)
+        let wantMapping = want && settings.enabled
         if want {
+            // Hyper off or paused while the tap stays: the mapping goes first,
+            // so Caps Lock is never F18 with no machine to take it.
+            if mapping, !wantMapping {
+                HIDMapping.clear()
+                mapping = false
+            }
             if engine.isRunning {
-                if engineSettings != keys.hyper || engineLaunchKeys != launchKeys {
-                    engine.update(settings: keys.hyper, launchKeys: launchKeys)
-                    engineSettings = keys.hyper
+                if engineSettings != settings || engineLaunchKeys != launchKeys {
+                    engine.update(settings: settings, launchKeys: launchKeys)
+                    engineSettings = settings
                     engineLaunchKeys = launchKeys
                 }
-            } else if engine.start(settings: keys.hyper, launchKeys: launchKeys) {
-                engineSettings = keys.hyper
+            } else if engine.start(settings: settings, launchKeys: launchKeys) {
+                engineSettings = settings
                 engineLaunchKeys = launchKeys
                 if engineLine == Self.cannotStart { engineLine = nil }
             } else {
                 engineLine = Self.cannotStart
             }
-            if engine.isRunning, !mapping {
+            if engine.isRunning, wantMapping, !mapping {
                 if keyboards == nil {
                     keyboards = KeyboardWatcher { AppModel.shared.reapplyMapping() }
                 }
@@ -380,6 +404,7 @@ final class AppModel: ObservableObject {
         mapping = false
         stopEngine()
         paused = true
+        tapGaveUp = true
         engineLine = "macOS kept stopping the key tap, so Hyper is off · Resume Hyper to try again"
         writeState()
     }

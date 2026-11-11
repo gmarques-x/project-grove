@@ -177,6 +177,9 @@ public enum CheatSheet {
         CheatRow(id: "macos/spotlight", keys: "⌘ Space", text: "Spotlight"),
         CheatRow(id: "macos/lock", keys: "⌃⌘ Q", text: "Lock the screen"),
         CheatRow(id: "macos/dictation", keys: "Fn Fn", text: "Dictation (the Fn/Globe key, twice)"),
+        // Grove Keys' doing (`right_option` in keys.toml): the left ⌥ is for shortcuts.
+        CheatRow(id: "macos/right-option", keys: "Right ⌥ + key", text: "@ € and other characters (left ⌥: shortcuts)",
+                 detail: "right option alt symbols at euro"),
     ]
 
     private static func hyperKeys(_ key: String) -> String {

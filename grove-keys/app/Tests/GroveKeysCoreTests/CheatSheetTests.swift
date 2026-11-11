@@ -50,7 +50,8 @@ import Testing
         #expect(service[1].detail == "r flatten-workspace-tree, mode main")
 
         #expect(all[3].rows.map(\.keys) == ["⌃ R", "⌃ T", "⌥ C", "⌃ `"])
-        #expect(all[4].rows.map(\.keys) == ["⇧⌘ 3", "⇧⌘ 4", "⇧⌘ 5", "⌃⌘ Space", "⌘ Space", "⌃⌘ Q", "Fn Fn"])
+        #expect(all[4].rows.map(\.keys) == ["⇧⌘ 3", "⇧⌘ 4", "⇧⌘ 5", "⌃⌘ Space", "⌘ Space", "⌃⌘ Q", "Fn Fn",
+                                               "Right ⌥ + key"])
         #expect(all.flatMap(\.rows).filter { $0.id.hasPrefix("shell/") || $0.id.hasPrefix("macos/") }
             .allSatisfy { $0.action == .none })
         let ids = all.flatMap(\.rows).map(\.id)
@@ -155,6 +156,8 @@ import Testing
         #expect(CheatSheet.filter(all, "shell").map(\.id) == ["shell"])
         #expect(found("shell").count == 4)
         #expect(found("macos lock") == ["macos/lock"])
+        #expect(found("right option") == ["macos/right-option"])
+        #expect(found("euro") == ["macos/right-option"])
         #expect(found("service join right") == ["mode:service/alt-shift-l"])
         // Across sections, in the sheet's order.
         #expect(found("quick terminal") == ["shell/quick", "ghostty/toggle_quick_terminal"])

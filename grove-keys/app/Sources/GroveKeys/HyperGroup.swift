@@ -3,7 +3,8 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// Hyper key: on/off, what a tap sends, the two timings (spec §5).
+/// Hyper key: on/off, what a tap sends, the two timings (spec §5), and what
+/// the right Option key does.
 struct HyperGroup: View {
     @ObservedObject var model: AppModel
     @Environment(\.theme) private var theme
@@ -36,6 +37,15 @@ struct HyperGroup: View {
             setting("Cheat sheet after holding") {
                 MsField(value: h.cheatsheetMs) { ms in update { $0.cheatsheetMs = ms } }.id(h.cheatsheetMs)
                     .help("0 = no cheat sheet")
+            }
+            setting("Right ⌥ types characters") {
+                Toggle("", isOn: Binding(get: { h.rightOption == .characters },
+                                         set: { on in update { $0.rightOption = on ? .characters : .shortcuts } }))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(Color(theme.green))
+                    .labelsHidden()
+                    .help("On: the right ⌥ types @ € and the layout's other characters, and only the left ⌥ runs shortcuts. Off: both ⌥ keys run shortcuts")
             }
         }
     }

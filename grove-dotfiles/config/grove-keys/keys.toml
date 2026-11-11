@@ -6,6 +6,7 @@ tap = "escape" # "escape" or "none"
 tap_ms = 200 # a press shorter than this, with no other key, is a tap
 cheatsheet_ms = 500 # hold Caps Lock alone this long to show the cheat sheet; 0 = off
 enabled = true # false = Caps Lock is left alone
+right_option = "characters" # the right ⌥ types @ € and the layout's other characters; "shortcuts" = both ⌥ keys run shortcuts
 
 [launch] # Hyper + key → app bundle ID, e.g. t = "com.mitchellh.ghostty"
 enter = "com.mitchellh.ghostty"

@@ -49,7 +49,15 @@ Hyper plus a key can also launch an app. Add launchers in the Grove Keys window;
 
 Each of these returns you to the normal mode.
 
-These ⌥ shortcuts work in every app, so the characters macOS normally types with ⌥ and those keys are not available while AeroSpace runs.
+These shortcuts are for the **left ⌥**, and they work in every app.
+
+## Special characters (the right ⌥)
+
+The **right ⌥** types the characters your keyboard layout has on ⌥, in every app, and never runs a shortcut: on a Portuguese keyboard right ⌥2 is `@`, right ⌥3 is `€`, and right ⌥⇧8 is `{`. Keys that type nothing (the arrows, ⌫, Tab) still work with it as usual, so right ⌥← moves back a word.
+
+A key that normally waits for a letter (⌥´ for `¨`, ⌥~ for `˜`) types its accent at once with the right ⌥. To put that accent on a letter, use the left ⌥ or the keyboard's own accent keys.
+
+Grove Keys does this, so it works while Grove Keys is running (also with Hyper off or paused); password fields, where macOS hides the keys from every app, are the exception. To have both ⌥ keys run shortcuts, turn off "Right ⌥ types characters" in the Bindings tab's Hyper key group, or set `right_option = "shortcuts"` under `[hyper]` in `keys.toml`.
 
 ## Elsewhere
 

@@ -16,7 +16,7 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 | Full screen and Split View (the green button) | Tiling does this job: a window alone on a workspace fills the screen, and ⌥/ and ⌥, arrange several |
 | Minimise (⌘M) and Hide (⌘H) | Still work; sending a window to another workspace (⌥⇧ and a number) is usually tidier |
 | Caps Lock | It is the Hyper key now: tap for Escape, hold for shortcuts. See [Hotkeys](05-hotkeys.md) |
-| ⌥ plus a letter or digit for a special character | ⌥H J K L, ⌥1 … 9, ⌥- = / , now move windows. In Ghostty use the right ⌥ |
+| ⌥ plus a letter or digit for a special character | Use the **right ⌥**: it types the character in every app (right ⌥2 is `@` on a Portuguese keyboard). The left ⌥ is for shortcuts: ⌥H J K L, ⌥1 … 9, ⌥- = / , move windows. See [Hotkeys](05-hotkeys.md) |
 | The clock and calendar | The clock at the right of the bar; click it for this month |
 | The battery menu | The `bat` figure in the bar. It is a read-out only; settings are in System Settings › Battery |
 | The Wi-Fi menu | The bar shows `wifi`, `eth`, `vpn` or `off`, not the network's name. To choose a network, open System Settings › Wi-Fi |

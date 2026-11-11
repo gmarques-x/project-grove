@@ -7,6 +7,7 @@ public struct HyperSettings: Equatable, Sendable {
     public var tap: TapAction = .escape
     public var tapMs = 200
     public var cheatsheetMs = 500
+    public var rightOption: RightOptionMode = .characters
 
     public init() {}
 }
@@ -36,6 +37,7 @@ public struct KeysFile: Equatable, Sendable {
             case ("tap", .string(let s)): h.tap = TapAction(rawValue: s) ?? h.tap
             case ("tap_ms", .int(let n)): h.tapMs = n
             case ("cheatsheet_ms", .int(let n)): h.cheatsheetMs = n
+            case ("right_option", .string(let s)): h.rightOption = RightOptionMode(rawValue: s) ?? h.rightOption
             default: break
             }
         }
@@ -63,6 +65,7 @@ public struct KeysFile: Equatable, Sendable {
         set(["hyper"], "tap_ms", .int(h.tapMs))
         set(["hyper"], "cheatsheet_ms", .int(h.cheatsheetMs))
         set(["hyper"], "enabled", .bool(h.enabled))
+        set(["hyper"], "right_option", .string(h.rightOption.rawValue))
     }
 
     public mutating func setLaunch(key: String, bundleID: String) {
@@ -163,7 +166,11 @@ public struct KeysFile: Equatable, Sendable {
             }
         case ("tap_ms", .int(let n)), ("cheatsheet_ms", .int(let n)):
             guard n >= 0 else { throw TomlError(line: e.line, message: "\(e.key) can't be negative") }
-        case ("key", _), ("enabled", _), ("tap", _), ("tap_ms", _), ("cheatsheet_ms", _):
+        case ("right_option", .string(let s)):
+            guard RightOptionMode(rawValue: s) != nil else {
+                throw TomlError(line: e.line, message: "right_option must be \"characters\" or \"shortcuts\"")
+            }
+        case ("key", _), ("enabled", _), ("tap", _), ("tap_ms", _), ("cheatsheet_ms", _), ("right_option", _):
             throw TomlError(line: e.line, message: "\(e.key) in [hyper] has the wrong kind of value")
         default:
             throw TomlError(line: e.line, message: "unknown setting \"\(e.key)\" in [hyper]")
