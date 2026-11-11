@@ -1,0 +1,12 @@
+vm.loadavg: { 1.85 1.93 1.97 }
+kern.boottime: { sec = 1794421254, usec = 459503 } Wed Nov 11 18:20:54 2026
+vm.swapusage: total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)
+kern.memorystatus_vm_pressure_level: 1
+kern.memorystatus_level: 90
+hw.memsize: 25769803776
+hw.physicalcpu: 10
+hw.nperflevels: 2
+hw.perflevel0.physicalcpu: 4
+hw.perflevel0.name: Performance
+hw.perflevel1.physicalcpu: 6
+hw.perflevel1.name: Efficiency

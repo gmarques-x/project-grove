@@ -52,6 +52,8 @@ grove-keys/app                                grovekeys://menu opens its menu ba
 
 ## 5. Look
 
+> **Note, 2026-11-11 (later the same day):** the bar moved on from this section and §6. The floating bar's outline and every `│` separator are gone: each group of items sits in its own pill (an orange 1 pt outline, 24 pt high). Wi-Fi, volume and battery are icons alone, drawn from SF Symbols by `config/sketchybar/icons/make.swift`; CPU and memory are an icon and a percentage. The network rates left the bar for the Wi-Fi icon's popup (charts, addresses, top apps), and a click on CPU or memory, or on the battery, opens a popup of its own. `config/sketchybar/sketchybarrc` and `tests/sketchybar_config.bats` describe the bar as it is.
+
 - **Strip:** the bar window is full width and 48 pt tall, `color` = bg0, `topmost = window`, so it sits above the menu bar and hides its slide. `sticky = on`.
 - **Floating bar:** 32 pt tall, inset 8 pt left, right and top, corner radius 10, bg0 fill with a 1 pt bg3 border (as mockup B). It's drawn as a background bracket behind all items, or as `bar` margins plus a background on the item groups, whichever SketchyBar draws cleanly. The plan's first task settles this with a spike.
 - **Text:** JetBrains Mono 13; values in fg, labels in the mockup's accents (cpu/mem aqua, ↓ blue, ↑ orange, battery green, Wi-Fi blue, volume yellow).

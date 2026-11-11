@@ -10,11 +10,7 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft fill under the pointer.
-NAME="${NAME:-}"
-case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
-  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
-esac
+# Hover: the pill under the pointer fills softly.
+sb_hover && exit 0
 
 "$SB" --set clock label="$(date "+%a %-d %b  %H:%M")"

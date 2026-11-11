@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · volume: the level (volume_change gives it in INFO), or mute.
+# Grove bar · volume: a speaker filled with the level (volume_change gives it in INFO), struck out on mute.
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -10,17 +10,13 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft fill under the pointer.
-NAME="${NAME:-}"
-case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
-  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
-esac
-
+# An icon alone: the speaker and its waves filled from the left with the
+# level, in tenths; struck out when muted.
 if [ "$(sb_timeout 2 osascript -e "output muted of (get volume settings)" 2>/dev/null)" = true ]; then
-  "$SB" --set volume label=mute
+  icon=vol-mute
 else
   # volume_change gives the level in INFO; a reload or the first run doesn't.
   level="${INFO:-$(sb_timeout 2 osascript -e "output volume of (get volume settings)" 2>/dev/null)}"
-  "$SB" --set volume label="$(sb_pct "$level")"
+  icon="vol-$(sb_vol_level "$level")"
 fi
+"$SB" --set volume icon.background.image="$(sb_icon "$icon")"

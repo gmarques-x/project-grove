@@ -1,8 +1,8 @@
 #!/bin/bash
 # Grove bar: SketchyBar as the top bar. A 48 pt strip in the desktop's colour
 # (bg0) sits above the menu bar (topmost=on), so macOS's auto-hidden menu bar
-# never shows; one bracket draws the floating bar (32 pt, radius 10, an
-# outline in the border colour) behind every item. Spec: docs/specs/2026-11-11-sketchybar-design.md.
+# never shows. On it, each group of items sits in a pill with an orange
+# outline. Spec: docs/specs/2026-11-11-sketchybar-design.md.
 # Colours come from colors.sh (rendered by grove-themes); plugins/ fill the items.
 
 # Tests point SB_PATH at a fake sketchybar.
@@ -19,14 +19,25 @@ MUTED="${MUTED:-$GREY2}"
 . "$CONFIG_DIR/lib.sh"
 P="$CONFIG_DIR/plugins"
 TEXT="JetBrains Mono:Regular:13.0"
-# Fixed label widths keep the separators still as values change: JetBrains
-# Mono 13 is 7.8 pt a character, each width fits the item's longest value.
-W4=32     # "100%", "mute", "wifi"
+# Fixed label widths keep the pills still as values change: JetBrains Mono 13
+# is 7.8 pt a character, each width fits the item's longest value.
+W4=32     # "100%"
 W5=40     # "1023K", "1.2M" (the compact rates)
 W17=134   # "Wed 11 Nov  15:24"
-# Hover: clickable items light a bg1 background under the pointer (plugins).
-HOVER=(background.height=24 background.corner_radius=6 background.drawing=off)
+W20=156   # a line of `cal`, 20 characters
+# Hover: under the pointer a clickable item's pill fills softly, its outline
+# untouched (sb_hover in lib.sh, called by the item's plugin). The app's name
+# is in no pill: it lights a fill of its own, this shape.
+HOVER=(background.height=24 background.corner_radius=12 background.drawing=off)
 BOLD="JetBrains Mono:SemiBold:13.0"
+# No fill: the pills until the pointer is over them, the charts' ground.
+TRANSPARENT="$(sb_transparent)"
+# The popups: a bg1 box with a thin outline, hanging from the item's right
+# edge, 24 pt a row.
+POPUP=(popup.align=right popup.height=24 popup.background.color="$BG1" popup.background.corner_radius=10
+  popup.background.border_width=1 popup.background.border_color="$BORDER")
+# K is the width of a popup's first column, its short muted captions.
+K=52
 
 sketchybar --bar height=48 color="$BG0" topmost=on sticky=on position=top \
   padding_left=8 padding_right=8 shadow=off
@@ -38,37 +49,46 @@ sketchybar --add event aerospace_workspace_change
 # A reload closes every popup: forget the one plugins/popup.sh had open.
 rm -f "$SB_POPUP"
 
-# sep NAME SIDE: a bar in the border colour between groups.
-sep() {
+# gap NAME SIDE WIDTH: empty space between pills.
+gap() {
   sketchybar --add item "$1" "$2" \
-    --set "$1" icon="│" icon.color="$BORDER" icon.padding_left=4 icon.padding_right=4 label.drawing=off
+    --set "$1" width="$3" icon.drawing=off label.drawing=off padding_left=0 padding_right=0
 }
 
-# Left: the Grove tree, the workspaces, the front app.
+# symbol NAME FILE: the item's icon is one of the symbol images (the dark or
+# the light set, sb_icon knows), 22 pt.
+symbol() {
+  sketchybar --set "$1" icon.background.image="$(sb_icon "$2")" icon.background.image.scale=0.5 \
+    icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0
+}
+
+# Left: the Grove tree in its pill, the workspaces, the front app.
+gap gap.l0 left 4
 sketchybar --add item grove left \
   --set grove icon.background.image="$PINE_ICON" icon.background.image.scale=0.5 icon.background.drawing=on \
-    icon.width=18 icon.padding_left=0 icon.padding_right=0 width=52 align=center padding_left=14 label.drawing=off "${HOVER[@]}" \
+    icon.width=18 icon.padding_left=0 icon.padding_right=0 width=44 align=center padding_left=0 padding_right=0 label.drawing=off \
     script="$P/hover.sh" click_script="open grovekeys://grove-menu" \
   --subscribe grove mouse.entered mouse.exited
-sep sep.l1 left
+gap gap.l1 left 8
 
-# Each workspace in use: its number, the icons of the apps open on it (up to
-# six slots, a click goes to that app's window), then a separator.
+# Each workspace in use is a pill: its number (the focused one on green), the
+# icons of the apps open on it (up to six slots, a click goes to that app's
+# window), a little room, then a gap before the next pill.
 for n in 1 2 3 4 5 6 7 8 9; do
   sketchybar --add item "ws.$n" left \
     --set "ws.$n" label="$n" label.color="$MUTED" label.padding_left=7 label.padding_right=7 \
-      icon.drawing=off padding_left=1 padding_right=5 drawing=off \
-      background.color="$GREEN" background.height=20 background.corner_radius=5 background.drawing=off \
+      icon.drawing=off padding_left=2 padding_right=3 drawing=off \
+      background.color="$GREEN" background.height=20 background.corner_radius=10 background.drawing=off \
       click_script="aerospace workspace $n"
   for k in 1 2 3 4 5 6; do
     sketchybar --add item "ws.$n.$k" left \
       --set "ws.$n.$k" icon.background.drawing=on icon.background.image.scale=0.6 icon.width=20 \
         icon.padding_left=0 icon.padding_right=0 label.drawing=off padding_left=2 padding_right=2 drawing=off
   done
-  sep "sep.ws.$n" left
-  sketchybar --set "sep.ws.$n" drawing=off
+  gap "ws.$n.end" left 4
+  gap "gap.ws.$n" left 6
+  sketchybar --set "ws.$n.end" drawing=off --set "gap.ws.$n" drawing=off
 done
-# workspaces.sh also closes the open popup on these two events.
 sketchybar --set ws.1 script="$P/workspaces.sh" update_freq=30 \
   --subscribe ws.1 aerospace_workspace_change front_app_switched
 
@@ -78,70 +98,146 @@ sketchybar --add item front_app left \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
 # Right (the first added is the rightmost): clock, volume, Wi-Fi, battery,
-# network, memory, CPU. Grove Keys lives in the pine's menu.
-# A click on the clock or the network rates goes to plugins/popup.sh: it fills
-# the popup, shows it and closes the other; a second click, an app switch or
-# a workspace change closes it.
+# memory and CPU, each group in its own pill with a gap between. Volume and
+# Wi-Fi are an icon alone that changes with the level and the signal; CPU and
+# memory are an icon and a value.
+# A click on the clock, the Wi-Fi icon, the battery, CPU or memory goes to
+# plugins/popup.sh: it fills that item's popup, shows it and closes the one
+# that was open; a second click, an app switch or a workspace change closes it.
+
+# caption ITEM TEXT: a popup row's first column.
+caption() {
+  sketchybar --set "$1" icon="$2" icon.color="$MUTED" icon.width=$K icon.padding_right=0
+}
+# chart NAME POPUP CAPTION COLOUR LABEL_WIDTH: a popup row with a line chart,
+# 170 pt wide and 30 pt high, and the current value as its label.
+chart() {
+  sketchybar --add graph "$1" "$2" 170 \
+    --set "$1" icon="$3" icon.color="$4" icon.width=$K icon.padding_right=0 label.width="$5" label.align=right label="$SB_NONE" \
+      graph.color="$4" graph.line_width=1 background.height=30 background.drawing=on background.color="$TRANSPARENT"
+}
+gap gap.r0 right 4
+
 sketchybar --add item clock right \
-  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off padding_right=14 "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
-    popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
-    popup.background.border_width=1 popup.background.border_color="$BORDER" \
-    click_script="$P/popup.sh clock" \
+  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off padding_left=8 padding_right=8 script="$P/clock.sh" update_freq=10 \
+    "${POPUP[@]}" click_script="$P/popup.sh clock" \
   --subscribe clock mouse.entered mouse.exited
+# The month from `cal`, a row a line. The rows have a fixed width: SketchyBar
+# measures a label without its leading spaces, and a row measured short loses
+# its end.
 for i in 1 2 3 4 5 6 7 8; do
-  sketchybar --add item "cal.$i" popup.clock --set "cal.$i" icon.drawing=off drawing=off
+  sketchybar --add item "cal.$i" popup.clock --set "cal.$i" icon.drawing=off label.width=$W20 drawing=off
 done
 
-sep sep.r1 right
+gap gap.r1 right 6
 
 sketchybar --add item volume right \
-  --set volume icon="vol" icon.color="$YELLOW" label.width=$W4 label.align=right script="$P/volume.sh" \
+  --set volume label.drawing=off padding_left=8 padding_right=8 script="$P/volume.sh" \
   --subscribe volume volume_change
+symbol volume vol-2
 
-sep sep.r2 right
+gap gap.r2 right 6
 
 sketchybar --add item wifi right \
-  --set wifi icon.drawing=off label.width=$W4 script="$P/wifi.sh" update_freq=30 \
-  --subscribe wifi wifi_change system_woke
+  --set wifi label.drawing=off padding_left=8 padding_right=8 script="$P/wifi.sh" update_freq=30 \
+    "${POPUP[@]}" click_script="$P/popup.sh wifi" \
+  --subscribe wifi wifi_change system_woke mouse.entered mouse.exited
+symbol wifi wifi-3
 
-sep sep.r3 right
+# The Wi-Fi icon's popup: how the Mac is online (network, address, router,
+# DNS), a chart of the download and the upload rate, the totals since boot
+# and the apps using the network most.
+for row in name ip router dns; do
+  sketchybar --add item "net.$row" popup.wifi --set "net.$row" drawing=off
+  caption "net.$row" "$row"
+done
+sketchybar --set net.name icon=net drawing=on
+chart net.graph.down popup.wifi "↓" "$BLUE" $W5
+chart net.graph.up popup.wifi "↑" "$ORANGE" $W5
+sketchybar --add item net.total popup.wifi --set net.total drawing=off
+caption net.total total
+for i in 1 2 3 4 5; do
+  sketchybar --add item "net.app.$i" popup.wifi --set "net.app.$i" icon.drawing=off label.color="$MUTED" drawing=off
+done
+# Not drawn, but run every two seconds: it measures the rates and feeds the chart.
+sketchybar --add item net.sample right \
+  --set net.sample drawing=off updates=on script="$P/net_sample.sh" update_freq=2
+
+gap gap.r3 right 6
 
 sketchybar --add item battery right \
-  --set battery icon="bat" icon.color="$GREEN" label.width=$W4 label.align=right script="$P/battery.sh" update_freq=60 \
-  --subscribe battery power_source_change system_woke
+  --set battery label.drawing=off padding_left=8 padding_right=8 script="$P/battery.sh" update_freq=60 \
+    "${POPUP[@]}" click_script="$P/popup.sh battery" \
+  --subscribe battery power_source_change system_woke mouse.entered mouse.exited
+symbol battery bolt-10
 
-sep sep.r4 right
-
-sketchybar --add item net.up right \
-  --set net.up icon="↑" icon.color="$ORANGE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/hover.sh" \
-    click_script="$P/popup.sh net.down" \
-  --subscribe net.up mouse.entered mouse.exited
-
-sketchybar --add item net.down right \
-  --set net.down icon="↓" icon.color="$BLUE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/net.down.sh" update_freq=2 \
-    popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
-    popup.background.border_width=1 popup.background.border_color="$BORDER" \
-    click_script="$P/popup.sh net.down" \
-  --subscribe net.down mouse.entered mouse.exited
-
-for i in 1 2 3 4; do
-  sketchybar --add item "net.total.$i" popup.net.down --set "net.total.$i" icon.drawing=off drawing=off
+# The battery's popup: the charge and what it is doing, the time macOS
+# estimates, where the power comes from, the watts in or out, the battery's
+# health, its temperature where the Mac tells, Low Power Mode. Plain rows: the
+# charge moves too slowly for a chart to earn its room.
+for row in charge time source power health full temp mode; do
+  sketchybar --add item "batt.$row" popup.battery --set "batt.$row" drawing=off
+  caption "batt.$row" "$row"
 done
-for i in 1 2 3 4 5; do
-  sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$MUTED" drawing=off
-done
+sketchybar --set batt.charge drawing=on
 
-sep sep.r5 right
+gap gap.r4 right 6
 
+# CPU and memory share one popup, hung from cpu: a click on either opens it.
 sketchybar --add item mem right \
-  --set mem icon="mem" icon.color="$AQUA" label.width=$W4 label.align=right
+  --set mem label.width=$W4 label.align=right label.padding_left=4 padding_right=8 \
+    script="$P/hover.sh" click_script="$P/popup.sh mem" \
+  --subscribe mem mouse.entered mouse.exited
+symbol mem mem
 
 sketchybar --add item cpu right \
-  --set cpu icon="cpu" icon.color="$AQUA" label.width=$W4 label.align=right script="$P/cpu.sh" update_freq=4
-sep sep.r6 right
+  --set cpu label.width=$W4 label.align=right label.padding_left=4 padding_left=8 script="$P/cpu.sh" update_freq=4 \
+    "${POPUP[@]}" click_script="$P/popup.sh cpu" \
+  --subscribe cpu mouse.entered mouse.exited
+symbol cpu cpu
 
-# The floating bar: one bracket behind every item.
-sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app clock volume wifi battery net.up net.down mem cpu \
-  --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BORDER" background.drawing=on
+# Their popup. CPU: a chart of the load (plugins/cpu.sh feeds it and the
+# memory chart every 4 s, so there is history when the popup opens), user and
+# system time, the load averages, each core's load by core type (the core
+# counts where the Mac doesn't give that), the five busiest processes. Then
+# memory: a chart, used of total, app · wired · compressed as Activity Monitor
+# has them, swap and pressure, the five largest processes. The uptime last.
+chart sys.cpu popup.cpu cpu "$AQUA" $W4
+for row in split load perf eff cores; do
+  sketchybar --add item "sys.$row" popup.cpu --set "sys.$row" drawing=off
+  caption "sys.$row" "$row"
+done
+sketchybar --set sys.split icon="" drawing=on
+for i in 1 2 3 4 5; do
+  sketchybar --add item "sys.proc.$i" popup.cpu --set "sys.proc.$i" icon.drawing=off label.color="$MUTED" drawing=off
+done
+chart sys.mem popup.cpu mem "$AQUA" $W4
+for row in used parts swap; do
+  sketchybar --add item "sys.$row" popup.cpu --set "sys.$row" drawing=off
+  caption "sys.$row" "$row"
+done
+sketchybar --set sys.parts icon=""
+for i in 1 2 3 4 5; do
+  sketchybar --add item "sys.memproc.$i" popup.cpu --set "sys.memproc.$i" icon.drawing=off label.color="$MUTED" drawing=off
+done
+sketchybar --add item sys.up popup.cpu --set sys.up drawing=off
+caption sys.up up
+
+# pill NAME ITEM…: an orange outline around a group of items, nothing filled.
+pill() {
+  local name="$1"; shift
+  sketchybar --add bracket "$name" "$@" \
+    --set "$name" background.color="$TRANSPARENT" background.height=24 background.corner_radius=12 \
+      background.border_width=1 background.border_color="$ORANGE" background.drawing=on
+}
+pill pill.grove grove
+for n in 1 2 3 4 5 6 7 8 9; do
+  pill "pill.ws.$n" "ws.$n" "ws.$n.1" "ws.$n.2" "ws.$n.3" "ws.$n.4" "ws.$n.5" "ws.$n.6" "ws.$n.end"
+done
+pill pill.sys cpu mem
+pill pill.battery battery
+pill pill.wifi wifi
+pill pill.volume volume
+pill pill.clock clock
 
 sketchybar --update

@@ -1,0 +1,62 @@
+Power:
+
+    Battery Information:
+
+      Model Information:
+          Serial Number: XXXXXXXXXXXXXXXXX
+          Device Name: bq40z651
+          Pack Lot Code: 0x0000
+          PCB Lot Code: 0x0000
+          Firmware Version: 0x00000b00
+          Hardware Revision: 0x0100
+          Cell Revision: 0x0d17
+      Charge Information:
+          The battery’s charge is below the warning level: No
+          Fully Charged: No
+          Charging: Yes
+          State of Charge (%): 99
+      Health Information:
+          Cycle Count: 96
+          Condition: Normal
+          Maximum Capacity: 100%
+
+    System Power Settings:
+
+      AC Power:
+          System Sleep Timer (Minutes): 0
+          Disk Sleep Timer (Minutes): 10
+          Display Sleep Timer (Minutes): 0
+          Sleep on Power Button: Yes
+          Wake on LAN: Yes
+          Current Power Source: Yes
+          Hibernate Mode: 3
+          Low Power Mode: No
+          Prioritize Network Reachability Over Sleep: No
+      Battery Power:
+          System Sleep Timer (Minutes): 1
+          Disk Sleep Timer (Minutes): 10
+          Display Sleep Timer (Minutes): 0
+          Sleep on Power Button: Yes
+          Wake on LAN: No
+          Hibernate Mode: 3
+          Low Power Mode: No
+          Prioritize Network Reachability Over Sleep: No
+          Reduce Brightness: Yes
+
+    Hardware Configuration:
+
+      UPS Installed: No
+
+    AC Charger Information:
+
+      Connected: Yes
+      ID: 0x7019
+      Wattage (W): 94
+      Family: 0xe000400a
+      Serial Number: XXXXXXXXXXXXXXXXX
+      Name: 140W USB-C Power Adapter
+      Manufacturer: Apple Inc.
+      Hardware Version: 1,0
+      Firmware Version: 1040090
+      Charging: Yes
+

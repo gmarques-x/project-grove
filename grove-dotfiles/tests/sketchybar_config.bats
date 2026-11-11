@@ -1,7 +1,9 @@
 #!/usr/bin/env bats
 # config/sketchybar: sketchybarrc and its plugins. Each plugin runs under an
 # empty environment (as SketchyBar starts it), with faked data commands on
-# SB_PATH and a fake sketchybar that records its arguments.
+# SB_PATH and a fake sketchybar that records its arguments. The bar they
+# describe: groups of items in orange-outlined pills, symbol icons, and popups
+# under the clock, the Wi-Fi icon, the battery, and CPU and memory.
 # shellcheck disable=SC1090,SC1091,SC2016
 
 load helpers
@@ -66,6 +68,9 @@ ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; f
     for n in BG0 BG1 FG GREY2 BORDER ON_ACCENT HOVER_FILL MUTED GREEN AQUA BLUE ORANGE YELLOW RED; do
       grep -qE "^export $n=0xff[0-9A-F]{6}\$" "$out" || { echo "$s $n"; false; }
     done
+    # No fill is the one colour that isn't the palette's; the icon set follows the appearance.
+    grep -qx 'export TRANSPARENT=0x00000000' "$out" || { echo "$s TRANSPARENT"; false; }
+    grep -qx "export ICON_SET=${s%%-*}" "$out" || { echo "$s ICON_SET"; false; }
     grep -q "^export PINE_ICON=\"\$CONFIG_DIR/icons/pine-${s%%-*}.png\"\$" "$out"
   done
 }
@@ -77,7 +82,7 @@ argb() {
   [ -n "$hex" ] && echo "0xff$hex"
 }
 
-@test "sketchybar: lines take the border role, text on the pill the on_accent role" {
+@test "sketchybar: lines take the border role, text on the green fill the on_accent role" {
   local s c out
   for s in $(gt_schemes); do
     c="${s#*-}"
@@ -105,6 +110,49 @@ argb() {
   [ -s "$SB/icons/pine-dark.png" ] && [ -s "$SB/icons/pine-light.png" ]
 }
 
+# icon_names: every symbol icon a plugin or sketchybarrc can name.
+icon_names() {
+  local i
+  echo wifi-off eth vpn vol-mute cpu mem
+  for i in 1 2 3; do echo "wifi-$i"; done
+  for i in 0 1 2 3 4 5 6 7 8 9 10; do echo "vol-$i bolt-$i"; done
+  for i in 0 1 2; do echo "bolt-low-$i"; done
+}
+
+@test "icons: every symbol the bar can name exists in the dark and the light set, and nothing else does" {
+  local name set want have
+  for name in $(icon_names); do
+    for set in dark light; do
+      [ -s "$SB/icons/$name-$set.png" ] || { echo "$name-$set"; false; }
+    done
+  done
+  want="$(for name in $(icon_names) pine; do echo "$name-dark.png"; echo "$name-light.png"; done | sort)"
+  have="$(cd "$SB/icons" && ls -- *.png | sort)"
+  [ "$want" = "$have" ] || { diff <(echo "$want") <(echo "$have"); false; }
+}
+
+@test "icons: make.swift draws the same names" {
+  local gen="$SB/icons/make.swift" name file drawn
+  # Each family is written once, its level and the set filled in.
+  for name in $(icon_names); do
+    case "$name" in
+      wifi-[0-9]) file='wifi-\(level)-\(appearance).png' ;;
+      vol-[0-9]*) file='vol-\(step)-\(appearance).png' ;;
+      bolt-low-[0-9]) file='bolt-low-\(step)-\(appearance).png' ;;
+      bolt-[0-9]*) file='bolt-\(step)-\(appearance).png' ;;
+      *) file="$name"'-\(appearance).png' ;;
+    esac
+    grep -qF "to: \"$file\"" "$gen" || { echo "$name"; false; }
+  done
+  # And nothing the bar doesn't use: ten families.
+  drawn="$(grep -oE 'to: "[a-z-]+' "$gen" | sed -e 's/to: "//' -e 's/-$//' | sort -u | tr '\n' ' ')"
+  [ "$drawn" = "bolt bolt-low cpu eth mem vol vol-mute vpn wifi wifi-off " ] || { echo "$drawn"; false; }
+  # The levels it loops over are the ones the plugins ask for.
+  grep -q 'for step in 0...10' "$gen"
+  grep -q 'if step <= 2' "$gen"
+  grep -q '\[(1, 0.2), (2, 0.5), (3, 1.0)\]' "$gen"
+}
+
 # rc: run sketchybarrc against the fake sketchybar (one recorded line per call).
 rc() {
   run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" /bin/bash "$CFG/sketchybarrc"
@@ -115,54 +163,134 @@ rc() {
   ! calls | grep -qE -- '--add item keys '
 }
 
-@test "sketchybar: the items are added left and right in order" {
+@test "sketchybar: the items are added left and right in order, gaps between the groups" {
   local left right
   rc
   [ "$status" -eq 0 ]
   left="$(calls | grep -oE -- '--add item [a-z_.0-9]+ left' | awk '{print $3}' | tr '\n' ' ')"
   right="$(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}' | tr '\n' ' ')"
-  local want="grove sep.l1 " n
-  for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 sep.ws.$n "; done
+  local want="gap.l0 grove gap.l1 " n
+  for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end gap.ws.$n "; done
   [ "$left" = "${want}front_app " ] || { echo "$left"; false; }
-  [ "$right" = "clock sep.r1 volume sep.r2 wifi sep.r3 battery sep.r4 net.up net.down sep.r5 mem cpu sep.r6 " ] || { echo "$right"; false; }
+  # The first added is the rightmost. net.sample isn't drawn.
+  [ "$right" = "gap.r0 clock gap.r1 volume gap.r2 wifi net.sample gap.r3 battery gap.r4 mem cpu " ] || { echo "$right"; false; }
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
+  # A gap is empty room of a fixed width.
+  calls | grep -qx -- '--add item gap.r1 right --set gap.r1 width=6 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
+  calls | grep -qx -- '--add item gap.l1 left --set gap.l1 width=8 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
 }
 
-@test "sketchybar: separators are a bar in the border colour; each workspace ends with one, hidden until it's in use" {
+@test "sketchybar: no separators and no bar bracket" {
   rc
-  local n
-  for n in 1 2 3 4 5 6 7 8 9; do
-    calls | grep -qx -- "--set sep.ws.$n drawing=off" || { echo "sep.ws.$n"; false; }
-  done
-  for n in sep.l1 sep.ws.1 sep.ws.9 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
-    calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BORDER") " || { echo "$n"; false; }
-  done
-  # The app's name follows the last workspace's separator: none of its own.
+  ! calls | grep -qE -- '--add (item|bracket) (sep\.|bar( |$))'
+  ! calls | grep -q -- '│'
+  ! grep -q -- '│' "$SB/sketchybarrc"
+  # The app's name follows the last workspace's gap, text alone.
   calls | grep -q -- '--set front_app .*icon.drawing=off'
 }
 
-@test "sketchybar: values have fixed widths, so the separators never move" {
+# pills: "NAME MEMBER…" for each bracket sketchybarrc adds.
+pills() {
+  calls | sed -n 's/^--add bracket \(.*\) --set .*/\1/p'
+}
+
+@test "pills: every group of items sits in one, an orange outline with no fill" {
+  local n want line name members item count
   rc
-  local pair item width
-  # JetBrains Mono 13 is 7.8 pt a character: each width fits the item's longest value.
-  for pair in cpu:32 mem:32 net.down:40 net.up:40 battery:32 wifi:32 volume:32 clock:134; do
-    item="${pair%%:*}"; width="${pair#*:}"
-    calls | grep -qE -- "--set $item .*label.width=$width( |\$)" || { echo "$item"; false; }
-  done
-  for item in cpu mem net.down net.up volume; do
-    calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
+  [ "$status" -eq 0 ]
+  want="pill.grove grove"$'\n'
+  for n in 1 2 3 4 5 6 7 8 9; do want+="pill.ws.$n ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end"$'\n'; done
+  want+="pill.sys cpu mem"$'\n'"pill.battery battery"$'\n'"pill.wifi wifi"$'\n'"pill.volume volume"$'\n'"pill.clock clock"
+  [ "$(pills)" = "$want" ] || { pills; false; }
+  . "$CFG/colors.sh"
+  [ "$TRANSPARENT" = 0x00000000 ]
+  while read -r name members; do
+    calls | grep -qx -- "--add bracket $name $members --set $name background.color=$TRANSPARENT background.height=24 background.corner_radius=12 background.border_width=1 background.border_color=$ORANGE background.drawing=on" || { echo "$name"; false; }
+  done <<< "$(pills)"
+  # Every item drawn on the bar is in exactly one pill; the app's name and the
+  # gaps are in none.
+  for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ (left|right)' | awk '{print $3}'); do
+    count="$(pills | cut -d ' ' -f 2- | tr ' ' '\n' | grep -cx -- "$item" || true)"
+    case "$item" in
+      gap.* | front_app | net.sample) [ "$count" -eq 0 ] || { echo "$item in a pill"; false; } ;;
+      *) [ "$count" -eq 1 ] || { echo "$item in $count pills"; false; } ;;
+    esac
   done
 }
 
-@test "sketchybar: the right side's value slots fit beside the notch" {
+@test "pills: the outline is the scheme's orange in a light scheme too" {
+  gt_render_file light-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
   rc
-  # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle,
-  # so the right side has ~860 pt; labels may take at most 380 of it (icons,
-  # padding and separators take ~420).
-  local total
-  total="$(calls | grep -oE -- '--set [a-z.]+ [^-]*label.width=[0-9]+' | grep -vE 'ws\.|front_app' | grep -oE 'label.width=[0-9]+' | cut -d= -f2 | paste -sd+ - | bc)"
-  [ "$total" -le 380 ] || { echo "$total"; false; }
+  calls | grep -qE -- "--set pill.sys background.color=0x00000000 .*background.border_color=$(argb light-medium orange) "
+  calls | grep -qE -- "--set pill.ws.3 background.color=0x00000000 .*background.border_color=$(argb light-medium orange) "
+}
+
+@test "pills: a workspace's pill ends with 4 pt of room and is followed by a gap, both hidden until it's in use" {
+  rc
+  local n
+  for n in 1 2 3 4 5 6 7 8 9; do
+    calls | grep -qx -- "--add item ws.$n.end left --set ws.$n.end width=4 icon.drawing=off label.drawing=off padding_left=0 padding_right=0" || { echo "ws.$n.end"; false; }
+    calls | grep -qx -- "--add item gap.ws.$n left --set gap.ws.$n width=6 icon.drawing=off label.drawing=off padding_left=0 padding_right=0" || { echo "gap.ws.$n"; false; }
+    calls | grep -qx -- "--set ws.$n.end drawing=off --set gap.ws.$n drawing=off" || { echo "ws.$n hidden"; false; }
+  done
+}
+
+@test "sketchybar: values have fixed widths, so the pills never resize" {
+  rc
+  local pair item width
+  # JetBrains Mono 13 is 7.8 pt a character: each width fits the item's longest value.
+  for pair in cpu:32 mem:32 clock:134; do
+    item="${pair%%:*}"; width="${pair#*:}"
+    calls | grep -qE -- "--set $item .*label.width=$width( |\$)" || { echo "$item"; false; }
+  done
+  for item in cpu mem; do
+    calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
+  done
+  # The icons are images in a 22 pt slot, whatever the state; three items are an icon alone.
+  for item in cpu mem battery wifi volume; do
+    calls | grep -qE -- "--set $item icon.background.image=[^ ]+ icon.background.image.scale=0.5 icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0\$" || { echo "$item icon"; false; }
+  done
+  for item in battery wifi volume; do
+    calls | grep -qE -- "--set $item label.drawing=off " || { echo "$item label"; false; }
+  done
+}
+
+# prop ITEM KEY DEFAULT: the last value sketchybarrc gave ITEM's KEY.
+prop() {
+  local v
+  v="$(calls | awk -v item="$1" -v key="$2" '{
+    n = split(" " $0, seg, " --")
+    for (i = 1; i <= n; i++) {
+      m = split(seg[i], w, " ")
+      if (w[1] != "set" || w[2] != item) continue
+      for (j = 3; j <= m; j++) if (index(w[j], key "=") == 1) v = substr(w[j], length(key) + 2)
+    }
+  } END { print v }')"
+  echo "${v:-$3}"
+}
+
+@test "sketchybar: the right side's pills fit beside the notch" {
+  rc
+  # An item is as wide as its paddings, its icon slot and its label slot
+  # (checked against `sketchybar --query <item>` bounding rects on the live
+  # bar, where the right side measures 434 pt: 426 of items + the bar's 8).
+  local item total=8 w
+  [ "$(prop cpu padding_right 5)" = 5 ]
+  for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}'); do
+    [ "$(prop "$item" drawing on)" = on ] || continue
+    w="$(prop "$item" width "")"
+    if [ -z "$w" ]; then
+      w=$(($(prop "$item" padding_left 5) + $(prop "$item" padding_right 5)))
+      [ "$(prop "$item" icon.drawing on)" = off ] || w=$((w + $(prop "$item" icon.width 0)))
+      [ "$(prop "$item" label.drawing on)" = off ] || w=$((w + $(prop "$item" label.width 0)))
+    fi
+    total=$((total + w))
+  done
+  [ "$total" -eq 434 ] || { echo "$total"; false; }
+  # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle:
+  # the right side has ~860 pt.
+  [ "$total" -le 860 ]
 }
 
 @test "sketchybar: the Grove tree is the item's icon image, so its background can show hover" {
@@ -170,66 +298,126 @@ rc() {
   calls | grep -qE -- '--set grove .*icon.background.image=.*/icons/pine-dark.png'
 }
 
-@test "sketchybar: the pine button is 52 pt wide, the tree centred in it" {
+@test "sketchybar: the pine button is 44 pt wide, the tree centred in it" {
   rc
-  calls | grep -qE -- '--set grove .*icon.width=18 .*width=52 align=center '
+  calls | grep -qE -- '--set grove .*icon.width=18 .*width=44 align=center '
 }
 
-@test "sketchybar: clickable items subscribe to hover" {
+@test "sketchybar: clickable items subscribe to hover; only the app's name, in no pill, has a fill of its own" {
   rc
   local item
-  for item in grove net.up net.down clock; do
+  for item in grove front_app clock wifi battery cpu mem; do
     calls | grep -qE -- "--subscribe $item .*mouse.entered mouse.exited" || { echo "$item"; false; }
+    calls | grep -qE -- "--set $item .*script=[^ ]*/plugins/[a-z_]+\\.sh" || { echo "$item script"; false; }
+  done
+  # An item's own background would be drawn over its pill's outline: the pill
+  # itself is what fills (sb_hover).
+  for item in grove clock wifi battery cpu mem volume; do
+    ! calls | grep -qE -- "--set $item (.* )?background\\.(height|corner_radius|drawing|color)=" || { echo "$item has a background"; false; }
+  done
+  calls | grep -qE -- "--set front_app .*background.height=24 background.corner_radius=12 background.drawing=off"
+  # The volume has no click.
+  ! calls | grep -qE -- '--subscribe volume .*mouse'
+  # Memory has no plugin of its own (cpu.sh fills it): hover.sh lights it.
+  calls | grep -qE -- '--set mem .*script=[^ ]*/plugins/hover.sh '
+}
+
+# hover ITEM EVENT: the pointer entering or leaving ITEM, as its plugin gets it.
+hover() {
+  local script
+  case "$1" in grove | mem) script=hover ;; *) script="$1" ;; esac
+  : > "$CALLS"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME="$1" SENDER="$2" \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" /bin/bash "$CFG/plugins/$script.sh"
+}
+
+@test "hover: the item's pill fills with the hover colour (bg1 in dark, bg3 in light) and clears when the pointer leaves" {
+  local s fill pair item pill
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    if [ "$s" = dark-medium ]; then fill="$(argb "$s" bg1)"; else fill="$(argb "$s" bg3)"; fi
+    # CPU and memory share a pill: either lights the whole of it.
+    for pair in grove:pill.grove clock:pill.clock wifi:pill.wifi battery:pill.battery cpu:pill.sys mem:pill.sys; do
+      item="${pair%%:*}"; pill="${pair#*:}"
+      hover "$item" mouse.entered
+      [ "$status" -eq 0 ]
+      # Only the pill's fill changes: its orange outline stays, and the item gets no background over it.
+      [ "$(calls)" = "--set $pill background.color=$fill" ] || { echo "$s $item"; calls; false; }
+      hover "$item" mouse.exited
+      [ "$(calls)" = "--set $pill background.color=0x00000000" ] || { echo "$s $item"; calls; false; }
+    done
   done
 }
 
-@test "hover: a soft fill under the pointer (bg1 in dark, bg3 in light), gone when it leaves" {
-  gt_render_file light-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
-  plugin net.down SENDER=mouse.entered
-  [ "$(calls)" = "--set net.down background.drawing=on background.color=$(argb light-medium bg3)" ]
-  : > "$CALLS"
-  gt_render_file dark-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
-  plugin net.down SENDER=mouse.entered
+@test "hover: the app's name is in no pill, it lights a fill of its own" {
   . "$CFG/colors.sh"
-  [ "$(calls)" = "--set net.down background.drawing=on background.color=$BG1" ]
-  : > "$CALLS"
-  plugin net.down SENDER=mouse.exited
-  [ "$(calls)" = "--set net.down background.drawing=off" ]
+  hover front_app mouse.entered
+  [ "$(calls)" = "--set front_app background.drawing=on background.color=$BG1" ]
+  hover front_app mouse.exited
+  [ "$(calls)" = "--set front_app background.drawing=off" ]
 }
 
-@test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar with one floating bracket" {
+@test "hover: with a colors.sh from before the pills, a pill clears to bg0 without its alpha" {
+  grep -vE '^export (TRANSPARENT|HOVER_FILL)=' "$CFG/colors.sh" > "$CFG/colors.sh.old"
+  mv "$CFG/colors.sh.old" "$CFG/colors.sh"
+  hover clock mouse.entered
+  [ "$(calls)" = "--set pill.clock background.color=$(argb dark-medium bg1)" ]
+  hover clock mouse.exited
+  [ "$(calls)" = "--set pill.clock background.color=0x00$(argb dark-medium bg0 | cut -c 5-)" ]
+}
+
+@test "hover: one helper in lib.sh, called only by the plugins of items that subscribe to the pointer" {
+  local f
+  ! grep -n 'mouse\.entered' "$SB"/plugins/*.sh
+  for f in hover front_app clock wifi battery cpu; do
+    grep -qx 'sb_hover && exit 0' "$SB/plugins/$f.sh" || { echo "$f"; false; }
+  done
+  for f in workspaces volume net_sample network_popup clock_popup system_popup battery_popup popup; do
+    ! grep -q 'sb_hover' "$SB/plugins/$f.sh" || { echo "$f"; false; }
+  done
+  # A hover does nothing else: no readings, no other call.
+  fake pmset 'echo called >> "'"$BATS_TEST_TMPDIR"'/reads"'
+  fake iostat 'echo called >> "'"$BATS_TEST_TMPDIR"'/reads"'
+  hover battery mouse.entered
+  hover cpu mouse.entered
+  [ "$(ncalls)" -eq 1 ]
+  [ ! -e "$BATS_TEST_TMPDIR/reads" ]
+}
+
+@test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar, nothing drawn around it" {
   grep -q -- '--bar height=48 color="\$BG0" topmost=on sticky=on' "$SB/sketchybarrc"
-  # The floating bar's edges line up with the windows' 8 pt outer gaps.
+  # The outer pills line up with the windows' 8 pt outer gaps.
   grep -q -- 'padding_left=8 padding_right=8 shadow=off' "$SB/sketchybarrc"
-  grep -q -- '--add bracket bar ' "$SB/sketchybarrc"
-  grep -q 'background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="\$BORDER"' "$SB/sketchybarrc"
   rc
   . "$CFG/colors.sh"
-  calls | grep -qE -- "--set bar background.color=$BG0 .*background.border_width=1 background.border_color=$BORDER( |\$)"
+  calls | grep -qx -- "--bar height=48 color=$BG0 topmost=on sticky=on position=top padding_left=8 padding_right=8 shadow=off"
+  # The only brackets are the pills.
+  ! calls | grep -E -- '--add bracket' | grep -qvE -- '--add bracket pill\.'
 }
 
-@test "sketchybar: in a light scheme the outline, separators and popups are bg5, not bg3" {
+@test "sketchybar: in a light scheme the popups' outlines are bg5, not bg3" {
   local bg3 bg5 item
   gt_render_file light-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
   bg3="$(argb light-medium bg3)"; bg5="$(argb light-medium bg5)"
   rc
   [ "$status" -eq 0 ]
-  calls | grep -qE -- "--set bar .*background.border_color=$bg5( |\$)"
-  calls | grep -q -- "--set sep.r1 icon=│ icon.color=$bg5 "
-  for item in clock net.down; do
+  for item in clock wifi battery cpu; do
     calls | grep -qE -- "--set $item .*popup.background.border_width=1 popup.background.border_color=$bg5( |\$)" || { echo "$item"; false; }
   done
   ! calls | grep -q -- "$bg3"
   calls | grep -qE -- '--set grove .*icon.background.image=.*/icons/pine-light.png'
 }
 
-@test "sketchybar: popups are a bg1 box with an outline in the border colour" {
+@test "sketchybar: popups are a bg1 box with an outline in the border colour, all four the same shape" {
   local item
   rc
   . "$CFG/colors.sh"
-  for item in clock net.down; do
-    calls | grep -qE -- "--set $item .*popup.background.color=$BG1 .*popup.background.border_width=1 popup.background.border_color=$BORDER( |\$)" || { echo "$item"; false; }
+  # Hung from the item's right edge, 24 pt a row.
+  for item in clock wifi battery cpu; do
+    calls | grep -qE -- "--set $item .*popup.align=right popup.height=24 popup.background.color=$BG1 popup.background.corner_radius=10 popup.background.border_width=1 popup.background.border_color=$BORDER click_script=" || { echo "$item"; false; }
   done
+  # Memory opens the CPU's popup: it has none of its own.
+  ! calls | grep -qE -- '--set mem .*popup\.(align|height|background)'
 }
 
 # old_colors: a colors.sh rendered before the theme had roles (no BORDER, no ON_ACCENT).
@@ -240,19 +428,41 @@ old_colors() {
   mv "$CFG/colors.sh.old" "$CFG/colors.sh"
 }
 
-@test "sketchybar: with a colors.sh from before the roles, lines fall back to its BG3 and the pill's text to BG0" {
+@test "sketchybar: with a colors.sh from before the roles, lines fall back to its BG3 and the focused number to BG0" {
   old_colors
   rc
   [ "$status" -eq 0 ]
-  calls | grep -q -- "--set sep.l1 icon=│ icon.color=0xff123456 "
-  calls | grep -qE -- "--set bar .*background.border_color=0xff123456( |\$)"
-  calls | grep -qE -- "--set clock .*popup.background.border_color=0xff123456( |\$)"
+  local item
+  for item in clock wifi battery cpu; do
+    calls | grep -qE -- "--set $item .*popup.background.border_color=0xff123456( |\$)" || { echo "$item"; false; }
+  done
   ! calls | grep -qE -- 'color=( |$)'
   : > "$CALLS"
   fake aerospace 'case "$*" in *--focused*) echo 3 ;; *) printf "1\n3\n" ;; esac'
   plugin workspaces
   . "$CFG/colors.sh"
   [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on label.color=$BG0 "* ]] || false
+}
+
+@test "sketchybar: with a colors.sh from before the pills, no fill is bg0 without its alpha and the icon set follows the pine" {
+  local s
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    grep -vE '^export (TRANSPARENT|ICON_SET)=' "$CFG/colors.sh" > "$CFG/colors.sh.old"
+    mv "$CFG/colors.sh.old" "$CFG/colors.sh"
+    : > "$CALLS"
+    rc
+    [ "$status" -eq 0 ]
+    ! calls | grep -qE -- 'color=( |$)'
+    calls | grep -qE -- "--set pill.clock background.color=0x00$(argb "$s" bg0 | cut -c 5-) " || { echo "$s pill"; false; }
+    calls | grep -qE -- "--set net.graph.down .*background.color=0x00$(argb "$s" bg0 | cut -c 5-)\$" || { echo "$s chart"; false; }
+    calls | grep -qE -- "--set wifi icon.background.image=$CFG/icons/wifi-3-${s%%-*}.png " || { echo "$s rc icon"; false; }
+    # The plugins pick the same set.
+    : > "$CALLS"
+    fake osascript 'case "$*" in *muted*) echo false ;; *) echo 33 ;; esac'
+    plugin volume INFO=60
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-6-${s%%-*}.png" ] || { echo "$s plugin icon"; calls; false; }
+  done
 }
 
 @test "workspaces: the ones in use are drawn, the focused one is a green pill" {
@@ -295,7 +505,7 @@ old_colors() {
   [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off"* ]] || false
 }
 
-@test "workspaces: each one shows its apps' icons, once per app, then a separator" {
+@test "workspaces: each one shows its apps' icons, once per app; its pill's end and the gap after it show with it" {
   fake aerospace 'case "$*" in
     *--focused*) echo 1 ;;
     *list-windows*) printf "1|com.google.Chrome|50\n1|com.mitchellh.ghostty|27\n1|com.google.Chrome|51\n2|com.microsoft.VSCode|60\n" ;;
@@ -308,16 +518,47 @@ old_colors() {
   [[ "$(calls)" == *"--set ws.1.2 drawing=on icon.background.image=app.com.mitchellh.ghostty click_script=aerospace focus --window-id 27"* ]] || false
   [[ "$(calls)" == *"--set ws.1.3 drawing=off"* ]] || false
   [[ "$(calls)" == *"--set ws.2.1 drawing=on icon.background.image=app.com.microsoft.VSCode"* ]] || false
-  [[ "$(calls)" == *"--set sep.ws.1 drawing=on"* ]] || false
-  [[ "$(calls)" == *"--set sep.ws.2 drawing=on"* ]] || false
-  [[ "$(calls)" == *"--set ws.3 drawing=off --set sep.ws.3 drawing=off --set ws.3.1 drawing=off"* ]] || false
+  # With an app shown, the pill ends with its 4 pt of room.
+  [[ "$(calls)" == *"--set ws.1.end drawing=on width=4 --set gap.ws.1 drawing=on"* ]] || false
+  [[ "$(calls)" == *"--set ws.2.end drawing=on width=4 --set gap.ws.2 drawing=on"* ]] || false
+  [[ "$(calls)" == *"--set ws.3 drawing=off --set ws.3.end drawing=off --set gap.ws.3 drawing=off --set ws.3.1 drawing=off"* ]] || false
+  # A workspace that empties takes its pill's end and its gap with it.
+  : > "$CALLS"
+  fake aerospace 'case "$*" in *--focused*) echo 1 ;; *list-windows*) printf "1|com.google.Chrome|50\n" ;; *) printf "1\n" ;; esac'
+  plugin workspaces
+  [[ "$(calls)" == *"--set ws.2 drawing=off --set ws.2.end drawing=off --set gap.ws.2 drawing=off --set ws.2.1 drawing=off"* ]] || false
+}
+
+@test "workspaces: one in use but empty keeps the room of one app icon, so its pill is as wide as one with an app" {
+  # 3 is focused and empty (AeroSpace keeps the focused one); 1 has a window.
+  fake aerospace 'case "$*" in
+    *--focused*) echo 3 ;;
+    *list-windows*) printf "1|com.google.Chrome|50\n" ;;
+    *) printf "1\n" ;;
+  esac'
+  plugin workspaces
+  [ "$status" -eq 0 ]
+  # A 24 pt slot plus the 4 pt of room.
+  [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on "*"--set ws.3.end drawing=on width=28 --set gap.ws.3 drawing=on --set ws.3.1 drawing=off"* ]] || { calls; false; }
+  [[ "$(calls)" == *"--set ws.1.end drawing=on width=4 --set gap.ws.1 drawing=on"* ]] || { calls; false; }
+  # It gets an app: back to 4.
+  : > "$CALLS"
+  fake aerospace 'case "$*" in
+    *--focused*) echo 3 ;;
+    *list-windows*) printf "1|com.google.Chrome|50\n3|com.mitchellh.ghostty|27\n" ;;
+    *) printf "1\n3\n" ;;
+  esac'
+  plugin workspaces
+  [[ "$(calls)" == *"--set ws.3.end drawing=on width=4 --set gap.ws.3 drawing=on"* ]] || { calls; false; }
+  # A workspace not in use isn't given a width: it is hidden.
+  [[ "$(calls)" == *"--set ws.2 drawing=off --set ws.2.end drawing=off --set gap.ws.2 drawing=off"* ]] || false
 }
 
 @test "workspaces: without AeroSpace every workspace is hidden" {
   fake aerospace 'exit 2'
   plugin workspaces
   [ "$status" -eq 0 ]
-  [[ "$(calls)" == *"--set ws.1 drawing=off"* ]] || false
+  [[ "$(calls)" == *"--set ws.1 drawing=off --set ws.1.end drawing=off --set gap.ws.1 drawing=off"* ]] || false
   [[ "$(calls)" != *"drawing=on"* ]] || false
 }
 
@@ -332,23 +573,26 @@ old_colors() {
   [ "$(calls)" = '--set front_app label=Ghostty' ]
 }
 
-@test "cpu and mem: one call sets both" {
+@test "cpu and mem: one call sets both, and feeds their popup's charts" {
   fake iostat 'cat "'"$FX"'/iostat.txt"'
   fake vm_stat 'cat "'"$FX"'/vm_stat.txt"'
   fake sysctl 'echo 25769803776'
+  fake osascript 'echo called >> "'"$BATS_TEST_TMPDIR"'/osascript-calls"'
   plugin cpu
   [ "$(ncalls)" -eq 1 ]
   . "$CFG/colors.sh"
-  [ "$(calls)" = "--set cpu label=9% label.color=$FG --set mem label=52% label.color=$FG" ]
+  [ "$(calls)" = "--set cpu label=9% label.color=$FG --set mem label=52% label.color=$FG --set sys.cpu label=9% --set sys.mem label=52% --set sys.split label=user 6% · system 4% --push sys.cpu 0.09 --push sys.mem 0.52" ] || { calls; false; }
+  # The popup is closed: nothing measures the cores.
+  [ ! -e "$BATS_TEST_TMPDIR/osascript-calls" ]
 }
 
-@test "cpu and mem: a failing source shows —" {
+@test "cpu and mem: a failing source shows —, and the charts get 0" {
   fake iostat 'exit 1'
   fake vm_stat 'exit 1'
   fake sysctl 'exit 1'
   plugin cpu
   . "$CFG/colors.sh"
-  [ "$(calls)" = "--set cpu label=— label.color=$FG --set mem label=— label.color=$FG" ]
+  [ "$(calls)" = "--set cpu label=— label.color=$FG --set mem label=— label.color=$FG --set sys.cpu label=— --set sys.mem label=— --set sys.split label=— --push sys.cpu 0 --push sys.mem 0" ] || { calls; false; }
 }
 
 @test "cpu and mem: yellow above 70%, red above 90%" {
@@ -357,40 +601,205 @@ old_colors() {
   fake sysctl 'echo 14033844547'
   plugin cpu
   . "$CFG/colors.sh"
-  [ "$(calls)" = "--set cpu label=80% label.color=$YELLOW --set mem label=95% label.color=$RED" ]
+  [[ "$(calls)" == "--set cpu label=80% label.color=$YELLOW --set mem label=95% label.color=$RED --set sys.cpu label=80% --set sys.mem label=95% --set sys.split label=user 50% · system 30% --push sys.cpu 0.80 --push sys.mem 0.95" ]] || { calls; false; }
 }
 
-@test "network: the first sample shows —, the next the rate on the default interface" {
+# system_fakes: this Mac's readings for the CPU and memory popup. The cores'
+# loads come from osascript (ten cores: six efficiency, then four performance),
+# which is given the seconds to measure over as its last argument.
+system_fakes() {
+  fake sysctl 'cat "'"$FX"'/sysctl.txt"'
+  fake ps 'cat "'"$FX"'/ps.txt"'
+  fake vm_stat 'cat "'"$FX"'/vm_stat.txt"'
+  fake ioreg 'cat "'"$FX"'/ioreg-cpus.txt"'
+  fake osascript 'echo "${@: -1}" >> "'"$BATS_TEST_TMPDIR"'/osascript-calls"; echo "12 40 3 8 1 2 50 60 70 80"'
+}
+
+@test "system popup: load, each core by type, the busiest processes, memory and its parts, swap, the largest processes, uptime" {
+  system_fakes
+  plugin system_popup SB_NOW=1794435774
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 1 ]
+  local c; c="$(calls)"
+  [[ "$c" == *"--set sys.load drawing=on label=1.85  1.93  1.97 --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.proc.1 drawing=on label=launchd  18.7% --set sys.proc.2 drawing=on label=WindowServer  7.4% --set sys.proc.3 drawing=on label=ghostty  2.6% --set sys.proc.4 drawing=on label=zsh  2.3% --set sys.proc.5 drawing=on label=corespotlightd  0.9% --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.used drawing=on label=12.4 of 24.0 GB --set sys.parts drawing=on label=app 10.3 · wired 1.9 · compressed 0.4 --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.swap drawing=on label=0 B · pressure normal --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.memproc.1 drawing=on label=SourceKitService  828 MB --set sys.memproc.2 drawing=on label=WindowServer  329 MB --set sys.memproc.3 drawing=on label=Google Chrome  309 MB --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.memproc.5 drawing=on label=Siri AI  216 MB --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.up drawing=on label=4h 2m --"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.perf drawing=on label=50  60  70  80 --set sys.eff drawing=on label=12  40  3  8  1  2 --set sys.cores drawing=off" ]] || { echo "$c"; false; }
+  # The charts and the user · system row are cpu.sh's: the fill leaves them alone.
+  [[ "$c" != *"sys.cpu "* && "$c" != *"sys.mem "* && "$c" != *"sys.split"* && "$c" != *"--push"* ]] || false
+  # The cores were measured once, over a moment short enough for a click.
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/osascript-calls" | tr -d ' ')" -eq 1 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/osascript-calls")" = 0.15 ]
+}
+
+@test "system popup: when the cores can't be measured, how many there are of each type" {
+  system_fakes
+  fake osascript 'exit 1'
+  plugin system_popup
+  [ "$status" -eq 0 ]
+  [[ "$(calls)" == *"--set sys.perf drawing=off --set sys.eff drawing=off --set sys.cores drawing=on label=4 Performance · 6 Efficiency" ]] || { calls; false; }
+}
+
+@test "system popup: on a Mac that doesn't tell the cores' types, all the cores on one row" {
+  system_fakes
+  fake ioreg 'exit 1'
+  plugin system_popup
+  [[ "$(calls)" == *"--set sys.perf drawing=off --set sys.eff drawing=off --set sys.cores drawing=on label=12  40  3  8  1  2  50  60  70  80" ]] || { calls; false; }
+}
+
+@test "system popup: sources that fail hide their rows, a long process name is cut" {
+  fake sysctl 'exit 1'
+  fake vm_stat 'exit 1'
+  fake ioreg 'exit 1'
+  fake osascript 'exit 1'
+  fake ps 'printf " %%CPU    RSS COMM\n  1,5   2048 com.apple.DriverKit-AppleBCMWLAN\n"'
+  plugin system_popup
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 1 ]
+  local c row; c="$(calls)"
+  for row in load used parts swap up perf eff cores; do
+    [[ "$c" == *"--set sys.$row drawing=off"* ]] || { echo "$row"; echo "$c"; false; }
+  done
+  # A decimal comma from ps is read as a point.
+  [[ "$c" == *"--set sys.proc.1 drawing=on label=com.apple.DriverKit-App…  1.5% --set sys.proc.2 drawing=off"* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set sys.memproc.1 drawing=on label=com.apple.DriverKit-App…  2.0 MB --set sys.memproc.2 drawing=off"* ]] || { echo "$c"; false; }
+}
+
+@test "system popup: while it is open cpu.sh fills it again, the cores measured over iostat's second" {
+  system_fakes
+  fake iostat 'cat "'"$FX"'/iostat.txt"'
+  echo cpu > "$BATS_TEST_TMPDIR/grove-sketchybar-popup"
+  plugin cpu SB_NOW=1794435774
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 2 ]
+  [[ "$(calls | sed -n 1p)" == "--set cpu label=9% "*"--push sys.cpu 0.09 --push sys.mem "* ]] || { calls; false; }
+  [[ "$(calls | sed -n 2p)" == "--set sys.load drawing=on label=1.85  1.93  1.97 "*"--set sys.perf drawing=on label=50  60  70  80 --set sys.eff drawing=on label=12  40  3  8  1  2 --set sys.cores drawing=off" ]] || { calls; false; }
+  # One measure, a second long: the fill doesn't take its own.
+  [ "$(wc -l < "$BATS_TEST_TMPDIR/osascript-calls" | tr -d ' ')" -eq 1 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/osascript-calls")" = 1 ]
+  # Another popup open: cpu.sh fills nothing.
+  : > "$CALLS"
+  echo wifi > "$BATS_TEST_TMPDIR/grove-sketchybar-popup"
+  plugin cpu
+  [ "$(ncalls)" -eq 1 ]
+}
+
+@test "system popup: its rows hang from cpu: two charts in aqua, captions in the muted colour" {
+  rc
+  . "$CFG/colors.sh"
+  local row i
+  for row in cpu mem; do
+    calls | grep -qx -- "--add graph sys.$row popup.cpu 170 --set sys.$row icon=$row icon.color=$AQUA icon.width=52 icon.padding_right=0 label.width=32 label.align=right label=— graph.color=$AQUA graph.line_width=1 background.height=30 background.drawing=on background.color=$TRANSPARENT" || { echo "$row"; false; }
+  done
+  for row in load perf eff cores used swap up; do
+    calls | grep -qE -- "--add item sys.$row popup.cpu --set sys.$row drawing=off\$" || { echo "$row"; false; }
+    calls | grep -qx -- "--set sys.$row icon=$row icon.color=$MUTED icon.width=52 icon.padding_right=0" || { echo "$row caption"; false; }
+  done
+  for i in 1 2 3 4 5; do
+    calls | grep -qx -- "--add item sys.proc.$i popup.cpu --set sys.proc.$i icon.drawing=off label.color=$MUTED drawing=off"
+    calls | grep -qx -- "--add item sys.memproc.$i popup.cpu --set sys.memproc.$i icon.drawing=off label.color=$MUTED drawing=off"
+  done
+  # In the popup's order: CPU first, memory after, the uptime last.
+  [ "$(calls | grep -oE -- '--add (item|graph) sys\.[a-z.0-9]+ popup.cpu' | awk '{print $3}' | tr '\n' ' ')" = "sys.cpu sys.split sys.load sys.perf sys.eff sys.cores sys.proc.1 sys.proc.2 sys.proc.3 sys.proc.4 sys.proc.5 sys.mem sys.used sys.parts sys.swap sys.memproc.1 sys.memproc.2 sys.memproc.3 sys.memproc.4 sys.memproc.5 sys.up " ]
+}
+
+@test "sampler: a hidden item that runs every 2 s and feeds the Wi-Fi popup's two charts" {
+  rc
+  calls | grep -qE -- "--add item net.sample right --set net.sample drawing=off updates=on script=[^ ]*/plugins/net_sample.sh update_freq=2\$"
+  [ -x "$SB/plugins/net_sample.sh" ] && [ ! -e "$SB/plugins/net.down.sh" ]
+  . "$CFG/colors.sh"
+  calls | grep -qx -- "--add graph net.graph.down popup.wifi 170 --set net.graph.down icon=↓ icon.color=$BLUE icon.width=52 icon.padding_right=0 label.width=40 label.align=right label=— graph.color=$BLUE graph.line_width=1 background.height=30 background.drawing=on background.color=$TRANSPARENT"
+  calls | grep -qx -- "--add graph net.graph.up popup.wifi 170 --set net.graph.up icon=↑ icon.color=$ORANGE icon.width=52 icon.padding_right=0 label.width=40 label.align=right label=— graph.color=$ORANGE graph.line_width=1 background.height=30 background.drawing=on background.color=$TRANSPARENT"
+  # No rates on the bar itself.
+  ! calls | grep -qE -- '--add item net\.(up|down) '
+}
+
+@test "sampler: the first sample shows — and pushes 0, the next the rate on the default interface" {
   fake route 'printf "   route to: default\n  interface: en0\n"'
   fake netstat 'cat "'"$FX"'/netstat.txt"'
-  plugin net.down
-  [ "$(calls)" = '--set net.down label=— --set net.up label=—' ]
+  plugin net_sample
+  [ "$(calls)" = '--set net.graph.down label=— --set net.graph.up label=— --push net.graph.down 0 --push net.graph.up 0' ]
   # One second later the counters grew by 2048 in and 1024 out.
   sed -e 's/2456789012/2456791060/' -e 's/187654321/187655345/' "$FX/netstat.txt" > "$BATS_TEST_TMPDIR/netstat2.txt"
   fake netstat 'cat "'"$BATS_TEST_TMPDIR"'/netstat2.txt"'
   echo "en0 2456789012 187654321 1000" > "$BATS_TEST_TMPDIR/grove-sketchybar-net"
   : > "$CALLS"
-  plugin net.down SB_NOW=1001
-  [ "$(calls)" = '--set net.down label=2K --set net.up label=1K' ]
+  plugin net_sample SB_NOW=1001
+  [ "$(calls)" = '--set net.graph.down label=2K --set net.graph.up label=1K --push net.graph.down 0.442 --push net.graph.up 0.401' ] || { calls; false; }
+  [ "$(cat "$BATS_TEST_TMPDIR/grove-sketchybar-net")" = "en0 2456791060 187655345 1001" ]
 }
 
-@test "network: an interface change shows — for one sample" {
+@test "sampler: an interface change shows — for one sample" {
   fake route 'printf "  interface: en5\n"'
   fake netstat 'cat "'"$FX"'/netstat.txt"'
   echo "en0 2456789012 187654321 1000" > "$BATS_TEST_TMPDIR/grove-sketchybar-net"
-  plugin net.down SB_NOW=1002
-  [ "$(calls)" = '--set net.down label=— --set net.up label=—' ]
+  plugin net_sample SB_NOW=1002
+  [ "$(calls)" = '--set net.graph.down label=— --set net.graph.up label=— --push net.graph.down 0 --push net.graph.up 0' ]
 }
 
-@test "network popup: interface totals and the top apps" {
+# network_fakes: online over Wi-Fi on en0.
+network_fakes() {
+  fake route 'printf "   route to: default\n  interface: en0\n"'
+  fake ipconfig 'case "$1" in getsummary) cat "'"$FX"'/ipconfig-wifi.txt" ;; getifaddr) echo 192.168.1.20 ;; getoption) echo 192.168.1.1 ;; esac'
+  fake scutil 'cat "'"$FX"'/scutil-dns.txt"'
   fake netstat 'cat "'"$FX"'/netstat.txt"'
   fake nettop 'cat "'"$FX"'/nettop.csv"'
+}
+
+@test "network popup: how the Mac is online, the default interface's totals and the top apps" {
+  network_fakes
   plugin network_popup
+  [ "$status" -eq 0 ]
   [ "$(ncalls)" -eq 1 ]
-  [[ "$(calls)" == *"--set net.total.1 drawing=on label=en0  ↓ 2.3 GB  ↑ 179 MB"* ]] || false
-  [[ "$(calls)" == *"--set net.app.1 drawing=on label=mDNSResponder  ↓ 8.9 MB  ↑ 1.8 MB"* ]] || false
-  [[ "$(calls)" == *"--set net.app.2 drawing=on label=Google Chrome H  ↓ 2.0 MB  ↑ 74 KB"* ]] || false
-  [[ "$(calls)" == *"--set net.app.5 drawing=on"* ]] || false
+  local c; c="$(calls)"
+  # macOS hides the network's name from command-line tools: "Wi-Fi" without the file.
+  [[ "$c" == "--set net.name label=Wi-Fi --set net.ip drawing=on label=192.168.1.20 --set net.router drawing=on label=192.168.1.1 --set net.dns drawing=on label=192.168.1.1 --set net.total drawing=on label=↓ 2.3 GB  ↑ 179 MB --set net.app.1 "* ]] || { echo "$c"; false; }
+  [[ "$c" == *"--set net.app.1 drawing=on label=mDNSResponder  ↓ 8.9 MB  ↑ 1.8 MB"* ]] || false
+  [[ "$c" == *"--set net.app.2 drawing=on label=Google Chrome H  ↓ 2.0 MB  ↑ 74 KB"* ]] || false
+  [[ "$c" == *"--set net.app.5 drawing=on"* ]] || false
+  # The charts are the sampler's.
+  [[ "$c" != *"net.graph"* ]] || false
+}
+
+@test "network popup: the Wi-Fi network's name comes from the state folder's wifi-name file" {
+  network_fakes
+  mkdir -p "$GROVE_STATE"
+  printf 'Grove Home\nsecond line\n' > "$GROVE_STATE/wifi-name"
+  plugin network_popup
+  [[ "$(calls)" == "--set net.name label=Grove Home --set net.ip "* ]] || { calls; false; }
+  # Not Wi-Fi: the file isn't read.
+  : > "$CALLS"
+  fake ipconfig 'case "$1" in getsummary) cat "'"$FX"'/ipconfig-eth.txt" ;; getifaddr) echo 10.0.0.5 ;; getoption) echo 10.0.0.1 ;; esac'
+  plugin network_popup
+  [[ "$(calls)" == "--set net.name label=Ethernet --set net.ip drawing=on label=10.0.0.5 --set net.router drawing=on label=10.0.0.1 "* ]] || { calls; false; }
+  : > "$CALLS"
+  fake route 'printf "  interface: utun3\n"'
+  plugin network_popup
+  [[ "$(calls)" == "--set net.name label=VPN "* ]] || { calls; false; }
+}
+
+@test "network popup: offline, the rows without a value are hidden" {
+  network_fakes
+  fake route 'exit 1'
+  fake scutil 'exit 1'
+  plugin network_popup
+  [[ "$(calls)" == "--set net.name label=Offline --set net.ip drawing=off --set net.router drawing=off --set net.dns drawing=off --set net.total drawing=off "* ]] || { calls; false; }
+}
+
+@test "network popup: its rows hang from the Wi-Fi icon, captions in the muted colour" {
+  rc
+  . "$CFG/colors.sh"
+  [ "$(calls | grep -oE -- '--add (item|graph) net\.[a-z.0-9]+ popup.wifi' | awk '{print $3}' | tr '\n' ' ')" = "net.name net.ip net.router net.dns net.graph.down net.graph.up net.total net.app.1 net.app.2 net.app.3 net.app.4 net.app.5 " ]
+  local row
+  for row in ip router dns total; do
+    calls | grep -qx -- "--set net.$row icon=$row icon.color=$MUTED icon.width=52 icon.padding_right=0" || { echo "$row"; false; }
+  done
+  calls | grep -qx -- '--set net.name icon=net drawing=on'
+  calls | grep -qx -- "--add item net.app.5 popup.wifi --set net.app.5 icon.drawing=off label.color=$MUTED drawing=off"
 }
 
 @test "network popup: nettop is asked not to resolve names (-n), or it outlasts its 2 s" {
@@ -408,23 +817,45 @@ old_colors() {
   [[ "$(calls)" == *"--set net.app.2 drawing=off"* ]] || false
 }
 
-@test "battery: the level, coloured green while charging, yellow under 20%, red under 10%" {
-  . "$CFG/colors.sh"
-  fake pmset 'cat "'"$FX"'/pmset-charging.txt"'
-  plugin battery
-  [ "$(calls)" = "--set battery drawing=on label=87% label.color=$GREEN" ]
+# battery_icon PMSET_LINE: the icon battery.sh picks for a `pmset -g batt` battery line.
+battery_icon() {
   : > "$CALLS"
-  fake pmset 'cat "'"$FX"'/pmset-battery.txt"'
+  fake pmset 'printf "x\n -InternalBattery-0 (id=1)\t%s present: true\n" "'"$1"'"'
   plugin battery
-  [ "$(calls)" = "--set battery drawing=on label=100% label.color=$FG" ]
-  : > "$CALLS"
-  fake pmset 'printf "x\n -InternalBattery-0 (id=1)\t15%%; discharging; 1:00 remaining present: true\n"'
-  plugin battery
-  [ "$(calls)" = "--set battery drawing=on label=15% label.color=$YELLOW" ]
-  : > "$CALLS"
-  fake pmset 'printf "x\n -InternalBattery-0 (id=1)\t9%%; discharging; 0:20 remaining present: true\n"'
-  plugin battery
-  [ "$(calls)" = "--set battery drawing=on label=9% label.color=$RED" ]
+  calls
+}
+
+@test "battery: a bolt filled with the charge in tenths, red under 20% when not charging" {
+  local s set
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    : > "$CALLS"
+    fake pmset 'cat "'"$FX"'/pmset-charging.txt"'
+    plugin battery
+    [ "$(calls)" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-9-$set.png" ] || { calls; false; }
+    : > "$CALLS"
+    fake pmset 'cat "'"$FX"'/pmset-battery.txt"'
+    plugin battery
+    [ "$(calls)" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-10-$set.png" ]
+    [ "$(battery_icon "20%; discharging; 1:30 remaining")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-2-$set.png" ]
+    [ "$(battery_icon "19%; discharging; 1:20 remaining")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-low-2-$set.png" ]
+    [ "$(battery_icon "9%; discharging; 0:20 remaining")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-low-1-$set.png" ]
+    [ "$(battery_icon "4%; discharging; (no estimate)")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-low-0-$set.png" ]
+    # Low but charging: the yellow bolt.
+    [ "$(battery_icon "15%; charging; 1:00 remaining")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-2-$set.png" ]
+    [ "$(battery_icon "4%; AC attached; not charging")" = "--set battery drawing=on icon.background.image=$CFG/icons/bolt-0-$set.png" ]
+  done
+}
+
+@test "battery: every level names an icon that exists" {
+  local level state file
+  for level in 0 1 4 5 9 10 14 15 19 20 44 45 94 95 99 100; do
+    for state in discharging charging; do
+      file="$(battery_icon "$level%; $state; 1:00 remaining" | sed 's/.*icon.background.image=//')"
+      [ -s "$file" ] || { echo "$level $state: $file"; false; }
+    done
+  done
 }
 
 @test "battery: hidden without a battery" {
@@ -433,36 +864,132 @@ old_colors() {
   [ "$(calls)" = '--set battery drawing=off' ]
 }
 
-@test "connection: wifi, eth or vpn from the default route, grey when off" {
-  . "$CFG/colors.sh"
-  fake route 'printf "  interface: en0\n"'
-  fake ipconfig 'cat "'"$FX"'/ipconfig-wifi.txt"'
-  plugin wifi
-  [ "$(calls)" = "--set wifi label=wifi label.color=$BLUE" ]
-  : > "$CALLS"
-  fake route 'printf "  interface: utun3\n"'
-  plugin wifi
-  [ "$(calls)" = "--set wifi label=vpn label.color=$BLUE" ]
-  : > "$CALLS"
-  fake route 'exit 1'
-  plugin wifi
-  [ "$(calls)" = "--set wifi label=off label.color=$GREY2" ]
+# battery_fakes: this Mac on its charger, as recorded.
+battery_fakes() {
+  fake pmset 'case "$*" in *batt*) cat "'"$FX"'/pmset-finishing.txt" ;; *) cat "'"$FX"'/pmset-g.txt" ;; esac'
+  fake ioreg 'cat "'"$FX"'/ioreg-battery.txt"'
+  fake system_profiler 'cat "'"$FX"'/system_profiler-power.txt"'
 }
 
-@test "volume: the level from INFO, mute when muted" {
-  fake osascript 'case "$*" in *muted*) echo false ;; *) echo 33 ;; esac'
-  plugin volume INFO=60
-  [ "$(calls)" = '--set volume label=60%' ]
+@test "battery popup: charge and state, time to full, the adapter, watts, health, capacity, Low Power Mode" {
+  battery_fakes
+  plugin battery_popup
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 1 ]
+  [ "$(calls)" = "--set batt.charge label=99% · charging --set batt.time drawing=on label=0:13 to full --set batt.source drawing=on label=140W USB-C Power Adapter · 94 W --set batt.power drawing=on label=4.2 W charging · Mac 7.7 W --set batt.health drawing=on label=100% · Normal · 96 cycles --set batt.full drawing=on label=5493 of 5760 mAh --set batt.temp drawing=off --set batt.mode drawing=on label=Low Power off" ] || { calls; false; }
+}
+
+@test "battery popup: on battery, the time left and the watts going out; a temperature where the Mac gives one" {
+  battery_fakes
+  fake pmset 'case "$*" in *batt*) cat "'"$FX"'/pmset-battery.txt" ;; *) sed "s/lowpowermode         0/lowpowermode         1/" "'"$FX"'/pmset-g.txt" ;; esac'
+  # A discharge is a 64-bit two'"'"'s complement number (here -1000 mA); older Macs publish a Temperature.
+  sed -e 's/"Amperage" = [0-9]*/"Amperage" = 18446744073709550616/' -e 's/^\(.*\)"CycleCount" = 96/\1"Temperature" = 3012\'$'\n''&/' "$FX/ioreg-battery.txt" > "$BATS_TEST_TMPDIR/ioreg.txt"
+  grep -q '"Temperature" = 3012' "$BATS_TEST_TMPDIR/ioreg.txt"
+  fake ioreg 'cat "'"$BATS_TEST_TMPDIR"'/ioreg.txt"'
+  fake system_profiler 'exit 1'
+  plugin battery_popup
+  # Without System Settings' figure, health is the measured capacity over the design's.
+  [ "$(calls)" = "--set batt.charge label=100% · on battery --set batt.time drawing=on label=8:56 left --set batt.source drawing=on label=Battery --set batt.power drawing=on label=13.3 W discharging · Mac 7.7 W --set batt.health drawing=on label=95% · 96 cycles --set batt.full drawing=on label=5493 of 5760 mAh --set batt.temp drawing=on label=30.1 °C --set batt.mode drawing=on label=Low Power on" ] || { calls; false; }
+}
+
+@test "battery popup: plugged in and not charging has no time; sources that fail hide their rows" {
+  fake pmset 'case "$*" in *batt*) printf "Now drawing from '"'"'AC Power'"'"'\n -InternalBattery-0 (id=1)\t80%%; AC attached; not charging present: true\n" ;; *) exit 1 ;; esac'
+  fake ioreg 'exit 1'
+  fake system_profiler 'exit 1'
+  plugin battery_popup
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "--set batt.charge label=80% · plugged in, not charging --set batt.time drawing=off --set batt.source drawing=on label=Power adapter --set batt.power drawing=off --set batt.health drawing=off --set batt.full drawing=off --set batt.temp drawing=off --set batt.mode drawing=off" ] || { calls; false; }
+}
+
+@test "battery popup: nothing to fill without a battery" {
+  battery_fakes
+  fake pmset 'cat "'"$FX"'/pmset-none.txt"'
+  plugin battery_popup
+  [ "$status" -eq 0 ]
+  [ "$(ncalls)" -eq 0 ]
+}
+
+@test "battery popup: its rows hang from the battery, plain rows with muted captions and no chart" {
+  rc
+  . "$CFG/colors.sh"
+  [ "$(calls | grep -oE -- '--add (item|graph) batt\.[a-z.0-9]+ popup.battery' | awk '{print $2 ":" $3}' | tr '\n' ' ')" = "item:batt.charge item:batt.time item:batt.source item:batt.power item:batt.health item:batt.full item:batt.temp item:batt.mode " ]
+  local row
+  for row in charge time source power health full temp mode; do
+    calls | grep -qx -- "--set batt.$row icon=$row icon.color=$MUTED icon.width=52 icon.padding_right=0" || { echo "$row"; false; }
+  done
+}
+
+# wifi_icon RSSI: the icon wifi.sh picks on Wi-Fi with that signal.
+wifi_icon() {
   : > "$CALLS"
-  fake osascript 'case "$*" in *muted*) echo true ;; *) echo 33 ;; esac'
-  plugin volume INFO=60
-  [ "$(calls)" = '--set volume label=mute' ]
+  fake osascript 'echo "'"$1"'"'
+  plugin wifi
+  calls
+}
+
+@test "connection: an icon alone: the Wi-Fi fan by signal, a cable, a tunnel, or off" {
+  local s set
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    fake route 'printf "  interface: en0\n"'
+    fake ipconfig 'cat "'"$FX"'/ipconfig-wifi.txt"'
+    [ "$(wifi_icon -52)" = "--set wifi icon.background.image=$CFG/icons/wifi-3-$set.png" ] || { calls; false; }
+    [ "$(wifi_icon -66)" = "--set wifi icon.background.image=$CFG/icons/wifi-2-$set.png" ]
+    [ "$(wifi_icon -80)" = "--set wifi icon.background.image=$CFG/icons/wifi-1-$set.png" ]
+    # A signal that can't be read: the whole fan.
+    [ "$(wifi_icon "")" = "--set wifi icon.background.image=$CFG/icons/wifi-3-$set.png" ]
+    fake ipconfig 'cat "'"$FX"'/ipconfig-eth.txt"'
+    [ "$(wifi_icon -52)" = "--set wifi icon.background.image=$CFG/icons/eth-$set.png" ]
+    fake route 'printf "  interface: utun3\n"'
+    [ "$(wifi_icon -52)" = "--set wifi icon.background.image=$CFG/icons/vpn-$set.png" ]
+    fake route 'exit 1'
+    [ "$(wifi_icon -52)" = "--set wifi icon.background.image=$CFG/icons/wifi-off-$set.png" ]
+  done
+}
+
+@test "connection: the signal is asked of CoreWLAN, and only on Wi-Fi" {
+  fake route 'printf "  interface: en0\n"'
+  fake ipconfig 'cat "'"$FX"'/ipconfig-wifi.txt"'
+  fake osascript 'echo "$*" >> "'"$BATS_TEST_TMPDIR"'/osascript-calls"; echo -70'
+  plugin wifi
+  grep -q -- '-l JavaScript -e .*CoreWLAN.*rssiValue' "$BATS_TEST_TMPDIR/osascript-calls"
+  rm "$BATS_TEST_TMPDIR/osascript-calls"
+  fake ipconfig 'cat "'"$FX"'/ipconfig-eth.txt"'
+  plugin wifi
+  [ ! -e "$BATS_TEST_TMPDIR/osascript-calls" ]
+}
+
+@test "volume: a speaker filled with the level from INFO in tenths, struck out when muted" {
+  local s set
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    : > "$CALLS"
+    fake osascript 'case "$*" in *muted*) echo false ;; *) echo 33 ;; esac'
+    plugin volume INFO=60
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-6-$set.png" ] || { calls; false; }
+    : > "$CALLS"
+    plugin volume INFO=0
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-0-$set.png" ]
+    : > "$CALLS"
+    # Anything above silence shows.
+    plugin volume INFO=3
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-1-$set.png" ]
+    : > "$CALLS"
+    plugin volume INFO=100
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-10-$set.png" ]
+    : > "$CALLS"
+    fake osascript 'case "$*" in *muted*) echo true ;; *) echo 33 ;; esac'
+    plugin volume INFO=60
+    [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-mute-$set.png" ]
+  done
 }
 
 @test "volume: without INFO (a reload, the first run) it reads the current level" {
   fake osascript 'case "$*" in *muted*) echo false ;; *) echo 56 ;; esac'
   plugin volume
-  [ "$(calls)" = '--set volume label=56%' ]
+  [ "$(calls)" = "--set volume icon.background.image=$CFG/icons/vol-6-dark.png" ]
 }
 
 @test "clock: weekday day month, two spaces, hours:minutes" {
@@ -471,16 +998,43 @@ old_colors() {
   [ "$(calls)" = '--set clock label=Tue 11 Nov  14:32' ]
 }
 
-@test "calendar: the clock's popup shows this month, one line per row" {
+@test "calendar: the clock's popup shows this month as cal prints it, one line per row, today underlined" {
   fake cal 'printf "   November 2026\nSu Mo Tu We Th Fr Sa\n 1  2  3  4  5  6  7\n 8  9 10 11 12 13 14\n"'
+  fake date 'echo 11'
   plugin clock_popup
   [ "$(ncalls)" -eq 1 ]
-  # Leading spaces are no-break spaces (SketchyBar would cut the row's end otherwise).
-  local nb=$'\xc2\xa0'
-  [[ "$(calls)" == *"--set cal.1 drawing=on label=$nb$nb${nb}November 2026"* ]] || false
-  [[ "$(calls)" == *"--set cal.4 drawing=on label=${nb}8  9 10 11 12 13 14"* ]] || false
-  [[ "$(calls)" == *"--set cal.5 drawing=off"* ]] || false
-  [[ "$(calls)" == *"--set cal.8 drawing=off"* ]] || false
+  # A combining low line after each digit: it takes no room, the columns hold.
+  local low=$'\xcc\xb2'
+  [ "$(calls)" = "--set cal.1 drawing=on label=   November 2026 --set cal.2 drawing=on label=Su Mo Tu We Th Fr Sa --set cal.3 drawing=on label= 1  2  3  4  5  6  7 --set cal.4 drawing=on label= 8  9 10 1${low}1${low} 12 13 14 --set cal.5 drawing=off --set cal.6 drawing=off --set cal.7 drawing=off --set cal.8 drawing=off" ] || { calls; false; }
+  # A one-digit day keeps its leading space; only the first match is marked
+  # (the year in the title never is).
+  : > "$CALLS"
+  fake date 'echo 2'
+  plugin clock_popup
+  [[ "$(calls)" == *"label=   November 2026 --set"*"label= 1  2${low}  3  4  5  6  7 --set cal.4 drawing=on label= 8  9 10 11 12 13 14 "* ]] || { calls; false; }
+  # Without the date, the month unmarked.
+  : > "$CALLS"
+  fake date 'exit 1'
+  plugin clock_popup
+  [[ "$(calls)" == *"label= 8  9 10 11 12 13 14 "* ]] || { calls; false; }
+}
+
+@test "calendar: the rows have a fixed width that fits cal's 20 characters, so none is measured short and cut" {
+  rc
+  local i
+  # JetBrains Mono 13 is 7.8 pt a character: 20 × 7.8 = 156.
+  for i in 1 2 3 4 5 6 7 8; do
+    calls | grep -qx -- "--add item cal.$i popup.clock --set cal.$i icon.drawing=off label.width=156 drawing=off" || { echo "cal.$i"; false; }
+  done
+  # The old way round it (no-break spaces for the leading ones) is gone.
+  ! grep -q 'xc2.xa0' "$SB/plugins/clock_popup.sh"
+  # A six-week month fits the eight rows: title, weekdays, six weeks.
+  fake cal 'printf "    August 2026\nSu Mo Tu We Th Fr Sa\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30 31\n"'
+  fake date 'echo 1'
+  : > "$CALLS"
+  plugin clock_popup
+  local low=$'\xcc\xb2'
+  [[ "$(calls)" == *"--set cal.3 drawing=on label=                   1${low} --set cal.4 "*"--set cal.8 drawing=on label=30 31" ]] || { calls; false; }
 }
 
 @test "clock: under a Portuguese locale the day and month stay English" {
@@ -489,15 +1043,57 @@ old_colors() {
   calls | grep -qE -- '^--set clock label=(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [0-9]+ (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)  [0-9]{2}:[0-9]{2}$' || { calls; false; }
 }
 
-@test "popups: a click on the clock or either network rate goes to popup.sh" {
+@test "popups: a click on the clock, the Wi-Fi icon, the battery, CPU or memory goes to popup.sh" {
   rc
-  calls | grep -qE -- '--set clock .*click_script=[^ ]*/plugins/popup.sh clock( |$)'
-  calls | grep -qE -- '--set net.up .*click_script=[^ ]*/plugins/popup.sh net.down( |$)'
-  calls | grep -qE -- '--set net.down .*click_script=[^ ]*/plugins/popup.sh net.down( |$)'
+  local item
+  for item in clock wifi battery cpu mem; do
+    calls | grep -qE -- "--set $item .*click_script=[^ ]*/plugins/popup.sh $item( |\$)" || { echo "$item"; false; }
+  done
   calls | grep -qE -- '--add item cal.1 popup.clock'
-  calls | grep -qE -- '--add item net.app.1 popup.net.down'
+  calls | grep -qE -- '--add item net.app.1 popup.wifi'
+  calls | grep -qE -- '--add item batt.charge popup.battery'
+  calls | grep -qE -- '--add item sys.load popup.cpu'
+  # Memory has no popup of its own.
+  ! calls | grep -qE -- '--add (item|graph) [^ ]+ popup\.mem'
   # Nothing toggles a popup directly: that would show it before it's filled.
   ! grep -q 'popup.drawing=toggle' "$SB/sketchybarrc" "$SB"/plugins/*.sh
+}
+
+@test "popups: popup.sh knows each item's popup and the plugin that fills it" {
+  fake cal 'echo "   November 2026"'
+  network_fakes
+  battery_fakes
+  system_fakes
+  local pair item first
+  for pair in "clock:--set cal.1 " "wifi:--set net.name " "battery:--set batt.charge " "cpu:--set sys.load "; do
+    item="${pair%%:*}"; first="${pair#*:}"
+    rm -f "$BATS_TEST_TMPDIR/grove-sketchybar-popup"
+    : > "$CALLS"
+    click "$item"
+    [ "$status" -eq 0 ]
+    [ "$(ncalls)" -eq 2 ] || { echo "$item"; calls; false; }
+    [[ "$(calls | sed -n 1p)" == "$first"* ]] || { echo "$item"; calls; false; }
+    [ "$(calls | sed -n 2p)" = "--set $item popup.drawing=on" ] || { echo "$item"; calls; false; }
+    [ "$(cat "$BATS_TEST_TMPDIR/grove-sketchybar-popup")" = "$item" ]
+    [ -x "$SB/plugins/popup.sh" ]
+  done
+}
+
+@test "popups: CPU and memory share one popup, hung from cpu: a click on either opens it, on either closes it" {
+  system_fakes
+  click mem
+  [ "$(ncalls)" -eq 2 ]
+  [[ "$(calls | sed -n 1p)" == "--set sys.load "* ]] || { calls; false; }
+  [ "$(calls | sed -n 2p)" = "--set cpu popup.drawing=on" ]
+  : > "$CALLS"
+  click cpu
+  [ "$(calls)" = "--set cpu popup.drawing=off" ]
+  : > "$CALLS"
+  click cpu
+  [ "$(calls | sed -n 2p)" = "--set cpu popup.drawing=on" ]
+  : > "$CALLS"
+  click mem
+  [ "$(calls)" = "--set cpu popup.drawing=off" ]
 }
 
 @test "popups: a reload forgets the open popup" {
@@ -512,7 +1108,7 @@ old_colors() {
   click clock
   [ "$status" -eq 0 ]
   [ "$(ncalls)" -eq 2 ]
-  [[ "$(calls | sed -n 1p)" == "--set cal.1 drawing=on label="*"November 2026"* ]] || false
+  [[ "$(calls | sed -n 1p)" == "--set cal.1 drawing=on label=   November 2026 "* ]] || false
   [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=on" ]
   : > "$CALLS"
   click clock
@@ -524,17 +1120,24 @@ old_colors() {
 
 @test "popups: opening one closes the other" {
   fake cal 'echo "   November 2026"'
-  fake netstat 'cat "'"$FX"'/netstat.txt"'
-  fake nettop 'cat "'"$FX"'/nettop.csv"'
+  network_fakes
+  battery_fakes
+  system_fakes
   click clock
   : > "$CALLS"
-  click net.down
+  click wifi
   [ "$(ncalls)" -eq 2 ]
-  [[ "$(calls | sed -n 1p)" == "--set net.total.1 drawing=on"* ]] || false
-  [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=off --set net.down popup.drawing=on" ]
+  [[ "$(calls | sed -n 1p)" == "--set net.name label=Wi-Fi "* ]] || false
+  [ "$(calls | sed -n 2p)" = "--set clock popup.drawing=off --set wifi popup.drawing=on" ]
+  : > "$CALLS"
+  click mem
+  [ "$(calls | sed -n 2p)" = "--set wifi popup.drawing=off --set cpu popup.drawing=on" ]
+  : > "$CALLS"
+  click battery
+  [ "$(calls | sed -n 2p)" = "--set cpu popup.drawing=off --set battery popup.drawing=on" ]
   : > "$CALLS"
   click clock
-  [ "$(calls | sed -n 2p)" = "--set net.down popup.drawing=off --set clock popup.drawing=on" ]
+  [ "$(calls | sed -n 2p)" = "--set battery popup.drawing=off --set clock popup.drawing=on" ]
 }
 
 @test "popups: an item without a popup does nothing" {
@@ -565,6 +1168,10 @@ old_colors() {
   [[ "$(calls)" != *"popup.drawing"* ]] || false
   plugin workspaces
   [[ "$(calls)" != *"popup.drawing"* ]] || false
+}
+
+@test "comments: nothing still describes the separators, the floating bar or the rates on the bar" {
+  ! grep -nEi 'separator|floating bar|net\.(down|up)([^a-z]|$)|sep\.' "$SB/sketchybarrc" "$SB/lib.sh" "$SB"/plugins/*.sh "$SB/colors.sh.tmpl"
 }
 
 @test "sketchybar: the pine opens the grove menu, the app name the app's menus" {

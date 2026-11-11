@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · the connection: wifi, eth or vpn through the default route, or off (macOS hides Wi-Fi names from command-line tools).
+# Grove bar · the connection, an icon: Wi-Fi by signal, a cable or a tunnel through the default route, or off. A click opens its popup (network_popup.sh).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -10,14 +10,20 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft fill under the pointer.
-NAME="${NAME:-}"
-case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
-  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
-esac
+# Hover: the pill under the pointer fills softly.
+sb_hover && exit 0
 
+# An icon alone: the Wi-Fi fan with one to three arcs by signal, a plug on
+# a cable, a shield on a tunnel, a struck-out fan when offline.
 iface="$(sb_timeout 2 route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
 conn="$( { [ -n "$iface" ] && sb_timeout 2 ipconfig getsummary "$iface" 2>/dev/null; } | sb_conn "$iface")"
-if [ "$conn" = off ]; then color="$GREY2"; else color="$BLUE"; fi
-"$SB" --set wifi label="$conn" label.color="$color"
+case "$conn" in
+  wifi)
+    # The signal in dBm from CoreWLAN (needs no Location permission).
+    rssi="$(sb_timeout 2 osascript -l JavaScript -e 'ObjC.import("CoreWLAN"); var i = $.CWWiFiClient.sharedWiFiClient.interface; i.isNil() ? "" : String(i.rssiValue)' 2>/dev/null)"
+    icon="wifi-$(sb_wifi_level "$rssi")" ;;
+  eth) icon=eth ;;
+  vpn) icon=vpn ;;
+  *) icon=wifi-off ;;
+esac
+"$SB" --set wifi icon.background.image="$(sb_icon "$icon")"

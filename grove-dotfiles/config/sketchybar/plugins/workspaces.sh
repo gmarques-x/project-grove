@@ -1,6 +1,6 @@
 #!/bin/bash
 # Grove bar · workspaces ws.1…ws.9: the ones in use drawn, the focused one a green pill,
-# each followed by its apps' icons (ws.N.1…6) and a separator (sep.ws.N).
+# each followed by its apps' icons (ws.N.1…6), the room that ends its pill (ws.N.end) and a gap (gap.ws.N).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -11,15 +11,8 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft fill under the pointer.
-NAME="${NAME:-}"
-case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
-  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
-esac
-
-# An app or workspace switch closes the open popup (the clock's or the
-# network's). Here because this is the one plugin that gets both events;
+# An app or workspace switch closes the open popup, whichever it is. Here
+# because this is the one plugin that gets both events;
 # first, so the popup doesn't wait for AeroSpace's answers.
 case "${SENDER:-}" in
   front_app_switched | aerospace_workspace_change) sb_popup_close ;;
@@ -47,9 +40,12 @@ for n in 1 2 3 4 5 6 7 8 9; do
     else
       args+=(--set "ws.$n" drawing=on background.drawing=off label.color="${MUTED:-$GREY2}")
     fi
-    args+=(--set "sep.ws.$n" drawing=on)
+    # An empty workspace keeps the room of one app icon (a 24 pt slot), so its
+    # pill is as wide as one with an app open.
+    if [[ "$shown" == *" $n."* ]]; then end=4; else end=28; fi
+    args+=(--set "ws.$n.end" drawing=on width="$end" --set "gap.ws.$n" drawing=on)
   else
-    args+=(--set "ws.$n" drawing=off --set "sep.ws.$n" drawing=off)
+    args+=(--set "ws.$n" drawing=off --set "ws.$n.end" drawing=off --set "gap.ws.$n" drawing=off)
   fi
   for k in 1 2 3 4 5 6; do
     [[ "$shown" == *" $n.$k "* ]] || args+=(--set "ws.$n.$k" drawing=off)

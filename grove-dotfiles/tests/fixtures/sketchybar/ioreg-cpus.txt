@@ -1,0 +1,60 @@
++-o cpu0@0  <class IOPlatformDevice, id 0x100000286, registered, matched, active, busy 0 (199 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 0
+    }
++-o cpu1@1  <class IOPlatformDevice, id 0x100000287, registered, matched, active, busy 0 (201 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 1
+    }
++-o cpu2@2  <class IOPlatformDevice, id 0x100000288, registered, matched, active, busy 0 (0 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 2
+    }
++-o cpu3@3  <class IOPlatformDevice, id 0x100000289, registered, matched, active, busy 0 (196 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 3
+    }
++-o cpu4@4  <class IOPlatformDevice, id 0x10000028b, registered, matched, active, busy 0 (195 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 4
+    }
++-o cpu5@5  <class IOPlatformDevice, id 0x10000028c, registered, matched, active, busy 0 (195 ms), retain 8>
+    {
+      "cluster-type" = <"E">
+      "logical-cluster-id" = 0
+      "logical-cpu-id" = 5
+    }
++-o cpu6@100  <class IOPlatformDevice, id 0x10000028d, registered, matched, active, busy 0 (195 ms), retain 8>
+    {
+      "logical-cluster-id" = 1
+      "logical-cpu-id" = 6
+      "cluster-type" = <"P">
+    }
++-o cpu7@101  <class IOPlatformDevice, id 0x10000028e, registered, matched, active, busy 0 (166 ms), retain 8>
+    {
+      "cluster-type" = <"P">
+      "logical-cluster-id" = 1
+      "logical-cpu-id" = 7
+    }
++-o cpu8@102  <class IOPlatformDevice, id 0x10000028f, registered, matched, active, busy 0 (166 ms), retain 8>
+    {
+      "cluster-type" = <"P">
+      "logical-cluster-id" = 1
+      "logical-cpu-id" = 8
+    }
++-o cpu9@103  <class IOPlatformDevice, id 0x100000290, registered, matched, active, busy 0 (0 ms), retain 8>
+    {
+      "cluster-type" = <"P">
+      "logical-cluster-id" = 1
+      "logical-cpu-id" = 9
+    }

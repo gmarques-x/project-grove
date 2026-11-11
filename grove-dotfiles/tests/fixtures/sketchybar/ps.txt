@@ -1,0 +1,26 @@
+ %CPU    RSS COMM
+ 18.7  32320 launchd
+  0.0  57520 mds
+  0.5  22304 opendirectoryd
+  7.4 337296 WindowServer
+  0.0 265216 loginwindow
+  0.6  26128 WindowManager
+  2.6 200464 ghostty
+  0.0 316064 Google Chrome
+  0.0  35232 Dock
+  0.0  51648 Finder
+  0.9 181504 corespotlightd
+  0.0 221248 Siri AI
+  0.0 204544 mediaanalysisd
+  0.2  65280 sketchybar
+  0.0  90304 AeroSpace
+  0.0 208224 Code
+  0.0  82144 Code Helper
+  0.0  50880 Code Helper
+  0.0 146208 Code Helper
+  0.0 101104 Code Helper
+  0.0 847872 SourceKitService
+  0.0  77392 Code Helper
+  2.3   3248 zsh
+  0.0   4544 zsh
+  0.0   2080 zsh

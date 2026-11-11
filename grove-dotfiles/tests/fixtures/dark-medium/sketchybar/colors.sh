@@ -6,10 +6,10 @@ export BG0=0xff2D353B
 export BG1=0xff343F44
 export FG=0xffD3C6AA
 export GREY2=0xff9DA9A0
-# Roles (see the theme files): BORDER draws the lines (the bar's outline, the
-# separators, the popups' outlines), ON_ACCENT the text on an accent fill (the
-# focused workspace's pill), HOVER_FILL the fill under the pointer, MUTED text
-# that steps back (the other workspaces' numbers, the network popup's apps).
+# Roles (see the theme files): BORDER draws the lines (the popups' outlines),
+# ON_ACCENT the text on an accent fill (the focused workspace's number),
+# HOVER_FILL the fill under the pointer, MUTED text that steps back (the other
+# workspaces' numbers, the popups' captions and lists).
 export BORDER=0xff475258
 export ON_ACCENT=0xff2D353B
 export HOVER_FILL=0xff343F44
@@ -20,4 +20,8 @@ export BLUE=0xff7FBBB3
 export ORANGE=0xffE69875
 export YELLOW=0xffDBBC7F
 export RED=0xffE67E80
+# No fill: the pills are an outline alone, the charts have no ground.
+export TRANSPARENT=0x00000000
+# The symbol icons (icons/<name>-<ICON_SET>.png) come in a dark and a light set.
+export ICON_SET=dark
 export PINE_ICON="$CONFIG_DIR/icons/pine-dark.png"

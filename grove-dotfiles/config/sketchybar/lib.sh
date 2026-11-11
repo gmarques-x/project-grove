@@ -112,6 +112,308 @@ sb_conn() {
   awk '/^ *InterfaceType : / { t = $3 } END { print (t == "WiFi" ? "wifi" : "eth") }'
 }
 
+# sb_icon NAME: the file of a symbol icon in the scheme's set, dark or light
+# (icons/NAME-SET.png). A colors.sh rendered before the icons has no
+# ICON_SET: the pine's file says which.
+sb_icon() {
+  local set="${ICON_SET:-}"
+  [ -n "$set" ] || case "${PINE_ICON:-}" in *light*) set=light ;; *) set=dark ;; esac
+  echo "$CONFIG_DIR/icons/$1-$set.png"
+}
+
+# sb_wifi_level RSSI: the Wi-Fi fan's arcs for a signal in dBm: 3 (-60 or
+# better), 2 (down to -72), 1 (weaker); 3 when the signal can't be read.
+sb_wifi_level() {
+  case "$1" in -[0-9]*) ;; *) echo 3; return ;; esac
+  case "${1#-}" in *[!0-9]*) echo 3; return ;; esac
+  if [ "$1" -ge -60 ]; then echo 3; elif [ "$1" -ge -72 ]; then echo 2; else echo 1; fi
+}
+
+# sb_vol_level PERCENT: the speaker icon's fill in tenths, 0 to 10; anything
+# above silence shows at least 1.
+sb_vol_level() {
+  case "$1" in '' | *[!0-9]*) echo 0; return ;; esac
+  if [ "$1" -eq 0 ]; then echo 0; elif [ "$1" -lt 10 ]; then echo 1; elif [ "$1" -ge 100 ]; then echo 10; else echo $((($1 + 5) / 10)); fi
+}
+
+# sb_graph_value BYTES_PER_SECOND: the chart's height for a rate, 0 to 1, on a
+# log scale so a trickle and a download both show: 1 KB/s is 0.4, 1 MB/s 0.8,
+# 32 MB/s and above 1.
+sb_graph_value() {
+  case "$1" in '' | *[!0-9]*) echo 0; return ;; esac
+  awk -v n="$1" 'BEGIN { v = log(n + 1) / log(10) / 7.5; if (v > 1) v = 1; printf "%.3f\n", v }'
+}
+
+# sb_dns < `scutil --dns`: the name servers in use, each once, three at most,
+# joined by ", ".
+sb_dns() {
+  awk '/nameserver\[[0-9]+\] : / && !seen[$3]++ && n < 3 { printf "%s%s", (n++ ? ", " : ""), $3 } END { if (n) print "" }'
+}
+
+# sb_graph_pct PERCENT: the chart's height for a percentage, 0 to 1 ("0.07",
+# "0.52", "1"); 0 for anything else.
+sb_graph_pct() {
+  case "$1" in '' | *[!0-9]*) echo 0; return ;; esac
+  if [ "$1" -ge 100 ]; then echo 1; else printf '0.%02d\n' "$1"; fi
+}
+
+# sb_cpu_split < `iostat -n 0 -c 2 -w 1`: "USER SYSTEM" percentages from the
+# last sample, nothing when it can't be read.
+sb_cpu_split() {
+  awk '
+    / id / || /^ *us +sy +id/ { for (i = 1; i <= NF; i++) { if ($i == "us") u = i; if ($i == "sy") s = i }; next }
+    u && s && $u ~ /^[0-9]+$/ && $s ~ /^[0-9]+$/ { us = $u; sy = $s }
+    END { if (us != "") print us, sy }'
+}
+
+# sb_sysctl KEY < `sysctl KEY…` (the "key: value" lines): KEY's value.
+sb_sysctl() {
+  awk -v k="$1: " 'index($0, k) == 1 { print substr($0, length(k) + 1); exit }'
+}
+
+# sb_loadavg < `sysctl vm.loadavg`: the 1, 5 and 15 minute load averages,
+# "1.85 1.93 1.97".
+sb_loadavg() {
+  sb_sysctl vm.loadavg | awk '{ gsub(/[{}]/, ""); gsub(/,/, "."); if ($1 ~ /^[0-9.]+$/ && NF == 3) print $1, $2, $3 }'
+}
+
+# sb_cores < `sysctl hw.physicalcpu hw.perflevel0.physicalcpu hw.perflevel0.name …`:
+# the cores by type, "4 Performance · 6 Efficiency"; "8 cores" on a Mac with
+# one type.
+sb_cores() {
+  awk -F ': ' '
+    /^hw\.perflevel[0-9]\.physicalcpu: / { n[substr($1, 13, 1)] = $2 }
+    /^hw\.perflevel[0-9]\.name: / { name[substr($1, 13, 1)] = $2 }
+    /^hw\.physicalcpu: / { all = $2 }
+    END {
+      for (i = 0; i <= 9; i++) if (n[i] ~ /^[0-9]+$/ && name[i] != "") out = out (out == "" ? "" : " · ") n[i] " " name[i]
+      if (out == "" && all ~ /^[0-9]+$/) out = all " cores"
+      if (out != "") print out
+    }'
+}
+
+# sb_boot < `sysctl kern.boottime`: when the Mac started, in seconds since 1970.
+sb_boot() {
+  sb_sysctl kern.boottime | sed -n 's/^{ sec = \([0-9][0-9]*\),.*/\1/p'
+}
+
+# sb_duration SECONDS: "45s", "12m", "3h 59m", "2d 3h"; "—" otherwise.
+sb_duration() {
+  case "$1" in '' | *[!0-9]*) echo "$SB_NONE"; return ;; esac
+  if [ "$1" -lt 60 ]; then echo "$1s"
+  elif [ "$1" -lt 3600 ]; then echo "$(($1 / 60))m"
+  elif [ "$1" -lt 86400 ]; then echo "$(($1 / 3600))h $(($1 % 3600 / 60))m"
+  else echo "$(($1 / 86400))d $(($1 % 86400 / 3600))h"; fi
+}
+
+# sb_swap < `sysctl vm.swapusage`: the swap in use, in bytes.
+sb_swap() {
+  sb_sysctl vm.swapusage | awk '{
+    for (i = 1; i < NF - 1; i++) if ($i == "used" && $(i + 1) == "=") {
+      v = $(i + 2); unit = substr(v, length(v)); sub(/[A-Za-z]$/, "", v); sub(/,/, ".", v)
+      if (v !~ /^[0-9.]+$/) exit
+      printf "%.0f\n", v * (unit == "G" ? 1073741824 : unit == "K" ? 1024 : 1048576)
+      exit
+    }
+  }'
+}
+
+# sb_pressure < `sysctl kern.memorystatus_vm_pressure_level`: the memory
+# pressure as Activity Monitor colours it: normal, warning or critical.
+sb_pressure() {
+  case "$(sb_sysctl kern.memorystatus_vm_pressure_level)" in
+    1) echo normal ;;
+    2) echo warning ;;
+    4) echo critical ;;
+  esac
+}
+
+# sb_mem_parts < `vm_stat`: "USED APP WIRED COMPRESSED" in bytes. USED is what
+# sb_mem counts (active + wired + compressed); the other three are Activity
+# Monitor's: app memory (anonymous − purgeable pages), wired, compressed.
+sb_mem_parts() {
+  awk '
+    /page size of/ { for (i = 1; i <= NF; i++) if ($i == "of") ps = $(i + 1) }
+    /^Pages active:/ { a = $3 }
+    /^Pages wired down:/ { w = $4 }
+    /^Pages purgeable:/ { p = $3 }
+    /^Anonymous pages:/ { an = $3 }
+    /^Pages occupied by compressor:/ { c = $5 }
+    END {
+      gsub(/\./, "", a); gsub(/\./, "", w); gsub(/\./, "", p); gsub(/\./, "", an); gsub(/\./, "", c)
+      if (ps == "" || a == "" || an == "") exit
+      app = an - p; if (app < 0) app = 0
+      printf "%.0f %.0f %.0f %.0f\n", (a + w + c) * ps, app * ps, w * ps, c * ps
+    }'
+}
+
+# sb_gb BYTES: gigabytes with one decimal and no unit, "12.9"; "—" otherwise.
+sb_gb() {
+  case "$1" in '' | *[!0-9]*) echo "$SB_NONE"; return ;; esac
+  awk -v n="$1" 'BEGIN { printf "%.1f\n", n / 1073741824 }'
+}
+
+# sb_top_cpu N < `ps -Aceo pcpu,rss,comm`: the N processes using the CPU most,
+# one "name<TAB>percent" each ("WindowServer<TAB>7.4"); idle ones left out.
+sb_top_cpu() {
+  awk -v OFS='\t' 'NR > 1 {
+    p = $1; sub(/,/, ".", p)
+    name = $0; sub(/^ *[^ ]+ +[^ ]+ +/, "", name)
+    if (p ~ /^[0-9.]+$/ && p + 0 > 0 && name != "") print p, name
+  }' | sort -t "$(printf '\t')" -k1,1rn -k2,2 | head -n "$1" | awk -F '\t' -v OFS='\t' '{ print $2, $1 }'
+}
+
+# sb_top_mem N < `ps -Aceo pcpu,rss,comm`: the N processes holding the most
+# memory, one "name<TAB>bytes" each.
+sb_top_mem() {
+  awk -v OFS='\t' 'NR > 1 {
+    name = $0; sub(/^ *[^ ]+ +[^ ]+ +/, "", name)
+    if ($2 ~ /^[0-9]+$/ && $2 > 0 && name != "") print $2, name
+  }' | sort -t "$(printf '\t')" -k1,1rn -k2,2 | head -n "$1" | awk -F '\t' -v OFS='\t' '{ printf "%s\t%.0f\n", $2, $1 * 1024 }'
+}
+
+# sb_name NAME: a process name short enough for a popup row, 24 characters at
+# most, cut with "…".
+sb_name() {
+  if [ "${#1}" -gt 24 ]; then echo "${1:0:23}…"; else echo "$1"; fi
+}
+
+# sb_core_loads SECONDS: each core's load over SECONDS, as percentages in the
+# cores' order ("12 40 3 …"). Reads the kernel's per-core tick counters twice
+# through JavaScript for Automation: no root and no helper.
+sb_core_loads() {
+  case "$1" in '' | *[!0-9.]*) return ;; esac
+  sb_timeout 4 osascript -l JavaScript -e '
+    ObjC.bindFunction("mach_host_self", ["unsigned int", []]);
+    ObjC.bindFunction("host_processor_info", ["int", ["unsigned int", "int", "unsigned int *", "int **", "unsigned int *"]]);
+    function ticks() {
+      var n = Ref(), info = Ref(), count = Ref(), t = [];
+      if ($.host_processor_info($.mach_host_self(), 2, n, info, count) != 0) return t;
+      for (var i = 0; i < count[0]; i++) t.push(info[0][i]);
+      return t;
+    }
+    function run(argv) {
+      var a = ticks(); delay(Number(argv[0])); var b = ticks(), out = [];
+      // Four counters a core: user, system, idle, nice.
+      for (var c = 0; c * 4 + 3 < b.length && b.length == a.length; c++) {
+        var busy = 0, all = 0;
+        for (var k = 0; k < 4; k++) { var d = (b[c * 4 + k] - a[c * 4 + k]) | 0; all += d; if (k != 2) busy += d; }
+        out.push(all > 0 ? Math.round(100 * busy / all) : 0);
+      }
+      return out.join(" ");
+    }' "$1" 2>/dev/null
+}
+
+# sb_core_types < `ioreg -p IODeviceTree -r -k cluster-type -d 1`: each core's
+# type in the cores' order, "EEEEEEPPPP" (E efficiency, P performance);
+# nothing on a Mac that doesn't say.
+sb_core_types() {
+  awk '
+    function keep() { if (id != "" && type != "") { t[id] = type; if (id + 0 > max) max = id + 0; any = 1 }; id = ""; type = "" }
+    /^ *\+-o / { keep() }
+    /"cluster-type" = <"[A-Z]">/ { type = $0; sub(/.*<"/, "", type); sub(/">.*/, "", type) }
+    /"logical-cpu-id" = [0-9]+/ { id = $NF }
+    END {
+      keep()
+      if (!any) exit
+      for (i = 0; i <= max; i++) out = out (t[i] == "" ? "?" : t[i])
+      print out
+    }'
+}
+
+# sb_core_rows TYPES < the loads from sb_core_loads: one row per core type,
+# "P<TAB>34 12 8 2" then "E<TAB>40 31 …"; without usable TYPES one row,
+# "-<TAB>…", for all the cores.
+sb_core_rows() {
+  awk -v types="$1" -v OFS='\t' '
+    NR == 1 {
+      for (i = 1; i <= NF; i++) if ($i !~ /^[0-9]+$/) exit
+      if (NF == 0) exit
+      if (length(types) != NF || types ~ /[^EP]/) {
+        for (i = 1; i <= NF; i++) all = all (i > 1 ? " " : "") $i
+        print "-", all; exit
+      }
+      for (i = 1; i <= NF; i++) { k = substr(types, i, 1); row[k] = row[k] (row[k] == "" ? "" : " ") $i }
+      if (row["P"] != "") print "P", row["P"]
+      if (row["E"] != "") print "E", row["E"]
+    }'
+}
+
+# sb_batt_status < `pmset -g batt`: "LEVEL|STATE|TIME|SOURCE": the charge in
+# percent; charging, on battery, charged or "plugged in, not charging"; the
+# time macOS estimates ("1:42", empty without an estimate); ac or battery.
+# Nothing without a battery.
+sb_batt_status() {
+  awk -F '\t' '
+    /^Now drawing from/ { source = ($0 ~ /AC Power/ ? "ac" : "battery") }
+    /InternalBattery/ {
+      n = split($2, f, ";"); level = f[1]; state = f[2]; gsub(/[ %]/, "", level); gsub(/^ +| +$/, "", state)
+      if (state == "discharging") state = "on battery"
+      else if (state == "charging" || state == "finishing charge") state = "charging"
+      else if (state == "AC attached") state = "plugged in, not charging"
+      time = ""
+      if (match($2, /[0-9]+:[0-9][0-9] remaining/)) { time = substr($2, RSTART, RLENGTH - 10); if (time == "0:00") time = "" }
+      print level "|" state "|" time "|" source
+      exit
+    }'
+}
+
+# sb_ioreg KEY < `ioreg -rn AppleSmartBattery`: KEY's value, a number, Yes/No
+# or a string without its quotes. A key of the battery itself wins over the
+# same name inside one of its dictionaries.
+sb_ioreg() {
+  awk -v key="$1" '
+    function value(rest) {
+      if (rest ~ /^"/) { sub(/^"/, "", rest); sub(/".*/, "", rest); return rest }
+      if (match(rest, /^[0-9]+|^Yes|^No/)) return substr(rest, 1, RLENGTH)
+      return ""
+    }
+    {
+      if (match($0, "^[ |]*\"" key "\" = ")) { top = value(substr($0, RSTART + RLENGTH)); found = 1; exit }
+      if (inner == "" && match($0, "\"" key "\" ?= ?")) inner = value(substr($0, RSTART + RLENGTH))
+    }
+    END { if (found) print top; else if (inner != "") print inner }'
+}
+
+# sb_batt_power < `ioreg -rn AppleSmartBattery`: the watts going into the
+# battery ("4.9") or out of it ("-12.3"): Amperage (mA) × Voltage (mV). A
+# discharge comes as a 64-bit two's complement number.
+sb_batt_power() {
+  local reg amps volts
+  reg="$(cat)"
+  amps="$(sb_ioreg Amperage <<< "$reg")"
+  volts="$(sb_ioreg Voltage <<< "$reg")"
+  case "$amps$volts" in '' | *[!0-9]*) return ;; esac
+  [ -n "$amps" ] && [ -n "$volts" ] || return 0
+  awk -v a="$amps" -v v="$volts" 'BEGIN {
+    # 2^64 is 18446744073709551616: past what awk counts exactly, so the
+    # last ten digits are taken on their own.
+    if (length(a) == 20 && substr(a, 1, 10) == "1844674407") a = substr(a, 11) - 3709551616
+    printf "%.1f\n", a * v / 1000000
+  }'
+}
+
+# sb_watts MILLIWATTS: "9.0"; "—" otherwise.
+sb_watts() {
+  case "$1" in '' | *[!0-9]*) echo "$SB_NONE"; return ;; esac
+  awk -v n="$1" 'BEGIN { printf "%.1f\n", n / 1000 }'
+}
+
+# sb_batt_health < `system_profiler SPPowerDataType`: the battery's health as
+# System Settings gives it, "100% · Normal"; nothing when it isn't there.
+sb_batt_health() {
+  awk -F ': ' '
+    /^ *Maximum Capacity: / { cap = $2 }
+    /^ *Condition: / { cond = $2 }
+    END { if (cap != "") print cap (cond != "" ? " · " cond : ""); else if (cond != "") print cond }'
+}
+
+# sb_lowpower < `pmset -g`: Low Power Mode, on or off; nothing on a Mac
+# without it.
+sb_lowpower() {
+  awk '$1 == "lowpowermode" { print ($2 == 1 ? "on" : "off"); exit }'
+}
+
 # sb_load PERCENT: normal, high (above 70) or critical (above 90).
 sb_load() {
   case "$1" in '' | *[!0-9]*) echo normal; return ;; esac
@@ -161,6 +463,46 @@ sb_top_apps() {
     split(substr($0, RSTART + 1), b, ",")
     print b[1] + b[2], name, b[1], b[2]
   }' | sort -t "$(printf '\t')" -rn -k1,1 | head -n "$1" | cut -f 2-
+}
+
+# sb_transparent: the colour of no fill. A colors.sh rendered before the pills
+# has no TRANSPARENT: bg0 without its alpha is as clear.
+sb_transparent() {
+  echo "${TRANSPARENT:-0x00${BG0#0x??}}"
+}
+
+# sb_pill ITEM: the pill (bracket) an item of the bar sits in; nothing for an
+# item outside the pills (the front app's name).
+sb_pill() {
+  local n
+  case "$1" in
+    grove | battery | wifi | volume | clock) echo "pill.$1" ;;
+    cpu | mem) echo pill.sys ;;
+    ws.[1-9] | ws.[1-9].*) n="${1#ws.}"; echo "pill.ws.${n%%.*}" ;;
+  esac
+}
+
+# sb_hover: the pointer over a clickable item ($SENDER mouse.entered or
+# mouse.exited, $NAME the item). Its pill fills with the hover colour, the
+# orange outline untouched, and clears when the pointer leaves; an item
+# outside the pills gets a fill of its own. Returns 1 for any other event, so
+# a plugin starts with `sb_hover && exit 0`. Uses the plugin's $SB.
+sb_hover() {
+  local pill
+  case "${SENDER:-}" in mouse.entered | mouse.exited) ;; *) return 1 ;; esac
+  pill="$(sb_pill "${NAME:-}")"
+  if [ -n "$pill" ]; then
+    if [ "$SENDER" = mouse.entered ]; then
+      "${SB:-sketchybar}" --set "$pill" background.color="${HOVER_FILL:-$BG1}"
+    else
+      "${SB:-sketchybar}" --set "$pill" background.color="$(sb_transparent)"
+    fi
+  elif [ "$SENDER" = mouse.entered ]; then
+    "${SB:-sketchybar}" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"
+  else
+    "${SB:-sketchybar}" --set "$NAME" background.drawing=off
+  fi
+  return 0
 }
 
 # sb_popup_open: the item whose popup is open, nothing when none is.

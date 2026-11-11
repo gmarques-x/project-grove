@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · popup ITEM: a click on an item with a popup (clock, net.down). Opens it, rows filled first, and closes the other one; a second click closes it.
+# Grove bar · popup ITEM: a click on an item with a popup (clock, wifi, battery, cpu and mem, which share one). Opens it, rows filled first, and closes the one that was open; a second click closes it.
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -8,11 +8,12 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/lib.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-item="${1:-}"
-# The plugin that fills each popup's rows.
-case "$item" in
-  clock) fill=clock_popup ;;
-  net.down) fill=network_popup ;;
+# The item each popup hangs from and the plugin that fills its rows.
+case "${1:-}" in
+  clock) item=clock; fill=clock_popup ;;
+  wifi) item=wifi; fill=network_popup ;;
+  cpu | mem) item=cpu; fill=system_popup ;;
+  battery) item=battery; fill=battery_popup ;;
   *) exit 0 ;;
 esac
 
