@@ -16,6 +16,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var keys: KeysFile
     @Published private(set) var layers: [Layer] = []
     @Published private(set) var paused = false
+    /// Opens the window from outside SwiftUI (the pointer menu); set by the
+    /// menu bar label, which SwiftUI always keeps alive.
+    var openMainWindow: (() -> Void)?
     @Published private(set) var permissions = PermissionStatus(accessibility: false, inputMonitoring: false)
     @Published private(set) var colors = ThemeColors.fallback
     /// The Caps Lock → F18 mapping is set right now.

@@ -297,7 +297,8 @@ _ka_iconset() {
   iconutil -c icns "$set" -o "$out" >/dev/null
 }
 
-# _ka_info_plist: the app bundle's Info.plist. The icon is Grove Themes' for now.
+# _ka_info_plist: the app bundle's Info.plist. The icon is Grove Themes' for now;
+# grovekeys:// is how the Grove bar's key glyph opens the menu.
 _ka_info_plist() {
   cat <<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -315,6 +316,13 @@ _ka_info_plist() {
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>com.projectgrove.keys</string>
+      <key>CFBundleURLSchemes</key><array><string>grovekeys</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>
 XML

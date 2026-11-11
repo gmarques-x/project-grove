@@ -1,4 +1,5 @@
 import AppKit
+import GroveKeysCore
 import SwiftUI
 
 /// Started from main.swift, after the `--render-aerospace` check.
@@ -31,6 +32,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // No Dock icon, as LSUIElement in the bundle (also when run bare from .build).
         NSApp.setActivationPolicy(.accessory)
         AppModel.shared.start()
+    }
+
+    /// `grovekeys://menu` from the Grove bar's key glyph: the menu at the pointer.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where KeysURL(url) == .menu {
+            MainActor.assumeIsolated { PointerMenu.shared.show() }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

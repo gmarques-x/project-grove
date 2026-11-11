@@ -641,3 +641,10 @@ ka_ready() {
   run swift test
   [ "$status" -eq 0 ]
 }
+
+@test "keys-app: the bundle registers the grovekeys URL scheme for the bar's key glyph" {
+  load_module
+  _ka_info_plist | grep -q '<key>CFBundleURLTypes</key>'
+  _ka_info_plist | grep -q '<string>grovekeys</string>'
+  _ka_info_plist | plutil -lint - >/dev/null
+}

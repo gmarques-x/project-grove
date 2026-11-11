@@ -5,9 +5,13 @@ import SwiftUI
 /// The key glyph: orange while a permission is missing or a red line is up.
 struct MenuBarLabel: View {
     @ObservedObject var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Image(nsImage: Self.glyph(tint: model.needsAttention ? NSColor(model.colors.orange) : nil))
+            .onAppear {
+                model.openMainWindow = { openWindow(id: MenuBarView.windowID) }
+            }
     }
 
     static func glyph(tint: NSColor?) -> NSImage {
