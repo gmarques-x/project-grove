@@ -9,6 +9,8 @@ config-version = 2
 start-at-login = true
 # JankyBorders in the current scheme's colours (rendered by grove-themes).
 after-startup-command = ['exec-and-forget /bin/sh ~/.config/borders/bordersrc']
+# The Grove bar (SketchyBar) redraws its workspaces at once on every change.
+exec-on-workspace-change = ['/bin/bash', '-c', '/opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change FOCUSED=$AEROSPACE_FOCUSED_WORKSPACE']
 
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
@@ -22,12 +24,12 @@ key-mapping.preset = 'qwerty'
 # No persistent-workspaces: a workspace exists only while it has a window (or
 # is focused), so the bar can show just the ones in use.
 
-# The top gap grows when SketchyBar arrives.
+# The top gap clears the Grove bar: its 48 pt strip + 8.
 gaps.inner.horizontal = 8
 gaps.inner.vertical = 8
 gaps.outer.left = 8
 gaps.outer.bottom = 8
-gaps.outer.top = 8
+gaps.outer.top = 56
 gaps.outer.right = 8
 
 # Floating apps, also for windows already open when AeroSpace starts.
