@@ -39,7 +39,7 @@ sep() {
 # Left: the Grove tree, the workspaces, the front app.
 sketchybar --add item grove left \
   --set grove icon.background.image="$PINE_ICON" icon.background.image.scale=0.5 icon.background.drawing=on \
-    icon.width=18 icon.padding_left=4 icon.padding_right=4 padding_left=14 label.drawing=off "${HOVER[@]}" \
+    icon.width=18 icon.padding_left=17 icon.padding_right=17 padding_left=14 label.drawing=off "${HOVER[@]}" \
     script="$P/hover.sh" click_script="open grovekeys://grove-menu" \
   --subscribe grove mouse.entered mouse.exited
 sep sep.l1 left
@@ -59,17 +59,10 @@ sketchybar --add item front_app left \
     "${HOVER[@]}" script="$P/front_app.sh" click_script="open grovekeys://app-menu" \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
-# Right (the first added is the rightmost): Grove Keys, clock, volume, Wi-Fi,
-# battery, network, memory, CPU.
-sketchybar --add item keys right \
-  --set keys icon="⌘" icon.color="$GREY2" padding_right=14 label.drawing=off "${HOVER[@]}" script="$P/keys.sh" update_freq=30 \
-    click_script="open grovekeys://menu" \
-  --subscribe keys mouse.entered mouse.exited
-
-sep sep.r1 right
-
+# Right (the first added is the rightmost): clock, volume, Wi-Fi, battery,
+# network, memory, CPU. Grove Keys lives in the pine's menu.
 sketchybar --add item clock right \
-  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
+  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off padding_right=14 "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
     popup.background.border_width=1 popup.background.border_color="$BG3" \
     click_script="sketchybar --set clock popup.drawing=toggle; $P/clock_popup.sh" \
@@ -78,25 +71,25 @@ for i in 1 2 3 4 5 6 7 8; do
   sketchybar --add item "cal.$i" popup.clock --set "cal.$i" icon.drawing=off drawing=off
 done
 
-sep sep.r2 right
+sep sep.r1 right
 
 sketchybar --add item volume right \
   --set volume icon="vol" icon.color="$YELLOW" label.width=$W4 label.align=right script="$P/volume.sh" \
   --subscribe volume volume_change
 
-sep sep.r3 right
+sep sep.r2 right
 
 sketchybar --add item wifi right \
   --set wifi icon.drawing=off label.width=$W4 script="$P/wifi.sh" update_freq=30 \
   --subscribe wifi wifi_change system_woke
 
-sep sep.r4 right
+sep sep.r3 right
 
 sketchybar --add item battery right \
   --set battery icon="bat" icon.color="$GREEN" label.width=$W4 label.align=right script="$P/battery.sh" update_freq=60 \
   --subscribe battery power_source_change system_woke
 
-sep sep.r5 right
+sep sep.r4 right
 
 sketchybar --add item net.up right \
   --set net.up icon="↑" icon.color="$ORANGE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/hover.sh" \
@@ -117,17 +110,17 @@ for i in 1 2 3 4 5; do
   sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$GREY2" drawing=off
 done
 
-sep sep.r6 right
+sep sep.r5 right
 
 sketchybar --add item mem right \
   --set mem icon="mem" icon.color="$AQUA" label.width=$W4 label.align=right
 
 sketchybar --add item cpu right \
   --set cpu icon="cpu" icon.color="$AQUA" label.width=$W4 label.align=right script="$P/cpu.sh" update_freq=4
-sep sep.r7 right
+sep sep.r6 right
 
 # The floating bar: one bracket behind every item.
-sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \
+sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app clock volume wifi battery net.up net.down mem cpu \
   --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BG3" background.drawing=on
 
 sketchybar --update

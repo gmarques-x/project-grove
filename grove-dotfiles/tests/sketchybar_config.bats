@@ -73,6 +73,11 @@ rc() {
   run env -i HOME="$HOME" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" /bin/bash "$CFG/sketchybarrc"
 }
 
+@test "sketchybar: no Grove Keys glyph on the right (it lives in the pine's menu)" {
+  rc
+  ! calls | grep -qE -- '--add item keys '
+}
+
 @test "sketchybar: the items are added left and right in order" {
   local left right
   rc
@@ -80,7 +85,7 @@ rc() {
   left="$(calls | grep -oE -- '--add item [a-z_.0-9]+ left' | awk '{print $3}' | tr '\n' ' ')"
   right="$(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}' | tr '\n' ' ')"
   [ "$left" = "grove sep.l1 ws.1 ws.2 ws.3 ws.4 ws.5 ws.6 ws.7 ws.8 ws.9 front_app " ] || { echo "$left"; false; }
-  [ "$right" = "keys sep.r1 clock sep.r2 volume sep.r3 wifi sep.r4 battery sep.r5 net.up net.down sep.r6 mem cpu sep.r7 " ] || { echo "$right"; false; }
+  [ "$right" = "clock sep.r1 volume sep.r2 wifi sep.r3 battery sep.r4 net.up net.down sep.r5 mem cpu sep.r6 " ] || { echo "$right"; false; }
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
 }
@@ -88,7 +93,7 @@ rc() {
 @test "sketchybar: separators are a bg3 bar, the same as the one before the app" {
   rc
   local n
-  for n in sep.l1 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6 sep.r7; do
+  for n in sep.l1 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
     calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BG3")" || { echo "$n"; false; }
   done
   calls | grep -q -- '--set front_app .*icon=│'
@@ -122,10 +127,15 @@ rc() {
   calls | grep -qE -- '--set grove .*icon.background.image=.*/icons/pine-dark.png'
 }
 
+@test "sketchybar: the pine button is 52 pt wide, the tree centred in it" {
+  rc
+  calls | grep -qE -- '--set grove .*icon.width=18 icon.padding_left=17 icon.padding_right=17 '
+}
+
 @test "sketchybar: clickable items subscribe to hover" {
   rc
   local item
-  for item in grove net.up net.down keys clock; do
+  for item in grove net.up net.down clock; do
     calls | grep -qE -- "--subscribe $item .*mouse.entered mouse.exited" || { echo "$item"; false; }
   done
 }
@@ -312,18 +322,6 @@ rc() {
   fake date 'echo "Tue 11 Nov  14:32"'
   plugin clock
   [ "$(calls)" = '--set clock label=Tue 11 Nov  14:32' ]
-}
-
-@test "keys: grey when Grove Keys is fine, orange when it needs attention" {
-  mkdir -p "$GROVE_STATE"
-  printf '{"accessibility": true, "input_monitoring": true, "mapping": true}\n' > "$GROVE_STATE/keys.json"
-  plugin keys
-  . "$CFG/colors.sh"
-  [ "$(calls)" = "--set keys icon.color=$GREY2" ]
-  : > "$CALLS"
-  printf '{"accessibility": true, "input_monitoring": false, "mapping": false}\n' > "$GROVE_STATE/keys.json"
-  plugin keys
-  [ "$(calls)" = "--set keys icon.color=$ORANGE" ]
 }
 
 @test "calendar: the clock's popup shows this month, one line per row" {
