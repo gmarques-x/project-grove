@@ -37,6 +37,15 @@ grey2  = #9DA9A0
 # Grove additions
 # The prompt's ─ fill line, carried over from the Everforest zsh port.
 fill = #596763
+# Roles: what a colour is for, so a config names the job and each scheme picks
+# the colour that does it. In the dark schemes they are the colours the configs
+# always used.
+# Lines between things: window borders, the bar's outline and separators, boxes.
+border    = #4D5960
+# Text on an accent-coloured block (the prompt's segments, the focused workspace).
+on_accent = #333C43
+# Quiet text: labels, notes.
+dim       = #859289
 # Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
 # colors. Bright black (ANSI 8) is grey1 instead of upstream's bg3, so dim
 # terminal text stays readable. A mapping, not a new color.

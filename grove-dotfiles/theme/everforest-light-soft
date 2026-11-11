@@ -37,9 +37,21 @@ grey2  = #829181
 # Grove additions
 # The prompt's ─ fill line, the scheme's bg5.
 fill = #B9C0AB
+# Roles: what a colour is for, so a config names the job and each scheme picks
+# the colour that does it. The light schemes need other picks than the dark
+# ones to stay readable on a pale background.
+# Lines between things: bg5, since bg3 on bg0 is only 1.2:1 here (1.7:1 now,
+# as bg3 is in the dark schemes).
+border    = #B9C0AB
+# Text on an accent-coloured block: the dark soft scheme's bg0 as ink. This
+# scheme's own bg0 or fg on its accents is 1.7 to 3.3:1; the ink is 3.3 to 6:1.
+on_accent = #333C43
+# Quiet text: grey2, the darkest grey here (grey1 is 2.3 to 2.7:1 on bg0).
+dim       = #829181
 # Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
 # colors. Bright black (ANSI 8) is grey1 instead of upstream's fg, so dim
-# terminal text stays readable. A mapping, not a new color.
+# terminal text stays readable. Bright white (ANSI 15) is fg instead of
+# upstream's bg3, which can't be read on bg0. Mappings, not new colors.
 term0  = #5C6A72
 term1  = #F85552
 term2  = #8DA101
@@ -55,4 +67,4 @@ term11 = #DFA000
 term12 = #3A94C5
 term13 = #DF69BA
 term14 = #35A77C
-term15 = #DDD8BE
+term15 = #5C6A72

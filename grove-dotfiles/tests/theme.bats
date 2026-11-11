@@ -37,10 +37,10 @@ palette_value() {
   done
 }
 
-@test "the palette's Grove additions are only the fill color and the terminal roles" {
+@test "the palette's Grove additions are only the fill color, the roles and the terminal roles" {
   run sed -n '/^# Grove additions/,$p' "$GROVE_ROOT/$PALETTE_REL"
   [ "$status" -eq 0 ]
-  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
+  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
 }
 
 # scheme_value SCHEME NAME: the hex for NAME in theme/everforest-SCHEME.
@@ -70,9 +70,29 @@ SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
       i=$((i + 1))
     done
     [ "$(v term8)" = "$(v grey1)" ] || { echo "$s term8"; false; }
-    for i in 1 2 3 4 5 6 7; do
+    for i in 1 2 3 4 5 6; do
       [ "$(v term$((i + 8)))" = "$(v term$i)" ] || { echo "$s term$((i + 8))"; false; }
     done
+    # Bright white: upstream's in the dark schemes; fg in the light ones, where
+    # upstream's bg3 can't be read on bg0.
+    if [[ $s == dark-* ]]; then white=term7; else white=fg; fi
+    [ "$(v term15)" = "$(v $white)" ] || { echo "$s term15"; false; }
+  done
+}
+
+@test "roles: the dark schemes keep their colours; the light ones pick readable ones" {
+  local s c
+  for s in $SCHEMES; do
+    c="${s#*-}"
+    if [[ $s == dark-* ]]; then
+      [ "$(scheme_value "$s" border)" = "$(scheme_value "$s" bg3)" ] || { echo "$s border"; false; }
+      [ "$(scheme_value "$s" on_accent)" = "$(scheme_value "$s" bg0)" ] || { echo "$s on_accent"; false; }
+      [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey1)" ] || { echo "$s dim"; false; }
+    else
+      [ "$(scheme_value "$s" border)" = "$(scheme_value "$s" bg5)" ] || { echo "$s border"; false; }
+      [ "$(scheme_value "$s" on_accent)" = "$(scheme_value "dark-$c" bg0)" ] || { echo "$s on_accent"; false; }
+      [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey2)" ] || { echo "$s dim"; false; }
+    fi
   done
 }
 
