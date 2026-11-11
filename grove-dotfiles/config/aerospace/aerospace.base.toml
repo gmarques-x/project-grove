@@ -29,10 +29,11 @@ gaps.inner.horizontal = 8
 gaps.inner.vertical = 8
 gaps.outer.left = 8
 gaps.outer.bottom = 8
-# The top clears the Grove bar's 48 pt strip + 8: 56 where the menu bar
+# Windows start where the Grove bar's 48 pt strip ends, 8 pt below its
+# floating bar (the same as the gaps between windows): 48 where the menu bar
 # reserves nothing; the built-in screen keeps 37.5 pt for the notch even when
-# the menu bar hides, so it needs only 19 more.
-gaps.outer.top = [{ monitor."built-in" = 19 }, 56]
+# the menu bar hides, so it needs only 11 more.
+gaps.outer.top = [{ monitor."built-in" = 11 }, 48]
 gaps.outer.right = 8
 
 # Floating apps, also for windows already open when AeroSpace starts.
