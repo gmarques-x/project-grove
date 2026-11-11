@@ -1,0 +1,82 @@
+import Foundation
+import Testing
+@testable import GroveKeysCore
+
+@Suite struct KeyEditTests {
+    func shipped() throws -> KeysFile { try KeysFile(text: fixture("keys.toml")) }
+
+    @Test func readsWhatAKeyDoes() throws {
+        var f = try shipped()
+        #expect(f.action(layerID: "alt", shortcut: "alt-1") == .aerospace(command: "workspace 1"))
+        #expect(f.action(layerID: "alt", shortcut: "alt-q") == KeyAction.none)
+        #expect(f.action(layerID: "mode:service", shortcut: "r") == .aerospace(command: "flatten-workspace-tree"))
+        f.setLaunch(key: "t", bundleID: "com.mitchellh.ghostty")
+        #expect(f.action(layerID: "hyper", shortcut: "hyper-t") == .launcher(bundleID: "com.mitchellh.ghostty"))
+        #expect(f.savedLine(layerID: "alt", shortcut: "alt-1") == "alt-1 = \"workspace 1\"")
+        #expect(f.savedLine(layerID: "hyper", shortcut: "hyper-t") == "t = \"com.mitchellh.ghostty\"")
+        #expect(f.savedLine(layerID: "alt", shortcut: "alt-q") == nil)
+    }
+
+    /// A key written with spelled-out modifiers is found and rewritten in place.
+    @Test func matchesSpelledOutHyper() throws {
+        var f = try shipped()
+        f.setBinding(mode: "main", key: "cmd-ctrl-alt-shift-f", value: .string("fullscreen"))
+        #expect(f.action(layerID: "hyper", shortcut: "hyper-f") == .aerospace(command: "fullscreen"))
+        f.assign(.aerospace(command: "close"), layerID: "hyper", shortcut: "hyper-f")
+        let main = f.modes.first { $0.name == "main" }!.bindings
+        #expect(main.contains { $0.key == "cmd-ctrl-alt-shift-f" && $0.value == .string("close") })
+        #expect(!main.contains { $0.key == "hyper-f" })
+    }
+
+    @Test func launcherReplacesAHyperBindingAndBack() throws {
+        var f = try shipped()
+        f.assign(.aerospace(command: "workspace 3"), layerID: "hyper", shortcut: "hyper-t")
+        f.assign(.launcher(bundleID: "com.mitchellh.ghostty"), layerID: "hyper", shortcut: "hyper-t")
+        #expect(f.launch.map(\.key) == ["t"])
+        #expect(!f.modes[0].bindings.contains { $0.key == "hyper-t" })
+        f.assign(.aerospace(command: "workspace 3"), layerID: "hyper", shortcut: "hyper-t")
+        #expect(f.launch.isEmpty)
+        #expect(f.modes[0].bindings.contains { $0.key == "hyper-t" && $0.value == .string("workspace 3") })
+        f.assign(.none, layerID: "hyper", shortcut: "hyper-t")
+        #expect(f.action(layerID: "hyper", shortcut: "hyper-t") == KeyAction.none)
+    }
+
+    @Test func launcherOnlyOnHyper() throws {
+        var f = try shipped()
+        f.assign(.launcher(bundleID: "com.mitchellh.ghostty"), layerID: "alt", shortcut: "alt-t")
+        #expect(f == (try shipped()))
+    }
+
+    @Test func noneRemoves() throws {
+        var f = try shipped()
+        f.assign(.none, layerID: "alt", shortcut: "alt-1")
+        #expect(!f.modes[0].bindings.contains { $0.key == "alt-1" })
+        f.assign(.none, layerID: "mode:service", shortcut: "alt-shift-h")
+        #expect(!f.modes[1].bindings.contains { $0.key == "alt-shift-h" })
+    }
+
+    @Test func blankCommandChangesNothing() throws {
+        var f = try shipped()
+        f.assign(.aerospace(command: "  "), layerID: "alt", shortcut: "alt-1")
+        #expect(f == (try shipped()))
+    }
+
+    /// In a non-main mode a command goes back to main afterwards, as the shipped
+    /// service bindings do, unless it is itself a mode switch or the key was a
+    /// plain string before.
+    @Test func serviceCommandsReturnToMain() throws {
+        var f = try shipped()
+        f.assign(.aerospace(command: "close"), layerID: "mode:service", shortcut: "c")
+        f.assign(.aerospace(command: "fullscreen"), layerID: "mode:service", shortcut: "r")
+        f.assign(.aerospace(command: "mode main"), layerID: "mode:service", shortcut: "q")
+        f.setBinding(mode: "service", key: "x", value: .string("focus left"))
+        f.assign(.aerospace(command: "focus right"), layerID: "mode:service", shortcut: "x")
+        let service = Dictionary(uniqueKeysWithValues: f.modes[1].bindings.map { ($0.key, $0.value) })
+        #expect(service["c"] == .array(["close", "mode main"]))
+        #expect(service["r"] == .array(["fullscreen", "mode main"]))
+        #expect(service["q"] == .string("mode main"))
+        #expect(service["x"] == .string("focus right"))
+        f.assign(.aerospace(command: "workspace 2"), layerID: "alt", shortcut: "alt-1")
+        #expect(f.modes[0].bindings.first { $0.key == "alt-1" }?.value == .string("workspace 2"))
+    }
+}

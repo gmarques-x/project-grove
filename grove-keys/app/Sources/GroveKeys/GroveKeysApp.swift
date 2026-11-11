@@ -16,11 +16,13 @@ struct GroveKeysApp: App {
             MenuBarLabel(model: model)
         }
 
-        // The window itself is Task 8.
+        // Seamless, as Grove Themes: no title bar, the scheme's bg0 up to the
+        // top edge with the window buttons over it; sized to its content.
         Window("Grove Keys", id: MenuBarView.windowID) {
-            Text("Grove Keys")
-                .frame(minWidth: 480, minHeight: 320)
+            WindowView(model: model)
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
     }
 }
 

@@ -27,9 +27,13 @@ final class AppModel: ObservableObject {
 
     /// The red line under the tabs and in the menu.
     var redLine: String? { engineLine ?? saveLine }
+    /// `edit` would be applied: keys.toml has been read and has no error.
+    var canEdit: Bool { loaded && !keysInvalid }
     /// The menu glyph turns orange.
     var needsAttention: Bool { !permissions.granted || redLine != nil }
 
+    /// This Mac's LocalHostName, for the window's header.
+    let host: String
     private let paths: KeysPaths
     private let pipeline: SavePipeline
     private let themes: GroveThemesClient
@@ -44,7 +48,7 @@ final class AppModel: ObservableObject {
     private var signalSources: [DispatchSourceSignal] = []
     private var started = false
     /// The first save run has answered; until then the engine stays off.
-    private var loaded = false
+    @Published private var loaded = false
     /// What the running engine was given, so unrelated edits don't reset it mid-hold.
     private var engineSettings: HyperSettings?
     private var engineLaunchKeys: Set<String> = []
@@ -52,7 +56,7 @@ final class AppModel: ObservableObject {
     /// The last keys.toml the save path accepted (the defaults until then).
     private var lastGood: KeysFile
     /// keys.toml on disk has an error with a line number: edits are refused.
-    private var keysInvalid = false
+    @Published private var keysInvalid = false
     /// The newest edit, and how many edits are still saving.
     private var pendingKeys: KeysFile?
     private var pendingEdits = 0
@@ -61,7 +65,8 @@ final class AppModel: ObservableObject {
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser
         paths = KeysPaths.standard(home: home, environment: environment)
-        pipeline = SavePipeline(paths: paths, host: localHostName(), aerospace: AeroSpaceCLI())
+        host = localHostName()
+        pipeline = SavePipeline(paths: paths, host: host, aerospace: AeroSpaceCLI())
         let cli = environment["GROVE_THEMES_CLI"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
             ?? home.appendingPathComponent(".local/bin/grove-themes")
         themes = GroveThemesClient(runner: ProcessRunner(path: cli))

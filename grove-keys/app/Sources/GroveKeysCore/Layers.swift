@@ -179,6 +179,8 @@ public enum CommandLabel {
             case "floating": return ("float/tile", .layout)
             default: return ("layout", .layout)
             }
+        case "fullscreen":
+            return ("fullscreen", .layout)
         case "mode":
             if let m = args.first { return (m, .mode) }
         case "reload-config":

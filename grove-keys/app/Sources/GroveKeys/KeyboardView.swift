@@ -1,0 +1,310 @@
+import AppKit
+import GroveKeysCore
+import GroveThemesCore
+import SwiftUI
+
+/// One key the editor is open on.
+struct EditTarget: Equatable, Identifiable {
+    var layerID: String
+    /// The AeroSpace key text in the layer's mode ("alt-1", "hyper-t", "r", "alt-shift-h").
+    var shortcut: String
+    var id: String { layerID + " " + shortcut }
+}
+
+/// The Keyboard tab (spec §7, mockup §1): the layer picker with binding
+/// counts, the MacBook keyboard for that layer, bindings that have no cap,
+/// and the legend. Arrows or Ctrl+H/J/K/L move between keys, Return opens the
+/// editor, Esc closes the editor, then the window.
+struct KeyboardView: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.theme) private var theme
+    @Environment(\.dismissWindow) private var dismissWindow
+    @FocusState private var hasKeys: Bool
+
+    // `State` used directly: no SwiftUI macros with the Command Line Tools.
+    private var layerID = State<String?>(initialValue: nil)
+    private var focused = State<String?>(initialValue: nil)
+    private var showFocus = State(initialValue: false)
+    private var editing = State<EditTarget?>(initialValue: nil)
+
+    /// Inside the window's 22 pt margins and the keyboard's 12 pt padding.
+    static let keyboardWidth: CGFloat = WindowView.width - 44 - 24
+    static let gap: CGFloat = 6
+    static let capHeight: CGFloat = 54
+
+    init(model: AppModel) {
+        self.model = model
+    }
+
+    /// The "No modifier" layer only when it has bindings.
+    private var layers: [Layer] {
+        model.layers.filter { $0.id != "none" || !$0.bindings.isEmpty }
+    }
+
+    private var current: Layer? {
+        let all = layers
+        if let id = layerID.wrappedValue, let l = all.first(where: { $0.id == id }) { return l }
+        // At first: the first layer with bindings (Option on the shipped file).
+        return all.first { !$0.bindings.isEmpty } ?? all.first
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            layerPicker
+            if let layer = current {
+                keyboard(layer)
+                extras(layer)
+            }
+            legend
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 6)
+        .padding(.bottom, 22)
+        .focusable(interactions: .edit)
+        .focusEffectDisabled()
+        .focused($hasKeys)
+        .onKeyPress(phases: [.down, .repeat]) { press in handle(press) }
+        .onAppear { hasKeys = true }
+        .onChange(of: model.layers) { _, _ in
+            // A key that no longer exists (an edit elsewhere) closes its editor.
+            if let target = editing.wrappedValue, !layers.contains(where: { $0.id == target.layerID }) {
+                editing.wrappedValue = nil
+            }
+        }
+    }
+
+    // MARK: Layer picker
+
+    private var layerPicker: some View {
+        HStack(spacing: 4) {
+            Text("LAYER")
+                .font(GroveFont.mono(10.5))
+                .tracking(1)
+                .foregroundStyle(Color(theme.grey1))
+                .padding(.trailing, 8)
+            ForEach(layers) { layer in
+                let on = layer.id == current?.id
+                Button {
+                    layerID.wrappedValue = layer.id
+                    editing.wrappedValue = nil
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(layer.title).foregroundStyle(Color(on ? theme.fg : theme.grey1))
+                        Text(String(layer.bindings.count))
+                            .font(GroveFont.mono(10))
+                            .foregroundStyle(Color(theme.grey1).opacity(0.8))
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 5)
+                    .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: Keyboard
+
+    /// A row's slots: one cap each, except up and down, which share one.
+    private func slots(_ row: [KeyboardLayout.Cap]) -> [[KeyboardLayout.Cap]] {
+        var result: [[KeyboardLayout.Cap]] = []
+        for cap in row {
+            if cap.stacked, let last = result.last?.last, last.stacked {
+                result[result.count - 1].append(cap)
+            } else {
+                result.append([cap])
+            }
+        }
+        return result
+    }
+
+    private func keyboard(_ layer: Layer) -> some View {
+        let held = KeyboardLayout.held(layerID: layer.id)
+        return VStack(spacing: Self.gap) {
+            ForEach(Array(KeyboardLayout.rows.enumerated()), id: \.offset) { _, row in
+                let rowSlots = slots(row)
+                let units = rowSlots.reduce(0) { $0 + $1[0].width }
+                let unit = (Self.keyboardWidth - Self.gap * CGFloat(rowSlots.count - 1)) / CGFloat(units)
+                HStack(spacing: Self.gap) {
+                    ForEach(Array(rowSlots.enumerated()), id: \.offset) { _, slot in
+                        let width = unit * CGFloat(slot[0].width)
+                        if slot.count == 1 {
+                            cap(slot[0], layer: layer, held: held, width: width, height: Self.capHeight)
+                        } else {
+                            VStack(spacing: 2) {
+                                ForEach(Array(slot.enumerated()), id: \.offset) { _, c in
+                                    cap(c, layer: layer, held: held, width: width,
+                                        height: (Self.capHeight - 2) / CGFloat(slot.count))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(theme.bg0))
+                .overlay(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(theme.isDark ? 0.2 : 0.05)))
+        }
+    }
+
+    @ViewBuilder
+    private func cap(_ cap: KeyboardLayout.Cap, layer: Layer, held: Set<Modifier>,
+                     width: CGFloat, height: CGFloat) -> some View {
+        let isCaps = cap.name == nil && cap.modifier == nil && cap.legend == "caps"
+        // Hyper is Caps Lock held; other layers light their modifier caps.
+        let isHeld = layer.id == "hyper" ? isCaps : cap.modifier.map(held.contains) ?? false
+        let legend = isCaps ? (layer.id == "hyper" ? "⇪ hyper" : "⇪") : cap.legend
+        if let name = cap.name {
+            let target = EditTarget(layerID: layer.id,
+                                    shortcut: KeyboardLayout.shortcut(layerID: layer.id, key: name))
+            KeyCapView(legend: legend, binding: layer.bindings[name], isModifier: false, held: false,
+                       focused: showFocus.wrappedValue && focused.wrappedValue == name,
+                       width: width, height: height)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    focused.wrappedValue = name
+                    showFocus.wrappedValue = false
+                    editing.wrappedValue = target
+                }
+                .popover(isPresented: presented(target), arrowEdge: .bottom) {
+                    editor(target, layer: layer)
+                }
+        } else {
+            KeyCapView(legend: legend, binding: nil, isModifier: true, held: isHeld, focused: false,
+                       width: width, height: height)
+        }
+    }
+
+    private func presented(_ target: EditTarget) -> Binding<Bool> {
+        Binding(get: { editing.wrappedValue == target },
+                set: { if !$0, editing.wrappedValue == target { editing.wrappedValue = nil } })
+    }
+
+    private func editor(_ target: EditTarget, layer: Layer) -> some View {
+        KeyEditorPopover(model: model, target: target, layerTitle: layer.title)
+            .environment(\.theme, theme)
+            .preferredColorScheme(theme.colorScheme)
+    }
+
+    // MARK: Bindings without a cap
+
+    /// Escape (the function row) and, in a mode, keys with modifiers
+    /// ("alt-shift-h"): listed under the keyboard, not drawn on caps.
+    private func extras(_ layer: Layer) -> some View {
+        let names = Set(KeyboardLayout.rows.flatMap { $0 }.compactMap(\.name))
+        let rows = layer.bindings.values.filter { !names.contains($0.key) }.sorted { $0.key < $1.key }
+        return Group {
+            if !rows.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("NOT ON THE KEYBOARD")
+                        .font(GroveFont.mono(10.5)).tracking(1)
+                        .foregroundStyle(Color(theme.grey1))
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8, alignment: .leading), count: 4),
+                              alignment: .leading, spacing: 4) {
+                        ForEach(rows, id: \.key) { binding in
+                            extraRow(binding, layer: layer)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func extraRow(_ binding: KeyBinding, layer: Layer) -> some View {
+        let shortcut: String
+        switch binding.source {
+        case .aerospace(_, let key): shortcut = key
+        case .launcher: shortcut = KeyboardLayout.shortcut(layerID: layer.id, key: binding.key)
+        }
+        let target = EditTarget(layerID: layer.id, shortcut: shortcut)
+        return Button { editing.wrappedValue = target } label: {
+            HStack(spacing: 8) {
+                Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
+                    .font(GroveFont.mono(11.5))
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 5))
+                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(theme.bg3), lineWidth: 1))
+                Text(binding.label)
+                    .foregroundStyle(Color(theme.named(binding.kind.tint)))
+                    .lineLimit(1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: presented(target), arrowEdge: .bottom) {
+            editor(target, layer: layer)
+        }
+    }
+
+    // MARK: Legend
+
+    private var legend: some View {
+        HStack(spacing: 14) {
+            swatch(theme.green, "workspace")
+            swatch(theme.aqua, "focus · move")
+            swatch(theme.blue, "launcher")
+            swatch(theme.yellow, "layout · resize")
+            swatch(theme.orange, "mode · service")
+            swatch(theme.bg2, "free")
+        }
+        .font(GroveFont.mono(11))
+        .foregroundStyle(Color(theme.grey1))
+    }
+
+    private func swatch(_ color: RGB, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 3).fill(Color(color)).frame(width: 10, height: 10)
+            Text(text)
+        }
+    }
+
+    // MARK: Keys
+
+    private func handle(_ press: KeyPress) -> KeyPress.Result {
+        if press.key == .escape {
+            if editing.wrappedValue != nil {
+                editing.wrappedValue = nil
+            } else {
+                dismissWindow(id: MenuBarView.windowID)
+            }
+            return .handled
+        }
+        if press.key == .return {
+            guard let name = focused.wrappedValue, let layer = current else { return .ignored }
+            editing.wrappedValue = EditTarget(layerID: layer.id,
+                                              shortcut: KeyboardLayout.shortcut(layerID: layer.id, key: name))
+            return .handled
+        }
+        guard let direction = Self.direction(press) else { return .ignored }
+        if showFocus.wrappedValue, let name = focused.wrappedValue {
+            if let next = KeyboardLayout.neighbor(of: name, direction) { focused.wrappedValue = next }
+        } else {
+            // The first press shows the box where it is (or on 1).
+            if focused.wrappedValue == nil { focused.wrappedValue = KeyboardLayout.firstKey }
+            showFocus.wrappedValue = true
+        }
+        return .handled
+    }
+
+    private static func direction(_ press: KeyPress) -> KeyboardLayout.Direction? {
+        switch press.key {
+        case .leftArrow: return .left
+        case .rightArrow: return .right
+        case .upArrow: return .up
+        case .downArrow: return .down
+        default: break
+        }
+        guard press.modifiers.contains(.control) else { return nil }
+        // Ctrl+letter may arrive as the letter or as its control character.
+        switch press.characters.lowercased().first ?? press.key.character {
+        case "h", "\u{08}": return .left
+        case "j", "\u{0A}": return .down
+        case "k", "\u{0B}": return .up
+        case "l", "\u{0C}": return .right
+        default: return nil
+        }
+    }
+}

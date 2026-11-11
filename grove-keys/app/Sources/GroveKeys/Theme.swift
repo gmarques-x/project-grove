@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import GroveThemesCore
 import SwiftUI
 
@@ -36,5 +37,65 @@ extension EnvironmentValues {
     var theme: ThemeColors {
         get { self[ThemeKey.self] }
         set { self[ThemeKey.self] = newValue }
+    }
+}
+
+enum GroveFont {
+    private static let families = Set((CTFontManagerCopyAvailableFontFamilyNames() as? [String]) ?? [])
+    private static let hasMono = families.contains("JetBrains Mono")
+    private static let lockupFamily = families.contains("Courier Prime") ? "Courier Prime" : "Courier New"
+
+    /// JetBrains Mono, else the system monospaced font.
+    static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        hasMono ? .custom("JetBrains Mono", size: size).weight(weight)
+                : .system(size: size, weight: weight, design: .monospaced)
+    }
+
+    /// The lockup's typewriter face: Courier Prime, else Courier New; bold.
+    static func lockup(_ size: CGFloat) -> Font {
+        .custom(lockupFamily, size: size).weight(.bold)
+    }
+}
+
+extension ThemeColors {
+    /// A key's colour by palette name (BindingKind.tint).
+    func named(_ name: String) -> RGB {
+        switch name {
+        case "green": return green
+        case "aqua": return aqua
+        case "blue": return blue
+        case "yellow": return yellow
+        case "orange": return orange
+        case "red": return red
+        case "purple": return purple
+        case "grey1": return grey1
+        default: return fg
+        }
+    }
+}
+
+extension View {
+    /// The keyboard focus box, as Grove Themes: a 2 pt outline in the scheme's
+    /// green, `outset` points outside the view.
+    func focusBox(_ shown: Bool, cornerRadius: CGFloat, outset: CGFloat) -> some View {
+        modifier(FocusBox(shown: shown, cornerRadius: cornerRadius, outset: outset))
+    }
+}
+
+private struct FocusBox: ViewModifier {
+    let shown: Bool
+    let cornerRadius: CGFloat
+    let outset: CGFloat
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if shown {
+                RoundedRectangle(cornerRadius: cornerRadius + outset)
+                    .strokeBorder(Color(theme.green), lineWidth: 2)
+                    .padding(-outset)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 }
