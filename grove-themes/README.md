@@ -2,6 +2,8 @@
 
 Switches the desktop between the six Everforest schemes. The colour-carrying configs in `grove-dotfiles/config/` are tracked as `*.tmpl` templates; `grove-themes` fills in the palette from `grove-dotfiles/theme/` and writes the real (untracked) config files.
 
+To switch from the desktop, click the pine at the left of the Grove bar and choose Appearance: the six schemes are there, and Grove Themes… opens the gallery. The manual's [Themes](../docs/manual/04-themes.md) chapter covers everyday use; this page is the reference.
+
 Schemes: `dark-hard`, `dark-medium` (the default), `dark-soft`, `light-hard`, `light-medium`, `light-soft`.
 
 ```
@@ -17,8 +19,9 @@ grove-themes render [--scheme S] [--config DIR]
 --json                             machine-readable output on list, current, set, log, logo and wallpaper
 ```
 
-The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grove/theme`). `grove install` links the command into `~/.local/bin` and renders the configs. 
-`list --json` also carries `palettes`: for each scheme its `name` (e.g. `Dark Medium`), `appearance` (`dark` or `light`) and `colors` (`bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple`, then the three roles `border on_accent dim`, as `#RRGGBB`).
+The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grove/theme`). `grove install` links the command into `~/.local/bin` and renders the configs.
+
+`list --json` also carries `palettes`: for each scheme its `name` (e.g. `Dark Medium`), `appearance` (`dark` or `light`) and `colors` (`bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple`, then the three roles `border on_accent dim`, as `#RRGGBB`). The palettes define two more roles, `hover` and `muted`, which templates can use.
 
 Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (`{"time", "scheme", "exit", "steps"}`, the last 50 kept). `log` prints it newest first, one `<time> <scheme> exit=<n>` line per switch, or `{"entries": [...]}` with `--json`; damaged lines are skipped.
 
@@ -38,8 +41,10 @@ The wallpaper step sets the picture on every Space, not only the visible ones: a
 
 Tests: `bats tests`.
 
-## The menu bar app
+## The app
 
-`app/` is Grove Themes, a SwiftUI menu bar app that shows the six schemes in a dropdown and a gallery window and switches them by running `grove-themes set` (so it needs the CLI installed). It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable.
+`app/` is Grove Themes, a SwiftUI app that shows the six schemes, the terminal logo and the wallpaper in a gallery window and switches them by running `grove-themes` (so it needs the CLI installed). It has no Dock icon, and its dropdown in the native menu bar is hidden behind the Grove bar, so it is reached from the pine: Appearance › Grove Themes… opens the gallery through the link `grovethemes://gallery` (also `open grovethemes://gallery` from a terminal). The link only opens the window; it never switches anything.
 
-`grove install themes-app` (module `97-themes-app`) builds it, assembles and ad hoc signs `~/Applications/Grove Themes.app` (no Dock icon; `Resources/Info.plist` sets `LSUIElement`) and starts it at login with the LaunchAgent `~/Library/LaunchAgents/com.projectgrove.themes.plist`. It rebuilds when the tracked files under `app/` change. The first switch from the app triggers macOS's Automation prompt; allow it once.
+It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable.
+
+`grove install themes-app` (module `97-themes-app`) builds it, assembles and ad hoc signs `~/Applications/Grove Themes.app` (`Resources/Info.plist` sets `LSUIElement`) and starts it at login with the LaunchAgent `~/Library/LaunchAgents/com.projectgrove.themes.plist`. It rebuilds when the tracked files under `app/` change. The first switch from the app triggers macOS's Automation prompt; allow it once.

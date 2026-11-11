@@ -4,7 +4,34 @@
 
 # Project Grove
 
-A complete macOS desktop overhaul: dotfiles, an installer, and third-party tools adapted to fit, all in the [Everforest](https://github.com/sainnhe/everforest) dark medium palette by sainnhe. JetBrains Mono for code, SF Pro for everything else. Every change is recorded, so the whole setup can be planted again on a fresh Mac.
+A personal macOS overhaul in the [Everforest](https://github.com/sainnhe/everforest) colours by sainnhe: a tiling desktop with its own top bar, a keyboard layer on Caps Lock, a themed terminal and editor, and one menu that reaches all of it. An installer sets the whole thing up on a fresh Mac, and a switcher moves everything between six schemes (dark or light, each in hard, medium or soft contrast).
+
+<!-- Screenshots go here: the desktop with the bar and tiled windows, the Grove menu or palette, and the theme gallery. -->
+
+## What's inside
+
+| Folder | What it is |
+| --- | --- |
+| [`grove-dotfiles/`](grove-dotfiles/) | The `grove` installer and every config it manages: the tiling desktop (AeroSpace, with JankyBorders), the Grove bar (SketchyBar, in place of the menu bar), the Grove menu, the terminal (Ghostty, zsh, Starship, Yazi, fastfetch), VS Code and Chrome themes, git and SSH, fonts and Finder settings. It also builds and installs the two apps below. |
+| [`grove-keys/`](grove-keys/) | Grove Keys, the keyboard app: Caps Lock as a Hyper key, app launchers, the window-manager shortcuts, a cheat sheet, and the menus behind the bar (the Grove menu, the palette and each app's own menus). |
+| [`grove-themes/`](grove-themes/) | The `grove-themes` command and the Grove Themes app: switch the desktop between the six Everforest schemes, and choose the terminal logo and wallpaper. |
+| [`grove-wallpapers/`](grove-wallpapers/) | Two wallpapers for each scheme, 2880 × 1864: the Project Grove lockup and the avatar drawing. |
+| [`assets/`](assets/) | Images for this page. |
+
+## The manual
+
+[**docs/manual**](docs/manual/README.md) says what to press: the desktop and the bar, the Grove menu, themes, hotkeys, the terminal, updating and undoing, and a table for people [coming from stock macOS](docs/manual/08-coming-from-stock-macos.md).
+
+## What it changes on your Mac
+
+Read this before you paste anything. Grove is a whole setup, and it is not undone with one command.
+
+- **`~/.config` becomes a link into this repo** (`grove-dotfiles/config`). An existing `~/.config` is not thrown away: its contents are moved into that folder, and any file that clashes with one Grove ships is moved to `~/.local/state/grove/backup/` instead. Afterwards, deleting the repo deletes your `~/.config`.
+- `~/.zshrc`, `~/.zprofile` and `~/.gitconfig` are moved to the same backup folder; `~/.zshenv` and `~/.ssh/config` become links.
+- The macOS menu bar is hidden behind the Grove bar, windows are tiled, and Caps Lock becomes a Hyper key. Menu-bar icons from other apps are not reachable for now.
+- Homebrew packages, fonts, two apps that start at login, a code-signing certificate in your keychain, an SSH key and a GitHub sign-in, and Finder, Dock and appearance settings.
+
+The full list, what the installer asks for, and how to take it all back are in the manual: [Getting started](docs/manual/01-getting-started.md) and [Updates and undo](docs/manual/07-updates-and-undo.md).
 
 ## Start on a fresh Mac
 
@@ -14,17 +41,7 @@ Open Terminal and paste:
 curl -fsSL https://raw.githubusercontent.com/gmarques-x/project-grove/main/grove-dotfiles/bootstrap.sh | bash
 ```
 
-It clones this repo to `~/Developer/project-grove` and runs `grove install`. Read [grove-dotfiles/README.md](grove-dotfiles/README.md) first: it lists what the installer asks for and what it changes.
-
-## What's inside
-
-| Folder | What it is |
-| --- | --- |
-| [`grove-dotfiles/`](grove-dotfiles/) | The `grove` installer and every config it links into `~/.config`: Ghostty, zsh, Starship, git, SSH, bat, eza, yazi and fastfetch, plus Homebrew packages, fonts and Finder settings. |
-| [`grove-wallpapers/`](grove-wallpapers/) | Desktop wallpapers in the same palette, 2880 × 1864: the Grove logo and lettering centred on each Everforest scheme's background, named `wallpaper-project-grove-<scheme>.png`: `dark-medium` `#2D353B` (the terminal's background, set by the installer), `dark-hard` `#272E33`, `dark-soft` `#333C43`, and `light-hard` `#FFFBEF`, `light-medium` `#FDF6E3`, `light-soft` `#F3EAD3`, where the lockup is in the branding's dark ink. |
-| [`grove-themes/`](grove-themes/) | The `grove-themes` command: switches the desktop between the six Everforest schemes by rendering the tracked `*.tmpl` configs from the palettes in `grove-dotfiles/theme/`. |
-
-More pieces will grow here over time.
+It clones this repo to `~/Developer/project-grove` and runs `grove install`.
 
 ## Credits
 
