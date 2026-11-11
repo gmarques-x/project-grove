@@ -80,7 +80,7 @@ rc() {
   left="$(calls | grep -oE -- '--add item [a-z_.0-9]+ left' | awk '{print $3}' | tr '\n' ' ')"
   right="$(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}' | tr '\n' ' ')"
   [ "$left" = "grove sep.l1 ws.1 ws.2 ws.3 ws.4 ws.5 ws.6 ws.7 ws.8 ws.9 front_app " ] || { echo "$left"; false; }
-  [ "$right" = "keys sep.r1 clock sep.r2 volume sep.r3 wifi sep.r4 battery sep.r5 net.up net.down sep.r6 mem cpu " ] || { echo "$right"; false; }
+  [ "$right" = "keys sep.r1 clock sep.r2 volume sep.r3 wifi sep.r4 battery sep.r5 net.up net.down sep.r6 mem cpu sep.r7 " ] || { echo "$right"; false; }
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
 }
@@ -88,7 +88,7 @@ rc() {
 @test "sketchybar: separators are a bg3 bar, the same as the one before the app" {
   rc
   local n
-  for n in sep.l1 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
+  for n in sep.l1 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6 sep.r7; do
     calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BG3")" || { echo "$n"; false; }
   done
   calls | grep -q -- '--set front_app .*icon=│'

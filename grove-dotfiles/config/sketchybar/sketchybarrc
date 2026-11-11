@@ -123,6 +123,7 @@ sketchybar --add item mem right \
 
 sketchybar --add item cpu right \
   --set cpu icon="cpu" icon.color="$AQUA" label.width=$W4 label.align=right script="$P/cpu.sh" update_freq=4
+sep sep.r7 right
 
 # The floating bar: one bracket behind every item.
 sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \
