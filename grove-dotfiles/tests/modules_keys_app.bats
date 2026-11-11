@@ -1,6 +1,9 @@
 # shellcheck disable=SC2016,SC1090,SC1091,SC2154,SC2030,SC2031
 # 96-keys-app: builds Grove Keys, installs it and starts it at login, against
-# fake swift, codesign, iconutil, sips, launchctl, hidutil and open and temp folders.
+# fake swift, codesign, security, openssl, iconutil, sips, launchctl, hidutil
+# and open and temp folders. The fake keychain is a file: keychain-identity
+# holds the hash of "Grove Code Signing" when it's there, and signed-with the
+# identity the app was last signed with ("-" is ad hoc).
 load helpers
 
 KA_MODULE=96-keys-app
@@ -51,7 +54,52 @@ FAKE
 echo "$*" >> "$BATS_TEST_TMPDIR/swift-args"
 if [ -n "$FAKE_SWIFT_FAIL" ]; then echo "error: boom.swift:1: cannot find x" >&2; exit 1; fi
 mkdir -p .build/release && cp "$BATS_TEST_TMPDIR/fake-groovekeys" .build/release/GroveKeys && chmod +x .build/release/GroveKeys'
-  stub codesign 'echo "$*" >> "$BATS_TEST_TMPDIR/codesign-args"'
+  stub codesign '
+if [ "$1" = -dvv ]; then
+  echo "Executable=$2/Contents/MacOS/GroveKeys" >&2
+  case "$(cat "$BATS_TEST_TMPDIR/signed-with" 2>/dev/null)" in
+    "") echo "$2: code object is not signed at all" >&2; exit 1 ;;
+    -) echo "Signature=adhoc" >&2 ;;
+    *) printf "Authority=Grove Code Signing\nTeamIdentifier=not set\n" >&2 ;;
+  esac
+  exit 0
+fi
+echo "$*" >> "$BATS_TEST_TMPDIR/codesign-args"
+[ "$1" = --force ] && [ "$2" = --sign ] && echo "$3" > "$BATS_TEST_TMPDIR/signed-with"
+exit 0'
+  KA_HASH=F68B51349BDD56C6A96FA6D0AAA8119A7B9F93B7
+  # security: find-identity lists the fake identity (untrusted, as a
+  # self-signed one is); import "adds" it and notes the folder the .p12 was in.
+  stub security '
+echo "$*" >> "$BATS_TEST_TMPDIR/security-args"
+case "$1" in
+  find-identity)
+    printf "\nPolicy: Code Signing\n  Matching identities\n"
+    if [ -s "$BATS_TEST_TMPDIR/keychain-identity" ]; then
+      printf "  1) %s \"Grove Code Signing\" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n" "$(cat "$BATS_TEST_TMPDIR/keychain-identity")"
+    else
+      printf "     0 identities found\n"
+    fi
+    printf "\n  Valid identities only\n     0 valid identities found\n" ;;
+  import)
+    [ -f "$2" ] || exit 1
+    dirname "$2" > "$BATS_TEST_TMPDIR/p12-dir"
+    [ -n "$FAKE_IMPORT_FAIL" ] && exit 1
+    echo F68B51349BDD56C6A96FA6D0AAA8119A7B9F93B7 > "$BATS_TEST_TMPDIR/keychain-identity" ;;
+esac
+exit 0'
+  # openssl: writes the files it is asked for and keeps a copy of the config.
+  stub openssl '
+echo "$*" >> "$BATS_TEST_TMPDIR/openssl-args"
+[ "$1" = rand ] && { echo 00112233445566778899aabbccddeeff; exit 0; }
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -keyout|-out) echo pem > "$2" ;;
+    -config) cp "$2" "$BATS_TEST_TMPDIR/openssl.cnf" ;;
+  esac
+  shift
+done
+exit 0'
   stub sips 'echo "$*" >> "$BATS_TEST_TMPDIR/sips-args"; while [ $# -gt 0 ]; do [ "$1" = --out ] && cp "$BATS_TEST_TMPDIR/stubs/sips" "$2"; shift; done'
   stub iconutil 'echo "$*" >> "$BATS_TEST_TMPDIR/iconutil-args"; while [ $# -gt 0 ]; do [ "$1" = -o ] && echo icns > "$2"; shift; done'
   stub open 'echo "$*" >> "$BATS_TEST_TMPDIR/open-args"'
@@ -86,6 +134,10 @@ if [ -n "$FAKE_RELOAD_FAIL" ]; then echo "unknown key foo" >&2; exit 1; fi'
   export GROVE_AEROSPACE="$BATS_TEST_TMPDIR/stubs/aerospace"
   export GROVE_SWIFT="$BATS_TEST_TMPDIR/stubs/swift"
   export GROVE_CODESIGN="$BATS_TEST_TMPDIR/stubs/codesign"
+  export GROVE_SECURITY="$BATS_TEST_TMPDIR/stubs/security"
+  export GROVE_OPENSSL="$BATS_TEST_TMPDIR/stubs/openssl"
+  # The identity is there unless a test removes it.
+  echo "$KA_HASH" > "$BATS_TEST_TMPDIR/keychain-identity"
   export GROVE_LAUNCHCTL="$BATS_TEST_TMPDIR/stubs/launchctl"
   export GROVE_HIDUTIL="$BATS_TEST_TMPDIR/stubs/hidutil"
   mkdir -p "$GROVE_STATE"
@@ -107,6 +159,7 @@ ka_ready() {
   touch "$BATS_TEST_TMPDIR/loaded"
   "$APP/Contents/MacOS/GroveKeys" --render-aerospace
   keys_state true true true
+  echo "$KA_HASH" > "$BATS_TEST_TMPDIR/signed-with"
   : > "$BATS_TEST_TMPDIR/groovekeys-args"
 }
 
@@ -304,7 +357,7 @@ ka_ready() {
   [ "$(plutil -extract CFBundleName raw "$APP/Contents/Info.plist")" = "Grove Keys" ]
   [ "$(plutil -extract CFBundleExecutable raw "$APP/Contents/Info.plist")" = GroveKeys ]
   [ "$(plutil -extract LSUIElement raw "$APP/Contents/Info.plist")" = true ]
-  grep -q -- "^--force --sign - .*/Grove Keys.app$" "$BATS_TEST_TMPDIR/codesign-args"
+  grep -q -- "^--force --sign $KA_HASH .*/Grove Keys.app$" "$BATS_TEST_TMPDIR/codesign-args"
   [ "$(cat "$GROVE_STATE/keys-app.stamp")" = "$(_ka_source_hash)" ]
   [ "$(cat "$AGENT")" = "$(_ka_agent_plist)" ]
   [ -f "$AEROSPACE_TOML" ]
@@ -439,6 +492,73 @@ ka_ready() {
   run apply
   [ "$status" -eq 1 ]
   [[ "$output" == *"launchctl bootstrap"* ]] || false
+}
+
+@test "keys-app: needs work when the app is signed ad hoc" {
+  ka_ready
+  echo - > "$BATS_TEST_TMPDIR/signed-with"
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "keys-app: ok when the app is signed by Grove Code Signing" {
+  ka_ready
+  run check
+  [ "$status" -eq 0 ]
+  grep -q -- "^find-identity -p codesigning" "$BATS_TEST_TMPDIR/security-args"
+}
+
+@test "keys-app: needs work when the signing identity is missing" {
+  ka_ready
+  rm "$BATS_TEST_TMPDIR/keychain-identity"
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "keys-app: apply creates the signing identity when it's missing" {
+  load_module
+  rm "$BATS_TEST_TMPDIR/keychain-identity"
+  run apply
+  [ "$status" -eq 0 ]
+  grep -q -- '^req -x509 -newkey rsa:2048 -nodes .*-days 3650 ' "$BATS_TEST_TMPDIR/openssl-args"
+  grep -qx 'CN = Grove Code Signing' "$BATS_TEST_TMPDIR/openssl.cnf"
+  grep -qx 'keyUsage = critical,digitalSignature' "$BATS_TEST_TMPDIR/openssl.cnf"
+  grep -qx 'extendedKeyUsage = critical,codeSigning' "$BATS_TEST_TMPDIR/openssl.cnf"
+  grep -q -- '^pkcs12 -export ' "$BATS_TEST_TMPDIR/openssl-args"
+  grep -q -- "^import .*\.p12 -k $HOME/Library/Keychains/login.keychain-db -P .* -T /usr/bin/codesign\$" "$BATS_TEST_TMPDIR/security-args"
+  # The key, certificate and .p12 are gone.
+  [ ! -e "$(cat "$BATS_TEST_TMPDIR/p12-dir")" ]
+  grep -q -- "^--force --sign $KA_HASH .*/Grove Keys.app$" "$BATS_TEST_TMPDIR/codesign-args"
+}
+
+@test "keys-app: apply doesn't recreate an identity that is there" {
+  load_module
+  run apply
+  [ "$status" -eq 0 ]
+  run grep -q '^import' "$BATS_TEST_TMPDIR/security-args"
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/openssl-args" ]
+}
+
+@test "keys-app: apply signs with the identity's hash" {
+  load_module
+  echo 0123456789ABCDEF0123456789ABCDEF01234567 > "$BATS_TEST_TMPDIR/keychain-identity"
+  run apply
+  [ "$status" -eq 0 ]
+  grep -q -- "^--force --sign 0123456789ABCDEF0123456789ABCDEF01234567 .*/Grove Keys.app$" "$BATS_TEST_TMPDIR/codesign-args"
+}
+
+@test "keys-app: a failed identity import stops apply and leaves the installed app" {
+  ka_ready
+  echo old > "$APP/Contents/MacOS/GroveKeys"
+  rm "$BATS_TEST_TMPDIR/keychain-identity"
+  export FAKE_IMPORT_FAIL=1
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Grove Code Signing"* ]] || false
+  [ "$(cat "$APP/Contents/MacOS/GroveKeys")" = old ]
+  [ ! -e "$(cat "$BATS_TEST_TMPDIR/p12-dir")" ]
+  [ ! -e "$BATS_TEST_TMPDIR/codesign-args" ]
 }
 
 @test "keys-app: a failed build leaves the installed app and stamp" {

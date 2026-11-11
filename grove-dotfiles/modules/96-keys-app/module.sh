@@ -1,12 +1,14 @@
 # shellcheck shell=bash
 # 96-keys-app: Grove Keys, the menu bar app in grove-keys/app, is built with
-# swift, assembled into ~/Applications/Grove Keys.app (ad hoc signed) and
-# started at login by a LaunchAgent. It also renders ~/.config/aerospace/
+# swift, assembled into ~/Applications/Grove Keys.app, signed with the
+# self-signed "Grove Code Signing" identity in the login keychain (made once,
+# here) and started at login by a LaunchAgent. It also renders ~/.config/aerospace/
 # aerospace.toml from keys.toml and the base (GroveKeys --render-aerospace).
 # A stamp holds a hash of the tracked source files of the app and of
 # grove-themes/app (its package dependency), so check notices when the app is
 # out of date.
-# Tests point GROVE_SWIFT, GROVE_LAUNCHCTL, GROVE_CODESIGN, GROVE_HIDUTIL,
+# Tests point GROVE_SWIFT, GROVE_LAUNCHCTL, GROVE_CODESIGN, GROVE_SECURITY,
+# GROVE_OPENSSL, GROVE_HIDUTIL,
 # GROVE_AEROSPACE, GROVE_PS (as 98-aerospace's), GROVE_APPS_DIR and
 # GROVE_AGENTS_DIR at fakes and temp folders (GROVE_APP_SRC and
 # GROVE_THEMES_SRC at copies of the sources, because swift builds into them).
@@ -14,10 +16,14 @@
 about() { echo "Grove Keys in the menu bar"; }
 
 _KA_LABEL=com.projectgrove.keys
+_KA_IDENTITY="Grove Code Signing"
 
 _ka_swift() { printf '%s' "${GROVE_SWIFT:-swift}"; }
 _ka_launchctl() { printf '%s' "${GROVE_LAUNCHCTL:-launchctl}"; }
 _ka_codesign() { printf '%s' "${GROVE_CODESIGN:-codesign}"; }
+_ka_security() { printf '%s' "${GROVE_SECURITY:-/usr/bin/security}"; }
+_ka_openssl() { printf '%s' "${GROVE_OPENSSL:-/usr/bin/openssl}"; }
+_ka_keychain() { printf '%s/Library/Keychains/login.keychain-db' "$HOME"; }
 _ka_apps() { printf '%s' "${GROVE_APPS_DIR:-$HOME/Applications}"; }
 _ka_app() { printf '%s/Grove Keys.app' "$(_ka_apps)"; }
 _ka_agent() { printf '%s/%s.plist' "${GROVE_AGENTS_DIR:-$HOME/Library/LaunchAgents}" "$_KA_LABEL"; }
@@ -105,6 +111,68 @@ _ka_agent_plist() {
 XML
 }
 
+# Signing. An ad hoc signature changes with every build, and macOS forgets
+# Accessibility and Input Monitoring for a binary it no longer recognises. A
+# certificate signature gives the designated requirement
+#   identifier com.projectgrove.keys and certificate leaf = H"<cert hash>"
+# which stays the same across rebuilds, so the permissions are granted once.
+
+# _ka_identity_hash: the SHA-1 of the "Grove Code Signing" identity, empty when
+# there's none. A self-signed certificate isn't trusted, so it never shows
+# under find-identity -v; this reads the full list.
+_ka_identity_hash() {
+  "$(_ka_security)" find-identity -p codesigning 2>/dev/null \
+    | awk -v n="\"$_KA_IDENTITY\"" '$1 ~ /^[0-9]+\)$/ && index($0, n) { print $2; exit }'
+}
+
+# _ka_create_identity: a self-signed code-signing certificate (10 years) and
+# its key, imported into the login keychain so that only codesign may use the
+# key without asking. The key, certificate and .p12 live in a temp folder that
+# is deleted afterwards.
+_ka_create_identity() {
+  local tmp pass rc=0
+  tmp="$(umask 077 && mktemp -d)" || return 1
+  cat > "$tmp/cs.cnf" <<EOF
+[req]
+distinguished_name = dn
+prompt = no
+x509_extensions = ext
+[dn]
+CN = $_KA_IDENTITY
+[ext]
+basicConstraints = critical,CA:false
+keyUsage = critical,digitalSignature
+extendedKeyUsage = critical,codeSigning
+EOF
+  pass="$("$(_ka_openssl)" rand -hex 16)" || rc=1
+  if [ "$rc" -eq 0 ]; then
+    "$(_ka_openssl)" req -x509 -newkey rsa:2048 -nodes -keyout "$tmp/key.pem" -out "$tmp/cert.pem" \
+        -days 3650 -config "$tmp/cs.cnf" >/dev/null 2>&1 \
+      && "$(_ka_openssl)" pkcs12 -export -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -out "$tmp/id.p12" \
+        -passout "pass:$pass" -name "$_KA_IDENTITY" >/dev/null 2>&1 \
+      && "$(_ka_security)" import "$tmp/id.p12" -k "$(_ka_keychain)" -P "$pass" -T /usr/bin/codesign >/dev/null 2>&1 \
+      || rc=1
+  fi
+  rm -rf "$tmp"
+  return "$rc"
+}
+
+# _ka_ensure_identity: print the identity's hash, making it first if needed.
+_ka_ensure_identity() {
+  local hash
+  hash="$(_ka_identity_hash)"
+  if [ -z "$hash" ]; then
+    _ka_create_identity && hash="$(_ka_identity_hash)"
+  fi
+  [ -n "$hash" ] || return 1
+  printf '%s' "$hash"
+}
+
+# _ka_signed_by_identity: the installed app's signature names Grove Code Signing.
+_ka_signed_by_identity() {
+  "$(_ka_codesign)" -dvv "$(_ka_app)" 2>&1 | grep -qx "Authority=$_KA_IDENTITY"
+}
+
 _ka_loaded() { "$(_ka_launchctl)" print "$(_ka_domain)/$_KA_LABEL" >/dev/null 2>&1; }
 
 # _ka_wait_gone: launchd can still hold the job for a moment after bootout
@@ -156,6 +224,8 @@ check() {
   [ -x "$(_ka_app)/Contents/MacOS/GroveKeys" ] || return 3
   stamp="$(cat "$(_ka_stamp)" 2>/dev/null)" || return 3
   [ "$stamp" = "$(_ka_source_hash)" ] || return 3
+  [ -n "$(_ka_identity_hash)" ] || return 3
+  _ka_signed_by_identity || return 3
   [ -f "$(_ka_agent)" ] && [ "$(cat "$(_ka_agent)")" = "$(_ka_agent_plist)" ] || return 3
   _ka_loaded || return 3
   _ka_render_current
@@ -232,7 +302,7 @@ _ka_open_panes() {
 }
 
 apply() {
-  local src app tmp log stage rc=0 domain changed out
+  local src app tmp log stage rc=0 domain changed out identity
   src="$(_ka_src)"
   app="$(_ka_app)"
   domain="$(_ka_domain)"
@@ -241,6 +311,10 @@ apply() {
     return 1
   fi
   mkdir -p "$(_ka_apps)" "$(dirname "$(_ka_agent)")" "$GROVE_STATE" || return 1
+  if ! identity="$(_ka_ensure_identity)"; then
+    grove_fail "could not make the \"$_KA_IDENTITY\" certificate in the login keychain"
+    return 1
+  fi
   tmp="$(mktemp -d "$(_ka_apps)/.grove-keys.XXXXXX")" || return 1
   log="$tmp/build.log"
 
@@ -257,7 +331,7 @@ apply() {
     cp "$src/.build/release/GroveKeys" "$stage/Contents/MacOS/GroveKeys" \
       && _ka_info_plist > "$stage/Contents/Info.plist" \
       && _ka_iconset "$(_ka_themes_src)/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
-      && "$(_ka_codesign)" --force --sign - "$stage" >/dev/null 2>&1 || rc=1
+      && "$(_ka_codesign)" --force --sign "$identity" "$stage" >/dev/null 2>&1 || rc=1
   fi
   if [ "$rc" -ne 0 ]; then
     grove_fail "could not assemble or sign Grove Keys.app"

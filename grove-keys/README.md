@@ -12,7 +12,11 @@ Design: `grove-dotfiles/docs/specs/2026-11-10-grove-keys-design.md`.
 grove install keys-app
 ```
 
-It builds the app with `swift` (Command Line Tools are enough), signs it ad hoc, installs `~/Applications/Grove Keys.app`, renders `aerospace.toml` and starts the app at login with a LaunchAgent (`com.projectgrove.keys`, restarted if it crashes). `grove check` notices when the source of the app, or of `grove-themes/app` which it depends on, changed and says it needs work.
+It builds the app with `swift` (Command Line Tools are enough), signs it with the Grove Code Signing certificate, installs `~/Applications/Grove Keys.app`, renders `aerospace.toml` and starts the app at login with a LaunchAgent (`com.projectgrove.keys`, restarted if it crashes). `grove check` notices when the source of the app, or of `grove-themes/app` which it depends on, changed and says it needs work.
+
+## Signing
+
+The first `grove install keys-app` makes a self-signed code-signing certificate, "Grove Code Signing", in your login keychain (valid for ten years; only `codesign` may use its key without asking), and every build is signed with it. macOS ties Accessibility and Input Monitoring to the app's signature: an ad hoc signature changes with every rebuild, so the permissions were lost each time, while a certificate signature stays the same. Grant the permissions once and they survive rebuilds. If macOS asks whether `codesign` may use the key, choose Always Allow. `grove check` says the app needs work when it isn't signed by this certificate.
 
 ## Permissions
 
