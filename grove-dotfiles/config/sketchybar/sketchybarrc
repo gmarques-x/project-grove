@@ -1,8 +1,8 @@
 #!/bin/bash
 # Grove bar: SketchyBar as the top bar. A 48 pt strip in the desktop's colour
 # (bg0) sits above the menu bar (topmost=on), so macOS's auto-hidden menu bar
-# never shows; one bracket draws the floating bar (32 pt, radius 10, bg3
-# border) behind every item. Spec: docs/specs/2026-11-11-sketchybar-design.md.
+# never shows; one bracket draws the floating bar (32 pt, radius 10, an
+# outline in the border colour) behind every item. Spec: docs/specs/2026-11-11-sketchybar-design.md.
 # Colours come from colors.sh (rendered by grove-themes); plugins/ fill the items.
 
 # Tests point SB_PATH at a fake sketchybar.
@@ -11,6 +11,9 @@ CONFIG_DIR="${CONFIG_DIR:-$HOME/.config/sketchybar}"
 export CONFIG_DIR
 # shellcheck source=/dev/null
 . "$CONFIG_DIR/colors.sh"
+# A colors.sh rendered before the theme had roles has no BORDER: its BG3 is
+# what the lines were drawn in.
+BORDER="${BORDER:-${BG3:-}}"
 # shellcheck source-path=SCRIPTDIR source=lib.sh
 . "$CONFIG_DIR/lib.sh"
 P="$CONFIG_DIR/plugins"
@@ -34,10 +37,10 @@ sketchybar --add event aerospace_workspace_change
 # A reload closes every popup: forget the one plugins/popup.sh had open.
 rm -f "$SB_POPUP"
 
-# sep NAME SIDE: a bg3 bar between groups.
+# sep NAME SIDE: a bar in the border colour between groups.
 sep() {
   sketchybar --add item "$1" "$2" \
-    --set "$1" icon="│" icon.color="$BG3" icon.padding_left=4 icon.padding_right=4 label.drawing=off
+    --set "$1" icon="│" icon.color="$BORDER" icon.padding_left=4 icon.padding_right=4 label.drawing=off
 }
 
 # Left: the Grove tree, the workspaces, the front app.
@@ -81,7 +84,7 @@ sketchybar --add item front_app left \
 sketchybar --add item clock right \
   --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off padding_right=14 "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
-    popup.background.border_width=1 popup.background.border_color="$BG3" \
+    popup.background.border_width=1 popup.background.border_color="$BORDER" \
     click_script="$P/popup.sh clock" \
   --subscribe clock mouse.entered mouse.exited
 for i in 1 2 3 4 5 6 7 8; do
@@ -116,7 +119,7 @@ sketchybar --add item net.up right \
 sketchybar --add item net.down right \
   --set net.down icon="↓" icon.color="$BLUE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/net.down.sh" update_freq=2 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
-    popup.background.border_width=1 popup.background.border_color="$BG3" \
+    popup.background.border_width=1 popup.background.border_color="$BORDER" \
     click_script="$P/popup.sh net.down" \
   --subscribe net.down mouse.entered mouse.exited
 
@@ -138,6 +141,6 @@ sep sep.r6 right
 
 # The floating bar: one bracket behind every item.
 sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app clock volume wifi battery net.up net.down mem cpu \
-  --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BG3" background.drawing=on
+  --set bar background.color="$BG0" background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="$BORDER" background.drawing=on
 
 sketchybar --update

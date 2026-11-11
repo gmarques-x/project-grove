@@ -4,9 +4,13 @@
 # shellcheck disable=SC2034
 export BG0=0xff2D353B
 export BG1=0xff343F44
-export BG3=0xff475258
 export FG=0xffD3C6AA
 export GREY2=0xff9DA9A0
+# Roles (see the theme files): BORDER draws the lines (the bar's outline, the
+# separators, the popups' outlines), ON_ACCENT the text on an accent fill (the
+# focused workspace's pill).
+export BORDER=0xff475258
+export ON_ACCENT=0xff2D353B
 export GREEN=0xffA7C080
 export AQUA=0xff83C092
 export BLUE=0xff7FBBB3

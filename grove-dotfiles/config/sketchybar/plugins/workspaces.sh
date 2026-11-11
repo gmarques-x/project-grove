@@ -41,7 +41,9 @@ done <<< "$apps"
 for n in 1 2 3 4 5 6 7 8 9; do
   if [[ " $used " == *" $n "* ]]; then
     if [ "$n" = "$focused" ]; then
-      args+=(--set "ws.$n" drawing=on background.drawing=on label.color="$BG0")
+      # Text on the green pill. A colors.sh rendered before the theme had
+      # roles has no ON_ACCENT: its BG0 is what the number was drawn in.
+      args+=(--set "ws.$n" drawing=on background.drawing=on label.color="${ON_ACCENT:-$BG0}")
     else
       args+=(--set "ws.$n" drawing=on background.drawing=off label.color="$GREY2")
     fi

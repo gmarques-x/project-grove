@@ -63,11 +63,42 @@ ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; f
   for s in $(gt_schemes); do
     out="$BATS_TEST_TMPDIR/colors-$s.sh"
     gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$out"
-    for n in BG0 BG1 BG3 FG GREY2 GREEN AQUA BLUE ORANGE YELLOW RED; do
+    for n in BG0 BG1 FG GREY2 BORDER ON_ACCENT GREEN AQUA BLUE ORANGE YELLOW RED; do
       grep -qE "^export $n=0xff[0-9A-F]{6}\$" "$out" || { echo "$s $n"; false; }
     done
     grep -q "^export PINE_ICON=\"\$CONFIG_DIR/icons/pine-${s%%-*}.png\"\$" "$out"
   done
+}
+
+# argb SCHEME NAME: the palette's colour as colors.sh writes it (0xffRRGGBB).
+argb() {
+  local hex
+  hex="$(sed -n "s/^$2 *= *#\\([0-9A-Fa-f]\\{6\\}\\)\$/\\1/p" "$GROVE_ROOT/theme/everforest-$1" | tr '[:lower:]' '[:upper:]')"
+  [ -n "$hex" ] && echo "0xff$hex"
+}
+
+@test "sketchybar: lines take the border role, text on the pill the on_accent role" {
+  local s c out
+  for s in $(gt_schemes); do
+    c="${s#*-}"
+    out="$BATS_TEST_TMPDIR/roles-$s.sh"
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$out"
+    if [ "${s%%-*}" = dark ]; then
+      # The dark schemes keep the colours the bar always had.
+      grep -qx "export BORDER=$(argb "$s" bg3)" "$out" || { echo "$s BORDER"; false; }
+      grep -qx "export ON_ACCENT=$(argb "$s" bg0)" "$out" || { echo "$s ON_ACCENT"; false; }
+    else
+      # Light: bg5 for lines (bg3 can't be seen on bg0), the dark sibling's bg0 as ink.
+      grep -qx "export BORDER=$(argb "$s" bg5)" "$out" || { echo "$s BORDER"; false; }
+      grep -qx "export ON_ACCENT=$(argb "dark-$c" bg0)" "$out" || { echo "$s ON_ACCENT"; false; }
+      ! grep -qx "export BORDER=$(argb "$s" bg3)" "$out" || { echo "$s BORDER is bg3"; false; }
+      ! grep -qx "export ON_ACCENT=$(argb "$s" bg0)" "$out" || { echo "$s ON_ACCENT is bg0"; false; }
+    fi
+    # bg3 only drew lines: nothing else needs it.
+    ! grep -q '^export BG3=' "$out" || { echo "$s BG3"; false; }
+  done
+  # Outside comments, BG3 is only the fallback for an older colors.sh.
+  ! grep -nE '^[^#]*BG3' "$SB/sketchybarrc" "$SB"/plugins/*.sh | grep -v 'BORDER:-'
 }
 
 @test "sketchybar: the pine icon exists for dark and light" {
@@ -98,14 +129,14 @@ rc() {
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
 }
 
-@test "sketchybar: separators are a bg3 bar; each workspace ends with one, hidden until it's in use" {
+@test "sketchybar: separators are a bar in the border colour; each workspace ends with one, hidden until it's in use" {
   rc
   local n
   for n in 1 2 3 4 5 6 7 8 9; do
     calls | grep -qx -- "--set sep.ws.$n drawing=off" || { echo "sep.ws.$n"; false; }
   done
   for n in sep.l1 sep.ws.1 sep.ws.9 sep.r1 sep.r2 sep.r3 sep.r4 sep.r5 sep.r6; do
-    calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BG3")" || { echo "$n"; false; }
+    calls | grep -q -- "--set $n icon=│ icon.color=$(. "$CFG/colors.sh"; echo "$BORDER") " || { echo "$n"; false; }
   done
   # The app's name follows the last workspace's separator: none of its own.
   calls | grep -q -- '--set front_app .*icon.drawing=off'
@@ -166,7 +197,57 @@ rc() {
   # The floating bar's edges line up with the windows' 8 pt outer gaps.
   grep -q -- 'padding_left=8 padding_right=8 shadow=off' "$SB/sketchybarrc"
   grep -q -- '--add bracket bar ' "$SB/sketchybarrc"
-  grep -q 'background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="\$BG3"' "$SB/sketchybarrc"
+  grep -q 'background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="\$BORDER"' "$SB/sketchybarrc"
+  rc
+  . "$CFG/colors.sh"
+  calls | grep -qE -- "--set bar background.color=$BG0 .*background.border_width=1 background.border_color=$BORDER( |\$)"
+}
+
+@test "sketchybar: in a light scheme the outline, separators and popups are bg5, not bg3" {
+  local bg3 bg5 item
+  gt_render_file light-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+  bg3="$(argb light-medium bg3)"; bg5="$(argb light-medium bg5)"
+  rc
+  [ "$status" -eq 0 ]
+  calls | grep -qE -- "--set bar .*background.border_color=$bg5( |\$)"
+  calls | grep -q -- "--set sep.r1 icon=│ icon.color=$bg5 "
+  for item in clock net.down; do
+    calls | grep -qE -- "--set $item .*popup.background.border_width=1 popup.background.border_color=$bg5( |\$)" || { echo "$item"; false; }
+  done
+  ! calls | grep -q -- "$bg3"
+  calls | grep -qE -- '--set grove .*icon.background.image=.*/icons/pine-light.png'
+}
+
+@test "sketchybar: popups are a bg1 box with an outline in the border colour" {
+  local item
+  rc
+  . "$CFG/colors.sh"
+  for item in clock net.down; do
+    calls | grep -qE -- "--set $item .*popup.background.color=$BG1 .*popup.background.border_width=1 popup.background.border_color=$BORDER( |\$)" || { echo "$item"; false; }
+  done
+}
+
+# old_colors: a colors.sh rendered before the theme had roles (no BORDER, no ON_ACCENT).
+old_colors() {
+  gt_render_file dark-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+  grep -vE '^export (BORDER|ON_ACCENT)=' "$CFG/colors.sh" > "$CFG/colors.sh.old"
+  echo "export BG3=0xff123456" >> "$CFG/colors.sh.old"
+  mv "$CFG/colors.sh.old" "$CFG/colors.sh"
+}
+
+@test "sketchybar: with a colors.sh from before the roles, lines fall back to its BG3 and the pill's text to BG0" {
+  old_colors
+  rc
+  [ "$status" -eq 0 ]
+  calls | grep -q -- "--set sep.l1 icon=│ icon.color=0xff123456 "
+  calls | grep -qE -- "--set bar .*background.border_color=0xff123456( |\$)"
+  calls | grep -qE -- "--set clock .*popup.background.border_color=0xff123456( |\$)"
+  ! calls | grep -qE -- 'color=( |$)'
+  : > "$CALLS"
+  fake aerospace 'case "$*" in *--focused*) echo 3 ;; *) printf "1\n3\n" ;; esac'
+  plugin workspaces
+  . "$CFG/colors.sh"
+  [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on label.color=$BG0 "* ]] || false
 }
 
 @test "workspaces: the ones in use are drawn, the focused one is a green pill" {
@@ -177,6 +258,28 @@ rc() {
   [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off"* ]] || false
   [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on"* ]] || false
   [[ "$(calls)" == *"--set ws.2 drawing=off"* ]] || false
+}
+
+@test "workspaces: the number on the green pill is in the on_accent colour, the others grey" {
+  local s
+  fake aerospace 'case "$*" in *--focused*) echo 3 ;; *) printf "1\n3\n5\n" ;; esac'
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    : > "$CALLS"
+    plugin workspaces
+    [ "$status" -eq 0 ]
+    (
+      . "$CFG/colors.sh"
+      [ "$ON_ACCENT" = "$(argb dark-medium bg0)" ]
+      [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on label.color=$ON_ACCENT "* ]] || { echo "$s pill"; false; }
+      [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off label.color=$GREY2 "* ]] || { echo "$s grey"; false; }
+    )
+  done
+  # Light: the pill's text is no longer the bar's own background.
+  [[ "$(calls)" != *"background.drawing=on label.color=$(argb light-medium bg0)"* ]] || false
+  # The pill itself is the scheme's green.
+  rc
+  calls | grep -qE -- "--set ws.3 .*background.color=$(argb light-medium green) "
 }
 
 @test "workspaces: FOCUSED from the AeroSpace trigger wins" {
