@@ -3,8 +3,9 @@ import GroveKeysCore
 
 /// Grove Keys' menus popped up at the pointer, for the `grovekeys://` links
 /// (the native menu bar is hidden behind the Grove bar): the bar's pine opens
-/// `grove-menu` and its app name `app-menu`. Nothing in the bar opens `menu`
-/// any more; it still works, e.g. `open grovekeys://menu` from a terminal.
+/// `grove-menu` (the Grove menu, from `menu.toml`) and its app name
+/// `app-menu`. Nothing in the bar opens `menu` any more; it still works, e.g.
+/// `open grovekeys://menu` from a terminal.
 @MainActor
 final class PointerMenu: NSObject {
     static let shared = PointerMenu()
@@ -13,6 +14,8 @@ final class PointerMenu: NSObject {
     private var front = FrontAppTracker()
     /// Set by a menu item that brings an app forward itself (a window, Settings).
     private var staysFront = false
+    private let menuPaths = MenuPaths.standard(
+        home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment)
 
     /// Follows app switches from launch (the bar never takes focus).
     func start() {
@@ -28,21 +31,91 @@ final class PointerMenu: NSObject {
         }
     }
 
-    /// The pine's dropdown: Grove Themes, Grove Keys ▸ and Global Menu ▸ (the front app's menus).
+    /// The Grove menu as its files have it now (they are read each time: an
+    /// edit shows at the next opening), with Grove Keys' own items in place.
+    func groveMenu() -> GroveMenu {
+        GroveMenu.read(menuPaths).expandingKeys(model.keysMenuItems)
+    }
+
+    /// The app to give the keyboard back to: the last one in front.
+    var previousApp: pid_t? { front.current?.pid }
+
+    /// The pine's dropdown: the Grove menu.
     func showGroveMenu() {
+        popUpAtPointer(menu(of: groveMenu().rows))
+    }
+
+    /// `grovekeys://menu/<id>`: a row with an action is run, a submenu is
+    /// popped up at the pointer.
+    func showRow(id: String) {
+        guard let row = groveMenu().row(id: id) else {
+            NSLog("Grove Keys: no row \"%@\" in the Grove menu", id)
+            return
+        }
+        if let action = row.action {
+            if !action.takesFocus(home: MenuRunner.home) { handBackAfterLink() }
+            MenuRunner.run(action, title: row.title)
+        } else {
+            popUpAtPointer(menu(of: row.children))
+        }
+    }
+
+    /// For a link that shows no menu (a row run by its id, the cheat sheet):
+    /// `open` can still bring Grove Keys forward, shortly after the link
+    /// arrives. The app in front before then gets the keyboard back. Not when
+    /// Grove Keys' own window was in front already.
+    func handBackAfterLink() {
+        guard !NSApp.isActive else { return }
+        let once = Once { [self] in
+            guard NSApp.isActive, let previousApp else { return }
+            NSRunningApplication(processIdentifier: previousApp)?.activate()
+        }
+        let center = NotificationCenter.default
+        let token = center.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { once.run() } }
+        once.cleanup = { center.removeObserver(token) }
+        // Not brought forward by then: nothing to give back.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { once.run() }
+    }
+
+    /// The rows as a native menu. The `checked` tests start now, all at once,
+    /// and tick their items as they succeed: by the time a submenu is opened
+    /// its ✓ is there, and a slow test delays nothing.
+    private func menu(of rows: [GroveMenuRow]) -> NSMenu {
+        var tests: [String: (item: NSMenuItem, command: String)] = [:]
+        let menu = menu(of: rows, tests: &tests)
+        let items = tests.mapValues(\.item)
+        CheckedTests.run(tests.map { (id: $0.key, command: $0.value.command) }) { id in
+            items[id]?.state = .on
+        }
+        return menu
+    }
+
+    private func menu(of rows: [GroveMenuRow], tests: inout [String: (item: NSMenuItem, command: String)]) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(item("Grove Themes", handsBack: false) {
-            if let url = URL(string: "grovethemes://gallery") { NSWorkspace.shared.open(url) }
-        })
-        let keys = NSMenuItem(title: "Grove Keys", action: nil, keyEquivalent: "")
-        keys.submenu = keysMenu()
-        menu.addItem(keys)
-        menu.addItem(.separator())
-        let global = NSMenuItem(title: "Global Menu", action: nil, keyEquivalent: "")
-        global.submenu = appMenu()
-        menu.addItem(global)
-        popUpAtPointer(menu)
+        for row in rows {
+            if row.separator, !menu.items.isEmpty { menu.addItem(.separator()) }
+            let entry: NSMenuItem
+            if !row.children.isEmpty {
+                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
+                entry.submenu = self.menu(of: row.children, tests: &tests)
+            } else if row.action == .builtin(.globalMenu) {
+                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
+                entry.submenu = appMenu()
+            } else if let action = row.action {
+                entry = item(row.title, handsBack: !action.takesFocus(home: MenuRunner.home)) {
+                    MenuRunner.run(action, title: row.title)
+                }
+                if let command = row.checked { tests[row.id] = (entry, command) }
+            } else {
+                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
+                entry.isEnabled = false
+            }
+            menu.addItem(entry)
+        }
+        return menu
     }
 
     /// The front app's menus directly (the bar's app name).
@@ -64,42 +137,9 @@ final class PointerMenu: NSObject {
     }
 
     /// `grovekeys://menu`: Grove Keys' own menu at the pointer (the pine's
-    /// Grove Keys ▸ submenu, on its own).
+    /// Grove Keys ▸ submenu, on its own, whatever the menu file says).
     func show() {
-        popUpAtPointer(keysMenu())
-    }
-
-    /// Grove Keys' own menu: permission lines, the red line, Restart while it
-    /// may help (`AppModel.offersRestart`), then its three items.
-    private func keysMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        if !model.permissions.accessibility {
-            menu.addItem(item("Grove Keys needs Accessibility — Open Settings", handsBack: false) {
-                NSWorkspace.shared.open(Permissions.accessibilitySettings)
-            })
-        }
-        if !model.permissions.inputMonitoring {
-            menu.addItem(item("Grove Keys needs Input Monitoring — Open Settings", handsBack: false) {
-                NSWorkspace.shared.open(Permissions.inputMonitoringSettings)
-            })
-        }
-        if let line = model.redLine {
-            let info = NSMenuItem(title: line, action: nil, keyEquivalent: "")
-            info.isEnabled = false
-            menu.addItem(info)
-        }
-        if model.offersRestart {
-            menu.addItem(item("Restart Grove Keys", handsBack: false) { [model] in model.restart() })
-        }
-        if model.needsAttention { menu.addItem(.separator()) }
-        menu.addItem(item("Open Grove Keys", handsBack: false) { [model] in
-            model.openMainWindow?()
-            NSApp.activate(ignoringOtherApps: true)
-        })
-        menu.addItem(item("Show cheat sheet") { [model] in model.showCheatSheetFromMenu() })
-        menu.addItem(item(model.paused ? "Resume Hyper" : "Pause Hyper") { [model] in model.togglePause() })
-        return menu
+        popUpAtPointer(menu(of: KeysMenuItem.rows(model.keysMenuItems, under: "keys")))
     }
 
     /// Pops `menu` up where the pointer was at the click. With another app in

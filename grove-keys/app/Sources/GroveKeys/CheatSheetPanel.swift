@@ -13,6 +13,8 @@ final class CheatSheetPanel {
     private let model: AppModel
     private var panel: NSPanel?
     private var monitors: [Any] = []
+    /// When a key or click last put the sheet away.
+    private var hiddenByInput: Date?
 
     init(model: AppModel) {
         self.model = model
@@ -47,13 +49,32 @@ final class CheatSheetPanel {
         if untilInput {
             let mask: NSEvent.EventTypeMask = [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
             if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-                Task { @MainActor in self?.hide() }
+                Task { @MainActor in self?.hideForInput() }
             }) { monitors.append(global) }
             if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-                self?.hide()
+                self?.hideForInput()
                 return event
             }) { monitors.append(local) }
         }
+    }
+
+    /// `grovekeys://cheatsheet`: shows the sheet as the menu item does, or
+    /// puts it away. When the hotkey's own key press has just hidden it, the
+    /// link that follows is that same "put away", not a new "show".
+    func toggle() {
+        if panel != nil {
+            hide()
+        } else if let hiddenByInput, Date().timeIntervalSince(hiddenByInput) < 0.5 {
+            self.hiddenByInput = nil
+        } else {
+            show(untilInput: true)
+        }
+    }
+
+    private func hideForInput() {
+        guard panel != nil else { return }
+        hiddenByInput = Date()
+        hide()
     }
 
     func hide() {

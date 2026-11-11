@@ -35,6 +35,34 @@ func renderAeroSpace() -> Never {
     exit(0)
 }
 
-// The internal flag for grove (spec §8) runs before any app code.
+/// `--check-menu <file> [<local file>]`: reads the Grove menu's file (and the
+/// local one over it) as the app would, for grove's tests. Prints the number
+/// of rows; an error goes to stderr as "<file> line N: message".
+func checkMenu(_ files: [String]) -> Never {
+    guard let main = files.first, files.count <= 2 else {
+        fail("usage: GroveKeys --check-menu <file> [<local file>]")
+    }
+    func read(_ path: String) -> (name: String, text: String) {
+        let url = URL(fileURLWithPath: path)
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+            fail("\(url.lastPathComponent): can't be read")
+        }
+        return (url.lastPathComponent, text)
+    }
+    let tracked = read(main), local = files.dropFirst().first.map(read)
+    do {
+        let menu = try GroveMenu.strict(main: tracked.text, mainName: tracked.name,
+                                        local: local?.text, localName: local?.name ?? "")
+        print("\(menu.count) rows")
+    } catch {
+        fail(error.description)
+    }
+    exit(0)
+}
+
+// The internal flags for grove (spec §8) run before any app code.
 if CommandLine.arguments.contains("--render-aerospace") { renderAeroSpace() }
+if let flag = CommandLine.arguments.firstIndex(of: "--check-menu") {
+    checkMenu(Array(CommandLine.arguments[(flag + 1)...]))
+}
 GroveKeysApp.main()

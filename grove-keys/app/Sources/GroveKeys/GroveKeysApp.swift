@@ -38,21 +38,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { PointerMenu.shared.start() }
     }
 
-    /// The `grovekeys://` links (see `KeysURL`): each pops a menu up at the
-    /// pointer. The Grove bar's pine and app name send `grove-menu` and
-    /// `app-menu`; `menu` is only opened by hand now.
+    /// The `grovekeys://` links (see `KeysURL`); anything else is ignored.
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            switch KeysURL(url) {
-            case .menu: MainActor.assumeIsolated { PointerMenu.shared.show() }
-            case .groveMenu: MainActor.assumeIsolated { PointerMenu.shared.showGroveMenu() }
-            case .appMenu: MainActor.assumeIsolated { PointerMenu.shared.showAppMenu() }
-            case nil: break
-            }
+        for link in urls.compactMap(KeysURL.init) {
+            MainActor.assumeIsolated { Links.answer(link) }
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         AppModel.shared.shutdown()
+    }
+}
+
+/// What each `grovekeys://` link does. The Grove bar's pine and app name
+/// send `grove-menu` and `app-menu`, AeroSpace's hotkeys `palette` and
+/// `cheatsheet`; an `open` row of the Grove menu naming one of these links is
+/// answered here too, without going round through macOS.
+@MainActor
+enum Links {
+    static func answer(_ link: KeysURL) {
+        switch link {
+        case .menu: PointerMenu.shared.show()
+        case .row(let id): PointerMenu.shared.showRow(id: id)
+        case .groveMenu: PointerMenu.shared.showGroveMenu()
+        case .appMenu: PointerMenu.shared.showAppMenu()
+        case .palette: PalettePanel.shared.toggle()
+        case .cheatSheet:
+            PointerMenu.shared.handBackAfterLink()
+            AppModel.shared.toggleCheatSheet()
+        }
     }
 }

@@ -132,6 +132,12 @@ enum GroveFont {
                 : .system(size: size, weight: weight, design: .monospaced)
     }
 
+    /// `mono` for AppKit (a text field).
+    static func monoNS(_ size: CGFloat) -> NSFont {
+        NSFontManager.shared.font(withFamily: "JetBrains Mono", traits: [], weight: 5, size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
     /// The lockup's typewriter face: Courier Prime, else Courier New; bold.
     static func lockup(_ size: CGFloat) -> Font {
         .custom(lockupFamily, size: size).weight(.bold)

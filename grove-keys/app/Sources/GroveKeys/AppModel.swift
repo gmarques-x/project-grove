@@ -47,6 +47,11 @@ final class AppModel: ObservableObject {
     /// only let a process started after the grant watch the keyboard). Not for
     /// a keys.toml error, which a restart wouldn't change.
     var offersRestart: Bool { !permissions.granted || engineLine != nil }
+    /// Grove Keys' own menu as the pointer menus and the palette show it.
+    var keysMenuItems: [KeysMenuItem] {
+        KeysMenuItem.items(accessibility: permissions.accessibility, inputMonitoring: permissions.inputMonitoring,
+                           redLine: redLine, offersRestart: offersRestart, paused: paused)
+    }
 
     private let paths: KeysPaths
     private let pipeline: SavePipeline
@@ -392,6 +397,8 @@ final class AppModel: ObservableObject {
     func showCheatSheet() { cheatSheet.show(untilInput: false) }
     func hideCheatSheet() { cheatSheet.hide() }
     func showCheatSheetFromMenu() { cheatSheet.show(untilInput: true) }
+    /// `grovekeys://cheatsheet`: the menu item's sheet, or away with it.
+    func toggleCheatSheet() { cheatSheet.toggle() }
     private lazy var cheatSheet = CheatSheetPanel(model: self)
 
     // MARK: State file
