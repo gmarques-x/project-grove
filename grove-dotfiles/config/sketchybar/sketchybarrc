@@ -23,7 +23,7 @@ HOVER=(background.height=24 background.corner_radius=6 background.drawing=off)
 BOLD="JetBrains Mono:SemiBold:13.0"
 
 sketchybar --bar height=48 color="$BG0" topmost=on sticky=on position=top \
-  padding_left=18 padding_right=18 shadow=off
+  padding_left=8 padding_right=8 shadow=off
 
 sketchybar --default label.font="$TEXT" label.color="$FG" icon.font="$TEXT" icon.color="$FG" \
   padding_left=5 padding_right=5 icon.padding_right=6
@@ -39,7 +39,7 @@ sep() {
 # Left: the Grove tree, the workspaces, the front app.
 sketchybar --add item grove left \
   --set grove icon.background.image="$PINE_ICON" icon.background.image.scale=0.5 icon.background.drawing=on \
-    icon.width=18 icon.padding_left=4 icon.padding_right=4 label.drawing=off "${HOVER[@]}" \
+    icon.width=18 icon.padding_left=4 icon.padding_right=4 padding_left=14 label.drawing=off "${HOVER[@]}" \
     script="$P/hover.sh" click_script="open -b com.projectgrove.themes" \
   --subscribe grove mouse.entered mouse.exited
 sep sep.l1 left
@@ -61,7 +61,7 @@ sketchybar --add item front_app left \
 # Right (the first added is the rightmost): Grove Keys, clock, volume, Wi-Fi,
 # battery, network, memory, CPU.
 sketchybar --add item keys right \
-  --set keys icon="⌘" icon.color="$GREY2" label.drawing=off "${HOVER[@]}" script="$P/keys.sh" update_freq=30 \
+  --set keys icon="⌘" icon.color="$GREY2" padding_right=14 label.drawing=off "${HOVER[@]}" script="$P/keys.sh" update_freq=30 \
     click_script="open grovekeys://menu" \
   --subscribe keys mouse.entered mouse.exited
 

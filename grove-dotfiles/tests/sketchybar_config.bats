@@ -141,6 +141,8 @@ rc() {
 
 @test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar with one floating bracket" {
   grep -q -- '--bar height=48 color="\$BG0" topmost=on sticky=on' "$SB/sketchybarrc"
+  # The floating bar's edges line up with the windows' 8 pt outer gaps.
+  grep -q -- 'padding_left=8 padding_right=8 shadow=off' "$SB/sketchybarrc"
   grep -q -- '--add bracket bar ' "$SB/sketchybarrc"
   grep -q 'background.height=32 background.corner_radius=10 background.border_width=1 background.border_color="\$BG3"' "$SB/sketchybarrc"
 }
