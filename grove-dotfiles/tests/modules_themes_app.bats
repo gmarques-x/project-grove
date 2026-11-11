@@ -238,3 +238,10 @@ ta_ready() {
   # The real suite ran (not a fake swift that "builds" into this source tree).
   [[ "$output" == *"Test run with"* ]] || false
 }
+
+@test "themes-app: the bundle registers the grovethemes URL scheme for the bar's Themes… item" {
+  local plist="$GROVE_ROOT/../grove-themes/app/Resources/Info.plist"
+  grep -q '<key>CFBundleURLTypes</key>' "$plist"
+  grep -q '<string>grovethemes</string>' "$plist"
+  plutil -lint "$plist" >/dev/null
+}

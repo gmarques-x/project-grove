@@ -341,3 +341,10 @@ rc() {
   calls | grep -qE -- '--set clock .*click_script=sketchybar --set clock popup.drawing=toggle; .*/plugins/clock_popup.sh'
   calls | grep -qE -- '--add item cal.1 popup.clock'
 }
+
+@test "sketchybar: the pine opens the grove menu, the app name the app's menus" {
+  rc
+  calls | grep -qE -- '--set grove .*click_script=open grovekeys://grove-menu'
+  calls | grep -qE -- '--set front_app .*click_script=open grovekeys://app-menu'
+  calls | grep -qE -- '--subscribe front_app front_app_switched mouse.entered mouse.exited'
+}

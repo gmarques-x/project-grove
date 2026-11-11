@@ -14,5 +14,12 @@
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppleEventsUsageDescription</key><string>Grove Themes switches macOS between light and dark and sets the wallpaper to match your scheme.</string>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>com.projectgrove.themes</string>
+      <key>CFBundleURLSchemes</key><array><string>grovethemes</string></array>
+    </dict>
+  </array>
 </dict>
 </plist>

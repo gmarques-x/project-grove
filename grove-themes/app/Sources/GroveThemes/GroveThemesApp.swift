@@ -7,6 +7,7 @@ struct GroveThemesApp: App {
     // SwiftUI creates the App once, so plain properties hold the one model and
     // watcher. (`@State` is a macro in this SDK, and the Command Line Tools ship
     // no SwiftUIMacros plugin, so the app avoids it.)
+    @NSApplicationDelegateAdaptor(ThemesAppDelegate.self) private var delegate
     private let model: ThemesModel
     private let watcher: StateWatcher
 
@@ -36,7 +37,7 @@ struct GroveThemesApp: App {
             DropdownView()
                 .environment(model)
         } label: {
-            Image(nsImage: PineShape.menuBarImage(size: 16))
+            MenuBarPine()
         }
         .menuBarExtraStyle(.window)
 
