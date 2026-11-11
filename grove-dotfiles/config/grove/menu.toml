@@ -1,0 +1,134 @@
+# The Grove menu: the pine's menu in the bar, and the same rows in the palette
+# (Hyper + Space). Grove Keys reads this file and, after it, menu.local.toml
+# beside it (yours, not tracked): a table there with the same name changes a
+# row, a new name adds one, and `hidden = true` removes one.
+#
+# A table is a row; its name is its place in the tree ([update.check] sits
+# under [update]). Rows keep the order they have here.
+#   title      the row's text (a row without an action is a submenu)
+#   run        a shell command, run quietly
+#   present    a shell command, run in the Grove window (a floating terminal)
+#   open       a link or a path to open
+#   builtin    rows Grove Keys draws itself: "keys", "global-menu", "lock"
+#   checked    a shell test; the row gets a ✓ when it succeeds
+#   separator  true: a line above this row
+#   hidden     true: the row is left out
+
+[appearance]
+title = "Appearance"
+
+[appearance.gallery]
+title = "Grove Themes…"
+open = "grovethemes://gallery"
+
+[appearance.dark-hard]
+title = "Dark Hard"
+separator = true
+run = "grove-themes set dark-hard"
+checked = "test \"$(grove-themes current)\" = dark-hard"
+
+[appearance.dark-medium]
+title = "Dark Medium"
+run = "grove-themes set dark-medium"
+checked = "test \"$(grove-themes current)\" = dark-medium"
+
+[appearance.dark-soft]
+title = "Dark Soft"
+run = "grove-themes set dark-soft"
+checked = "test \"$(grove-themes current)\" = dark-soft"
+
+[appearance.light-hard]
+title = "Light Hard"
+run = "grove-themes set light-hard"
+checked = "test \"$(grove-themes current)\" = light-hard"
+
+[appearance.light-medium]
+title = "Light Medium"
+run = "grove-themes set light-medium"
+checked = "test \"$(grove-themes current)\" = light-medium"
+
+[appearance.light-soft]
+title = "Light Soft"
+run = "grove-themes set light-soft"
+checked = "test \"$(grove-themes current)\" = light-soft"
+
+[keys]
+title = "Grove Keys"
+builtin = "keys"
+
+[update]
+title = "Update"
+
+[update.check]
+title = "Check"
+present = "grove check"
+
+[update.grove]
+title = "Update Grove"
+present = "grove update"
+
+[update.install]
+title = "Run the Installer"
+present = "grove install"
+
+[learn]
+title = "Learn"
+
+[learn.keys]
+title = "Keybindings"
+open = "grovekeys://cheatsheet"
+
+[learn.manual]
+title = "The Grove Manual"
+separator = true
+open = "https://github.com/gmarques-x/project-grove/blob/main/docs/manual/README.md"
+
+[learn.aerospace]
+title = "AeroSpace"
+separator = true
+open = "https://nikitabobko.github.io/AeroSpace/guide"
+
+[learn.ghostty]
+title = "Ghostty"
+open = "https://ghostty.org/docs"
+
+[learn.yazi]
+title = "Yazi"
+open = "https://yazi-rs.github.io/docs/quick-start"
+
+[about]
+title = "About"
+present = "grove about"
+
+[system]
+title = "System"
+
+[system.lock]
+title = "Lock"
+builtin = "lock"
+
+[system.display-sleep]
+title = "Sleep Display"
+run = "pmset displaysleepnow"
+
+[system.sleep]
+title = "Sleep"
+run = "pmset sleepnow"
+
+[system.logout]
+title = "Log Out…"
+separator = true
+run = "osascript -e 'tell application \"loginwindow\" to «event aevtrlgo»'"
+
+[system.restart]
+title = "Restart…"
+run = "osascript -e 'tell application \"loginwindow\" to «event aevtrrst»'"
+
+[system.shutdown]
+title = "Shut Down…"
+run = "osascript -e 'tell application \"loginwindow\" to «event aevtrsdn»'"
+
+[global-menu]
+title = "Global Menu"
+separator = true
+builtin = "global-menu"
