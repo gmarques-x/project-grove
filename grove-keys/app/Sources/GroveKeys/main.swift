@@ -43,5 +43,6 @@ func renderAeroSpace() -> Never {
     exit(0)
 }
 
+// The internal flag for grove (spec §8) runs before any app code.
 if CommandLine.arguments.contains("--render-aerospace") { renderAeroSpace() }
-print("Grove Keys")
+GroveKeysApp.main()
