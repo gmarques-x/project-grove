@@ -97,8 +97,8 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 
 | Role | Font | Used for | License |
 | --- | --- | --- | --- |
-| Principal | **JetBrains Mono** and **JetBrains Mono NL** (2.304, 32 static TTFs) | Terminal, editor, code | SIL Open Font License 1.1 |
-| Companion | **SF Pro**, **SF Pro Text**, **SF Pro Display**, **SF Pro Rounded** (47 files) | Interface and reading text | Apple font license |
+| Principal | **JetBrains Mono** and **JetBrains Mono NL** (2.304, 32 static TTFs) | Code and app text: the terminal, the editor, the Grove bar and the Grove apps | SIL Open Font License 1.1 |
+| Companion | **SF Pro**, **SF Pro Text**, **SF Pro Display**, **SF Pro Rounded** (47 files) | Where macOS draws it: menus, dialogs and other system text | Apple font license |
 
 `grove install fonts` copies them to `~/Library/Fonts` (no admin password) and registers them with macOS, which this version of macOS needs before apps can use a font. Downloads are cached in `~/Library/Caches/grove/fonts` and fetched again only when the server has a newer file.
 
