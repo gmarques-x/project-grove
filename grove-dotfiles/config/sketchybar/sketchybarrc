@@ -13,6 +13,13 @@ export CONFIG_DIR
 . "$CONFIG_DIR/colors.sh"
 P="$CONFIG_DIR/plugins"
 TEXT="JetBrains Mono:Regular:13.0"
+# Fixed label widths keep the separators still as values change: JetBrains
+# Mono 13 is 7.8 pt a character, each width fits the item's longest value.
+W4=32     # "100%", "mute"
+W9=72     # "1023 KB/s"
+W13=102   # "100% charging"
+W17=134   # "Wed 11 Nov  15:24"
+W3=24     # "off" (macOS redacts the Wi-Fi name)
 BOLD="JetBrains Mono:SemiBold:13.0"
 
 sketchybar --bar height=48 color="$BG0" topmost=on sticky=on position=top \
@@ -59,34 +66,34 @@ sketchybar --add item keys right \
 sep sep.r1 right
 
 sketchybar --add item clock right \
-  --set clock label.font="$BOLD" icon.drawing=off script="$P/clock.sh" update_freq=10
+  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off script="$P/clock.sh" update_freq=10
 
 sep sep.r2 right
 
 sketchybar --add item volume right \
-  --set volume icon="vol" icon.color="$YELLOW" script="$P/volume.sh" \
+  --set volume icon="vol" icon.color="$YELLOW" label.width=$W4 label.align=right script="$P/volume.sh" \
   --subscribe volume volume_change
 
 sep sep.r3 right
 
 sketchybar --add item wifi right \
-  --set wifi icon="wifi" icon.color="$BLUE" script="$P/wifi.sh" update_freq=60 \
+  --set wifi icon="wifi" icon.color="$BLUE" label.width=$W3 script="$P/wifi.sh" update_freq=60 \
   --subscribe wifi wifi_change
 
 sep sep.r4 right
 
 sketchybar --add item battery right \
-  --set battery icon="▮" icon.color="$GREEN" script="$P/battery.sh" update_freq=60 \
+  --set battery icon="▮" icon.color="$GREEN" label.width=$W13 script="$P/battery.sh" update_freq=60 \
   --subscribe battery power_source_change system_woke
 
 sep sep.r5 right
 
 sketchybar --add item net.up right \
-  --set net.up icon="↑" icon.color="$ORANGE" \
+  --set net.up icon="↑" icon.color="$ORANGE" label.width=$W9 label.align=right \
     click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
 
 sketchybar --add item net.down right \
-  --set net.down icon="↓" icon.color="$BLUE" script="$P/net.down.sh" update_freq=2 \
+  --set net.down icon="↓" icon.color="$BLUE" label.width=$W9 label.align=right script="$P/net.down.sh" update_freq=2 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
     popup.background.border_width=1 popup.background.border_color="$BG3" \
     click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
@@ -101,10 +108,10 @@ done
 sep sep.r6 right
 
 sketchybar --add item mem right \
-  --set mem icon="mem" icon.color="$AQUA"
+  --set mem icon="mem" icon.color="$AQUA" label.width=$W4 label.align=right
 
 sketchybar --add item cpu right \
-  --set cpu icon="cpu" icon.color="$AQUA" script="$P/cpu.sh" update_freq=4
+  --set cpu icon="cpu" icon.color="$AQUA" label.width=$W4 label.align=right script="$P/cpu.sh" update_freq=4
 
 # The floating bar: one bracket behind every item.
 sketchybar --add bracket bar grove '/sep\..*/' '/ws\..*/' front_app keys clock volume wifi battery net.up net.down mem cpu \

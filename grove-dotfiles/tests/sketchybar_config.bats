@@ -94,6 +94,19 @@ rc() {
   calls | grep -q -- '--set front_app .*icon=│'
 }
 
+@test "sketchybar: values have fixed widths, so the separators never move" {
+  rc
+  local pair item width
+  # JetBrains Mono 13 is 7.8 pt a character: each width fits the item's longest value.
+  for pair in cpu:32 mem:32 net.down:72 net.up:72 battery:102 wifi:24 volume:32 clock:134; do
+    item="${pair%%:*}"; width="${pair#*:}"
+    calls | grep -qE -- "--set $item .*label.width=$width( |\$)" || { echo "$item"; false; }
+  done
+  for item in cpu mem net.down net.up volume; do
+    calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
+  done
+}
+
 @test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar with one floating bracket" {
   grep -q -- '--bar height=48 color="\$BG0" topmost=on sticky=on' "$SB/sketchybarrc"
   grep -q -- '--add bracket bar ' "$SB/sketchybarrc"
