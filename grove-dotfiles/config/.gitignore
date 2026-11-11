@@ -16,6 +16,7 @@
 !/vscode/
 !/borders/
 !/aerospace/
+!/sketchybar/
 /aerospace/aerospace.toml
 !/grove-keys/
 !/starship.toml.tmpl
@@ -36,6 +37,7 @@
 /yazi/init.lua
 /vscode/settings.json
 /borders/bordersrc
+/sketchybar/colors.sh
 /zsh/conf.d/40-tools.zsh
 /zsh/conf.d/85-autosuggest.zsh
 /zsh/conf.d/95-fetch.zsh

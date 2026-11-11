@@ -1,0 +1,5 @@
+<dictionary> {
+  InterfaceType : WiFi
+  LinkStatusActive : FALSE
+  State : Inactive
+}
