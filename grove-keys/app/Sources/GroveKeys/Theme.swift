@@ -22,10 +22,91 @@ extension ThemeColors {
         "bg0": "#2D353B", "bg1": "#343F44", "bg2": "#3D484D", "bg3": "#475258",
         "fg": "#D3C6AA", "grey1": "#859289", "red": "#E67E80", "orange": "#E69875",
         "yellow": "#DBBC7F", "green": "#A7C080", "aqua": "#83C092", "blue": "#7FBBB3",
-        "purple": "#D699B6",
+        "purple": "#D699B6", "border": "#475258", "on_accent": "#2D353B", "dim": "#859289",
     ]))!
 
     var colorScheme: ColorScheme { isDark ? .dark : .light }
+}
+
+/// What the views draw with, so each names the job and not the scheme. The app
+/// was tuned in the dark schemes and looks there as it always did: the roles
+/// are the old colours in dark, and anything else changes in light only.
+/// (Grove Themes' Theme.swift has the same helpers; keep the two alike.)
+extension ThemeColors {
+    /// A line between things (a field's or pill's outline): `border`.
+    var line: Color { Color(border) }
+
+    /// Quiet text (labels, notes): `dim`.
+    var quiet: Color { Color(dim) }
+
+    /// Quiet text the dark schemes dim further, to `dark` opacity; full
+    /// strength in light (`quietOpacity`).
+    func quiet(dark opacity: Double) -> Color {
+        Color(dim).opacity(quietOpacity(dark: opacity))
+    }
+
+    /// Words set in an accent: the accent in dark, fg in light (`accentInk`).
+    func ink(_ accent: RGB) -> Color { Color(accentInk(accent)) }
+
+    /// A sentence in an accent colour (an error in red, a warning in orange).
+    /// Dark: as it was. Light: the accents are 1.9 to 3.3:1 as text, so a dot
+    /// carries the colour and the sentence is fg.
+    func marked(_ text: String, _ accent: RGB) -> Text {
+        guard isLight else { return Text(text).foregroundStyle(Color(accent)) }
+        return (Text("● ").foregroundStyle(Color(accent)) + Text(verbatim: text)).foregroundStyle(Color(fg))
+    }
+
+    /// A key cap's or the keyboard well's own outline: one background step
+    /// from its fill in dark (`dark`), which can't be seen in light: `border`.
+    func capLine(dark: RGB) -> Color {
+        isDark ? Color(dark) : Color(border)
+    }
+
+    /// A line in an accent (a bound cap's outline): faint in dark, where the
+    /// label carries the colour; whole in light, where the label is fg and
+    /// the line carries it.
+    func accentLine(_ accent: Color, dark opacity: Double) -> Color {
+        isDark ? accent.opacity(opacity) : accent
+    }
+
+    /// The cheat sheet's backdrop: the desktop dimmed with bg0 in dark; in
+    /// light bg0 would whiten it, so the dark ink (`onAccent`), thinner.
+    var scrim: Color {
+        isDark ? Color(bg0).opacity(0.6) : Color(onAccent).opacity(0.4)
+    }
+
+    /// The cheat sheet's shadow: bg0 in dark; the dark ink in light, where a
+    /// bg0 shadow can't be seen.
+    var cardShadow: Color {
+        isDark ? Color(bg0).opacity(0.5) : Color(onAccent).opacity(0.35)
+    }
+}
+
+extension View {
+    /// A panel one background step from what it sits on (bg1 on bg0, a bg0
+    /// well on bg1, a bg3 selection) is 1.06 to 1.2:1 in the light schemes:
+    /// there it gets an outline to read as a panel, `border` unless `accent`
+    /// is given (a warning banner). Nothing in dark, and nothing unless `shown`.
+    func lightOutline(cornerRadius: CGFloat, accent: RGB? = nil, when shown: Bool = true) -> some View {
+        modifier(LightOutline(cornerRadius: cornerRadius, accent: accent, shown: shown))
+    }
+}
+
+private struct LightOutline: ViewModifier {
+    let cornerRadius: CGFloat
+    let accent: RGB?
+    let shown: Bool
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if theme.isLight, shown {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(accent.map(Color.init) ?? theme.line, lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
 }
 
 /// The current scheme's colours, for the window and the cheat sheet.
@@ -68,7 +149,7 @@ extension ThemeColors {
         case "orange": return orange
         case "red": return red
         case "purple": return purple
-        case "grey1": return grey1
+        case "grey1": return dim
         default: return fg
         }
     }

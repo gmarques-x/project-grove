@@ -21,7 +21,8 @@ public struct Step: Decodable, Equatable, Sendable {
     }
 }
 
-/// One scheme's palette from `list --json`: `colors` maps bg0 … purple to `#RRGGBB`.
+/// One scheme's palette from `list --json`: `colors` maps bg0 … purple and the
+/// three roles (border, on_accent, dim) to `#RRGGBB`.
 public struct Palette: Decodable, Equatable, Sendable {
     public let name: String
     public let appearance: String

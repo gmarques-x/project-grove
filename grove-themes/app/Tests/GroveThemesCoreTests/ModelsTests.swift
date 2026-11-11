@@ -13,7 +13,8 @@ import Testing
         let palette = try #require(list.palettes["dark-medium"])
         #expect(palette.name == "Dark Medium")
         #expect(palette.appearance == "dark")
-        #expect(palette.colors.count == 13)
+        #expect(palette.colors.count == 16)
+        #expect(palette.colors["on_accent"] == "#2D353B")
         #expect(palette.colors["bg0"] == "#2D353B")
         #expect(list.palettes["light-soft"]?.appearance == "light")
     }

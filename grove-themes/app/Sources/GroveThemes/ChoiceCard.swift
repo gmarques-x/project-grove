@@ -76,19 +76,20 @@ struct ChoiceCard: View {
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .lightOutline(cornerRadius: 6)
                 HStack(alignment: .firstTextBaseline) {
                     Text(choiceName(name)).modifier(SchemeNameStyle())
                     Spacer(minLength: 4)
                     if isBusy {
                         ProgressView().controlSize(.small)
                     } else if isCurrent {
-                        Text("● on").font(GroveFont.mono(12)).foregroundStyle(Color(theme.green))
+                        OnMark()
                     }
                 }
             }
             .padding(10)
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : Color(theme.bg3),
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
                                    lineWidth: isCurrent ? 2 : 1)
             }
             .contentShape(shape)
@@ -116,14 +117,14 @@ struct ChoicePill: View {
                 if isBusy {
                     ProgressView().controlSize(.mini)
                 } else {
-                    Circle().fill(isCurrent ? Color(theme.green) : Color(theme.bg3)).frame(width: 7, height: 7)
+                    Circle().fill(isCurrent ? Color(theme.green) : theme.line).frame(width: 7, height: 7)
                 }
                 Text(choiceName(name)).font(GroveFont.mono(12))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(Color(theme.bg1), in: shape)
-            .overlay { shape.strokeBorder(isCurrent ? Color(theme.green) : Color(theme.bg3), lineWidth: 1) }
+            .overlay { shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1) }
             .contentShape(shape)
         }
         .buttonStyle(.plain)
@@ -142,6 +143,6 @@ struct ChoiceRowLabel: View {
         Text(title)
             .font(GroveFont.mono(10))
             .tracking(0.8)
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
     }
 }

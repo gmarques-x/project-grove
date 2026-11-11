@@ -142,7 +142,18 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].appearance')" = light ]
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].colors.bg0')" = "#F3EAD3" ]
   [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","fg","green","grey1","orange","purple","red","yellow"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","on_accent","orange","purple","red","yellow"]' ]
+}
+
+@test "list --json carries the three roles, each scheme's own pick" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  # Dark: the colours the apps always drew with (bg3, bg0, grey1).
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-medium"].colors | [.border, .on_accent, .dim]')" = '["#475258","#2D353B","#859289"]' ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("dark")) | .value.colors | (.border == .bg3 and .on_accent == .bg0 and .dim == .grey1)] | all')" = true ]
+  # Light: bg5, the dark sibling's bg0 as ink, grey2.
+  [ "$(printf '%s' "$output" | jq -c '.palettes["light-medium"].colors | [.border, .on_accent, .dim]')" = '["#BDC3AF","#2D353B","#829181"]' ]
+  [ "$(printf '%s' "$output" | jq -r '.palettes["light-hard"].colors.on_accent')" = "$(printf '%s' "$output" | jq -r '.palettes["dark-hard"].colors.bg0')" ]
 }
 
 @test "logo prints grove by default" {

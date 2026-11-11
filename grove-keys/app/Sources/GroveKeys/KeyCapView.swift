@@ -4,6 +4,8 @@ import SwiftUI
 
 /// One drawn key (mockup §1): its legend on top, what it does below, tinted by
 /// the binding's kind. Free keys are dim, modifier caps darker, held caps lit.
+/// In the light schemes the label is fg (the kinds' colours are 1.6 to 2.6:1
+/// as text on a tinted cap) and the cap's outline carries the colour, whole.
 struct KeyCapView: View {
     let legend: String
     let binding: KeyBinding?
@@ -15,7 +17,8 @@ struct KeyCapView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let tint = binding.map { Color(theme.named($0.missingApp ? "grey1" : $0.kind.tint)) }
+        let accent = binding.map { theme.named($0.missingApp ? "grey1" : $0.kind.tint) }
+        let tint = accent.map { Color($0) }
         let layout = compact
             ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
         layout {
@@ -25,10 +28,11 @@ struct KeyCapView: View {
                 .lineLimit(1)
                 .layoutPriority(1)
             Spacer(minLength: 0)
-            if let binding, let tint {
+            if let binding, let accent, let tint {
                 Text(binding.label)
                     .font(GroveFont.mono(compact ? 10 : 11.5, .semibold))
-                    .foregroundStyle(tint)
+                    // A missing app's label stays quiet in light too.
+                    .foregroundStyle(binding.missingApp ? tint : theme.ink(accent))
                     .strikethrough(binding.missingApp)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -60,7 +64,7 @@ struct KeyCapView: View {
 
     private var legendColor: Color {
         if held { return Color(theme.fg) }
-        return Color(theme.grey1).opacity(binding == nil ? 0.75 : 1)
+        return theme.quiet(dark: binding == nil ? 0.75 : 1)
     }
 
     private var baseColor: Color {
@@ -69,9 +73,9 @@ struct KeyCapView: View {
     }
 
     private func border(_ tint: Color?) -> Color {
-        if held { return Color(theme.grey1) }
-        if let tint { return tint.opacity(0.45) }
-        return Color(theme.bg2)
+        if held { return Color(theme.dim) }
+        if let tint { return theme.accentLine(tint, dark: 0.45) }
+        return theme.capLine(dark: theme.bg2)
     }
 
     private var help: String {

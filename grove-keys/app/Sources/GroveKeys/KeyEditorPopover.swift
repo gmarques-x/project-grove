@@ -71,12 +71,11 @@ struct KeyEditorPopover: View {
                 Spacer()
                 Text("\(layerTitle) layer · \(kind.wrappedValue == .launcher ? "launch" : "aerospace.\(mode)")")
                     .font(GroveFont.mono(11))
-                    .foregroundStyle(Color(theme.grey1))
+                    .foregroundStyle(theme.quiet)
             }
             segments
             if !model.canEdit {
-                Text(model.redLine ?? "keys.toml isn't loaded yet")
-                    .foregroundStyle(Color(theme.red))
+                theme.marked(model.redLine ?? "keys.toml isn't loaded yet", theme.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Group {
@@ -85,14 +84,13 @@ struct KeyEditorPopover: View {
                 case .aerospace: aerospace
                 case .none:
                     Text("\(Shortcut(aerospace: target.shortcut)?.symbols ?? target.shortcut) does nothing in this layer.")
-                        .foregroundStyle(Color(theme.grey1))
+                        .foregroundStyle(theme.quiet)
                 }
             }
             .disabled(!model.canEdit)
             if let replaced = replacedText {
-                Text(replaced)
+                theme.marked(replaced, theme.orange)
                     .font(GroveFont.mono(11))
-                    .foregroundStyle(Color(theme.orange))
                     .lineLimit(1)
             }
             HStack {
@@ -105,7 +103,7 @@ struct KeyEditorPopover: View {
                 Text("esc").foregroundColor(Color(theme.fg)) + Text(" close")
             }
             .font(GroveFont.mono(11))
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
             .lineLimit(1)
         }
         .padding(14)
@@ -126,6 +124,7 @@ struct KeyEditorPopover: View {
         }
         .padding(3)
         .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
+        .lightOutline(cornerRadius: 7)
     }
 
     private func segment(_ title: String, _ value: Kind, enabled: Bool) -> some View {
@@ -135,10 +134,11 @@ struct KeyEditorPopover: View {
             if value == .none { set(.none) }
         } label: {
             Text(title)
-                .foregroundStyle(Color(on ? theme.fg : theme.grey1))
+                .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
                 .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                .lightOutline(cornerRadius: 5, when: on)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -158,7 +158,7 @@ struct KeyEditorPopover: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 9).padding(.vertical, 7)
                 .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color(theme.bg3), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(theme.line, lineWidth: 1))
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(shown) { app in
@@ -169,7 +169,7 @@ struct KeyEditorPopover: View {
                     }
                     if shown.isEmpty {
                         Text(apps.wrappedValue.isEmpty ? "Looking for apps…" : "No app matches")
-                            .foregroundStyle(Color(theme.grey1))
+                            .foregroundStyle(theme.quiet)
                             .padding(.horizontal, 8).padding(.vertical, 5)
                     }
                 }
@@ -177,6 +177,7 @@ struct KeyEditorPopover: View {
             }
             .frame(height: 180)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
+            .lightOutline(cornerRadius: 7)
         }
         .task {
             // Once per popover: the list stays while switching segments.
@@ -193,9 +194,8 @@ struct KeyEditorPopover: View {
     private var aerospace: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !commandAllowed {
-                Text("Main-mode shortcuts need ⌃, ⌥ or ⌘")
+                theme.marked("Main-mode shortcuts need ⌃, ⌥ or ⌘", theme.orange)
                     .font(GroveFont.mono(11))
-                    .foregroundStyle(Color(theme.orange))
             }
             Group { commandList }.disabled(!commandAllowed)
         }
@@ -220,16 +220,17 @@ struct KeyEditorPopover: View {
             }
             .frame(height: 170)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
+            .lightOutline(cornerRadius: 7)
             HStack {
                 TextField("workspace 1", text: text.projectedValue)
                     .textFieldStyle(.plain)
                     .focused($fieldFocused)
                     .onSubmit { set(.aerospace(command: text.wrappedValue)) }
-                Text("AeroSpace syntax · ↩ saves").foregroundStyle(Color(theme.grey1)).font(GroveFont.mono(11))
+                Text("AeroSpace syntax · ↩ saves").foregroundStyle(theme.quiet).font(GroveFont.mono(11))
             }
             .padding(.horizontal, 9).padding(.vertical, 7)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color(theme.bg3), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(theme.line, lineWidth: 1))
         }
     }
 
@@ -240,10 +241,11 @@ struct KeyEditorPopover: View {
             HStack {
                 Text(title).lineLimit(1)
                 Spacer()
-                Text(detail).foregroundStyle(Color(theme.grey1)).lineLimit(1)
+                Text(detail).foregroundStyle(theme.quiet).lineLimit(1)
             }
             .padding(.horizontal, 8).padding(.vertical, 5)
             .background(on ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 5))
+            .lightOutline(cornerRadius: 5, when: on)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

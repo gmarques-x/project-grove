@@ -79,7 +79,7 @@ struct KeyboardView: View {
             Text("LAYER")
                 .font(GroveFont.mono(10.5))
                 .tracking(1)
-                .foregroundStyle(Color(theme.grey1))
+                .foregroundStyle(theme.quiet)
                 .padding(.trailing, 8)
             ForEach(layers) { layer in
                 let on = layer.id == current?.id
@@ -88,13 +88,14 @@ struct KeyboardView: View {
                     editing.wrappedValue = nil
                 } label: {
                     HStack(spacing: 5) {
-                        Text(layer.title).foregroundStyle(Color(on ? theme.fg : theme.grey1))
+                        Text(layer.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                         Text(String(layer.bindings.count))
                             .font(GroveFont.mono(10))
-                            .foregroundStyle(Color(theme.grey1).opacity(0.8))
+                            .foregroundStyle(theme.quiet(dark: 0.8))
                     }
                     .padding(.horizontal, 12).padding(.vertical, 5)
                     .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                    .lightOutline(cornerRadius: 6, when: on)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -145,7 +146,7 @@ struct KeyboardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("NOT ON THE KEYBOARD")
                         .font(GroveFont.mono(10.5)).tracking(1)
-                        .foregroundStyle(Color(theme.grey1))
+                        .foregroundStyle(theme.quiet)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8, alignment: .leading), count: 4),
                               alignment: .leading, spacing: 4) {
                         ForEach(rows, id: \.key) { binding in
@@ -164,16 +165,23 @@ struct KeyboardView: View {
         case .launcher: shortcut = KeyboardLayout.shortcut(layerID: layer.id, key: binding.key)
         }
         let target = EditTarget(layerID: layer.id, shortcut: shortcut)
+        let tint = theme.named(binding.kind.tint)
         return Button { editing.wrappedValue = target } label: {
             HStack(spacing: 8) {
                 Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
                     .font(GroveFont.mono(11.5))
                     .padding(.horizontal, 7).padding(.vertical, 3)
                     .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 5))
-                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(theme.bg3), lineWidth: 1))
-                Text(binding.label)
-                    .foregroundStyle(Color(theme.named(binding.kind.tint)))
-                    .lineLimit(1)
+                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(theme.line, lineWidth: 1))
+                // The kind's colour: on the label in dark; in light, where it
+                // can't be read as text, on a legend swatch before an fg label.
+                if theme.isLight {
+                    swatch(tint, binding.label).lineLimit(1)
+                } else {
+                    Text(binding.label)
+                        .foregroundStyle(Color(tint))
+                        .lineLimit(1)
+                }
             }
             .contentShape(Rectangle())
         }
@@ -192,15 +200,17 @@ struct KeyboardView: View {
             swatch(theme.blue, "launcher")
             swatch(theme.yellow, "layout · resize")
             swatch(theme.orange, "mode · service")
-            swatch(theme.bg2, "free")
+            swatch(theme.bg2, "free", outlined: true)
         }
         .font(GroveFont.mono(11))
-        .foregroundStyle(Color(theme.grey1))
+        .foregroundStyle(theme.quiet)
     }
 
-    private func swatch(_ color: RGB, _ text: String) -> some View {
+    /// `outlined`: a background colour's swatch, which needs its outline in light.
+    private func swatch(_ color: RGB, _ text: String, outlined: Bool = false) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(Color(color)).frame(width: 10, height: 10)
+                .lightOutline(cornerRadius: 3, when: outlined)
             Text(text)
         }
     }

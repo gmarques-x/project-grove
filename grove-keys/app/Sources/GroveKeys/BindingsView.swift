@@ -56,7 +56,7 @@ struct BindingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             if !model.canEdit, model.redLine == nil {
                 Text("keys.toml isn't loaded yet")
-                    .foregroundStyle(Color(theme.grey1))
+                    .foregroundStyle(theme.quiet)
                     .padding(.horizontal, 22)
             }
             ScrollView {
@@ -110,9 +110,9 @@ struct BindingsView: View {
                             HStack(spacing: 6) {
                                 Text(binding?.label ?? key)
                                     .strikethrough(missing)
-                                    .foregroundStyle(Color(missing ? theme.grey1 : theme.fg))
+                                    .foregroundStyle(missing ? theme.quiet : Color(theme.fg))
                                 if missing {
-                                    Text("not installed").font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1))
+                                    Text("not installed").font(GroveFont.mono(11)).foregroundStyle(theme.quiet)
                                 }
                             }
                             .lineLimit(1)
@@ -130,13 +130,13 @@ struct BindingsView: View {
                     RowView(shortcut: "record", recording: recorder.recording == row, recordable: true, conflict: nil,
                             onRecord: { record(row: row, from: nil, launcher: true, mode: "main") },
                             onRemove: { cancelDraft() }) {
-                        Text("choose an app").foregroundStyle(Color(theme.grey1))
+                        Text("choose an app").foregroundStyle(theme.quiet)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     clashLine(row)
                 }
             }
-            addButton("+ Add launcher", group: "launch")
+            addButton("Add launcher", group: "launch")
                 .popover(item: pickBinding("add:launch"), arrowEdge: .bottom) { popover($0) }
         }
     }
@@ -183,7 +183,7 @@ struct BindingsView: View {
                         if r.count > 1 {
                             HStack(spacing: 6) {
                                 Text(r.action).lineLimit(1)
-                                Text("\(r.count) rows").font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1))
+                                Text("\(r.count) rows").font(GroveFont.mono(11)).foregroundStyle(theme.quiet)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .help("Show all to change one of them; − removes all \(r.count)")
@@ -206,13 +206,13 @@ struct BindingsView: View {
                 } label: {
                     Text(open ? "Fold runs of 1…9" : "Show all \(bindings.count) · runs of 1…9 fold into one row")
                         .font(GroveFont.mono(11.5))
-                        .foregroundStyle(Color(theme.grey1))
+                        .foregroundStyle(theme.quiet)
                         .padding(.horizontal, 6).padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            addButton("+ Add binding", group: mode)
+            addButton("Add binding", group: mode)
         }
     }
 
@@ -313,9 +313,9 @@ struct BindingsView: View {
             draft.wrappedValue = Draft(group: group)
             record(row: row, from: nil, launcher: group == "launch", mode: group == "launch" ? "main" : group)
         } label: {
-            Text(title)
+            // "+ Add …": all green in dark; in light the + keeps the green.
+            (Text("+").foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
                 .font(GroveFont.mono(12))
-                .foregroundStyle(Color(theme.green))
                 .padding(.horizontal, 6).padding(.vertical, 4)
                 .contentShape(Rectangle())
         }
@@ -332,8 +332,7 @@ struct BindingsView: View {
         }
         if let c = clash.wrappedValue, c.row == row {
             HStack(spacing: 10) {
-                Text("\(describe(c.to)) already: " + c.clashes.map(action).joined(separator: "; "))
-                    .foregroundStyle(Color(theme.orange))
+                theme.marked("\(describe(c.to)) already: " + c.clashes.map(action).joined(separator: "; "), theme.orange)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 small("Replace", primary: true) { commit(from: c.from, to: c.to, replacing: c.clashes) }
@@ -367,9 +366,10 @@ struct BindingsView: View {
         Button(action: action) {
             Text(title)
                 .font(GroveFont.mono(11.5, .semibold))
-                .foregroundStyle(Color(primary ? theme.bg0 : theme.fg))
+                .foregroundStyle(Color(primary ? theme.onAccent : theme.fg))
                 .padding(.horizontal, 9).padding(.vertical, 3)
                 .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: 6))
+                .lightOutline(cornerRadius: 6, when: !primary)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -378,7 +378,7 @@ struct BindingsView: View {
     private func hint(_ text: String) -> some View {
         Text(text)
             .font(GroveFont.mono(11))
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6)
     }
@@ -397,15 +397,16 @@ struct BindingsGroup<Content: View>: View {
                 Text(title.uppercased())
                     .font(GroveFont.mono(11, .semibold))
                     .tracking(1.1)
-                    .foregroundStyle(Color(theme.grey1))
+                    .foregroundStyle(theme.quiet)
                 Spacer()
-                Text(note).font(GroveFont.mono(11)).foregroundStyle(Color(theme.grey1).opacity(0.8))
+                Text(note).font(GroveFont.mono(11)).foregroundStyle(theme.quiet(dark: 0.8))
             }
             content
         }
         .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 10))
+        .lightOutline(cornerRadius: 10)
     }
 }
 
@@ -444,7 +445,7 @@ private struct RowView<Action: View>: View {
                 Circle().fill(Color(theme.orange)).frame(width: 7, height: 7).help(conflict)
             }
             Button(action: onRemove) {
-                Text("−").foregroundStyle(Color(theme.grey1)).frame(width: 18).contentShape(Rectangle())
+                Text("−").foregroundStyle(theme.quiet).frame(width: 18).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Remove")

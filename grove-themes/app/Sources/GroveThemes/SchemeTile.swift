@@ -41,7 +41,7 @@ struct SchemeTile: View {
                 }
             }
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : Color(theme.fg).opacity(0.22),
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.softLine(dark: 0.22),
                                    lineWidth: isCurrent ? 2 : 1)
             }
             .contentShape(shape)

@@ -21,9 +21,8 @@ struct GalleryView: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
         VStack(alignment: .leading, spacing: 16) {
             if let error = model.error {
-                Text(error.message)
+                theme.marked(error.message, theme.red)
                     .font(GroveFont.mono(12))
-                    .foregroundStyle(Color(theme.red))
                     .fixedSize(horizontal: false, vertical: true)
             }
             LazyVGrid(columns: columns, spacing: 12) {

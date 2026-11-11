@@ -70,12 +70,12 @@ struct RecorderPill: View {
         Button(action: action) {
             Text(recording ? "press keys…" : text)
                 .font(GroveFont.mono(11.5))
-                .foregroundStyle(Color(recording ? theme.green : theme.fg))
+                .foregroundStyle(recording ? theme.ink(theme.green) : Color(theme.fg))
                 .lineLimit(1)
                 .padding(.horizontal, 7).padding(.vertical, 3)
                 .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(Color(recording ? theme.green : theme.bg3), lineWidth: 1))
+                    .strokeBorder(recording ? Color(theme.green) : theme.line, lineWidth: 1))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

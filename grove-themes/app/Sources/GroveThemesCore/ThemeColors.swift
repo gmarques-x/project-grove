@@ -21,8 +21,18 @@ public struct RGB: Equatable, Sendable {
 /// A scheme's palette as colours; nil unless all thirteen are there and readable.
 public struct ThemeColors: Equatable, Sendable {
     public let bg0, bg1, bg2, bg3, fg, grey1, red, orange, yellow, green, aqua, blue, purple: RGB
+    /// The roles: what a colour is for, each scheme's own pick (grove-dotfiles'
+    /// theme files). `border`: lines between things. `onAccent`: text on an
+    /// accent-coloured fill. `dim`: quiet text (labels, notes). In the dark
+    /// schemes they are bg3, bg0 and grey1, and a CLI older than the roles
+    /// sends none of them: those three stand in, so nothing changes until the
+    /// CLI catches up.
+    public let border, onAccent, dim: RGB
     /// The palette's `appearance` is "dark".
     public let isDark: Bool
+    /// Not dark. The apps were tuned in the dark schemes: what only a pale
+    /// background needs is asked for here.
+    public var isLight: Bool { !isDark }
 
     public init?(palette: Palette) {
         func color(_ key: String) -> RGB? { palette.colors[key].flatMap(RGB.init(hex:)) }
@@ -36,6 +46,24 @@ public struct ThemeColors: Equatable, Sendable {
         self.fg = fg; self.grey1 = grey1
         self.red = red; self.orange = orange; self.yellow = yellow; self.green = green
         self.aqua = aqua; self.blue = blue; self.purple = purple
+        border = color("border") ?? bg3
+        onAccent = color("on_accent") ?? bg0
+        dim = color("dim") ?? grey1
         isDark = palette.appearance == "dark"
+    }
+
+    /// Quiet text's opacity. Some of it is dimmed further in the dark schemes
+    /// (`dark`); the light ones' `dim` is 2.8 to 3.2:1 on bg0 at full strength
+    /// and has nothing to spare, so there it is always 1.
+    public func quietOpacity(dark: Double) -> Double {
+        isDark ? dark : 1
+    }
+
+    /// The colour for words set in an accent ("on", an error, a key's label).
+    /// The dark schemes' accents read as text (4.5:1 and more on bg0); the light
+    /// ones' are 1.9 to 3.3:1, so there the words are fg and the colour stays on
+    /// the mark beside them (a dot, a border, a tinted cap).
+    public func accentInk(_ accent: RGB) -> RGB {
+        isDark ? accent : fg
     }
 }

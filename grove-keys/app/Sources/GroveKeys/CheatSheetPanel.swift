@@ -74,7 +74,7 @@ struct CheatSheetView: View {
         let theme = model.colors
         let layer = model.layers.first { $0.id == "hyper" } ?? Layer(id: "hyper", title: "Hyper")
         ZStack {
-            Color(theme.bg0).opacity(0.6)
+            theme.scrim
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Hyper")
@@ -83,7 +83,7 @@ struct CheatSheetView: View {
                     Spacer()
                     Text(untilInput ? "⌃⌥⇧⌘ · press any key to close" : "⌃⌥⇧⌘ · release Caps Lock to close")
                         .font(GroveFont.mono(12))
-                        .foregroundStyle(Color(theme.grey1))
+                        .foregroundStyle(theme.quiet)
                 }
                 KeyboardGrid(layer: layer, width: Self.cardWidth - 32, capHeight: 46) { _, name, legend, width, height in
                     KeyCapView(legend: legend, binding: layer.bindings[name], isModifier: false, held: false,
@@ -93,8 +93,8 @@ struct CheatSheetView: View {
             .padding(16)
             .frame(width: Self.cardWidth)
             .background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(theme.bg3), lineWidth: 1))
-            .shadow(color: Color(theme.bg0).opacity(0.5), radius: 30, y: 15)
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(theme.line, lineWidth: 1))
+            .shadow(color: theme.cardShadow, radius: 30, y: 15)
         }
         .font(GroveFont.mono(12))
         .environment(\.theme, theme)

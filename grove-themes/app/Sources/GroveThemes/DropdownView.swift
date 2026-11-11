@@ -53,7 +53,7 @@ struct DropdownView: View {
             }
             .padding(.top, 8)
             .overlay(alignment: .top) {
-                Rectangle().fill(Color(theme.fg).opacity(0.18)).frame(height: 1)
+                Rectangle().fill(theme.softLine(dark: 0.18)).frame(height: 1)
             }
         }
         .padding(14)
@@ -104,7 +104,7 @@ struct DropdownView: View {
             Text(label)
                 .font(GroveFont.mono(10))
                 .tracking(0.8)
-                .foregroundStyle(Color(theme.grey1))
+                .foregroundStyle(theme.quiet)
             HStack(spacing: 8) {
                 ForEach(schemes, id: \.self) { scheme in
                     if let colors = model.colors(for: scheme) {

@@ -24,13 +24,13 @@ struct SchemeCard: View {
                     if isBusy {
                         ProgressView().controlSize(.small)
                     } else if isCurrent {
-                        Text("● on").font(GroveFont.mono(12)).foregroundStyle(Color(theme.green))
+                        OnMark()
                     }
                 }
             }
             .padding(10)
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : Color(theme.bg3),
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
                                    lineWidth: isCurrent ? 2 : 1)
             }
             .contentShape(shape)

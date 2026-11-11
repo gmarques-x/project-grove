@@ -66,11 +66,13 @@ _gt_unknown() {
 }
 
 # _gt_palette_json SCHEME: {"name": ..., "appearance": ..., "colors": {...}}
+# The colours the apps draw with: the backgrounds, fg, grey1, the seven
+# accents, then the three roles (border, on_accent, dim).
 _gt_palette_json() {
   local s="$1" tab name val colors="" sep="" app="" vals c title
   tab="$(printf '\t')"
   vals="$(gt_values "$s" "$GROVE_ROOT/theme")" || return 1
-  for c in bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple; do
+  for c in bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple border on_accent dim; do
     val="$(printf '%s\n' "$vals" | while IFS="$tab" read -r name val; do
       [ "$name" = "$c" ] && { printf '%s' "$val"; break; }
     done)"

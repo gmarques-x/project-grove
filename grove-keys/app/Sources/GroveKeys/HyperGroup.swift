@@ -63,7 +63,7 @@ struct HyperGroup: View {
             .foregroundStyle(Color(theme.fg))
             .padding(.horizontal, 9).padding(.vertical, 3)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(theme.bg3), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(theme.line, lineWidth: 1))
     }
 }
 
@@ -91,12 +91,12 @@ private struct MsField: View {
                 .frame(width: 44)
                 .focused($focused)
                 .onSubmit(commit)
-            Text("ms").foregroundStyle(Color(theme.grey1))
+            Text("ms").foregroundStyle(theme.quiet)
         }
         .font(GroveFont.mono(11.5))
         .padding(.horizontal, 9).padding(.vertical, 3)
         .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color(valid ? theme.bg3 : theme.red), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(valid ? theme.line : Color(theme.red), lineWidth: 1))
         .help(valid ? "Milliseconds · ↩ saves" : "A whole number of milliseconds, 0 or more")
         .onChange(of: focused) { _, now in if !now { commit() } }
     }

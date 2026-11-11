@@ -25,7 +25,7 @@ struct MonitorsView: View {
                 Text(connected)
             }
             .font(GroveFont.mono(11.5))
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
             .padding(.horizontal, 6)
             if saved.isEmpty { note("Not set for this Mac yet") }
             HStack(spacing: 6) {
@@ -58,15 +58,16 @@ struct MonitorsView: View {
             }
         } label: {
             VStack(spacing: 3) {
-                Text(String(n)).font(GroveFont.mono(13, .semibold)).foregroundStyle(Color(theme.green))
+                Text(String(n)).font(GroveFont.mono(13, .semibold)).foregroundStyle(theme.ink(theme.green))
                 Text((target ?? "main") + " ▾")
                     .font(GroveFont.mono(10))
-                    .foregroundStyle(Color(theme.grey1))
+                    .foregroundStyle(theme.quiet)
                     .lineLimit(1).truncationMode(.middle)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6).padding(.horizontal, 2)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 6))
+            .lightOutline(cornerRadius: 6)
             .contentShape(Rectangle())
         }
         .menuStyle(.button)
@@ -78,7 +79,7 @@ struct MonitorsView: View {
     private func note(_ text: String) -> some View {
         Text(text)
             .font(GroveFont.mono(11.5))
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 6).padding(.vertical, 2)
     }

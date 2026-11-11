@@ -28,12 +28,14 @@ struct WindowView: View {
             header(theme)
             VStack(alignment: .leading, spacing: 10) {
                 if let line = model.redLine {
+                    // In light the sentence is fg and the outline carries the red.
                     Text(line)
-                        .foregroundStyle(Color(theme.red))
+                        .foregroundStyle(theme.ink(theme.red))
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12).padding(.vertical, 7)
                         .background(Color(theme.red).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                        .lightOutline(cornerRadius: 8, accent: theme.red)
                 }
                 if !model.permissions.granted {
                     PermissionBanner(permissions: model.permissions)
@@ -67,9 +69,10 @@ struct WindowView: View {
                     let on = tab.wrappedValue == t
                     Button { tab.wrappedValue = t } label: {
                         Text(t.rawValue)
-                            .foregroundStyle(Color(on ? theme.fg : theme.grey1))
+                            .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                            .lightOutline(cornerRadius: 6, when: on)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -78,6 +81,7 @@ struct WindowView: View {
             }
             .padding(3)
             .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 8))
+            .lightOutline(cornerRadius: 8)
             .padding(.leading, 22)
             Spacer()
             HStack(spacing: 8) {
@@ -85,7 +89,7 @@ struct WindowView: View {
                 Text(status)
             }
             .font(GroveFont.mono(11.5))
-            .foregroundStyle(Color(theme.grey1))
+            .foregroundStyle(theme.quiet)
         }
         .padding(.leading, Self.buttonsClearance)
         .padding(.trailing, 14)
@@ -100,7 +104,7 @@ struct WindowView: View {
 
     private func statusDot(_ theme: ThemeColors) -> RGB {
         if model.mapping { return theme.green }
-        return model.needsAttention ? theme.orange : theme.grey1
+        return model.needsAttention ? theme.orange : theme.dim
     }
 }
 
@@ -124,15 +128,16 @@ private struct PermissionBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(Color(theme.yellow).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+        .lightOutline(cornerRadius: 8, accent: theme.orange)
     }
 
     private func line(_ text: String, _ url: URL) -> some View {
         HStack(spacing: 12) {
-            Text(text).foregroundStyle(Color(theme.orange)).fontWeight(.semibold)
+            Text(text).foregroundStyle(theme.ink(theme.orange)).fontWeight(.semibold)
             Button { NSWorkspace.shared.open(url) } label: {
                 Text("Open Settings")
                     .font(GroveFont.mono(11.5, .semibold))
-                    .foregroundStyle(Color(theme.bg0))
+                    .foregroundStyle(Color(theme.onAccent))
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .background(Color(theme.orange), in: RoundedRectangle(cornerRadius: 6))
             }
