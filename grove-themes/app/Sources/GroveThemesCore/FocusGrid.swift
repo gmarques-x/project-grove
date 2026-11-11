@@ -1,11 +1,13 @@
 /// Where the keyboard focus box can go, and how arrows and Ctrl+h/j/k/l move
 /// it. The tiles (dropdown) and cards (gallery) are 2 rows × 3: Dark on top,
-/// Light below, Hard / Medium / Soft left to right. The dropdown continues
-/// below the tiles with "Open Grove Themes…" then "Quit", one column. Moves
-/// off an edge stay put (no wrap).
+/// Light below, Hard / Medium / Soft left to right. Both continue below with
+/// the "Terminal logo" row (Project Grove under the left two columns, Avatar
+/// under the right one); the dropdown then has "Open Grove Themes…" and
+/// "Quit", one column. Moves off an edge stay put (no wrap).
 public struct FocusGrid: Equatable, Sendable {
     public enum Item: Equatable, Sendable {
         case scheme(String)
+        case logo(String)
         case openWindow
         case quit
     }
@@ -21,11 +23,14 @@ public struct FocusGrid: Equatable, Sendable {
 
     static let rows = ["dark", "light"]
     static let columns = ["hard", "medium", "soft"]
+    static let logos = SchemeList.defaultLogos
 
     public let layout: Layout
     public private(set) var focused: Item
-    /// The tile column last focused, for coming back up from the menu rows.
+    /// The tile column last focused, for coming back up from the logo row.
     private var column = 1
+    /// The logo last focused, for coming back up from the menu rows.
+    private var logo = 0
 
     /// Starts on `current`'s tile, or the middle of the top row for a name
     /// that isn't one of the six.
@@ -50,16 +55,30 @@ public struct FocusGrid: Equatable, Sendable {
             case .up: newRow = max(row - 1, 0)
             case .down:
                 if row == Self.rows.count - 1 {
-                    if layout == .dropdown { focused = .openWindow }
+                    self.column = column
+                    logo = column == Self.columns.count - 1 ? 1 : 0
+                    focused = .logo(Self.logos[logo])
                     return
                 }
                 newRow = row + 1
             }
             self.column = newColumn
             focused = .scheme(Self.scheme(row: newRow, column: newColumn))
+        case .logo:
+            switch direction {
+            case .left: logo = 0
+            case .right: logo = Self.logos.count - 1
+            case .up:
+                focused = .scheme(Self.scheme(row: Self.rows.count - 1, column: column))
+                return
+            case .down:
+                if layout == .dropdown { focused = .openWindow }
+                return
+            }
+            focused = .logo(Self.logos[logo])
         case .openWindow:
             switch direction {
-            case .up: focused = .scheme(Self.scheme(row: Self.rows.count - 1, column: column))
+            case .up: focused = .logo(Self.logos[logo])
             case .down: focused = .quit
             case .left, .right: break
             }
@@ -149,8 +168,8 @@ public struct KeyboardFocus: Equatable, Sendable {
     /// Where the box is drawn; nil while it's hidden.
     public var focused: FocusGrid.Item? { grid?.focused }
 
-    /// `schemesDisabled`: tiles and cards take no clicks (a switch is running,
-    /// or the CLI is in trouble), so they take no Return/Space either.
+    /// `schemesDisabled`: tiles, cards and logos take no clicks (a switch is
+    /// running, or the CLI is in trouble), so they take no Return/Space either.
     public mutating func handle(_ command: FocusKey.Command, current: String,
                                 schemesDisabled: Bool) -> Outcome {
         switch command {
@@ -163,7 +182,10 @@ public struct KeyboardFocus: Equatable, Sendable {
             return .handled
         case .activate:
             guard let item = grid?.focused else { return .handled }
-            if case .scheme = item, schemesDisabled { return .handled }
+            switch item {
+            case .scheme, .logo: if schemesDisabled { return .handled }
+            case .openWindow, .quit: break
+            }
             return .activate(item)
         case .escape:
             if grid != nil {

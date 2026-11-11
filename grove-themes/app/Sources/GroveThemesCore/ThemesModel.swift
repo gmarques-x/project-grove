@@ -13,7 +13,10 @@ public final class ThemesModel {
     /// log a switch whose configs step failed, so this is the only record of one.
     public private(set) var lastSwitch: LogEntry?
 
-    public var isBusy: Bool { busyScheme != nil }
+    /// The logo being switched to; set while `logo` runs.
+    public var busyLogo: String?
+
+    public var isBusy: Bool { busyScheme != nil || busyLogo != nil }
 
     /// The switches to show, newest first: the log, led by the last switch made
     /// here when the CLI didn't log it and nothing was logged after it.
@@ -72,6 +75,22 @@ public final class ThemesModel {
         do {
             let (result, exit) = try await client.set(scheme)
             lastSwitch = LogEntry(time: now(), scheme: result.scheme, exit: Int(exit), steps: result.steps)
+        } catch {
+            failure = Self.cliError(error)
+        }
+        await refresh()
+        if let failure { error = failure }
+    }
+
+    /// Switches the terminal logo, then refreshes. Ignored while a switch runs.
+    /// A failure shows in `error`, as for a scheme switch.
+    public func pickLogo(_ logo: String) async {
+        guard !isBusy else { return }
+        busyLogo = logo
+        defer { busyLogo = nil }
+        var failure: CLIError?
+        do {
+            _ = try await client.setLogo(logo)
         } catch {
             failure = Self.cliError(error)
         }

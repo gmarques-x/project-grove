@@ -263,3 +263,25 @@ actor SleepGate {
         #expect(model.error == nil)
     }
 }
+
+@Suite @MainActor struct ThemesModelLogoTests {
+    @Test func pickLogoRunsTheCLIThenRefreshes() async throws {
+        var answers = try fixtureAnswers()
+        answers["logo"] = .ok(Data(#"{"logo": "avatar"}"#.utf8))
+        let runner = FakeRunner(answers: answers)
+        let model = ThemesModel(client: GroveThemesClient(runner: runner))
+        await model.pickLogo("avatar")
+        #expect(await runner.calls.first == ["logo", "avatar", "--json"])
+        #expect(await runner.count("list") == 1)
+        #expect(model.error == nil)
+        #expect(model.busyLogo == nil)
+    }
+
+    @Test func pickLogoShowsAFailureLikeASwitch() async throws {
+        var answers = try fixtureAnswers()
+        answers["logo"] = CLIOutput(status: 2, stdout: Data(), stderr: "usage: grove-themes")
+        let model = ThemesModel(client: GroveThemesClient(runner: FakeRunner(answers: answers)))
+        await model.pickLogo("banana")
+        #expect(model.error == .usage("usage: grove-themes"))
+    }
+}

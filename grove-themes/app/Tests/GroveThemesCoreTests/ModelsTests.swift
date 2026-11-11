@@ -18,6 +18,20 @@ import Testing
         #expect(list.palettes["light-soft"]?.appearance == "light")
     }
 
+    @Test func decodesTheLogoFields() throws {
+        let json = #"{"current": "dark-medium", "schemes": [], "palettes": {}, "logo": "avatar", "logos": ["grove", "avatar"]}"#
+        let list = try decoder.decode(SchemeList.self, from: Data(json.utf8))
+        #expect(list.logo == "avatar")
+        #expect(list.logos == ["grove", "avatar"])
+    }
+
+    @Test func aListWithoutLogoFieldsDefaultsThem() throws {
+        let json = #"{"current": "dark-medium", "schemes": [], "palettes": {}}"#
+        let list = try decoder.decode(SchemeList.self, from: Data(json.utf8))
+        #expect(list.logo == "grove")
+        #expect(list.logos == ["grove", "avatar"])
+    }
+
     @Test func decodesSet() throws {
         let result = try decoder.decode(SwitchResult.self, from: Fixture.data("set.json"))
         #expect(result.scheme == "dark-medium")

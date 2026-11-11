@@ -21,6 +21,13 @@ import Testing
         #expect(await runner.calls == [["set", "light-soft", "--json"]])
     }
 
+    @Test func setLogoRunsLogoWithJSON() async throws {
+        let runner = FakeRunner(answers: ["logo": .ok(Data(#"{"logo": "avatar"}"#.utf8))])
+        let client = GroveThemesClient(runner: runner)
+        #expect(try await client.setLogo("avatar") == "avatar")
+        #expect(await runner.calls == [["logo", "avatar", "--json"]])
+    }
+
     @Test func logAsksForTheLimit() async throws {
         let runner = FakeRunner(answers: try fixtureAnswers())
         let entries = try await GroveThemesClient(runner: runner).log(limit: 5)

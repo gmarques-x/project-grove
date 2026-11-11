@@ -17,6 +17,24 @@ struct DropdownView: View {
                 row("DARK", model.schemes(dark: true), theme)
                 row("LIGHT", model.schemes(dark: false), theme)
             }
+            if let list = model.list {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("TERMINAL LOGO")
+                        .font(GroveFont.mono(10))
+                        .tracking(0.8)
+                        .foregroundStyle(Color(theme.grey1))
+                    HStack(spacing: 8) {
+                        ForEach(list.logos, id: \.self) { logo in
+                            LogoPill(logo: logo, isCurrent: logo == list.logo,
+                                     isBusy: model.busyLogo == logo,
+                                     isFocused: focus.wrappedValue.focused == .logo(logo)) {
+                                run(.logo(logo))
+                            }
+                            .disabled(model.switchingDisabled)
+                        }
+                    }
+                }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 MenuRow(title: "Open Grove Themes…", isFocused: focus.wrappedValue.focused == .openWindow) {
                     run(.openWindow)
@@ -45,6 +63,8 @@ struct DropdownView: View {
         switch item {
         case .scheme(let scheme):
             Task { await model.switchTo(scheme) }
+        case .logo(let logo):
+            Task { await model.pickLogo(logo) }
         case .openWindow:
             openWindow(id: "gallery")
             NSApp.activate()

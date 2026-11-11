@@ -45,35 +45,50 @@ import Testing
         #expect(after([.left, .left, .left], from: "light-soft", layout: layout) == .scheme("light-hard"))
     }
 
-    @Test func galleryHasNoMenuRows() {
-        for scheme in ["light-hard", "light-medium", "light-soft"] {
-            #expect(after([.down], from: scheme, layout: .gallery) == .scheme(scheme))
-            #expect(after([.down, .down, .down], from: scheme, layout: .gallery) == .scheme(scheme))
-        }
+    /// Below the light row: the "Terminal logo" row, Project Grove under the
+    /// left two columns, Avatar under the right one.
+    @Test(arguments: [FocusGrid.Layout.dropdown, .gallery])
+    func downFromTheBottomRowReachesTheLogoRow(_ layout: FocusGrid.Layout) {
+        #expect(after([.down], from: "light-hard", layout: layout) == .logo("grove"))
+        #expect(after([.down], from: "light-medium", layout: layout) == .logo("grove"))
+        #expect(after([.down], from: "light-soft", layout: layout) == .logo("avatar"))
+        #expect(after([.down, .right], from: "light-hard", layout: layout) == .logo("avatar"))
+        #expect(after([.down, .left], from: "light-soft", layout: layout) == .logo("grove"))
+        #expect(after([.down, .left, .left], from: "light-soft", layout: layout) == .logo("grove"))
+        #expect(after([.down, .right, .right], from: "light-hard", layout: layout) == .logo("avatar"))
     }
 
-    @Test func dropdownGoesDownFromTheBottomRowToOpenThenQuit() {
+    @Test(arguments: [FocusGrid.Layout.dropdown, .gallery])
+    func upFromTheLogoRowReturnsToTheColumnLastUsed(_ layout: FocusGrid.Layout) {
+        #expect(after([.down, .up], from: "light-soft", layout: layout) == .scheme("light-soft"))
+        #expect(after([.down, .up], from: "light-medium", layout: layout) == .scheme("light-medium"))
+    }
+
+    @Test func galleryStopsAtTheLogoRow() {
+        #expect(after([.down, .down], from: "light-hard", layout: .gallery) == .logo("grove"))
+        #expect(after([.down, .down, .down, .down], from: "dark-soft", layout: .gallery) == .logo("avatar"))
+    }
+
+    @Test func dropdownGoesDownFromTheLogoRowToOpenThenQuit() {
         for scheme in ["light-hard", "light-medium", "light-soft"] {
-            #expect(after([.down], from: scheme) == .openWindow)
-            #expect(after([.down, .down], from: scheme) == .quit)
+            #expect(after([.down, .down], from: scheme) == .openWindow)
             #expect(after([.down, .down, .down], from: scheme) == .quit)
+            #expect(after([.down, .down, .down, .down], from: scheme) == .quit)
         }
-        #expect(after([.down, .down], from: "dark-hard") == .openWindow)
+        #expect(after([.down, .down, .down], from: "dark-hard") == .openWindow)
     }
 
     @Test func menuRowsAreOneColumn() {
-        #expect(after([.down, .left], from: "light-hard") == .openWindow)
-        #expect(after([.down, .right], from: "light-soft") == .openWindow)
-        #expect(after([.down, .down, .left], from: "light-hard") == .quit)
-        #expect(after([.down, .down, .right], from: "light-soft") == .quit)
-        #expect(after([.down, .down, .up], from: "light-medium") == .openWindow)
+        #expect(after([.down, .down, .left], from: "light-hard") == .openWindow)
+        #expect(after([.down, .down, .right], from: "light-soft") == .openWindow)
+        #expect(after([.down, .down, .down, .left], from: "light-hard") == .quit)
+        #expect(after([.down, .down, .down, .up], from: "light-medium") == .openWindow)
     }
 
-    @Test func upFromOpenReturnsToTheColumnLastUsed() {
-        #expect(after([.down, .up], from: "light-hard") == .scheme("light-hard"))
-        #expect(after([.down, .up], from: "light-soft") == .scheme("light-soft"))
+    @Test func upFromOpenReturnsToTheLogoLastUsed() {
+        #expect(after([.down, .down, .up], from: "light-hard") == .logo("grove"))
+        #expect(after([.down, .down, .up], from: "light-soft") == .logo("avatar"))
         #expect(after([.down, .down, .up, .up], from: "light-soft") == .scheme("light-soft"))
-        #expect(after([.left, .down, .down, .up], from: "dark-soft") == .scheme("light-medium"))
     }
 }
 
@@ -128,10 +143,20 @@ import Testing
         #expect(focus.handle(.activate, current: "dark-hard", schemesDisabled: false) == .activate(.scheme("dark-hard")))
         _ = focus.handle(.move(.down), current: "dark-hard", schemesDisabled: false)
         _ = focus.handle(.move(.down), current: "dark-hard", schemesDisabled: false)
+        _ = focus.handle(.move(.down), current: "dark-hard", schemesDisabled: false)
         #expect(focus.focused == .openWindow)
         #expect(focus.handle(.activate, current: "dark-hard", schemesDisabled: true) == .activate(.openWindow))
         _ = focus.handle(.move(.down), current: "dark-hard", schemesDisabled: false)
         #expect(focus.handle(.activate, current: "dark-hard", schemesDisabled: false) == .activate(.quit))
+    }
+
+    @Test func aLogoIsActivatedLikeAScheme() {
+        var focus = KeyboardFocus(layout: .gallery)
+        _ = focus.handle(.move(.down), current: "light-soft", schemesDisabled: false)
+        _ = focus.handle(.move(.down), current: "light-soft", schemesDisabled: false)
+        #expect(focus.focused == .logo("avatar"))
+        #expect(focus.handle(.activate, current: "light-soft", schemesDisabled: false) == .activate(.logo("avatar")))
+        #expect(focus.handle(.activate, current: "light-soft", schemesDisabled: true) == .handled)
     }
 
     @Test func aSchemeIsNotActivatedWhileSwitchingIsDisabled() {

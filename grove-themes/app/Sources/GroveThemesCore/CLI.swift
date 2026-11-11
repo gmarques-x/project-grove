@@ -118,6 +118,13 @@ public struct GroveThemesClient: Sendable {
         return (try decode(SwitchResult.self, output), exit: output.status)
     }
 
+    /// Switches the terminal logo; returns the logo the CLI saved.
+    public func setLogo(_ name: String) async throws -> String {
+        let output = try await call(["logo", name, "--json"])
+        guard output.status == 0 else { throw CLIError.unreadable(Self.firstLine(output)) }
+        return try decode(LogoAnswer.self, output).logo
+    }
+
     /// Newest first. An entry that doesn't decode is dropped; the rest are kept.
     public func log(limit: Int) async throws -> [LogEntry] {
         let output = try await call(["log", "-n", String(limit), "--json"])
@@ -157,6 +164,10 @@ public struct GroveThemesClient: Sendable {
         }
         return ""
     }
+}
+
+private struct LogoAnswer: Decodable {
+    let logo: String
 }
 
 private struct LogPage: Decodable {

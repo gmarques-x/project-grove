@@ -39,11 +39,31 @@ public struct SchemeList: Decodable, Equatable, Sendable {
     public let current: String
     public let schemes: [String]
     public let palettes: [String: Palette]
+    /// The terminal logo (`grove` or `avatar`) and the choices, in menu order.
+    /// A CLI older than the logo command sends neither: grove and both logos.
+    public let logo: String
+    public let logos: [String]
 
-    public init(current: String, schemes: [String], palettes: [String: Palette]) {
+    public static let defaultLogos = ["grove", "avatar"]
+
+    public init(current: String, schemes: [String], palettes: [String: Palette],
+                logo: String = "grove", logos: [String] = SchemeList.defaultLogos) {
         self.current = current
         self.schemes = schemes
         self.palettes = palettes
+        self.logo = logo
+        self.logos = logos
+    }
+
+    private enum CodingKeys: String, CodingKey { case current, schemes, palettes, logo, logos }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        current = try c.decode(String.self, forKey: .current)
+        schemes = try c.decode([String].self, forKey: .schemes)
+        palettes = try c.decode([String: Palette].self, forKey: .palettes)
+        logo = try c.decodeIfPresent(String.self, forKey: .logo) ?? "grove"
+        logos = try c.decodeIfPresent([String].self, forKey: .logos) ?? Self.defaultLogos
     }
 }
 
