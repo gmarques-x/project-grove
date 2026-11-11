@@ -82,7 +82,7 @@ struct WindowView: View {
             Spacer()
             HStack(spacing: 8) {
                 Circle().fill(Color(statusDot(theme))).frame(width: 7, height: 7)
-                Text(model.host.isEmpty ? status : "\(status) · \(model.host)")
+                Text(status)
             }
             .font(GroveFont.mono(11.5))
             .foregroundStyle(Color(theme.grey1))

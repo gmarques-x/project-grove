@@ -36,8 +36,8 @@ extension TomlDocument {
         isBare(key, allowHyphen: true) && !key.allSatisfy(\.isNumber) ? key : quoted(key)
     }
 
-    /// Names after the first (a mode, a host name) are quoted when they hold
-    /// anything but letters, digits and underscores, as in `[monitors."Mac-Air"]`.
+    /// Names after the first (a mode) are quoted when they hold anything but
+    /// letters, digits and underscores, as in `[aerospace."my-mode"]`.
     static func headerPart(_ part: String, first: Bool) -> String {
         isBare(part, allowHyphen: first) ? part : quoted(part)
     }

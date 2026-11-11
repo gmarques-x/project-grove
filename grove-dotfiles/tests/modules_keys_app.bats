@@ -631,13 +631,13 @@ ka_ready() {
   grep -q '^| `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |$' "$GROVE_ROOT/README.md"
 }
 
-# ka_defaults FILE: keys.toml without the entries of [launch] and the
-# [monitors."…"] sections, which hold the user's own launchers and screens.
+# ka_defaults FILE: keys.toml without the entries of [launch], which holds
+# the user's own launchers. (Monitors are in monitors.toml, untracked.)
 ka_defaults() {
-  awk '/^\[/ { own = ($0 ~ /^\[launch\]/ || $0 ~ /^\[monitors\./); print; next } !own' "$1"
+  awk '/^\[/ { own = ($0 ~ /^\[launch\]/); print; next } !own' "$1"
 }
 
-@test "keys-app: the shipped keys.toml is the app's test fixture, apart from the user's launchers and screens" {
+@test "keys-app: the shipped keys.toml is the app's test fixture, apart from the user's launchers" {
   diff <(ka_defaults "$GROVE_ROOT/config/grove-keys/keys.toml") \
     <(ka_defaults "$GROVE_ROOT/../grove-keys/app/Tests/GroveKeysCoreTests/Fixtures/keys.toml")
 }

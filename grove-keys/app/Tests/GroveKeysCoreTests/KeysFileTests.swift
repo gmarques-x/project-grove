@@ -15,7 +15,7 @@ import Testing
         #expect(f.modes.map(\.name) == ["main", "service"])
         #expect(f.modes[1].bindings.first?.key == "esc")
         #expect(f.modes[1].bindings.first?.value == .array(["reload-config", "mode main"]))
-        #expect(f.monitors(host: "Test-Mac").isEmpty)
+        #expect(f.document.sections.map(\.path) == [[], ["hyper"], ["launch"], ["aerospace", "main"], ["aerospace", "service"]])
     }
 
     @Test func modesAreInFileOrderWithMainFirst() throws {
@@ -62,13 +62,15 @@ import Testing
         #expect(f.document.serialized().contains("key = \"caps_lock\" # only"))
     }
 
-    @Test func setMonitorCreatesHostSectionAtEnd() throws {
-        var f = try KeysFile(text: try fixture("keys.toml"))
-        f.setMonitor(host: "Other-Mac", workspace: "1", target: "secondary")
-        #expect(f.document.serialized().hasSuffix("\n[monitors.\"Other-Mac\"]\n\"1\" = \"secondary\"\n"))
-        #expect(f.monitors(host: "Other-Mac").map(\.workspace) == ["1"])
-        #expect(f.monitors(host: "Other-Mac").map(\.target) == ["secondary"])
-        #expect(f.monitors(host: "Elsewhere").isEmpty)
+    /// Monitors moved to monitors.toml. A `[monitors."<host>"]` table still
+    /// in someone's keys.toml is an unknown table: not validated (the `3`),
+    /// and written back as it was.
+    @Test func aLeftoverMonitorsTableIsKeptAndIgnored() throws {
+        let text = "[launch]\nt = \"a.b\"\n\n[monitors.\"Test-Mac\"] # old\n\"1\" = \"secondary\"\n\"2\" = 3\n"
+        var f = try KeysFile(text: text)
+        #expect(f.document.serialized() == text)
+        f.setBinding(mode: "main", key: "a", value: .string("x"))
+        #expect(f.document.serialized().hasSuffix("\n[monitors.\"Test-Mac\"] # old\n\"1\" = \"secondary\"\n\"2\" = 3\n"))
     }
 
     @Test func newSectionsGoInFixedOrder() throws {

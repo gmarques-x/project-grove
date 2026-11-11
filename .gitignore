@@ -17,6 +17,9 @@ grove-dotfiles/modules/30-fonts/local/*
 # Claude, with personal data (recent folders, bookmarks, paths). Local only.
 .recording/
 
+# Grove Keys: each Mac's own workspace-to-monitor assignments. Local only.
+grove-dotfiles/config/grove-keys/monitors.toml
+
 # Shared working files between Gustavo and Claude. Never published.
 artifacts/
 .superpowers/

@@ -4,6 +4,8 @@ Grove Keys is a menu bar app that turns Caps Lock into Hyper (Cmd+Ctrl+Option+Sh
 
 The file is `~/.config/grove-keys/keys.toml` (tracked as `grove-dotfiles/config/grove-keys/keys.toml`). Edit it by hand or in the Grove Keys window; both write the same file. Every save renders `~/.config/aerospace/aerospace.toml` from `keys.toml` and `aerospace.base.toml` (settings and window rules), and reloads AeroSpace. `aerospace.toml` is generated and untracked: edit the other two. A mistake in `keys.toml` shows as `keys.toml line N: ...` under the tabs, and the last good config keeps running.
 
+The monitor each workspace goes to is this Mac's own business, so it lives in `~/.config/grove-keys/monitors.toml`, which git ignores: a `[monitors]` table with lines like `1 = "main"` (`"main"`, `"secondary"`, `"built-in"` or a display's name). The Monitors group in the window creates the file on the first change; no file means every workspace stays where AeroSpace puts it. It is rendered into `aerospace.toml` with the rest, and a mistake in it shows as `monitors.toml line N: ...`.
+
 Design: `grove-dotfiles/docs/specs/2026-11-10-grove-keys-design.md`.
 
 ## Install

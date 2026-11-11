@@ -12,7 +12,8 @@ public struct HyperSettings: Equatable, Sendable {
 }
 
 /// keys.toml as the app sees it: a validated TomlDocument with typed readers
-/// and mutators. The document keeps comments and unknown sections.
+/// and mutators. The document keeps comments and unknown sections (a
+/// `[monitors.*]` table from before monitors.toml is one: kept, not read).
 public struct KeysFile: Equatable, Sendable {
     public private(set) var document: TomlDocument
 
@@ -55,13 +56,6 @@ public struct KeysFile: Equatable, Sendable {
         return ordered.map { s in (name: s.path[1], bindings: s.entries.map { (key: $0.key, value: $0.value) }) }
     }
 
-    public func monitors(host: String) -> [(workspace: String, target: String)] {
-        (document.section(["monitors", host])?.entries ?? []).compactMap { e in
-            if case .string(let s) = e.value { return (workspace: e.key, target: s) }
-            return nil
-        }
-    }
-
     // MARK: Writing
 
     public mutating func setHyper(_ h: HyperSettings) {
@@ -87,10 +81,6 @@ public struct KeysFile: Equatable, Sendable {
         remove(["aerospace", mode], key)
     }
 
-    public mutating func setMonitor(host: String, workspace: String, target: String) {
-        set(["monitors", host], workspace, .string(target))
-    }
-
     /// Renames an entry where it stands, keeping its value and comments.
     mutating func rename(_ path: [String], _ key: String, to newKey: String) {
         guard let s = document.sections.firstIndex(where: { $0.path == path }),
@@ -113,7 +103,7 @@ public struct KeysFile: Equatable, Sendable {
     }
 
     /// The section's index, creating it in the file's fixed order
-    /// (hyper, launch, aerospace modes, then monitors and anything else).
+    /// (hyper, launch, aerospace modes, then anything else).
     private mutating func sectionIndex(_ path: [String]) -> Int {
         if let i = document.sections.firstIndex(where: { $0.path == path }) { return i }
         func rank(_ p: [String]) -> Int {
@@ -154,12 +144,6 @@ public struct KeysFile: Equatable, Sendable {
                     case .string, .array: break
                     default:
                         throw TomlError(line: e.line, message: "\"\(e.key)\" must be a command in quotes, or a list of them")
-                    }
-                }
-            case "monitors" where section.path.count == 2:
-                for e in section.entries {
-                    guard case .string = e.value else {
-                        throw TomlError(line: e.line, message: "workspace \(e.key) must be assigned a monitor in quotes")
                     }
                 }
             default:

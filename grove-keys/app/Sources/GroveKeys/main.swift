@@ -6,19 +6,6 @@ func fail(_ message: String) -> Never {
     exit(1)
 }
 
-func localHostName() -> String {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/sbin/scutil")
-    p.arguments = ["--get", "LocalHostName"]
-    let pipe = Pipe()
-    p.standardOutput = pipe
-    p.standardError = FileHandle.nullDevice
-    do { try p.run() } catch { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    p.waitUntilExit()
-    return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
 func renderAeroSpace() -> Never {
     let env = ProcessInfo.processInfo.environment
     let paths = KeysPaths.standard(home: FileManager.default.homeDirectoryForCurrentUser, environment: env)
@@ -33,7 +20,12 @@ func renderAeroSpace() -> Never {
     do { keys = try KeysFile(text: keysText) } catch {
         fail("keys.toml line \(error.line): \(error.message)")
     }
-    let text = AeroSpaceRenderer.render(keys: keys, base: base, host: localHostName())
+    // This Mac's own file; not there means no assignments.
+    let monitors: MonitorsFile
+    do { monitors = try MonitorsFile.read(from: paths.monitors) } catch {
+        fail(error.line == 0 ? error.message : "monitors.toml line \(error.line): \(error.message)")
+    }
+    let text = AeroSpaceRenderer.render(keys: keys, base: base, monitors: monitors.assignments)
     let out = env["GROVE_KEYS_RENDER_OUT"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) } ?? paths.output
     do {
         try writeAtomically(Data(text.utf8), to: out)

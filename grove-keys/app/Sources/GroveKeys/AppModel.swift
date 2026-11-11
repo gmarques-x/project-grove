@@ -5,15 +5,18 @@ import GroveKeysCore
 import GroveThemesCore
 import os
 
-/// The app's one model: keys.toml as last applied, the save path, the Hyper
-/// engine and the Caps Lock mapping. The mapping is on only while both
-/// permissions are granted, the tap runs, and Hyper is enabled and not paused.
+/// The app's one model: keys.toml and this Mac's monitors.toml as last
+/// applied, the save path, the Hyper engine and the Caps Lock mapping. The
+/// mapping is on only while both permissions are granted, the tap runs, and
+/// Hyper is enabled and not paused.
 @MainActor
 final class AppModel: ObservableObject {
     static let shared = AppModel()
     private static let log = Logger(subsystem: "com.projectgrove.keys", category: "app")
 
     @Published private(set) var keys: KeysFile
+    /// This Mac's monitors.toml (no assignments when there is no file).
+    @Published private(set) var monitors = MonitorsFile()
     @Published private(set) var layers: [Layer] = []
     @Published private(set) var paused = false
     /// Opens the window from outside SwiftUI (the pointer menu); set by the
@@ -23,7 +26,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var colors = ThemeColors.fallback
     /// The Caps Lock → F18 mapping is set right now.
     @Published private(set) var mapping = false
-    /// From the last save run (keys.toml or AeroSpace).
+    /// From the last save run (keys.toml, monitors.toml or AeroSpace).
     @Published private var saveLine: String?
     /// From the engine (the tap kept stopping, or can't be created).
     @Published private var engineLine: String?
@@ -33,6 +36,10 @@ final class AppModel: ObservableObject {
     /// `edit` would be applied: the first run has answered, and keys.toml has
     /// no error and is readable (or doesn't exist yet).
     var canEdit: Bool { loaded && !keysInvalid }
+    /// `editMonitors` would be applied: monitors.toml has been read (or isn't
+    /// there) and has no error. Not while keys.toml has one either: nothing
+    /// is rendered then, so the change could not be shown to have worked.
+    var canEditMonitors: Bool { canEdit && monitorsKnown && !monitorsInvalid }
     /// The menu bar glyph turns orange.
     var needsAttention: Bool { !permissions.granted || redLine != nil }
     /// The menus show "Restart Grove Keys": a permission is missing or the
@@ -41,8 +48,6 @@ final class AppModel: ObservableObject {
     /// a keys.toml error, which a restart wouldn't change.
     var offersRestart: Bool { !permissions.granted || engineLine != nil }
 
-    /// This Mac's LocalHostName, for the window's header.
-    let host: String
     private let paths: KeysPaths
     private let pipeline: SavePipeline
     private let themes: GroveThemesClient
@@ -50,6 +55,8 @@ final class AppModel: ObservableObject {
     private let themeStateURL: URL
     private var engine: HyperEngine!
     private var watcher: FileWatcher?
+    /// monitors.toml: a hand edit (or the file appearing) re-renders too.
+    private var monitorsWatcher: FileWatcher?
     /// aerospace.base.toml: a change there re-renders as a keys.toml change does.
     private var baseWatcher: FileWatcher?
     private var themeWatcher: FileWatcher?
@@ -76,13 +83,20 @@ final class AppModel: ObservableObject {
     /// The newest edit, and how many edits are still saving.
     private var pendingKeys: KeysFile?
     private var pendingEdits = 0
+    /// The same for monitors.toml. A run reads it only after keys.toml
+    /// parses, so until one has, `monitorsKnown` is false: an edit would
+    /// write over a file the app has never seen.
+    private var lastGoodMonitors = MonitorsFile()
+    @Published private var monitorsKnown = false
+    @Published private var monitorsInvalid = false
+    private var pendingMonitors: MonitorsFile?
+    private var pendingMonitorEdits = 0
 
     private init() {
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser
         paths = KeysPaths.standard(home: home, environment: environment)
-        host = localHostName()
-        pipeline = SavePipeline(paths: paths, host: host, aerospace: AeroSpaceCLI())
+        pipeline = SavePipeline(paths: paths, aerospace: AeroSpaceCLI())
         let cli = environment["GROVE_THEMES_CLI"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
             ?? home.appendingPathComponent(".local/bin/grove-themes")
         themes = GroveThemesClient(runner: ProcessRunner(path: cli))
@@ -125,7 +139,7 @@ final class AppModel: ObservableObject {
 
         // The first run reloads AeroSpace even if the render is current:
         // grove install may have rendered it without AeroSpace reloading.
-        enqueue(edit: false) { [pipeline] in await pipeline.run(forceReload: true) }
+        enqueue { [pipeline] in await pipeline.run(forceReload: true) }
         writeState()
     }
 
@@ -136,6 +150,7 @@ final class AppModel: ObservableObject {
         stopEngine()
         pollTimer?.invalidate()
         watcher?.stop()
+        monitorsWatcher?.stop()
         baseWatcher?.stop()
         writeState()
     }
@@ -192,14 +207,32 @@ final class AppModel: ObservableObject {
         pendingEdits += 1
         publish(next)
         watcher?.ignoreNextChange(contents: Data(next.document.serialized().utf8))
-        enqueue(edit: true) { [pipeline, next] in
+        enqueue(edit: .keys) { [pipeline, next] in
             if let error = await pipeline.writeOverValid(next) { return .keysInvalid(error) }
             return await pipeline.run()
         }
     }
 
+    /// `edit` for monitors.toml (the Monitors panel): the same rules, and the
+    /// first change creates the file.
+    func editMonitors(_ change: (inout MonitorsFile) -> Void) {
+        guard canEditMonitors else { return }
+        let base = pendingMonitors ?? monitors
+        var next = base
+        change(&next)
+        guard next != base else { return }
+        pendingMonitors = next
+        pendingMonitorEdits += 1
+        monitors = next
+        monitorsWatcher?.ignoreNextChange(contents: Data(next.document.serialized().utf8))
+        enqueue(edit: .monitors) { [pipeline, next] in await pipeline.save(next) }
+    }
+
+    /// Which file a save run follows an edit of, if any.
+    private enum Edited { case keys, monitors }
+
     /// Runs one after another, in the order asked.
-    private func enqueue(edit: Bool, _ work: @escaping @Sendable () async -> SaveResult) {
+    private func enqueue(edit: Edited? = nil, _ work: @escaping @Sendable () async -> SaveResult) {
         let previous = saving
         saving = Task {
             await previous?.value
@@ -208,8 +241,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func apply(_ result: SaveResult, edit: Bool) {
-        if edit { pendingEdits -= 1 }
+    private func apply(_ result: SaveResult, edit: Edited?) {
+        if edit == .keys { pendingEdits -= 1 }
+        if edit == .monitors { pendingMonitorEdits -= 1 }
         if let k = result.keys {
             lastGood = k
             keysKnown = true
@@ -219,10 +253,22 @@ final class AppModel: ObservableObject {
         // An error on a line, or a file that is there but can't be read, blocks
         // edits; a missing file or a failed write does not.
         keysInvalid = result.blocksEdits
+        // A run that stopped at keys.toml says nothing about monitors.toml.
+        if let m = result.monitors {
+            lastGoodMonitors = m
+            monitorsKnown = true
+            monitorsInvalid = false
+        } else if result.blocksMonitorEdits {
+            monitorsInvalid = true
+        }
         // While edits are still saving, the screen keeps showing the newest one.
         if pendingEdits == 0 {
             pendingKeys = nil
             publish(lastGood)
+        }
+        if pendingMonitorEdits == 0 {
+            pendingMonitors = nil
+            if monitors != lastGoodMonitors { monitors = lastGoodMonitors }
         }
         saveLine = result.redLine
         if !loaded {
@@ -232,6 +278,11 @@ final class AppModel: ObservableObject {
             }
             watcher.start()
             self.watcher = watcher
+            let monitorsWatcher = FileWatcher(file: paths.monitors) {
+                Task { @MainActor in AppModel.shared.fileChanged() }
+            }
+            monitorsWatcher.start()
+            self.monitorsWatcher = monitorsWatcher
             let baseWatcher = FileWatcher(file: paths.base) {
                 Task { @MainActor in AppModel.shared.fileChanged() }
             }
@@ -247,7 +298,7 @@ final class AppModel: ObservableObject {
     }
 
     private func fileChanged() {
-        enqueue(edit: false) { [pipeline] in await pipeline.run() }
+        enqueue { [pipeline] in await pipeline.run() }
     }
 
     private func refreshColors() {

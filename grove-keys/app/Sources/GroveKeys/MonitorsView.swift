@@ -3,8 +3,8 @@ import GroveKeysCore
 import GroveThemesCore
 import SwiftUI
 
-/// The Monitors group (spec §7, §10, mockup §2): this Mac's
-/// `[monitors."<LocalHostName>"]`, a menu per workspace 1–9.
+/// The Monitors group (spec §7, §10, mockup §2): this Mac's monitors.toml,
+/// a menu per workspace 1–9.
 struct MonitorsView: View {
     @ObservedObject var model: AppModel
     @Environment(\.theme) private var theme
@@ -16,11 +16,10 @@ struct MonitorsView: View {
     }
 
     var body: some View {
-        let host = model.host
-        let saved = host.isEmpty ? [] : model.keys.monitors(host: host)
+        let saved = model.monitors.assignments
         let targets = Dictionary(saved.map { ($0.workspace, $0.target) }, uniquingKeysWith: { a, _ in a })
         let choices = Monitors.choices(displays: displays.wrappedValue, current: saved.map(\.target))
-        BindingsGroup(title: "Monitors", note: host.isEmpty ? "this Mac" : "this Mac · \(host)") {
+        BindingsGroup(title: "Monitors", note: "this Mac") {
             HStack(spacing: 8) {
                 Circle().fill(Color(theme.green)).frame(width: 7, height: 7)
                 Text(connected)
@@ -28,17 +27,14 @@ struct MonitorsView: View {
             .font(GroveFont.mono(11.5))
             .foregroundStyle(Color(theme.grey1))
             .padding(.horizontal, 6)
-            if host.isEmpty {
-                note("Can't read this Mac's name (scutil --get LocalHostName), so monitors can't be set.")
-            } else {
-                if saved.isEmpty { note("Not set for this Mac yet") }
-                HStack(spacing: 6) {
-                    ForEach(1...9, id: \.self) { n in
-                        cell(n, target: targets[String(n)], choices: choices, host: host)
-                    }
+            if saved.isEmpty { note("Not set for this Mac yet") }
+            HStack(spacing: 6) {
+                ForEach(1...9, id: \.self) { n in
+                    cell(n, target: targets[String(n)], choices: choices)
                 }
             }
-            note("Each workspace: main · secondary · built-in · a display name. Saved only for this Mac.")
+            .disabled(!model.canEditMonitors)
+            note("Each workspace: main · secondary · built-in · a display name. Saved only for this Mac, in monitors.toml.")
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             displays.wrappedValue = Displays.current()
@@ -51,11 +47,11 @@ struct MonitorsView: View {
         return "Connected now: " + ([first + " (main)"] + names.dropFirst()).joined(separator: ", ")
     }
 
-    private func cell(_ n: Int, target: String?, choices: [String], host: String) -> some View {
+    private func cell(_ n: Int, target: String?, choices: [String]) -> some View {
         Menu {
             ForEach(choices, id: \.self) { choice in
                 Button {
-                    model.edit { $0.setMonitor(host: host, workspace: String(n), target: choice) }
+                    model.editMonitors { $0.set(workspace: String(n), target: choice) }
                 } label: {
                     if choice == target { Label(choice, systemImage: "checkmark") } else { Text(choice) }
                 }
