@@ -15,12 +15,15 @@ private func configFolder() -> URL {
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config")
 }
 
-/// Images read once per path: the cards redraw often, the files rarely change.
+/// Thumbnails decoded once per path, at most 640 px on the longer side (a
+/// card is ≈ 336 pt wide): the cards redraw often, the files rarely change,
+/// and a full-size wallpaper would hold ~21 MB per entry.
 @MainActor private var imageCache: [String: NSImage] = [:]
 
 @MainActor private func cachedImage(_ url: URL) -> NSImage? {
     if let image = imageCache[url.path] { return image }
-    guard let image = NSImage(contentsOf: url) else { return nil }
+    guard let cg = Thumbnail.load(url, maxPixel: 640) else { return nil }
+    let image = NSImage(cgImage: cg, size: NSSize(width: cg.width / 2, height: cg.height / 2))
     imageCache[url.path] = image
     return image
 }
@@ -52,8 +55,9 @@ struct ChoiceCard: View {
     let isCurrent: Bool
     let isBusy: Bool
     var isFocused = false
-    /// Wallpapers fill their panel; logos sit inside it with a margin.
-    var fills = false
+    /// Logos sit inside the panel with a margin; wallpapers fill its height,
+    /// shown whole.
+    var margin: CGFloat = 10
     let action: () -> Void
     @Environment(\.theme) private var theme
 
@@ -67,8 +71,8 @@ struct ChoiceCard: View {
                     .overlay {
                         if let image {
                             Image(nsImage: image).resizable().interpolation(.high)
-                                .aspectRatio(contentMode: fills ? .fill : .fit)
-                                .padding(fills ? 0 : 10)
+                                .aspectRatio(contentMode: .fit)
+                                .padding(margin)
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 6))

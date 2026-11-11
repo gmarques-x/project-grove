@@ -62,7 +62,7 @@ struct GalleryView: View {
                                        isCurrent: wallpaper == list.wallpaper,
                                        isBusy: model.busyWallpaper == wallpaper,
                                        isFocused: focus.wrappedValue.focused == .wallpaper(wallpaper),
-                                       fills: true) {
+                                       margin: 0) {
                                 Task { await model.pickWallpaper(wallpaper) }
                             }
                             .disabled(model.switchingDisabled)

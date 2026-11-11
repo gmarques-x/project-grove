@@ -138,12 +138,6 @@ _gt_copy_backup() {
   mkdir -p "$(dirname "$dest")" && cp -p "$src" "$dest" && printf '%s\n' "$dest"
 }
 
-# gt_step_wallpaper SCHEME: the scheme's picture on every screen and Space.
-# osascript changes the visible Spaces at once; the rest live in macOS's
-# wallpaper store, which wallpaper_store.py rewrites (backed up first) before
-# WallpaperAgent is force-stopped (-KILL: a normal quit saves its in-memory
-# copy over ours) and launchd restarts it. Seams: GROVE_WALLPAPER_STORE,
-# GROVE_KILLALL.
 # gt_wallpaper_file SCHEME: the chosen set's picture for SCHEME, as a clean
 # path (no ".."), the same text 85-macos-wallpaper compares against.
 gt_wallpaper_file() {
@@ -155,6 +149,12 @@ gt_wallpaper_file() {
   printf '%s/wallpaper-%s-%s.png' "$dir" "$set" "$1"
 }
 
+# gt_step_wallpaper SCHEME: the chosen set's picture for the scheme on every screen and Space.
+# osascript changes the visible Spaces at once; the rest live in macOS's
+# wallpaper store, which wallpaper_store.py rewrites (backed up first) before
+# WallpaperAgent is force-stopped (-KILL: a normal quit saves its in-memory
+# copy over ours) and launchd restarts it. Seams: GROVE_WALLPAPER_STORE,
+# GROVE_KILLALL.
 gt_step_wallpaper() {
   local file store lib msg backup
   file="$(gt_wallpaper_file "$1")"

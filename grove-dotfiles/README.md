@@ -61,7 +61,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `60-github` | GitHub login and SSH signing key |
 | `70-zsh` | zsh config, Starship prompt and the `grove` and `grove-themes` commands |
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
-| `85-macos-wallpaper` | Desktop wallpaper: `grove-wallpapers/wallpaper-project-grove-<scheme>.png` for the current scheme on every screen (other Spaces are a manual step) |
+| `85-macos-wallpaper` | Desktop wallpaper: `grove-wallpapers/wallpaper-<set>-<scheme>.png` for the current scheme on every screen (other Spaces are a manual step); the set is `project-grove`, or `avatar` after `grove-themes wallpaper avatar` |
 | `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |
