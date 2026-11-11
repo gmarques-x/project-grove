@@ -32,12 +32,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // No Dock icon, as LSUIElement in the bundle (also when run bare from .build).
         NSApp.setActivationPolicy(.accessory)
         AppModel.shared.start()
+        MainActor.assumeIsolated { PointerMenu.shared.start() }
     }
 
     /// `grovekeys://menu` from the Grove bar's key glyph: the menu at the pointer.
     func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls where KeysURL(url) == .menu {
-            MainActor.assumeIsolated { PointerMenu.shared.show() }
+        for url in urls {
+            switch KeysURL(url) {
+            case .menu: MainActor.assumeIsolated { PointerMenu.shared.show() }
+            case .groveMenu: MainActor.assumeIsolated { PointerMenu.shared.showGroveMenu() }
+            case .appMenu: MainActor.assumeIsolated { PointerMenu.shared.showAppMenu() }
+            case nil: break
+            }
         }
     }
 
