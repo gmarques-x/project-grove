@@ -21,7 +21,8 @@ public struct AeroSpaceCLI: AeroSpaceRunning {
 
     public func dryRun() async -> (ok: Bool, message: String) {
         let r = Self.run(Self.binary, ["reload-config", "--dry-run"])
-        return (r.status == 0, r.output.trimmingCharacters(in: .whitespacesAndNewlines))
+        return (r.status == 0, r.output.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isNewline).first.map(String.init) ?? "")
     }
 
     public func reload() async {

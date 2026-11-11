@@ -9,8 +9,9 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
     private var _dryRuns = 0, _reloads = 0
     var dryRuns: Int { lock.withLock { _dryRuns } }
     var reloads: Int { lock.withLock { _reloads } }
+    var onDryRun: (@Sendable () -> Void)?
     func isRunning() async -> Bool { running }
-    func dryRun() async -> (ok: Bool, message: String) { lock.withLock { _dryRuns += 1 }; return dryRunResult }
+    func dryRun() async -> (ok: Bool, message: String) { lock.withLock { _dryRuns += 1 }; onDryRun?(); return dryRunResult }
     func reload() async { lock.withLock { _reloads += 1 } }
 }
 
@@ -110,9 +111,29 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
         let (paths, dir) = try setUp()
         let keys = try KeysFile(text: try fixture("keys.toml"))
         let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace())
-        try pipeline.write(keys)
+        try await pipeline.write(keys)
         #expect(try String(contentsOf: paths.keys, encoding: .utf8) == keys.document.serialized())
         let left = try FileManager.default.contentsOfDirectory(atPath: dir.appendingPathComponent("grove-keys").path)
         #expect(left == ["keys.toml"])
+    }
+
+    @Test func failedRestoreIsReportedAndRevalidated() async throws {
+        let (paths, _) = try setUp()
+        let folder = paths.output.deletingLastPathComponent()
+        try Data("old config\n".utf8).write(to: paths.output)
+        let fake = FakeAeroSpace()
+        fake.dryRunResult = (false, "unknown command")
+        fake.onDryRun = { chmod(folder.path, 0o555) }
+        let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: fake)
+        let first = await pipeline.run()
+        chmod(folder.path, 0o755)
+        guard case .aerospaceRejected(_, let message) = first else { Issue.record("\(first)"); return }
+        #expect(message == "unknown command · could not restore the previous config")
+        #expect(first.redLine == "AeroSpace refused the config: unknown command · could not restore the previous config")
+        // The refused render is still on disk; the next run must not call it unchanged.
+        fake.onDryRun = nil
+        let second = await pipeline.run()
+        #expect(fake.dryRuns == 2)
+        #expect(second.redLine == first.redLine)  // still refused, still not restorable
     }
 }
