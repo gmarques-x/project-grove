@@ -79,19 +79,81 @@ vsc_json() { sed '/^[[:space:]]*\/\//d' "$1"; }
 VSC_ICONS_DIR=config/vscode/grove-icons
 SETI_JSON="/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/theme-seti/icons/vs-seti-icon-theme.json"
 
-@test "vscode: every icon has a palette color" {
-  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" pal bad
-  pal="$(sed -n 's/^[a-z_0-9]* *= *\(#[0-9A-Fa-f]\{6\}\).*/\1/p' "$GROVE_ROOT/theme/everforest-dark-medium" | tr a-f A-F)"
+# icon_palette SCHEME: every #RRGGBB in theme/everforest-SCHEME, uppercased, one per line.
+icon_palette() {
+  sed -n 's/^[a-z_0-9]* *= *\(#[0-9A-Fa-f]\{6\}\).*/\1/p' "$GROVE_ROOT/theme/everforest-$1" | tr a-f A-F
+}
+
+@test "vscode: every dark icon has a Dark Medium color" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" bad
   [ "$(jq '[.iconDefinitions[] | select(.fontColor == null)] | length' "$t")" -eq 0 ]
-  bad="$(jq -r '.iconDefinitions[].fontColor' "$t" | tr a-f A-F | sort -u | grep -vxF "$pal" || true)"
-  [ -z "$bad" ] || { echo "not in the palette: $bad"; false; }
+  [ "$(jq '[.iconDefinitions | to_entries[] | select(.key | endswith("_light") | not)] | length' "$t")" -gt 100 ]
+  bad="$(jq -r '.iconDefinitions | to_entries[] | select(.key | endswith("_light") | not) | .value.fontColor' "$t" \
+    | tr a-f A-F | sort -u | grep -vxF "$(icon_palette dark-medium)" || true)"
+  [ -z "$bad" ] || { echo "not in Dark Medium: $bad"; false; }
+}
+
+@test "vscode: every light icon has a Light Medium color" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" bad
+  [ "$(jq '[.iconDefinitions | to_entries[] | select(.key | endswith("_light"))] | length' "$t")" -gt 100 ]
+  bad="$(jq -r '.iconDefinitions | to_entries[] | select(.key | endswith("_light")) | .value.fontColor' "$t" \
+    | tr a-f A-F | sort -u | grep -vxF "$(icon_palette light-medium)" || true)"
+  [ -z "$bad" ] || { echo "not in Light Medium: $bad"; false; }
+}
+
+@test "vscode: a light icon is its dark icon in the light palette's color of the same name" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" names bad
+  # {"#D3C6AA": "fg", ...} over both palettes: the name each icon color goes by.
+  names="$(cat "$GROVE_ROOT/theme/everforest-dark-medium" "$GROVE_ROOT/theme/everforest-light-medium" \
+    | grep -E '^(fg|grey0|grey1|red|orange|yellow|green|aqua|blue|purple) *= *#[0-9A-Fa-f]{6}' \
+    | awk '{ printf "%s %s\n", toupper($3), $1 }' | jq -R 'split(" ") | {(.[0]): .[1]}' | jq -s add)"
+  [ "$(jq length <<<"$names")" -eq 20 ]
+  bad="$(jq -r --argjson n "$names" '.iconDefinitions as $d | $d | to_entries[]
+    | select(.key | endswith("_light") | not)
+    | select(($d[.key + "_light"] | not)
+        or $d[.key + "_light"].fontCharacter != .value.fontCharacter
+        or $n[$d[.key + "_light"].fontColor | ascii_upcase] != $n[.value.fontColor | ascii_upcase])
+    | .key' "$t")"
+  [ -z "$bad" ] || { echo "no matching light icon: $bad"; false; }
+  # and no light icon without a dark one
+  [ "$(jq '.iconDefinitions | [keys[] | select(endswith("_light"))] | length' "$t")" -eq \
+    "$(jq '.iconDefinitions | [keys[] | select(endswith("_light") | not)] | length' "$t")" ]
+}
+
+@test "vscode: the light tables cover every association with a light icon" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" bad
+  [ "$(jq -r '.light | type' "$t")" = object ]
+  [ "$(jq -r '.light.file' "$t")" = "$(jq -r '.file + "_light"' "$t")" ]
+  bad="$(jq -r '. as $t | ["fileExtensions", "fileNames", "languageIds"][] as $k
+    | $t[$k] | to_entries[] | select($t.light[$k][.key] != .value + "_light") | "\($k) \(.key)"' "$t")"
+  [ -z "$bad" ] || { echo "no light twin: $bad"; false; }
+  bad="$(jq -r '. as $t | ["fileExtensions", "fileNames", "languageIds"][] as $k
+    | $t.light[$k] | keys[] | select($t[$k][.] == null) | "\($k) \(.)"' "$t")"
+  [ -z "$bad" ] || { echo "light only: $bad"; false; }
+}
+
+@test "vscode: every association points at an icon that exists" {
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" bad
+  bad="$(jq -r '.iconDefinitions as $d
+    | ([.file, .light.file]
+       + [(., .light) | (.fileExtensions, .fileNames, .languageIds) | .[]])
+    | unique[] | select($d[.] == null)' "$t")"
+  [ -z "$bad" ] || { echo "no such icon: $bad"; false; }
+  # the dark tables never use a light icon
+  [ "$(jq '[.file, (.fileExtensions, .fileNames, .languageIds | .[])] | map(select(endswith("_light"))) | length' "$t")" -eq 0 ]
 }
 
 @test "vscode: Grove Icons keeps every Seti icon" {
   [ -f "$SETI_JSON" ] || skip "VS Code not installed"
-  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json"
-  [ "$(jq '.iconDefinitions | length' "$t")" -eq "$(jq '.iconDefinitions | length' "$SETI_JSON")" ]
-  [ "$(jq 'has("light")' "$t")" = false ]
+  local t="$GROVE_ROOT/$VSC_ICONS_DIR/grove-icon-theme.json" k
+  # Seti's icons plus a light twin for each one Seti leaves without a color.
+  [ "$(jq -r '.iconDefinitions | keys[]' "$SETI_JSON" | sort)" = \
+    "$(jq -r --slurpfile s "$SETI_JSON" '.iconDefinitions | keys[]
+        | select(endswith("_light") and ($s[0].iconDefinitions[.] == null) | not)' "$t" | sort)" ]
+  [ "$(jq -S '[.iconDefinitions[] | .fontCharacter] | unique' "$t")" = "$(jq -S '[.iconDefinitions[] | .fontCharacter] | unique' "$SETI_JSON")" ]
+  for k in file fileExtensions fileNames languageIds; do
+    [ "$(jq -S ".$k" "$t")" = "$(jq -S ".$k" "$SETI_JSON")" ] || { echo "$k differs from Seti"; false; }
+  done
 }
 
 @test "vscode: the icon theme points at its files" {

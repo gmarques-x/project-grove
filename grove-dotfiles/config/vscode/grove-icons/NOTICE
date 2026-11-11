@@ -1,6 +1,9 @@
 Grove Icons is VS Code's Seti file icon theme with its colors changed to
-Everforest Dark Medium (theme/everforest-dark-medium). The font and the icon
-associations are unchanged. Both sources are under the MIT License:
+Everforest: Dark Medium (theme/everforest-dark-medium) under a dark color theme
+and Light Medium (theme/everforest-light-medium) under a light one. The font is
+unchanged, and so are the icon associations, except that the light tables also
+cover the "todo" icon, which has no color of its own in Seti. Both sources are
+under the MIT License:
 
 Seti UI (font and icon set): https://github.com/jesseweed/seti-ui
 Copyright (c) 2014 Jesse Weed

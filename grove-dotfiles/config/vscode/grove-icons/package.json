@@ -1,9 +1,9 @@
 {
   "name": "grove-icons",
   "displayName": "Grove Icons",
-  "description": "VS Code's Seti icons in Everforest colors",
+  "description": "VS Code's Seti icons in Everforest colors, dark and light",
   "publisher": "grove",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "engines": {
     "vscode": "^1.80.0"

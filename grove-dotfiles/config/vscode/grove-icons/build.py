@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Remake Grove Icons from VS Code's Seti icons: same font and icons, Everforest colors.
 
+One icon theme holds one dark set and one light set, the way Seti does: every icon
+NAME has a NAME_light twin, and the top-level "light" tables (what VS Code uses under
+a light color theme) point at the twins. The dark set takes Everforest Dark Medium,
+the light set the same-named colors of Everforest Light Medium. Hard and soft differ
+from medium only in backgrounds, which icons don't use.
+
 Usage: build.py [SETI_DIR]   (default: the installed VS Code's theme-seti/icons)
 Writes grove-icon-theme.json, seti.woff, package.json and NOTICE next to this file
 and prints the color mapping. Dev-only: grove install uses the committed output.
@@ -8,20 +14,25 @@ Standard library only.
 """
 import colorsys
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-THEME = HERE.parents[2] / "theme" / "everforest-dark-medium"
+THEMES = HERE.parents[2] / "theme"
+DARK = THEMES / "everforest-dark-medium"
+LIGHT = THEMES / "everforest-light-medium"
 SETI = Path("/Applications/Visual Studio Code.app/Contents/Resources/app/extensions/theme-seti/icons")
 ACCENTS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple"]
+TABLES = ["fileExtensions", "fileNames", "languageIds"]
+SUFFIX = "_light"
 
 
-def palette():
+def palette(path):
     pal = {}
-    for line in THEME.read_text().splitlines():
+    for line in path.read_text().splitlines():
         m = re.match(r"^([a-z_0-9]+)\s*=\s*(#[0-9A-Fa-f]{6})\b", line)
         if m:
             pal[m.group(1)] = m.group(2).upper()
@@ -32,17 +43,24 @@ def rgb01(hex6):
     return tuple(int(hex6[i:i + 2], 16) / 255 for i in (1, 3, 5))
 
 
-def recolor(hex6, pal):
+def color_name(hex6, pal):
     """Greys go to grey0, grey1 or fg by lightness; colors to the nearest accent by hue."""
     h, l, s = colorsys.rgb_to_hls(*rgb01(hex6))
     if s < 0.25:
-        return pal["grey0"] if l < 0.40 else pal["grey1"] if l < 0.65 else pal["fg"]
+        return "grey0" if l < 0.40 else "grey1" if l < 0.65 else "fg"
 
     def dist(name):
         d = abs(h - colorsys.rgb_to_hls(*rgb01(pal[name]))[0])
         return min(d, 1 - d)
 
-    return pal[min(ACCENTS, key=dist)]
+    return min(ACCENTS, key=dist)
+
+
+def write(path, text):
+    """Replace PATH in one step, so VS Code never reads a half-written file."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
 
 
 def bump(version):
@@ -51,8 +69,11 @@ def bump(version):
 
 
 NOTICE = """Grove Icons is VS Code's Seti file icon theme with its colors changed to
-Everforest Dark Medium (theme/everforest-dark-medium). The font and the icon
-associations are unchanged. Both sources are under the MIT License:
+Everforest: Dark Medium (theme/everforest-dark-medium) under a dark color theme
+and Light Medium (theme/everforest-light-medium) under a light one. The font is
+unchanged, and so are the icon associations, except that the light tables also
+cover the "todo" icon, which has no color of its own in Seti. Both sources are
+under the MIT License:
 
 Seti UI (font and icon set): https://github.com/jesseweed/seti-ui
 Copyright (c) 2014 Jesse Weed
@@ -84,18 +105,31 @@ SOFTWARE.
 
 def main():
     seti = Path(sys.argv[1]) if len(sys.argv) > 1 else SETI
-    pal = palette()
+    dark, light = palette(DARK), palette(LIGHT)
     theme = json.loads((seti / "vs-seti-icon-theme.json").read_text())
-    theme.pop("light", None)
     theme["fonts"][0]["src"][0]["path"] = "./seti.woff"
 
+    # Each icon is named from Seti's dark color, on the dark palette's hues, and its
+    # light twin takes the same name from the light palette: yellow stays yellow.
+    # Seti's own light twins only darken the dark color, so nothing is lost.
     mapping = {}
-    for d in theme["iconDefinitions"].values():
+    defs = {}
+    for key, d in theme["iconDefinitions"].items():
+        if key.endswith(SUFFIX):
+            continue
         old = d.get("fontColor")
         # No color means VS Code's text color; fg looks the same and stays in the palette.
-        new = recolor(old, pal) if old else pal["fg"]
-        mapping[(old or "(none)").lower()] = new
-        d["fontColor"] = new
+        name = color_name(old, dark) if old else "fg"
+        mapping[(old or "(none)").lower()] = name
+        defs[key + SUFFIX] = {**d, "fontColor": light[name]}
+        defs[key] = {**d, "fontColor": dark[name]}
+    theme["iconDefinitions"] = defs
+
+    # Every association gets a light twin; Seti leaves out the icons with no color.
+    lt = theme.setdefault("light", {})
+    lt["file"] = theme["file"] + SUFFIX
+    for table in TABLES:
+        lt[table] = {k: v + SUFFIX for k, v in theme[table].items()}
 
     out = HERE / "grove-icon-theme.json"
     text = json.dumps(theme, indent=2, ensure_ascii=False) + "\n"
@@ -105,12 +139,12 @@ def main():
         version = json.loads(pkg_path.read_text())["version"]
         if not out.exists() or out.read_text() != text:
             version = bump(version)
-    out.write_text(text)
+    write(out, text)
     shutil.copyfile(seti / "seti.woff", HERE / "seti.woff")
     pkg = {
         "name": "grove-icons",
         "displayName": "Grove Icons",
-        "description": "VS Code's Seti icons in Everforest colors",
+        "description": "VS Code's Seti icons in Everforest colors, dark and light",
         "publisher": "grove",
         "version": version,
         "license": "MIT",
@@ -118,14 +152,12 @@ def main():
         "categories": ["Themes"],
         "contributes": {"iconThemes": [{"id": "grove-icons", "label": "Grove Icons", "path": "./grove-icon-theme.json"}]},
     }
-    pkg_path.write_text(json.dumps(pkg, indent=2) + "\n")
+    write(pkg_path, json.dumps(pkg, indent=2) + "\n")
     (HERE / "NOTICE").write_text(NOTICE)
 
-    names = {v: k for k, v in pal.items() if k in ACCENTS + ["grey0", "grey1", "fg"]}
-    for old, new in sorted(mapping.items()):
-        print(f"{old} -> {names[new]} {new}")
-    print(f"{len(theme['iconDefinitions'])} icons, version {version}")
-
+    for old, name in sorted(mapping.items()):
+        print(f"{old} -> {name} {dark[name]} (light {light[name]})")
+    print(f"{len(defs) // 2} icons, each dark and light, version {version}")
 
 if __name__ == "__main__":
     main()
