@@ -10,10 +10,10 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft bg1 background under the pointer.
+# Hover: clickable items get a soft fill under the pointer.
 NAME="${NAME:-}"
 case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 

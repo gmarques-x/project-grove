@@ -46,6 +46,10 @@ border    = #475258
 on_accent = #2D353B
 # Quiet text: labels, notes.
 dim       = #859289
+# The fill under the pointer on something clickable.
+hover     = #343F44
+# Text that steps back but is read: the other workspaces' numbers, list rows.
+muted     = #9DA9A0
 # Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
 # colors. Bright black (ANSI 8) is grey1 instead of upstream's bg3, so dim
 # terminal text stays readable. A mapping, not a new color.

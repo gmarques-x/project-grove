@@ -48,6 +48,11 @@ border    = #BDC3AF
 on_accent = #2D353B
 # Quiet text: grey2, the darkest grey here (grey1 is 2.3 to 2.7:1 on bg0).
 dim       = #829181
+# The fill under the pointer: bg3 (bg1 on bg0 is 1.06:1 here; bg3 is about
+# 1.2:1, as soft as bg1 is in the dark schemes).
+hover     = #E6E2CC
+# Text that steps back but is read: fg, since no grey here reaches 3.3:1.
+muted     = #5C6A72
 # Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
 # colors. Bright black (ANSI 8) is grey1 instead of upstream's fg, so dim
 # terminal text stays readable. Bright white (ANSI 15) is fg instead of

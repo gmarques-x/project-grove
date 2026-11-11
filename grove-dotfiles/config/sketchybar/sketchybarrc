@@ -14,6 +14,7 @@ export CONFIG_DIR
 # A colors.sh rendered before the theme had roles has no BORDER: its BG3 is
 # what the lines were drawn in.
 BORDER="${BORDER:-${BG3:-}}"
+MUTED="${MUTED:-$GREY2}"
 # shellcheck source-path=SCRIPTDIR source=lib.sh
 . "$CONFIG_DIR/lib.sh"
 P="$CONFIG_DIR/plugins"
@@ -55,7 +56,7 @@ sep sep.l1 left
 # six slots, a click goes to that app's window), then a separator.
 for n in 1 2 3 4 5 6 7 8 9; do
   sketchybar --add item "ws.$n" left \
-    --set "ws.$n" label="$n" label.color="$GREY2" label.padding_left=7 label.padding_right=7 \
+    --set "ws.$n" label="$n" label.color="$MUTED" label.padding_left=7 label.padding_right=7 \
       icon.drawing=off padding_left=1 padding_right=5 drawing=off \
       background.color="$GREEN" background.height=20 background.corner_radius=5 background.drawing=off \
       click_script="aerospace workspace $n"
@@ -127,7 +128,7 @@ for i in 1 2 3 4; do
   sketchybar --add item "net.total.$i" popup.net.down --set "net.total.$i" icon.drawing=off drawing=off
 done
 for i in 1 2 3 4 5; do
-  sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$GREY2" drawing=off
+  sketchybar --add item "net.app.$i" popup.net.down --set "net.app.$i" icon.drawing=off label.color="$MUTED" drawing=off
 done
 
 sep sep.r5 right

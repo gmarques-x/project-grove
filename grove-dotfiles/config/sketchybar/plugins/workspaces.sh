@@ -11,10 +11,10 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# Hover: clickable items get a soft bg1 background under the pointer.
+# Hover: clickable items get a soft fill under the pointer.
 NAME="${NAME:-}"
 case "${SENDER:-}" in
-  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="${HOVER_FILL:-$BG1}"; exit 0 ;;
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
@@ -45,7 +45,7 @@ for n in 1 2 3 4 5 6 7 8 9; do
       # roles has no ON_ACCENT: its BG0 is what the number was drawn in.
       args+=(--set "ws.$n" drawing=on background.drawing=on label.color="${ON_ACCENT:-$BG0}")
     else
-      args+=(--set "ws.$n" drawing=on background.drawing=off label.color="$GREY2")
+      args+=(--set "ws.$n" drawing=on background.drawing=off label.color="${MUTED:-$GREY2}")
     fi
     args+=(--set "sep.ws.$n" drawing=on)
   else

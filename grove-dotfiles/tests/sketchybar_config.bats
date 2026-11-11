@@ -63,7 +63,7 @@ ncalls() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; f
   for s in $(gt_schemes); do
     out="$BATS_TEST_TMPDIR/colors-$s.sh"
     gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$out"
-    for n in BG0 BG1 FG GREY2 BORDER ON_ACCENT GREEN AQUA BLUE ORANGE YELLOW RED; do
+    for n in BG0 BG1 FG GREY2 BORDER ON_ACCENT HOVER_FILL MUTED GREEN AQUA BLUE ORANGE YELLOW RED; do
       grep -qE "^export $n=0xff[0-9A-F]{6}\$" "$out" || { echo "$s $n"; false; }
     done
     grep -q "^export PINE_ICON=\"\$CONFIG_DIR/icons/pine-${s%%-*}.png\"\$" "$out"
@@ -183,7 +183,12 @@ rc() {
   done
 }
 
-@test "hover: a soft bg1 background under the pointer, gone when it leaves" {
+@test "hover: a soft fill under the pointer (bg1 in dark, bg3 in light), gone when it leaves" {
+  gt_render_file light-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+  plugin net.down SENDER=mouse.entered
+  [ "$(calls)" = "--set net.down background.drawing=on background.color=$(argb light-medium bg3)" ]
+  : > "$CALLS"
+  gt_render_file dark-medium "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
   plugin net.down SENDER=mouse.entered
   . "$CFG/colors.sh"
   [ "$(calls)" = "--set net.down background.drawing=on background.color=$BG1" ]
@@ -260,7 +265,7 @@ old_colors() {
   [[ "$(calls)" == *"--set ws.2 drawing=off"* ]] || false
 }
 
-@test "workspaces: the number on the green pill is in the on_accent colour, the others grey" {
+@test "workspaces: the number on the green pill is in the on_accent colour, the others muted (grey2 in dark, fg in light)" {
   local s
   fake aerospace 'case "$*" in *--focused*) echo 3 ;; *) printf "1\n3\n5\n" ;; esac'
   for s in dark-medium light-medium; do
@@ -272,7 +277,8 @@ old_colors() {
       . "$CFG/colors.sh"
       [ "$ON_ACCENT" = "$(argb dark-medium bg0)" ]
       [[ "$(calls)" == *"--set ws.3 drawing=on background.drawing=on label.color=$ON_ACCENT "* ]] || { echo "$s pill"; false; }
-      [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off label.color=$GREY2 "* ]] || { echo "$s grey"; false; }
+      [[ "$(calls)" == *"--set ws.1 drawing=on background.drawing=off label.color=$MUTED "* ]] || { echo "$s muted"; false; }
+      if [ "$s" = dark-medium ]; then [ "$MUTED" = "$GREY2" ]; else [ "$MUTED" = "$FG" ]; fi
     )
   done
   # Light: the pill's text is no longer the bar's own background.
