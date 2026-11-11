@@ -128,6 +128,19 @@ actor SleepGate {
         #expect(model.error == nil)
     }
 
+    @Test func switchIsIgnoredWhileALogoOrWallpaperPickRuns() async throws {
+        let runner = FakeRunner(answers: try fixtureAnswers())
+        let model = ThemesModel(client: GroveThemesClient(runner: runner))
+        model.busyLogo = "avatar"
+        await model.switchTo("light-soft")
+        model.busyLogo = nil
+        model.busyWallpaper = "avatar"
+        await model.switchTo("light-soft")
+        #expect(await runner.calls.isEmpty)
+        #expect(model.busyScheme == nil)
+        #expect(model.busyWallpaper == "avatar")
+    }
+
     @Test func switchUsageErrorIsShown() async throws {
         var answers = try fixtureAnswers()
         answers["set"] = CLIOutput(status: 2, stdout: Data(), stderr: "grove-themes: unknown scheme: x")

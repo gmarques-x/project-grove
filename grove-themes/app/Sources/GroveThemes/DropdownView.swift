@@ -58,7 +58,7 @@ struct DropdownView: View {
         }
         .padding(14)
         .frame(width: 320)
-        .keyboardNavigation(focus.projectedValue, current: model.list?.current ?? "",
+        .keyboardNavigation(focus.projectedValue, list: model.list,
                             schemesDisabled: model.switchingDisabled, activate: run)
         .font(GroveFont.mono(13))
         .foregroundStyle(Color(theme.fg))

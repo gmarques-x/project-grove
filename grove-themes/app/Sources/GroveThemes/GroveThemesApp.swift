@@ -50,5 +50,9 @@ struct GroveThemesApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
         .defaultSize(width: GalleryView.width, height: GalleryView.height)
+        // grovethemes:// links are answered by ThemesAppDelegate (GalleryOpener);
+        // without this SwiftUI also opens this window for every link, whatever
+        // it says.
+        .handlesExternalEvents(matching: [])
     }
 }

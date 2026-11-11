@@ -1,10 +1,10 @@
 /// Where the keyboard focus box can go, and how arrows and Ctrl+h/j/k/l move
 /// it. The tiles (dropdown) and cards (gallery) are 2 rows × 3: Dark on top,
 /// Light below, Hard / Medium / Soft left to right. Both continue below with
-/// the "Terminal logo" row (Project Grove under the left two columns, Avatar
-/// under the right one) and the "Wallpaper" row (the same two columns, one
-/// remembered column for both); the dropdown then has "Open Grove Themes…"
-/// and "Quit", one column. Moves off an edge stay put (no wrap).
+/// the "Terminal logo" row and the "Wallpaper" row, each built from its own
+/// list as `grove-themes list` gives it (an empty list has no row); the
+/// dropdown then has "Open Grove Themes…" and "Quit", one item each. Moves
+/// off an edge stay put (no wrap).
 public struct FocusGrid: Equatable, Sendable {
     public enum Item: Equatable, Sendable {
         case scheme(String)
@@ -17,27 +17,34 @@ public struct FocusGrid: Equatable, Sendable {
     public enum Direction: Equatable, Sendable { case left, right, up, down }
 
     public enum Layout: Equatable, Sendable {
-        /// Tiles, then the two menu rows.
+        /// Tiles, the logo and wallpaper rows, then the two menu rows.
         case dropdown
-        /// Cards only.
+        /// Cards, then the logo and wallpaper rows.
         case gallery
     }
 
     static let rows = ["dark", "light"]
     static let columns = ["hard", "medium", "soft"]
-    static let logos = SchemeList.defaultLogos
 
     public let layout: Layout
     public private(set) var focused: Item
-    /// The tile column last focused, for coming back up from the logo row.
+    /// The rows under the tiles, top to bottom.
+    private let below: [[Item]]
+    /// The row of `below` the box is in; nil while it's on a tile.
+    private var row: Int?
+    /// The tile column last focused, for coming back up from the rows below.
     private var column = 1
-    /// The logo last focused, for coming back up from the menu rows.
-    private var logo = 0
+    /// The place along a row under the tiles last chosen, kept from row to
+    /// row; a row with fewer items shows its last one.
+    private var place = 0
 
     /// Starts on `current`'s tile, or the middle of the top row for a name
-    /// that isn't one of the six.
-    public init(layout: Layout, current: String) {
+    /// that isn't one of the six. `logos` and `wallpapers` are the two rows'
+    /// items in the order shown.
+    public init(layout: Layout, current: String, logos: [String], wallpapers: [String]) {
         self.layout = layout
+        let menuRows: [[Item]] = layout == .dropdown ? [[.openWindow], [.quit]] : []
+        below = ([logos.map(Item.logo), wallpapers.map(Item.wallpaper)] + menuRows).filter { !$0.isEmpty }
         if let (_, column) = Self.position(of: current) {
             focused = .scheme(current)
             self.column = column
@@ -47,58 +54,58 @@ public struct FocusGrid: Equatable, Sendable {
     }
 
     public mutating func move(_ direction: Direction) {
-        switch focused {
-        case .scheme(let name):
-            guard let (row, column) = Self.position(of: name) else { return }
-            var (newRow, newColumn) = (row, column)
-            switch direction {
-            case .left: newColumn = max(column - 1, 0)
-            case .right: newColumn = min(column + 1, Self.columns.count - 1)
-            case .up: newRow = max(row - 1, 0)
-            case .down:
-                if row == Self.rows.count - 1 {
-                    self.column = column
-                    logo = column == Self.columns.count - 1 ? 1 : 0
-                    focused = .logo(Self.logos[logo])
-                    return
-                }
-                newRow = row + 1
-            }
-            self.column = newColumn
-            focused = .scheme(Self.scheme(row: newRow, column: newColumn))
-        case .logo:
-            switch direction {
-            case .left: logo = 0
-            case .right: logo = Self.logos.count - 1
-            case .up:
+        guard let row else {
+            moveOnTiles(direction)
+            return
+        }
+        let items = below[row]
+        let index = min(place, items.count - 1)
+        switch direction {
+        case .left, .right:
+            let next = direction == .left ? max(index - 1, 0) : min(index + 1, items.count - 1)
+            // A move that stays put (an edge, a one-item row) keeps the place.
+            if next != index { place = next }
+        case .up:
+            guard row > 0 else {
+                self.row = nil
                 focused = .scheme(Self.scheme(row: Self.rows.count - 1, column: column))
                 return
-            case .down:
-                focused = .wallpaper(Self.logos[logo])
-                return
             }
-            focused = .logo(Self.logos[logo])
-        case .wallpaper:
-            switch direction {
-            case .left: logo = 0
-            case .right: logo = Self.logos.count - 1
-            case .up:
-                focused = .logo(Self.logos[logo])
-                return
-            case .down:
-                if layout == .dropdown { focused = .openWindow }
-                return
-            }
-            focused = .wallpaper(Self.logos[logo])
-        case .openWindow:
-            switch direction {
-            case .up: focused = .wallpaper(Self.logos[logo])
-            case .down: focused = .quit
-            case .left, .right: break
-            }
-        case .quit:
-            if direction == .up { focused = .openWindow }
+            self.row = row - 1
+        case .down:
+            guard row < below.count - 1 else { return }
+            self.row = row + 1
         }
+        focusBelow()
+    }
+
+    private mutating func moveOnTiles(_ direction: Direction) {
+        guard case .scheme(let name) = focused, let (row, column) = Self.position(of: name) else { return }
+        var (newRow, newColumn) = (row, column)
+        switch direction {
+        case .left: newColumn = max(column - 1, 0)
+        case .right: newColumn = min(column + 1, Self.columns.count - 1)
+        case .up: newRow = max(row - 1, 0)
+        case .down:
+            if row == Self.rows.count - 1 {
+                guard let first = below.first else { return }
+                // The item under the tile: the row's items share the tiles' width
+                // (two items: the first under the left two columns).
+                self.column = column
+                place = column * first.count / Self.columns.count
+                self.row = 0
+                focusBelow()
+                return
+            }
+            newRow = row + 1
+        }
+        self.column = newColumn
+        focused = .scheme(Self.scheme(row: newRow, column: newColumn))
+    }
+
+    private mutating func focusBelow() {
+        guard let row else { return }
+        focused = below[row][min(place, below[row].count - 1)]
     }
 
     static func scheme(row: Int, column: Int) -> String { "\(rows[row])-\(columns[column])" }
@@ -182,14 +189,17 @@ public struct KeyboardFocus: Equatable, Sendable {
     /// Where the box is drawn; nil while it's hidden.
     public var focused: FocusGrid.Item? { grid?.focused }
 
-    /// `schemesDisabled`: tiles, cards and logos take no clicks (a switch is
-    /// running, or the CLI is in trouble), so they take no Return/Space either.
+    /// `logos` and `wallpapers`: the two rows as the view shows them, for the
+    /// grid the first move makes. `schemesDisabled`: tiles, cards and logos
+    /// take no clicks (a switch is running, or the CLI is in trouble), so they
+    /// take no Return/Space either.
     public mutating func handle(_ command: FocusKey.Command, current: String,
+                                logos: [String], wallpapers: [String],
                                 schemesDisabled: Bool) -> Outcome {
         switch command {
         case .move(let direction):
             if grid == nil {
-                grid = FocusGrid(layout: layout, current: current)
+                grid = FocusGrid(layout: layout, current: current, logos: logos, wallpapers: wallpapers)
             } else {
                 grid?.move(direction)
             }

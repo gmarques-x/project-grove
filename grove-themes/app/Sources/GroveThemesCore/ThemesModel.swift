@@ -68,9 +68,10 @@ public final class ThemesModel {
         }
     }
 
-    /// Switches to `scheme`, then refreshes. Ignored while another switch runs.
+    /// Switches to `scheme`, then refreshes. Ignored while another switch or a
+    /// logo or wallpaper pick runs.
     public func switchTo(_ scheme: String) async {
-        guard busyScheme == nil else { return }
+        guard !isBusy else { return }
         busyScheme = scheme
         defer { busyScheme = nil }
         var failure: CLIError?

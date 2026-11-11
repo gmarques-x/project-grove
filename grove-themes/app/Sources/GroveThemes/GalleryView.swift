@@ -77,7 +77,7 @@ struct GalleryView: View {
         .padding(.top, Self.buttonsClearance)
         .frame(width: Self.width, alignment: .top)
         .frame(minHeight: Self.height, alignment: .top)
-        .keyboardNavigation(focus.projectedValue, current: model.list?.current ?? "",
+        .keyboardNavigation(focus.projectedValue, list: model.list,
                             schemesDisabled: model.switchingDisabled) { item in
             switch item {
             case .scheme(let scheme): Task { await model.switchTo(scheme) }

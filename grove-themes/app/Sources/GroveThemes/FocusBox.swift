@@ -10,16 +10,21 @@ import SwiftUI
 struct KeyboardNavigation: ViewModifier {
     let focus: Binding<KeyboardFocus>
     let current: String
+    /// The logo and wallpaper rows as shown (empty while there's no list).
+    let logos: [String]
+    let wallpapers: [String]
     let schemesDisabled: Bool
     let activate: (FocusGrid.Item) -> Void
     @FocusState private var hasKeys: Bool
     /// `State` used directly: see GroveThemesApp on why not `@State`.
     private var host = State(initialValue: HostWindow())
 
-    init(focus: Binding<KeyboardFocus>, current: String, schemesDisabled: Bool,
-         activate: @escaping (FocusGrid.Item) -> Void) {
+    init(focus: Binding<KeyboardFocus>, current: String, logos: [String], wallpapers: [String],
+         schemesDisabled: Bool, activate: @escaping (FocusGrid.Item) -> Void) {
         self.focus = focus
         self.current = current
+        self.logos = logos
+        self.wallpapers = wallpapers
         self.schemesDisabled = schemesDisabled
         self.activate = activate
     }
@@ -33,7 +38,8 @@ struct KeyboardNavigation: ViewModifier {
             .focused($hasKeys)
             .onKeyPress(phases: [.down, .repeat]) { press in
                 guard let command = Self.command(press) else { return .ignored }
-                switch focus.wrappedValue.handle(command, current: current, schemesDisabled: schemesDisabled) {
+                switch focus.wrappedValue.handle(command, current: current, logos: logos, wallpapers: wallpapers,
+                                                 schemesDisabled: schemesDisabled) {
                 case .handled:
                     return .handled
                 case .activate(let item):
@@ -88,9 +94,10 @@ struct KeyboardNavigation: ViewModifier {
 }
 
 extension View {
-    func keyboardNavigation(_ focus: Binding<KeyboardFocus>, current: String, schemesDisabled: Bool,
+    func keyboardNavigation(_ focus: Binding<KeyboardFocus>, list: SchemeList?, schemesDisabled: Bool,
                             activate: @escaping (FocusGrid.Item) -> Void) -> some View {
-        modifier(KeyboardNavigation(focus: focus, current: current, schemesDisabled: schemesDisabled,
+        modifier(KeyboardNavigation(focus: focus, current: list?.current ?? "", logos: list?.logos ?? [],
+                                    wallpapers: list?.wallpapers ?? [], schemesDisabled: schemesDisabled,
                                     activate: activate))
     }
 
