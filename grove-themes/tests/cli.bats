@@ -217,3 +217,60 @@ gt_copy_config() {
   [ "$output" = '{"logo": "avatar"}' ]
   [[ "$stderr" == *"backed up edited ghostty/config to "* ]] || false
 }
+
+wp_avatar_files() {
+  local s
+  for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
+    : > "$GROVE_WALLPAPER_DIR/wallpaper-avatar-$s.png"
+  done
+}
+
+@test "wallpaper prints grove by default" {
+  run "$CLI" wallpaper
+  [ "$status" -eq 0 ]
+  [ "$output" = grove ]
+  run "$CLI" wallpaper --json
+  [ "$output" = '{"wallpaper": "grove"}' ]
+}
+
+@test "wallpaper avatar saves it, sets the avatar picture, logs a wallpaper step, --json is only JSON" {
+  wp_avatar_files
+  mkdir -p "$GROVE_STATE"; echo light-soft > "$GROVE_STATE/theme"
+  stub osascript 'cat > /dev/null; echo "$2" >> "$BATS_TEST_TMPDIR/pictures"; exit 0'
+  run --separate-stderr "$CLI" wallpaper avatar --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == '{"wallpaper": "avatar", "steps": [{"name": "wallpaper", "result": "live", "message": '* ]] || false
+  printf '%s' "$output" | /opt/homebrew/bin/python3 -I -c 'import json,sys; json.load(sys.stdin)'
+  [ "$(cat "$GROVE_STATE/wallpaper")" = avatar ]
+  grep -q 'wallpaper-avatar-light-soft.png' "$BATS_TEST_TMPDIR/pictures"
+  tail -n 1 "$GROVE_STATE/theme-log.jsonl" | grep -q '"scheme": "light-soft", "exit": 0, "steps": \[{"name": "wallpaper", "result": "live"'
+  run "$CLI" wallpaper
+  [ "$output" = avatar ]
+}
+
+@test "wallpaper with Automation refused says needs-you, exits 1 and still saves the choice" {
+  wp_avatar_files
+  stub osascript 'cat > /dev/null; exit 1'
+  run "$CLI" wallpaper avatar
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"needs-you"* ]] || false
+  [ "$(cat "$GROVE_STATE/wallpaper")" = avatar ]
+}
+
+@test "wallpaper with a missing picture exits 1 and saves nothing" {
+  run "$CLI" wallpaper avatar
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"wallpaper not found:"*"wallpaper-avatar-dark-medium.png"* ]] || false
+  [ ! -e "$GROVE_STATE/wallpaper" ]
+}
+
+@test "wallpaper with an unknown name exits 2" {
+  run "$CLI" wallpaper banana
+  [ "$status" -eq 2 ]
+  [ ! -e "$GROVE_STATE/wallpaper" ]
+}
+
+@test "list --json carries the wallpaper and the wallpapers" {
+  run "$CLI" list --json
+  [[ "$output" == *'"wallpaper": "grove", "wallpapers": ["grove", "avatar"]'* ]] || false
+}

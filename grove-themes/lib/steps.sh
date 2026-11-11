@@ -144,16 +144,20 @@ _gt_copy_backup() {
 # WallpaperAgent is force-stopped (-KILL: a normal quit saves its in-memory
 # copy over ours) and launchd restarts it. Seams: GROVE_WALLPAPER_STORE,
 # GROVE_KILLALL.
-gt_step_wallpaper() {
-  local dir file store lib msg backup
+# gt_wallpaper_file SCHEME: the chosen set's picture for SCHEME, as a clean
+# path (no ".."), the same text 85-macos-wallpaper compares against.
+gt_wallpaper_file() {
+  local dir set
   dir="${GROVE_WALLPAPER_DIR:-${GROVE_ROOT:?}/../grove-wallpapers}"
-  # A clean path (no ".."), the same text 85-macos-wallpaper compares against.
   dir="$(cd "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")"
-  # The chosen set (grove-themes wallpaper): Project Grove or the avatar.
-  local set
   set="$(gt_wallpaper)"
   [ "$set" = grove ] && set=project-grove
-  file="$dir/wallpaper-$set-$1.png"
+  printf '%s/wallpaper-%s-%s.png' "$dir" "$set" "$1"
+}
+
+gt_step_wallpaper() {
+  local file store lib msg backup
+  file="$(gt_wallpaper_file "$1")"
   store="${GROVE_WALLPAPER_STORE:-$HOME/Library/Application Support/com.apple.wallpaper/Store/Index.plist}"
   lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   if [ ! -r "$file" ]; then

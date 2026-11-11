@@ -10,9 +10,11 @@ grove-themes current               the current scheme's name
 grove-themes set SCHEME            render the configs for SCHEME and remember it
 grove-themes log [-n N]            the last N switches (default 5), newest first
 grove-themes logo [grove|avatar]   the terminal logo, or switch it
+grove-themes wallpaper [grove|avatar]
+                                   the wallpaper set, or switch it
 grove-themes render [--scheme S] [--config DIR]
                                    write the configs (default: the current scheme, $GROVE_ROOT/config)
---json                             machine-readable output on list, current, set, log and logo
+--json                             machine-readable output on list, current, set, log, logo and wallpaper
 ```
 
 The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grove/theme`). `grove install` links the command into `~/.local/bin` and renders the configs. 
@@ -23,6 +25,10 @@ Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (
 ## The terminal logo
 
 New terminal windows show a logo beside the fastfetch box: `grove` (the Project Grove lockup, the default) or `avatar` (the GitHub avatar's tree-ring drawing). The choice is kept in `$GROVE_STATE/fetch-logo` and applies to every scheme; `logo NAME` renders the configs with it (nothing changes if any template fails), then saves it and logs a `logo` step. `list --json` carries `logo` and `logos`. The images are `grove-dotfiles/config/fastfetch/{grove,avatar}.png` and their `-light-<contrast>` variants.
+
+## The wallpaper
+
+Every scheme has two wallpapers in `grove-wallpapers/`: `wallpaper-project-grove-<scheme>.png` (the default) and `wallpaper-avatar-<scheme>.png` (the avatar's drawing). The set is kept in `$GROVE_STATE/wallpaper` (`grove` or `avatar`) and every `set` uses it. `wallpaper NAME` checks the current scheme's picture exists, saves the choice, then runs only the wallpaper step (every screen and Space) and logs it; the configs are left alone. If macOS refuses the Automation prompt the step says needs-you, but the choice is kept for the next switch. `list --json` carries `wallpaper` and `wallpapers`.
 
 ## Chrome (one-time setup)
 

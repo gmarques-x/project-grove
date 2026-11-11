@@ -11,12 +11,13 @@ commands:
   set SCHEME                     switch to SCHEME
   log [-n N]                     the last N switches (default 5), newest first
   logo [grove|avatar]            the terminal logo, or switch it
+  wallpaper [grove|avatar]       the wallpaper set, or switch it
   render [--scheme S] [--config DIR]
                                  write the configs (default: current scheme,
                                  $GROVE_ROOT/config)
 
 options:
-  --json   machine-readable output on list, current, set, log and logo
+  --json   machine-readable output on list, current, set, log, logo and wallpaper
 U
 }
 
@@ -92,8 +93,9 @@ cmd_list() {
       sep=", "
     done
     # shellcheck disable=SC2046
-    printf '{"current": "%s", "schemes": [%s], "palettes": {%s}, "logo": "%s", "logos": [%s]}\n' \
-      "$cur" "$(_gt_json_list $(gt_schemes))" "$pal" "$(gt_logo)" "$(_gt_json_list $(gt_logos))"
+    printf '{"current": "%s", "schemes": [%s], "palettes": {%s}, "logo": "%s", "logos": [%s], "wallpaper": "%s", "wallpapers": [%s]}\n' \
+      "$cur" "$(_gt_json_list $(gt_schemes))" "$pal" "$(gt_logo)" "$(_gt_json_list $(gt_logos))" \
+      "$(gt_wallpaper)" "$(_gt_json_list $(gt_wallpapers))"
     return 0
   fi
   for s in $(gt_schemes); do
@@ -169,6 +171,39 @@ cmd_logo() {
   if [ "$json" = 1 ]; then printf '{"logo": "%s"}\n' "$name"; else echo "grove-themes: logo $name"; fi
 }
 
+# cmd_wallpaper JSON [NAME]: print the wallpaper set, or switch to NAME: the
+# picture for the current scheme must exist; then save the choice (even if
+# Automation is refused, so the next switch applies it), run the wallpaper
+# step for the current scheme and log it. Configs are left alone.
+cmd_wallpaper() {
+  local json="$1" name="$2" scheme file tmp line tab step res text rc=0
+  if [ -z "$name" ]; then
+    if [ "$json" = 1 ]; then printf '{"wallpaper": "%s"}\n' "$(gt_wallpaper)"; else gt_wallpaper; fi
+    return 0
+  fi
+  case " $(gt_wallpapers) " in *" $name "*) ;; *) _gt_usage >&2; exit 2 ;; esac
+  scheme="$(gt_current)"
+  file="$(GROVE_WALLPAPER_SET="$name" gt_wallpaper_file "$scheme")"
+  [ -r "$file" ] || { echo "grove-themes: wallpaper not found: $file" >&2; exit 1; }
+  tmp="$GROVE_STATE/wallpaper.tmp"
+  if ! { mkdir -p "$GROVE_STATE" && echo "$name" > "$tmp" && mv -f "$tmp" "$GROVE_STATE/wallpaper"; }; then
+    echo "grove-themes: could not write $GROVE_STATE/wallpaper" >&2
+    exit 1
+  fi
+  tab="$(printf '\t')"
+  line="$(gt_step_wallpaper "$scheme")"
+  IFS="$tab" read -r step res text <<< "$line"
+  case "$res" in failed|needs-you) rc=1 ;; esac
+  step="$(printf '{"name": "%s", "result": "%s", "message": "%s"}' "$step" "$res" "$(_gt_json_esc "$text")")"
+  gt_log_append "$scheme" "$rc" "$step" 2>/dev/null || true
+  if [ "$json" = 1 ]; then
+    printf '{"wallpaper": "%s", "steps": [%s]}\n' "$name" "$step"
+  else
+    printf '%-11s %-12s %s\n' wallpaper "$res" "$text"
+  fi
+  exit "$rc"
+}
+
 cmd_set() {
   local json="$1" scheme="$2" msg="" result="live" rc=0 lines tab name res text out="" sep=""
   tab="$(printf '\t')"
@@ -220,6 +255,7 @@ case "$cmd" in
   set) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_set "$json" "${1:-}" ;;
   log) cmd_log "$json" "$@" ;;
   logo) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_logo "$json" "${1:-}" ;;
+  wallpaper) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_wallpaper "$json" "${1:-}" ;;
   render) cmd_render "$@" ;;
   *) _gt_usage >&2; exit 2 ;;
 esac

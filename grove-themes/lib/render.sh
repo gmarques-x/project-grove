@@ -32,9 +32,11 @@ gt_wallpapers() { echo "grove avatar"; }
 
 # gt_wallpaper: the chosen wallpaper set from $GROVE_STATE/wallpaper
 # (whitespace trimmed); a missing file or any other value is grove.
+# GROVE_WALLPAPER_SET overrides the file (`wallpaper` checks the new
+# choice's picture before saving it).
 gt_wallpaper() {
-  local v
-  v="$( { tr -d '[:space:]' < "$GROVE_STATE/wallpaper"; } 2>/dev/null || true)"
+  local v="${GROVE_WALLPAPER_SET:-}"
+  [ -n "$v" ] || v="$( { tr -d '[:space:]' < "$GROVE_STATE/wallpaper"; } 2>/dev/null || true)"
   case "$v" in avatar) echo avatar ;; *) echo grove ;; esac
 }
 
