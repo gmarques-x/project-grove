@@ -57,5 +57,11 @@ run = 'layout floating'
 if.app-id = 'com.apple.finder'
 run = 'layout floating'
 
+# The Grove window (`grove present`): a Ghostty window titled "Grove · …".
+[[on-window-detected]]
+if.app-id = 'com.mitchellh.ghostty'
+if.window-title-regex-substring = '^Grove · '
+run = 'layout floating'
+
 # No app is pinned to a workspace: a window opens on the workspace in front and
 # is moved from there (Option+Shift+number).

@@ -108,6 +108,16 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
   done
 }
 
+@test "aerospace: the Grove window (Ghostty, title starting with Grove · ) floats; other Ghostty windows tile" {
+  [ "$(as_q "[(r['if'], r['run']) for r in c['on-window-detected'] if r['if'].get('app-id') == 'com.mitchellh.ghostty']")" \
+    = '[[{"app-id": "com.mitchellh.ghostty", "window-title-regex-substring": "^Grove \u00b7 "}, "layout floating"]]' ]
+  # The pattern against the titles grove present gives and ordinary ones.
+  [ "$(as_q "[bool(__import__('re').search(r['if']['window-title-regex-substring'], t)) for r in c['on-window-detected'] if 'window-title-regex-substring' in r['if'] for t in ('Grove · Check', 'Grove · grove', 'zsh', 'About Grove · x', 'Grove')]")" \
+    = '[true, true, false, false, false]' ]
+  # bin/grove builds that title.
+  grep -q -- '--title=Grove · \$title' "$GROVE_ROOT/lib/present.sh"
+}
+
 @test "aerospace: a workspace change triggers the Grove bar" {
   [ "$(as_q "c['exec-on-workspace-change']")" = '["/bin/bash", "-c", "/opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change FOCUSED=$AEROSPACE_FOCUSED_WORKSPACE"]' ]
 }
