@@ -9,6 +9,8 @@ final class PointerMenu: NSObject {
     private let model = AppModel.shared
     /// The app the Global Menu is for: the last one in front that isn't Grove Keys.
     private var front = FrontAppTracker()
+    /// Set by a menu item that brings an app forward itself (a window, Settings).
+    private var staysFront = false
 
     /// Follows app switches from launch (the bar never takes focus).
     func start() {
@@ -28,7 +30,7 @@ final class PointerMenu: NSObject {
     func showGroveMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(item("Grove Themes") {
+        menu.addItem(item("Grove Themes", handsBack: false) {
             if let url = URL(string: "grovethemes://gallery") { NSWorkspace.shared.open(url) }
         })
         let keys = NSMenuItem(title: "Grove Keys", action: nil, keyEquivalent: "")
@@ -69,12 +71,12 @@ final class PointerMenu: NSObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
         if !model.permissions.accessibility {
-            menu.addItem(item("Grove Keys needs Accessibility — Open Settings") {
+            menu.addItem(item("Grove Keys needs Accessibility — Open Settings", handsBack: false) {
                 NSWorkspace.shared.open(Permissions.accessibilitySettings)
             })
         }
         if !model.permissions.inputMonitoring {
-            menu.addItem(item("Grove Keys needs Input Monitoring — Open Settings") {
+            menu.addItem(item("Grove Keys needs Input Monitoring — Open Settings", handsBack: false) {
                 NSWorkspace.shared.open(Permissions.inputMonitoringSettings)
             })
         }
@@ -84,7 +86,7 @@ final class PointerMenu: NSObject {
             menu.addItem(info)
         }
         if model.needsAttention { menu.addItem(.separator()) }
-        menu.addItem(item("Open Grove Keys") { [model] in
+        menu.addItem(item("Open Grove Keys", handsBack: false) { [model] in
             model.openMainWindow?()
             NSApp.activate(ignoringOtherApps: true)
         })
@@ -95,15 +97,27 @@ final class PointerMenu: NSObject {
 
     /// Pops `menu` up where the pointer was at the click. With another app in
     /// front, Grove Keys comes forward first: a menu shown while that switch is
-    /// still under way closes again at once (the "second click" bug).
+    /// still under way closes again at once (the "second click" bug). When the
+    /// menu closes, the app that was in front gets the keyboard back, unless
+    /// the chosen item brought something forward itself.
     private func popUpAtPointer(_ menu: NSMenu) {
         let point = NSEvent.mouseLocation
         if NSApp.isActive {
-            menu.popUp(positioning: nil, at: point, in: nil)
+            // Grove Keys' own window is in front: nothing to hand back.
+            DispatchQueue.main.async { menu.popUp(positioning: nil, at: point, in: nil) }
             return
         }
-        let once = Once {
-            DispatchQueue.main.async { menu.popUp(positioning: nil, at: point, in: nil) }
+        let previous = front.current?.pid
+        let once = Once { [self] in
+            DispatchQueue.main.async { [self] in
+                staysFront = false
+                menu.popUp(positioning: nil, at: point, in: nil)
+                // After the chosen item's action, whichever side of popUp's return it runs on.
+                DispatchQueue.main.async { [self] in
+                    guard !staysFront, let previous else { return }
+                    NSRunningApplication(processIdentifier: previous)?.activate()
+                }
+            }
         }
         let center = NotificationCenter.default
         let token = center.addObserver(
@@ -115,9 +129,13 @@ final class PointerMenu: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { once.run() }
     }
 
-    private func item(_ title: String, _ action: @escaping @MainActor () -> Void) -> NSMenuItem {
+    /// `handsBack: false` for an item that brings an app forward itself.
+    private func item(_ title: String, handsBack: Bool = true, _ action: @escaping @MainActor () -> Void) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: #selector(MenuAction.run), keyEquivalent: "")
-        let target = MenuAction(action)
+        let target = MenuAction { [self] in
+            if !handsBack { staysFront = true }
+            action()
+        }
         item.target = target
         item.representedObject = target   // keeps the target alive with the item
         return item
