@@ -1,4 +1,5 @@
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// One scheme in the gallery: a small desktop (its bg0 with the Grove lockup

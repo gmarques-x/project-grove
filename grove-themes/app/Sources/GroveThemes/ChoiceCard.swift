@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// "grove" → "Project Grove", "avatar" → "Avatar".

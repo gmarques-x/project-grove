@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// One key the editor is open on.

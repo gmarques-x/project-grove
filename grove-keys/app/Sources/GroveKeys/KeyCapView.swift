@@ -1,5 +1,6 @@
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// One drawn key (mockup §1): its legend on top, what it does below, tinted by

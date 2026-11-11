@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The cheat sheet shown while Caps Lock is held (spec §7, mockup §3): a

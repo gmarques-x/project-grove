@@ -17,15 +17,19 @@ let package = Package(
     products: [
         .executable(name: "GroveThemes", targets: ["GroveThemes"]),
         .library(name: "GroveThemesCore", targets: ["GroveThemesCore"]),
+        // What the Grove apps' views share: Grove Keys builds on it too.
+        .library(name: "GroveUI", targets: ["GroveUI"]),
     ],
     targets: [
         .target(name: "GroveThemesCore"),
-        .executableTarget(name: "GroveThemes", dependencies: ["GroveThemesCore"]),
+        .target(name: "GroveUI", dependencies: ["GroveThemesCore"]),
+        .executableTarget(name: "GroveThemes", dependencies: ["GroveThemesCore", "GroveUI"]),
         .testTarget(
             name: "GroveThemesCoreTests",
             dependencies: ["GroveThemesCore"],
             exclude: ["Fixtures"],
             swiftSettings: testSettings
         ),
+        .testTarget(name: "GroveUITests", dependencies: ["GroveUI", "GroveThemesCore"], swiftSettings: testSettings),
     ]
 )

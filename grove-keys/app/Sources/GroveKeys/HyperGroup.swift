@@ -1,5 +1,6 @@
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// Hyper key: on/off, what a tap sends, the two timings (spec §5).

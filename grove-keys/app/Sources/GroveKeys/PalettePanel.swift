@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The palette (`grovekeys://palette`, Hyper + Space): every row of the Grove

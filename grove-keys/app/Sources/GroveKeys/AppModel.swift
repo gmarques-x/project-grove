@@ -3,6 +3,7 @@ import Combine
 import Foundation
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import os
 
 /// The app's one model: keys.toml and this Mac's monitors.toml as last

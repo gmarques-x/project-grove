@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The Grove Keys window (spec §7, mockup §1): no title bar, the header with

@@ -1,4 +1,5 @@
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// One scheme in the dropdown, drawn in its own colours.

@@ -1,5 +1,6 @@
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The drawn MacBook keyboard for one layer (mockup §1 and §3): rows of caps

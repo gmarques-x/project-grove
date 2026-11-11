@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The menu bar dropdown, worn in the current scheme.

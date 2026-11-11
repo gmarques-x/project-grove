@@ -1,5 +1,6 @@
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The key editor (spec §7, mockup §1): Launcher (Hyper layer only) ·

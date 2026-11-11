@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// Keyboard navigation for the dropdown and the gallery (the rules are
@@ -99,31 +100,6 @@ extension View {
         modifier(KeyboardNavigation(focus: focus, current: list?.current ?? "", logos: list?.logos ?? [],
                                     wallpapers: list?.wallpapers ?? [], schemesDisabled: schemesDisabled,
                                     activate: activate))
-    }
-
-    /// The keyboard focus box: a 2 pt rounded outline in the current scheme's
-    /// green, `outset` points outside the view (tiles and cards: 5, a 3 pt gap
-    /// outside their own 2 pt border; menu rows: 0, on the row's edge).
-    func focusBox(_ shown: Bool, cornerRadius: CGFloat, outset: CGFloat) -> some View {
-        modifier(FocusBox(shown: shown, cornerRadius: cornerRadius, outset: outset))
-    }
-}
-
-private struct FocusBox: ViewModifier {
-    let shown: Bool
-    let cornerRadius: CGFloat
-    let outset: CGFloat
-    @Environment(\.theme) private var theme
-
-    func body(content: Content) -> some View {
-        content.overlay {
-            if shown {
-                RoundedRectangle(cornerRadius: cornerRadius + outset)
-                    .strokeBorder(Color(theme.green), lineWidth: 2)
-                    .padding(-outset)
-                    .allowsHitTesting(false)
-            }
-        }
     }
 }
 

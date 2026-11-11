@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// Records one shortcut for one row (spec §7): the next key-down in the app,

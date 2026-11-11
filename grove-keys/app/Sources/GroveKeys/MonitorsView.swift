@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The Monitors group (spec §7, §10, mockup §2): this Mac's monitors.toml,

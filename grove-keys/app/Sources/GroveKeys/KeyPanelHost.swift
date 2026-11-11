@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The panel the palette and the searchable cheat sheet are drawn in: over

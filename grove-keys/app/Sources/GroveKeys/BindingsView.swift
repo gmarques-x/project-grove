@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The Bindings tab (spec §7, mockup §2): keys.toml as grouped rows. Left:

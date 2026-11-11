@@ -26,7 +26,10 @@ let package = Package(
             name: "GroveKeysCore",
             dependencies: [.product(name: "GroveThemesCore", package: "grove-themes")]
         ),
-        .executableTarget(name: "GroveKeys", dependencies: ["GroveKeysCore"]),
+        .executableTarget(
+            name: "GroveKeys",
+            dependencies: ["GroveKeysCore", .product(name: "GroveUI", package: "grove-themes")]
+        ),
         .testTarget(
             name: "GroveKeysCoreTests",
             dependencies: ["GroveKeysCore"],

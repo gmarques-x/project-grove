@@ -1,5 +1,6 @@
 import AppKit
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The keyboard glyph in the native menu bar (hidden behind the Grove bar,

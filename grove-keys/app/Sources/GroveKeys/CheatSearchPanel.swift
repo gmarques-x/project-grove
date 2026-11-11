@@ -1,6 +1,7 @@
 import AppKit
 import GroveKeysCore
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The cheat sheet to search in (`grovekeys://cheatsheet`, Hyper + K, Show

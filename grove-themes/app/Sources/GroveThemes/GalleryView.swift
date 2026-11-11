@@ -1,4 +1,5 @@
 import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 /// The "Grove Themes" window: the six desktop cards, then the terminal logo
