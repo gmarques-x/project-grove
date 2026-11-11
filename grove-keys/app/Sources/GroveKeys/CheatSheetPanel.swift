@@ -18,12 +18,12 @@ final class CheatSheetPanel {
         self.model = model
     }
 
-    var isShown: Bool { panel != nil }
-
     /// `untilInput`: the menu item's way, hidden by the next key or click.
     func show(untilInput: Bool) {
         hide()
-        let screen = NSApp.keyWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+            ?? NSScreen.main ?? NSScreen.screens.first
         guard let screen else { return }
         // Below the menu bar, as the mockup.
         let full = screen.frame
@@ -39,7 +39,7 @@ final class CheatSheetPanel {
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: CheatSheetView(model: model))
+        panel.contentView = NSHostingView(rootView: CheatSheetView(model: model, untilInput: untilInput))
         panel.setFrame(frame, display: false)
         panel.orderFrontRegardless()
         self.panel = panel
@@ -67,6 +67,7 @@ final class CheatSheetPanel {
 /// The card: "Hyper", the modifier line, the Hyper layer's keyboard.
 struct CheatSheetView: View {
     @ObservedObject var model: AppModel
+    let untilInput: Bool
     static let cardWidth: CGFloat = 820
 
     var body: some View {
@@ -80,7 +81,7 @@ struct CheatSheetView: View {
                         .font(GroveFont.lockup(17))
                         .foregroundStyle(Color(theme.fg))
                     Spacer()
-                    Text("⌃⌥⇧⌘ · release Caps Lock to close")
+                    Text(untilInput ? "⌃⌥⇧⌘ · press any key to close" : "⌃⌥⇧⌘ · release Caps Lock to close")
                         .font(GroveFont.mono(12))
                         .foregroundStyle(Color(theme.grey1))
                 }
@@ -93,7 +94,7 @@ struct CheatSheetView: View {
             .frame(width: Self.cardWidth)
             .background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(theme.bg3), lineWidth: 1))
-            .shadow(color: .black.opacity(0.5), radius: 30, y: 15)
+            .shadow(color: Color(theme.bg0).opacity(0.5), radius: 30, y: 15)
         }
         .font(GroveFont.mono(12))
         .environment(\.theme, theme)
