@@ -144,3 +144,66 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
   [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","fg","green","grey1","orange","purple","red","yellow"]' ]
 }
+
+@test "logo prints grove by default" {
+  run "$CLI" logo
+  [ "$status" -eq 0 ]
+  [ "$output" = grove ]
+  run "$CLI" logo --json
+  [ "$output" = '{"logo": "grove"}' ]
+}
+
+@test "logo avatar saves it, renders the fetch files and logs a logo step" {
+  mkdir -p "$GROVE_STATE"; echo light-soft > "$GROVE_STATE/theme"
+  run "$CLI" logo avatar
+  [ "$status" -eq 0 ]
+  [ "$output" = "grove-themes: logo avatar" ]
+  [ "$(cat "$GROVE_STATE/fetch-logo")" = avatar ]
+  grep -q 'avatar-light-soft.png' "$GROVE_ROOT/config/fastfetch/config.jsonc"
+  grep -q '"width": 46,' "$GROVE_ROOT/config/fastfetch/config.jsonc"
+  grep -q 'COLUMNS >= 108' "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh"
+  tail -n 1 "$GROVE_STATE/theme-log.jsonl" | grep -q '"scheme": "light-soft", "exit": 0, "steps": \[{"name": "logo", "result": "live", "message": "avatar"}\]'
+  run "$CLI" logo
+  [ "$output" = avatar ]
+}
+
+@test "logo grove brings back the grove renders" {
+  mkdir -p "$GROVE_STATE"; echo dark-medium > "$GROVE_STATE/theme"
+  "$CLI" logo avatar
+  run "$CLI" logo grove --json
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"logo": "grove"}' ]
+  cmp "$DOTFILES/tests/fixtures/dark-medium/fastfetch/config.jsonc" "$GROVE_ROOT/config/fastfetch/config.jsonc"
+  cmp "$DOTFILES/tests/fixtures/dark-medium/zsh/conf.d/95-fetch.zsh" "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh"
+}
+
+@test "logo with an unknown name exits 2 with usage" {
+  run "$CLI" logo banana
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"usage: grove-themes"* ]] || false
+  [ ! -e "$GROVE_STATE/fetch-logo" ]
+}
+
+@test "logo keeps the state and files when a render fails" {
+  mkdir -p "$GROVE_STATE"; echo dark-medium > "$GROVE_STATE/theme"
+  "$CLI" logo grove
+  cp "$GROVE_ROOT/config/fastfetch/config.jsonc" "$BATS_TEST_TMPDIR/before"
+  printf 'x={{nope}}\n' > "$GROVE_ROOT/config/broken.tmpl"
+  run "$CLI" logo avatar
+  [ "$status" -eq 1 ]
+  [ "$(cat "$GROVE_STATE/fetch-logo")" = grove ]
+  cmp "$BATS_TEST_TMPDIR/before" "$GROVE_ROOT/config/fastfetch/config.jsonc"
+}
+
+@test "list --json carries the logo and the logos" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"logo": "grove", "logos": ["grove", "avatar"]'* ]] || false
+}
+
+@test "set keeps the chosen logo" {
+  mkdir -p "$GROVE_STATE"; echo dark-medium > "$GROVE_STATE/theme"
+  "$CLI" logo avatar
+  run "$CLI" set light-medium
+  grep -q 'avatar-light-medium.png' "$GROVE_ROOT/config/fastfetch/config.jsonc"
+}

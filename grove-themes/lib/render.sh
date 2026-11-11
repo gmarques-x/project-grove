@@ -19,10 +19,11 @@ gt_valid() {
 gt_logos() { echo "grove avatar"; }
 
 # gt_logo: the chosen terminal logo from $GROVE_STATE/fetch-logo (whitespace
-# trimmed); a missing file or any other value is grove.
+# trimmed); a missing file or any other value is grove. GROVE_FETCH_LOGO
+# overrides the file (`logo` renders with the new choice before saving it).
 gt_logo() {
-  local v
-  v="$( { tr -d '[:space:]' < "$GROVE_STATE/fetch-logo"; } 2>/dev/null || true)"
+  local v="${GROVE_FETCH_LOGO:-}"
+  [ -n "$v" ] || v="$( { tr -d '[:space:]' < "$GROVE_STATE/fetch-logo"; } 2>/dev/null || true)"
   case "$v" in avatar) echo avatar ;; *) echo grove ;; esac
 }
 

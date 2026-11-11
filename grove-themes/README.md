@@ -9,15 +9,20 @@ grove-themes list                  the six schemes, the current one marked
 grove-themes current               the current scheme's name
 grove-themes set SCHEME            render the configs for SCHEME and remember it
 grove-themes log [-n N]            the last N switches (default 5), newest first
+grove-themes logo [grove|avatar]   the terminal logo, or switch it
 grove-themes render [--scheme S] [--config DIR]
                                    write the configs (default: the current scheme, $GROVE_ROOT/config)
---json                             machine-readable output on list, current, set and log
+--json                             machine-readable output on list, current, set, log and logo
 ```
 
 The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grove/theme`). `grove install` links the command into `~/.local/bin` and renders the configs. 
 `list --json` also carries `palettes`: for each scheme its `name` (e.g. `Dark Medium`), `appearance` (`dark` or `light`) and `colors` (`bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple`, as `#RRGGBB`).
 
 Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (`{"time", "scheme", "exit", "steps"}`, the last 50 kept). `log` prints it newest first, one `<time> <scheme> exit=<n>` line per switch, or `{"entries": [...]}` with `--json`; damaged lines are skipped.
+
+## The terminal logo
+
+New terminal windows show a logo beside the fastfetch box: `grove` (the Project Grove lockup, the default) or `avatar` (the GitHub avatar's tree-ring drawing). The choice is kept in `$GROVE_STATE/fetch-logo` and applies to every scheme; `logo NAME` renders the configs with it (nothing changes if any template fails), then saves it and logs a `logo` step. `list --json` carries `logo` and `logos`. The images are `grove-dotfiles/config/fastfetch/{grove,avatar}.png` and their `-light-<contrast>` variants.
 
 ## Chrome (one-time setup)
 

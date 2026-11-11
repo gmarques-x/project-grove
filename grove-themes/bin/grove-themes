@@ -10,12 +10,13 @@ commands:
   current                        the current scheme's name
   set SCHEME                     switch to SCHEME
   log [-n N]                     the last N switches (default 5), newest first
+  logo [grove|avatar]            the terminal logo, or switch it
   render [--scheme S] [--config DIR]
                                  write the configs (default: current scheme,
                                  $GROVE_ROOT/config)
 
 options:
-  --json   machine-readable output on list, current, set and log
+  --json   machine-readable output on list, current, set, log and logo
 U
 }
 
@@ -91,7 +92,8 @@ cmd_list() {
       sep=", "
     done
     # shellcheck disable=SC2046
-    printf '{"current": "%s", "schemes": [%s], "palettes": {%s}}\n' "$cur" "$(_gt_json_list $(gt_schemes))" "$pal"
+    printf '{"current": "%s", "schemes": [%s], "palettes": {%s}, "logo": "%s", "logos": [%s]}\n' \
+      "$cur" "$(_gt_json_list $(gt_schemes))" "$pal" "$(gt_logo)" "$(_gt_json_list $(gt_logos))"
     return 0
   fi
   for s in $(gt_schemes); do
@@ -145,6 +147,27 @@ cmd_render() {
   gt_render_all "$scheme" "$cfg" || exit 1
 }
 
+# cmd_logo JSON [NAME]: print the terminal logo, or switch to NAME: render
+# every config with it first (nothing moves unless all render), then save it
+# and log a "logo" step.
+cmd_logo() {
+  local json="$1" name="$2" scheme tmp
+  if [ -z "$name" ]; then
+    if [ "$json" = 1 ]; then printf '{"logo": "%s"}\n' "$(gt_logo)"; else gt_logo; fi
+    return 0
+  fi
+  case " $(gt_logos) " in *" $name "*) ;; *) _gt_usage >&2; exit 2 ;; esac
+  scheme="$(gt_current)"
+  GROVE_FETCH_LOGO="$name" gt_render_all "$scheme" "$GROVE_ROOT/config" || exit 1
+  tmp="$GROVE_STATE/fetch-logo.tmp"
+  if ! { mkdir -p "$GROVE_STATE" && echo "$name" > "$tmp" && mv -f "$tmp" "$GROVE_STATE/fetch-logo"; }; then
+    echo "grove-themes: could not write $GROVE_STATE/fetch-logo" >&2
+    exit 1
+  fi
+  gt_log_append "$scheme" 0 "$(printf '{"name": "logo", "result": "live", "message": "%s"}' "$name")" 2>/dev/null || true
+  if [ "$json" = 1 ]; then printf '{"logo": "%s"}\n' "$name"; else echo "grove-themes: logo $name"; fi
+}
+
 cmd_set() {
   local json="$1" scheme="$2" msg="" result="live" rc=0 lines tab name res text out="" sep=""
   tab="$(printf '\t')"
@@ -195,6 +218,7 @@ case "$cmd" in
   current) [ $# -eq 0 ] || { _gt_usage >&2; exit 2; }; cmd_current "$json" ;;
   set) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_set "$json" "${1:-}" ;;
   log) cmd_log "$json" "$@" ;;
+  logo) [ $# -le 1 ] || { _gt_usage >&2; exit 2; }; cmd_logo "$json" "${1:-}" ;;
   render) cmd_render "$@" ;;
   *) _gt_usage >&2; exit 2 ;;
 esac
