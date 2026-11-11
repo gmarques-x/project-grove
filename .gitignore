@@ -19,3 +19,4 @@ grove-dotfiles/modules/30-fonts/local/*
 
 # Shared working files between Gustavo and Claude. Never published.
 artifacts/
+.superpowers/

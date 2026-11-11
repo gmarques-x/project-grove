@@ -29,7 +29,7 @@ Grove Keys is a menu bar app with a window. It turns Caps Lock into a Hyper key 
 | Engine | `hidutil` maps Caps Lock to F18; an event tap in the app turns F18 into Hyper/Escape | Chosen by the user over Karabiner-Elements: one app, no third-party driver. |
 | GUI | Two tabs, Keyboard (map per layer) and Bindings (grouped list); menu bar item; cheat sheet panel | Chosen by the user; mockups approved. |
 | Look | Follows the current scheme like Grove Themes (look B, JetBrains Mono, hidden title bar) | Consistency across Grove apps. |
-| Machine identity | `scutil --get LocalHostName` (this Mac: `Gustavos-MacBook-Air`) | Stable, readable, already unique per Mac. |
+| Machine identity | `scutil --get LocalHostName` (e.g. `Test-Mac`) | Stable, readable, already unique per Mac. |
 
 ## 3. Out of scope
 
@@ -80,7 +80,7 @@ alt-shift-semicolon = "mode service"
 esc = ["reload-config", "mode main"]
 # … today's service-mode bindings, unchanged …
 
-[monitors."Gustavos-MacBook-Air"]   # workspace → "main" | "secondary" | "built-in" | a display name
+[monitors."Test-Mac"]   # workspace → "main" | "secondary" | "built-in" | a display name
 ```
 
 - **Keys** in `[launch]` are AeroSpace key names (`t`, `1`, `semicolon`, `slash`…), so one vocabulary covers the whole file.

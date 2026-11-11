@@ -299,7 +299,7 @@ Changes the real home folder. Run only after Tasks 1–12 pass.
 
 - [ ] **Step 1:** Record the before state: `ls -la ~ ~/.config ~/.ssh`, `git config --global --list`, and `grove check` from the repo (`grove-dotfiles/bin/grove check`). Expected: 05-config, 40-ssh, 50-git and 70-zsh need work; the rest are ok.
 - [ ] **Step 2:** Run `grove-dotfiles/bin/grove install`. Answer the three prompts with the pre-filled defaults.
-- [ ] **Step 3:** Verify: `grove check` exits 0. `readlink ~/.config` points to the repo. `~/.config/gh/hosts.yml` still exists. `git config user.email` prints `gustavo.marques@outlook.com`. The backup folder holds `.gitconfig`, `.zprofile`, `.zshrc` and `.ssh/config`. `git status` in project-grove shows no untracked files from `config/`.
+- [ ] **Step 3:** Verify: `grove check` exits 0. `readlink ~/.config` points to the repo. `~/.config/gh/hosts.yml` still exists. `git config user.email` prints `you@example.com`. The backup folder holds `.gitconfig`, `.zprofile`, `.zshrc` and `.ssh/config`. `git status` in project-grove shows no untracked files from `config/`.
 - [ ] **Step 4:** Verify signing: a signed empty commit in a scratch repo passes `git verify-commit HEAD`.
 - [ ] **Step 5:** Verify the shell: `zsh -lic 'echo $ZDOTDIR; command -v grove; starship --version'` prints `~/.config/zsh`, `~/.local/bin/grove` and the version. Ask the user to open a new Terminal window and confirm the Everforest prompt.
 - [ ] **Step 6:** Verify Finder: `grove check` shows `macos-finder` ok, and the 14 values are unchanged.

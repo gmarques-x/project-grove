@@ -29,3 +29,7 @@ More pieces will grow here over time.
 ## Credits
 
 The colors are [Everforest](https://github.com/sainnhe/everforest) by sainnhe. Every color in the configs comes from its palette, and the tests check it.
+
+## License
+
+[MIT](LICENSE).

@@ -121,7 +121,7 @@ Modules get these variables from `grove`: `GROVE_ROOT` (the grove-dotfiles folde
 
 ```sh
 GROVE_NAME="gmarques-x"
-GROVE_EMAIL="gustavo.marques@outlook.com"
+GROVE_EMAIL="you@example.com"
 GROVE_GITHUB_USER="gmarques-x"
 ```
 
