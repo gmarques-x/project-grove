@@ -228,8 +228,13 @@ ta_ready() {
 }
 
 @test "themes-app: swift test passes" {
-  command -v swift >/dev/null || skip "swift isn't installed"
+  # The real swift: setup puts a fake one first on PATH, which would "build"
+  # a fake app into the real source tree.
+  local path="/usr/bin:/bin:/usr/sbin:/sbin"
+  PATH="$path" command -v swift >/dev/null || skip "swift isn't installed"
   cd "$GROVE_ROOT/../grove-themes/app"
-  run swift test
+  run env PATH="$path" swift test
   [ "$status" -eq 0 ]
+  # The real suite ran (not a fake swift that "builds" into this source tree).
+  [[ "$output" == *"Test run with"* ]] || false
 }
