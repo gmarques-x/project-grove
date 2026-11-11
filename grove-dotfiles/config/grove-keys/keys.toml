@@ -11,6 +11,8 @@ enabled = true # false = Caps Lock is left alone
 enter = "com.mitchellh.ghostty"
 
 [aerospace.main] # AeroSpace syntax; "hyper-" means cmd-ctrl-alt-shift-
+hyper-space = "exec-and-forget open grovekeys://palette" # the Grove menu, type to filter
+hyper-k = "exec-and-forget open grovekeys://cheatsheet" # every key, searchable
 alt-slash = "layout tiles horizontal vertical"
 alt-comma = "layout accordion horizontal vertical"
 alt-h = "focus left"
