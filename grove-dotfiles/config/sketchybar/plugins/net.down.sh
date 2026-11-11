@@ -10,6 +10,13 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
+# Hover: clickable items get a soft bg1 background under the pointer.
+NAME="${NAME:-}"
+case "${SENDER:-}" in
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
+esac
+
 state="${TMPDIR:-/tmp}/grove-sketchybar-net"
 now="${SB_NOW:-$(date +%s)}"
 iface="$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"

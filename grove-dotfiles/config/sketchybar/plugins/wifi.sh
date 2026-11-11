@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · wifi: the network name, on (macOS redacts the name), or off.
+# Grove bar · the connection: wifi, eth or vpn through the default route, or off (macOS hides Wi-Fi names from command-line tools).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
@@ -10,4 +10,14 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-"$SB" --set wifi label="$(ipconfig getsummary en0 2>/dev/null | sb_ssid)"
+# Hover: clickable items get a soft bg1 background under the pointer.
+NAME="${NAME:-}"
+case "${SENDER:-}" in
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
+esac
+
+iface="$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
+conn="$( { [ -n "$iface" ] && ipconfig getsummary "$iface" 2>/dev/null; } | sb_conn "$iface")"
+if [ "$conn" = off ]; then color="$GREY2"; else color="$BLUE"; fi
+"$SB" --set wifi label="$conn" label.color="$color"

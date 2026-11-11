@@ -10,4 +10,13 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-"$SB" --set front_app label="${INFO:-$SB_NONE}"
+# Hover: clickable items get a soft bg1 background under the pointer.
+NAME="${NAME:-}"
+case "${SENDER:-}" in
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
+esac
+
+# front_app_switched gives the name in INFO; a reload or the first run doesn't.
+name="${INFO:-$(lsappinfo info -only name "$(lsappinfo front 2>/dev/null)" 2>/dev/null | awk -F '"' 'NR == 1 { print $2 }')}"
+"$SB" --set front_app label="${name:-$SB_NONE}"

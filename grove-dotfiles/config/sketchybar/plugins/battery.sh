@@ -10,5 +10,20 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-level="$(pmset -g batt 2>/dev/null | sb_battery)"
-if [ -z "$level" ]; then "$SB" --set battery drawing=off; else "$SB" --set battery drawing=on label="$level"; fi
+# Hover: clickable items get a soft bg1 background under the pointer.
+NAME="${NAME:-}"
+case "${SENDER:-}" in
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
+esac
+
+read -r level state <<< "$(pmset -g batt 2>/dev/null | sb_battery)"
+if [ -z "$level" ]; then
+  "$SB" --set battery drawing=off
+  exit 0
+fi
+if [ "$state" = charging ]; then color="$GREEN"
+elif [ "$level" -lt 10 ]; then color="$RED"
+elif [ "$level" -lt 20 ]; then color="$YELLOW"
+else color="$FG"; fi
+"$SB" --set battery drawing=on label="$level%" label.color="$color"

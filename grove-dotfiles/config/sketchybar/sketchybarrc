@@ -15,11 +15,11 @@ P="$CONFIG_DIR/plugins"
 TEXT="JetBrains Mono:Regular:13.0"
 # Fixed label widths keep the separators still as values change: JetBrains
 # Mono 13 is 7.8 pt a character, each width fits the item's longest value.
-W4=32     # "100%", "mute"
-W9=72     # "1023 KB/s"
-W13=102   # "100% charging"
+W4=32     # "100%", "mute", "wifi"
+W5=40     # "1023K", "1.2M" (the compact rates)
 W17=134   # "Wed 11 Nov  15:24"
-W3=24     # "off" (macOS redacts the Wi-Fi name)
+# Hover: clickable items light a bg1 background under the pointer (plugins).
+HOVER=(background.height=24 background.corner_radius=6 background.drawing=off)
 BOLD="JetBrains Mono:SemiBold:13.0"
 
 sketchybar --bar height=48 color="$BG0" topmost=on sticky=on position=top \
@@ -38,9 +38,10 @@ sep() {
 
 # Left: the Grove tree, the workspaces, the front app.
 sketchybar --add item grove left \
-  --set grove background.image="$PINE_ICON" background.image.scale=0.5 background.drawing=on \
-    width=18 padding_left=4 padding_right=4 icon.drawing=off label.drawing=off \
-    click_script="open -b com.projectgrove.themes"
+  --set grove icon.background.image="$PINE_ICON" icon.background.image.scale=0.5 icon.background.drawing=on \
+    icon.width=18 icon.padding_left=4 icon.padding_right=4 label.drawing=off "${HOVER[@]}" \
+    script="$P/hover.sh" click_script="open -b com.projectgrove.themes" \
+  --subscribe grove mouse.entered mouse.exited
 sep sep.l1 left
 
 for n in 1 2 3 4 5 6 7 8 9; do
@@ -60,13 +61,21 @@ sketchybar --add item front_app left \
 # Right (the first added is the rightmost): Grove Keys, clock, volume, Wi-Fi,
 # battery, network, memory, CPU.
 sketchybar --add item keys right \
-  --set keys icon="⌘" icon.color="$GREY2" label.drawing=off script="$P/keys.sh" update_freq=30 \
-    click_script="open grovekeys://menu"
+  --set keys icon="⌘" icon.color="$GREY2" label.drawing=off "${HOVER[@]}" script="$P/keys.sh" update_freq=30 \
+    click_script="open grovekeys://menu" \
+  --subscribe keys mouse.entered mouse.exited
 
 sep sep.r1 right
 
 sketchybar --add item clock right \
-  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off script="$P/clock.sh" update_freq=10
+  --set clock label.font="$BOLD" label.width=$W17 icon.drawing=off "${HOVER[@]}" script="$P/clock.sh" update_freq=10 \
+    popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
+    popup.background.border_width=1 popup.background.border_color="$BG3" \
+    click_script="sketchybar --set clock popup.drawing=toggle; $P/clock_popup.sh" \
+  --subscribe clock mouse.entered mouse.exited
+for i in 1 2 3 4 5 6 7 8; do
+  sketchybar --add item "cal.$i" popup.clock --set "cal.$i" icon.drawing=off drawing=off
+done
 
 sep sep.r2 right
 
@@ -77,26 +86,28 @@ sketchybar --add item volume right \
 sep sep.r3 right
 
 sketchybar --add item wifi right \
-  --set wifi icon="wifi" icon.color="$BLUE" label.width=$W3 script="$P/wifi.sh" update_freq=60 \
-  --subscribe wifi wifi_change
+  --set wifi icon.drawing=off label.width=$W4 script="$P/wifi.sh" update_freq=30 \
+  --subscribe wifi wifi_change system_woke
 
 sep sep.r4 right
 
 sketchybar --add item battery right \
-  --set battery icon="▮" icon.color="$GREEN" label.width=$W13 script="$P/battery.sh" update_freq=60 \
+  --set battery icon="bat" icon.color="$GREEN" label.width=$W4 label.align=right script="$P/battery.sh" update_freq=60 \
   --subscribe battery power_source_change system_woke
 
 sep sep.r5 right
 
 sketchybar --add item net.up right \
-  --set net.up icon="↑" icon.color="$ORANGE" label.width=$W9 label.align=right \
-    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
+  --set net.up icon="↑" icon.color="$ORANGE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/hover.sh" \
+    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh" \
+  --subscribe net.up mouse.entered mouse.exited
 
 sketchybar --add item net.down right \
-  --set net.down icon="↓" icon.color="$BLUE" label.width=$W9 label.align=right script="$P/net.down.sh" update_freq=2 \
+  --set net.down icon="↓" icon.color="$BLUE" label.width=$W5 label.align=right "${HOVER[@]}" script="$P/net.down.sh" update_freq=2 \
     popup.align=right popup.background.color="$BG1" popup.background.corner_radius=10 \
     popup.background.border_width=1 popup.background.border_color="$BG3" \
-    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh"
+    click_script="sketchybar --set net.down popup.drawing=toggle; $P/network_popup.sh" \
+  --subscribe net.down mouse.entered mouse.exited
 
 for i in 1 2 3 4; do
   sketchybar --add item "net.total.$i" popup.net.down --set "net.total.$i" icon.drawing=off drawing=off

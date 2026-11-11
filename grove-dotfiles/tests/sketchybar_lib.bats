@@ -11,15 +11,17 @@ setup() {
   . "$GROVE_ROOT/config/sketchybar/lib.sh"
 }
 
-@test "sb_rate: B/s under 1 KB, KB/s without decimals under 1 MB, MB/s with one" {
-  [ "$(sb_rate 0)" = "0 B/s" ]
-  [ "$(sb_rate 512)" = "512 B/s" ]
-  [ "$(sb_rate 1023)" = "1023 B/s" ]
-  [ "$(sb_rate 1024)" = "1 KB/s" ]
-  [ "$(sb_rate 86016)" = "84 KB/s" ]
-  [ "$(sb_rate 1048575)" = "1024 KB/s" ]
-  [ "$(sb_rate 1048576)" = "1.0 MB/s" ]
-  [ "$(sb_rate 1258291)" = "1.2 MB/s" ]
+@test "sb_rate: compact, at most 5 characters: B, K, M (one decimal under 10), G" {
+  [ "$(sb_rate 0)" = "0B" ]
+  [ "$(sb_rate 512)" = "512B" ]
+  [ "$(sb_rate 1023)" = "1023B" ]
+  [ "$(sb_rate 1024)" = "1K" ]
+  [ "$(sb_rate 86016)" = "84K" ]
+  [ "$(sb_rate 1048575)" = "1024K" ]
+  [ "$(sb_rate 1048576)" = "1.0M" ]
+  [ "$(sb_rate 1258291)" = "1.2M" ]
+  [ "$(sb_rate 12582912)" = "12M" ]
+  [ "$(sb_rate 1073741824)" = "1.0G" ]
 }
 
 @test "sb_rate: anything but a whole number is —" {
@@ -39,8 +41,8 @@ setup() {
 }
 
 @test "sb_rate_delta: bytes over seconds; a counter that went down or is missing is —" {
-  [ "$(sb_rate_delta 1000 3048 2)" = "1 KB/s" ]
-  [ "$(sb_rate_delta 0 2516582 2)" = "1.2 MB/s" ]
+  [ "$(sb_rate_delta 1000 3048 2)" = "1K" ]
+  [ "$(sb_rate_delta 0 2516582 2)" = "1.2M" ]
   [ "$(sb_rate_delta 5000 4000 2)" = "—" ]
   [ "$(sb_rate_delta "" 4000 2)" = "—" ]
   [ "$(sb_rate_delta 1000 2000 0)" = "—" ]
@@ -58,10 +60,27 @@ setup() {
   [ "$(echo nonsense | sb_mem 25769803776)" = "—" ]
 }
 
-@test "sb_battery: level, a charging mark, nothing without a battery" {
-  [ "$(sb_battery < "$FX/pmset-charging.txt")" = "87% charging" ]
-  [ "$(sb_battery < "$FX/pmset-battery.txt")" = "100%" ]
+@test "sb_battery: level and whether it's charging, nothing without a battery" {
+  [ "$(sb_battery < "$FX/pmset-charging.txt")" = "87 charging" ]
+  [ "$(sb_battery < "$FX/pmset-battery.txt")" = "100 discharging" ]
   [ "$(sb_battery < "$FX/pmset-none.txt")" = "" ]
+}
+
+@test "sb_conn: vpn for a tunnel, wifi or eth from the interface type, off without a route" {
+  [ "$(sb_conn utun3 < /dev/null)" = "vpn" ]
+  [ "$(sb_conn ipsec0 < /dev/null)" = "vpn" ]
+  [ "$(sb_conn en0 < "$FX/ipconfig-wifi.txt")" = "wifi" ]
+  [ "$(sb_conn en5 < "$FX/ipconfig-eth.txt")" = "eth" ]
+  [ "$(sb_conn "" < /dev/null)" = "off" ]
+}
+
+@test "sb_load: high above 70, critical above 90" {
+  [ "$(sb_load 12)" = "normal" ]
+  [ "$(sb_load 70)" = "normal" ]
+  [ "$(sb_load 71)" = "high" ]
+  [ "$(sb_load 90)" = "high" ]
+  [ "$(sb_load 91)" = "critical" ]
+  [ "$(sb_load —)" = "normal" ]
 }
 
 @test "sb_ssid: the network name, on when macOS redacts it, off when not connected" {

@@ -5,18 +5,18 @@
 
 SB_NONE="—"
 
-# sb_rate BYTES_PER_SECOND: "512 B/s", "84 KB/s" (no decimals under 1 MB),
-# "1.2 MB/s" (one decimal).
+# sb_rate BYTES_PER_SECOND: compact, at most 5 characters so the bar's slot
+# never moves: "512B", "84K", "1.2M" (one decimal under 10), "12M", "1.0G".
 sb_rate() {
   local n="$1"
   case "$n" in '' | *[!0-9]*) echo "$SB_NONE"; return ;; esac
-  if [ "$n" -lt 1024 ]; then
-    echo "$n B/s"
-  elif [ "$n" -lt 1048576 ]; then
-    echo "$(((n + 512) / 1024)) KB/s"
-  else
-    awk -v n="$n" 'BEGIN { printf "%.1f MB/s\n", n / 1048576 }'
-  fi
+  awk -v n="$n" 'BEGIN {
+    if (n < 1024) printf "%dB\n", n
+    else if (n < 1048576) printf "%dK\n", (n + 512) / 1024
+    else if (n < 10485760) printf "%.1fM\n", n / 1048576
+    else if (n < 1073741824) printf "%dM\n", n / 1048576 + 0.5
+    else printf "%.1fG\n", n / 1073741824
+  }'
 }
 
 # sb_bytes BYTES: "512 B", "2 KB", "8.9 MB" (one decimal under 100 MB),
@@ -69,12 +69,30 @@ sb_mem() {
     }'
 }
 
-# sb_battery < `pmset -g batt`: "87% charging", "87%", or nothing (no battery).
+# sb_battery < `pmset -g batt`: "87 charging" or "87 discharging" (any other
+# state, e.g. "charged" or "AC attached", counts as charging), nothing
+# without a battery.
 sb_battery() {
   awk -F '\t' '/InternalBattery/ {
-    split($2, f, ";"); level = f[1]; state = f[2]; gsub(/ /, "", state)
-    if (state == "charging") print level " charging"; else print level
+    split($2, f, ";"); level = f[1]; state = f[2]; gsub(/[ %]/, "", level); gsub(/ /, "", state)
+    print level, (state == "discharging" ? "discharging" : "charging")
   }'
+}
+
+# sb_conn IFACE < `ipconfig getsummary IFACE`: how the Mac is online through
+# the default route's interface: vpn (a tunnel), wifi, eth, or off.
+sb_conn() {
+  case "$1" in
+    '') echo off; return ;;
+    utun* | ipsec* | ppp* | tun* | tap*) echo vpn; return ;;
+  esac
+  awk '/^ *InterfaceType : / { t = $3 } END { print (t == "WiFi" ? "wifi" : "eth") }'
+}
+
+# sb_load PERCENT: normal, high (above 70) or critical (above 90).
+sb_load() {
+  case "$1" in '' | *[!0-9]*) echo normal; return ;; esac
+  if [ "$1" -gt 90 ]; then echo critical; elif [ "$1" -gt 70 ]; then echo high; else echo normal; fi
 }
 
 # sb_ssid < `ipconfig getsummary en0`: the network name, "on" when macOS

@@ -10,8 +10,17 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
+# Hover: clickable items get a soft bg1 background under the pointer.
+NAME="${NAME:-}"
+case "${SENDER:-}" in
+  mouse.entered) "$SB" --set "$NAME" background.drawing=on background.color="$BG1"; exit 0 ;;
+  mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
+esac
+
 if [ "$(osascript -e "output muted of (get volume settings)" 2>/dev/null)" = true ]; then
   "$SB" --set volume label=mute
 else
-  "$SB" --set volume label="$(sb_pct "${INFO:-}")"
+  # volume_change gives the level in INFO; a reload or the first run doesn't.
+  level="${INFO:-$(osascript -e "output volume of (get volume settings)" 2>/dev/null)}"
+  "$SB" --set volume label="$(sb_pct "$level")"
 fi
