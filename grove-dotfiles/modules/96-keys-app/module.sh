@@ -338,7 +338,7 @@ _ka_open_panes() {
 }
 
 apply() {
-  local src app tmp log stage rc=0 domain changed out identity
+  local src app tmp log stage rc=0 domain out identity
   src="$(_ka_src)"
   app="$(_ka_app)"
   domain="$(_ka_domain)"
@@ -397,26 +397,18 @@ apply() {
     grove_note "AeroSpace didn't take the new config: ${out:-aerospace reload-config failed}"
   fi
 
-  # launchd keeps the definition it loaded, so a changed plist needs a bootout
-  # and bootstrap; an unchanged one only needs the process restarted.
-  changed=1
-  [ -f "$(_ka_agent)" ] && [ "$(cat "$(_ka_agent)")" = "$(_ka_agent_plist)" ] && changed=0
+  # Always a bootout and a bootstrap, never a kickstart: launchd pins the job
+  # to the code hash of the app it was loaded with, so after a rebuild it
+  # refuses to start the new binary (exit 78, forever) until loaded again.
   _ka_agent_plist > "$(_ka_agent)" || return 1
-  if _ka_loaded && [ "$changed" -eq 0 ]; then
-    "$(_ka_launchctl)" kickstart -k "$domain/$_KA_LABEL" >/dev/null 2>&1 || {
-      grove_fail "could not restart Grove Keys"
-      return 1
-    }
-  else
-    if _ka_loaded; then
-      "$(_ka_launchctl)" bootout "$domain/$_KA_LABEL" >/dev/null 2>&1
-      _ka_wait_gone
-    fi
-    _ka_bootstrap || {
-      grove_fail "could not start Grove Keys at login (launchctl bootstrap)"
-      return 1
-    }
+  if _ka_loaded; then
+    "$(_ka_launchctl)" bootout "$domain/$_KA_LABEL" >/dev/null 2>&1
+    _ka_wait_gone
   fi
+  _ka_bootstrap || {
+    grove_fail "could not start Grove Keys at login (launchctl bootstrap)"
+    return 1
+  }
   grove_note "Grove Keys is in the menu bar and starts at login."
   if [ "$(_ka_state accessibility)" = false ] || [ "$(_ka_state input_monitoring)" = false ]; then
     if [ "${GROVE_YES:-0}" = "1" ]; then

@@ -451,14 +451,15 @@ ka_ready() {
   [ ! -s "$BATS_TEST_TMPDIR/open-args" ] || false
 }
 
-@test "keys-app: apply restarts a running app" {
+@test "keys-app: apply loads a running app's job again (launchd pins it to the old build's code hash)" {
   load_module
   touch "$BATS_TEST_TMPDIR/loaded"
   _ka_agent_plist > "$AGENT"
   run apply
   [ "$status" -eq 0 ]
-  grep -q "^kickstart -k gui/$UID_/com.projectgrove.keys\$" "$BATS_TEST_TMPDIR/launchctl-args"
-  run grep -q '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args"
+  grep -q "^bootout gui/$UID_/com.projectgrove.keys\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  grep -q "^bootstrap gui/$UID_ $AGENT\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  run grep -q '^kickstart' "$BATS_TEST_TMPDIR/launchctl-args"
   [ "$status" -ne 0 ]
 }
 

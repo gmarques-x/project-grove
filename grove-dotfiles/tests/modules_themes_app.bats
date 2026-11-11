@@ -158,14 +158,15 @@ ta_ready() {
   [ "$status" -eq 0 ]
 }
 
-@test "themes-app: apply restarts a running app" {
+@test "themes-app: apply loads a running app's job again (launchd pins it to the old build's code hash)" {
   load_module
   touch "$BATS_TEST_TMPDIR/loaded"
   _ta_agent_plist > "$AGENT"
   run apply
   [ "$status" -eq 0 ]
-  grep -q "^kickstart -k gui/$UID_/com.projectgrove.themes\$" "$BATS_TEST_TMPDIR/launchctl-args"
-  run grep -q '^bootstrap' "$BATS_TEST_TMPDIR/launchctl-args"
+  grep -q "^bootout gui/$UID_/com.projectgrove.themes\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  grep -q "^bootstrap gui/$UID_ $AGENT\$" "$BATS_TEST_TMPDIR/launchctl-args"
+  run grep -q '^kickstart' "$BATS_TEST_TMPDIR/launchctl-args"
   [ "$status" -ne 0 ]
 }
 
