@@ -120,14 +120,15 @@ palette_rgb() {
 }
 
 @test "bordersrc colours the borders for every scheme" {
-  local s out green bg3 want
+  local s out green border want
   for s in $(gt_schemes); do
     out="$BATS_TEST_TMPDIR/$s-bordersrc"
     gt_render_file "$s" "$PALETTES" "$GROVE_ROOT/config/borders/bordersrc.tmpl" "$out"
     green="$(sed -n 's/^green *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
-    bg3="$(sed -n 's/^bg3 *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
-    [ -n "$green" ] && [ -n "$bg3" ]
-    want="borders active_color=0xff$green inactive_color=0xff$bg3 width=5.0 style=round hidpi=on"
+    # Unfocused windows take the border role: bg3 in dark, bg5 in light.
+    border="$(sed -n 's/^border *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
+    [ -n "$green" ] && [ -n "$border" ]
+    want="borders active_color=0xff$green inactive_color=0xff$border width=5.0 style=round hidpi=on"
     [ "$(grep -v '^#' "$out" | grep -v '^$')" = "$want" ] || { echo "$s:"; cat "$out"; false; }
   done
 }

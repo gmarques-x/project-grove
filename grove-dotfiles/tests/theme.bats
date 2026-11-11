@@ -40,7 +40,7 @@ palette_value() {
 @test "the palette's Grove additions are only the fill color, the roles and the terminal roles" {
   run sed -n '/^# Grove additions/,$p' "$GROVE_ROOT/$PALETTE_REL"
   [ "$status" -eq 0 ]
-  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
+  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|hover|muted|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
 }
 
 # scheme_value SCHEME NAME: the hex for NAME in theme/everforest-SCHEME.
@@ -88,10 +88,14 @@ SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
       [ "$(scheme_value "$s" border)" = "$(scheme_value "$s" bg3)" ] || { echo "$s border"; false; }
       [ "$(scheme_value "$s" on_accent)" = "$(scheme_value "$s" bg0)" ] || { echo "$s on_accent"; false; }
       [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey1)" ] || { echo "$s dim"; false; }
+      [ "$(scheme_value "$s" hover)" = "$(scheme_value "$s" bg1)" ] || { echo "$s hover"; false; }
+      [ "$(scheme_value "$s" muted)" = "$(scheme_value "$s" grey2)" ] || { echo "$s muted"; false; }
     else
       [ "$(scheme_value "$s" border)" = "$(scheme_value "$s" bg5)" ] || { echo "$s border"; false; }
       [ "$(scheme_value "$s" on_accent)" = "$(scheme_value "dark-$c" bg0)" ] || { echo "$s on_accent"; false; }
       [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey2)" ] || { echo "$s dim"; false; }
+      [ "$(scheme_value "$s" hover)" = "$(scheme_value "$s" bg3)" ] || { echo "$s hover"; false; }
+      [ "$(scheme_value "$s" muted)" = "$(scheme_value "$s" fg)" ] || { echo "$s muted"; false; }
     fi
   done
 }
@@ -105,6 +109,94 @@ SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
       [ "$(scheme_value "$s" fill)" = "$(scheme_value "$s" bg5)" ] || { echo "$s fill"; false; }
     fi
   done
+}
+
+# contrast A B: the WCAG contrast ratio of two #RRGGBB colours, two decimals.
+contrast() {
+  awk -v a="$1" -v b="$2" '
+    function ch(h, i,   v) {
+      v = (index("0123456789ABCDEF", toupper(substr(h, i, 1))) - 1) * 16 + index("0123456789ABCDEF", toupper(substr(h, i + 1, 1))) - 1
+      v /= 255
+      return v <= 0.03928 ? v / 12.92 : exp(2.4 * log((v + 0.055) / 1.055))
+    }
+    function lum(h) { return 0.2126 * ch(h, 2) + 0.7152 * ch(h, 4) + 0.0722 * ch(h, 6) }
+    BEGIN { x = lum(a); y = lum(b); if (x < y) { t = x; x = y; y = t }; printf "%.2f\n", (x + 0.05) / (y + 0.05) }'
+}
+
+# at_least RATIO MIN: 0 when RATIO >= MIN.
+at_least() { awk -v r="$1" -v m="$2" 'BEGIN { exit !(r >= m) }'; }
+
+@test "contrast is the WCAG ratio" {
+  [ "$(contrast '#000000' '#FFFFFF')" = "21.00" ]
+  [ "$(contrast '#FFFFFF' '#000000')" = "21.00" ]
+  [ "$(contrast '#2d353b' '#2D353B')" = "1.00" ]
+  [ "$(contrast '#2D353B' '#DFA000')" = "5.44" ]
+}
+
+@test "light schemes: text on the prompt's and yazi's accent blocks is at least 3:1, the border at least 1.5:1 on bg0" {
+  local s f d pairs bg fg r n ink
+  # shellcheck source=/dev/null
+  . "$GROVE_ROOT/../grove-themes/lib/render.sh"
+  for s in light-hard light-medium light-soft; do
+    d="$BATS_TEST_TMPDIR/$s"
+    mkdir -p "$d"
+    for f in starship.toml starship-plain.toml yazi/theme.toml yazi/init.lua; do
+      gt_render_file "$s" "$GROVE_ROOT/theme" "$GROVE_ROOT/config/$f.tmpl" "$d/${f##*/}" || false
+    done
+    ink="$(scheme_value "$s" on_accent)"
+    # The prompts: every block style is "bg:<accent> fg:<text>".
+    for f in starship.toml starship-plain.toml; do
+      pairs="$(sed -n 's/^[a-z_]*style[a-z_]* = "bg:\(#[0-9A-Fa-f]\{6\}\) fg:\(#[0-9A-Fa-f]\{6\}\)"$/\1 \2/p' "$d/$f")"
+      n=0
+      while read -r bg fg; do
+        r="$(contrast "$fg" "$bg")"
+        at_least "$r" 3 || { echo "$s $f: $fg on $bg is $r:1"; false; }
+        n=$((n + 1))
+      done <<< "$pairs"
+      [ "$n" -eq 7 ] || { echo "$s $f: $n block styles"; false; }
+    done
+    # yazi's blocks: every { fg, bg } pair whose bg is an accent (the marker_*
+    # rows are solid, fg = bg, and the *_alt rows sit on bg2).
+    pairs="$(sed -n 's/^[a-z_]* *= { fg = "\(#[0-9A-Fa-f]\{6\}\)", bg = "\(#[0-9A-Fa-f]\{6\}\)".*/\1 \2/p' "$d/theme.toml" | awk '$1 != $2')"
+    n=0
+    while read -r fg bg; do
+      case "$bg" in
+        "$(scheme_value "$s" green)"|"$(scheme_value "$s" red)"|"$(scheme_value "$s" yellow)"|"$(scheme_value "$s" orange)"|"$(scheme_value "$s" aqua)") ;;
+        *) continue ;;
+      esac
+      [ "$fg" = "$ink" ] || { echo "$s yazi: $fg on $bg is not on_accent"; false; }
+      r="$(contrast "$fg" "$bg")"
+      at_least "$r" 3 || { echo "$s yazi: $fg on $bg is $r:1"; false; }
+      n=$((n + 1))
+    done <<< "$pairs"
+    [ "$n" -eq 7 ] || { echo "$s yazi: $n accent blocks"; false; }
+    # yazi's top bar writes its text in on_accent and its rule in border.
+    grep -q "\"$ink\", \"$(scheme_value "$s" border)\"\$" "$d/init.lua" || { echo "$s yazi bar"; false; }
+    for bg in aqua green yellow; do
+      at_least "$(contrast "$ink" "$(scheme_value "$s" "$bg")")" 3 || { echo "$s yazi bar on $bg"; false; }
+    done
+    r="$(contrast "$(scheme_value "$s" border)" "$(scheme_value "$s" bg0)")"
+    at_least "$r" 1.5 || { echo "$s: border on bg0 is $r:1"; false; }
+  done
+}
+
+@test "lines and quiet text use the roles: yazi's and fzf's borders, fastfetch's empty marks and separator, eza, zsh" {
+  local c="$GROVE_ROOT/config"
+  grep -qx 'border_style = { fg = "{{border}}" }' "$c/yazi/theme.toml.tmpl"
+  grep -q 'info:{{dim}},.*border:{{border}}"$' "$c/zsh/conf.d/40-tools.zsh.tmpl"
+  grep -q '"separator": "{{dim}}"' "$c/fastfetch/config.jsonc.tmpl"
+  grep -q '"total": "{{border}}"' "$c/fastfetch/config.jsonc.tmpl"
+  grep -q "fg={{dim}}" "$c/zsh/conf.d/85-autosuggest.zsh.tmpl"
+  grep -q "\[comment\]='fg={{dim}}'" "$c/zsh/conf.d/98-highlight.zsh.tmpl"
+  grep -q '^punctuation: {foreground: "{{dim}}"}$' "$c/eza/theme.yml.tmpl"
+  # No text or line in these still names the colours the roles replaced.
+  run grep -lE '\{\{(bg3|grey1)\}\}|fg:\{\{bg0\}\}|fg = "\{\{bg0\}\}"' "$c/starship.toml.tmpl" "$c/starship-plain.toml.tmpl" \
+    "$c/yazi/init.lua.tmpl" "$c/fastfetch/config.jsonc.tmpl" "$c/eza/theme.yml.tmpl" \
+    "$c/zsh/conf.d/40-tools.zsh.tmpl" "$c/zsh/conf.d/85-autosuggest.zsh.tmpl" "$c/zsh/conf.d/98-highlight.zsh.tmpl"
+  [ -z "$output" ] || { echo "$output"; false; }
+  # yazi's theme keeps grey1 only for file icons, and bg0 nowhere as text.
+  run grep -E '\{\{(bg3|grey1)\}\}|fg = "\{\{bg0\}\}"' "$c/yazi/theme.toml.tmpl"
+  [ -z "$(printf '%s\n' "$output" | grep -v 'text = "')" ] || { echo "$output"; false; }
 }
 
 # scheme_hexes SCHEME: every #RRGGBB in theme/everforest-SCHEME, uppercased.
@@ -143,11 +235,14 @@ scheme_hexes() {
   done
 }
 
-@test "configs that aren't templates use only Dark Medium colours" {
+@test "configs that aren't templates use only Dark Medium colours; the icon theme's light set, Light Medium's" {
   local missing
-  missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/vscode/grove-icons/grove-icon-theme.json" \
-      $(git -C "$GROVE_ROOT" ls-files ':(glob)config/zsh/conf.d/*.zsh' | sed "s|^|$GROVE_ROOT/|")) <(palette_hexes))"
+  missing="$(comm -23 <(config_hexes $(git -C "$GROVE_ROOT" ls-files ':(glob)config/zsh/conf.d/*.zsh' | sed "s|^|$GROVE_ROOT/|")) <(palette_hexes))"
   [ -z "$missing" ] || { echo "not in the palette: $missing"; false; }
+  # Grove Icons holds a dark set and a light one (grove-icons/build.py).
+  missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/vscode/grove-icons/grove-icon-theme.json") \
+      <({ palette_hexes; scheme_hexes light-medium; } | sort -u))"
+  [ -z "$missing" ] || { echo "icon theme, not in Dark Medium or Light Medium: $missing"; false; }
 }
 
 # ghostty_value KEY: values of KEY in the Ghostty config, one per line.
@@ -232,12 +327,12 @@ ff_json() {
   [ "$output" = '["kitty-direct", "~/.config/fastfetch/grove.png", 76, 15, true, 3]' ]
 }
 
-@test "fastfetch's bars are green on bg3, ten marks, no brackets" {
+@test "fastfetch's bars are green on the border colour, ten marks, no brackets" {
   run ff_json 'c["display"]["bar"]'
   [ "$output" = '{"char": {"elapsed": "▮ ", "total": "▮ "}, "border": {"left": "", "right": ""}, "width": 10, "color": {"elapsed": "#A7C080", "total": "#475258"}}' ]
 }
 
-@test "fastfetch's labels are green and not bold, the separator grey1, values fg" {
+@test "fastfetch's labels are green and not bold, the separator dim, values fg" {
   local sep=$'\xef\x86\xb2'   # U+F1B2, as in macchina
   run ff_json '[c["display"]["brightColor"], c["display"]["separator"], c["display"]["color"]["keys"], c["display"]["color"]["separator"], c["display"]["color"]["output"]]'
   [ "$output" = "[false, \"$sep  \", \"#A7C080\", \"#859289\", \"#D3C6AA\"]" ]

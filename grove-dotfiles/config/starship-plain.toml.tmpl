@@ -5,23 +5,23 @@ format = """[ ](bg:{{aqua}})$username$directory$git_branch$git_status$time[ ](bg
 
 [username]
 show_always = true
-style_user = "bg:{{aqua}} fg:{{bg0}}"
-style_root = "bg:{{aqua}} fg:{{bg0}}"
+style_user = "bg:{{aqua}} fg:{{on_accent}}"
+style_root = "bg:{{aqua}} fg:{{on_accent}}"
 format = "[ $user ]($style)"
 
 [directory]
-style = "bg:{{green}} fg:{{bg0}}"
-read_only_style = "bg:{{green}} fg:{{bg0}}"
+style = "bg:{{green}} fg:{{on_accent}}"
+read_only_style = "bg:{{green}} fg:{{on_accent}}"
 read_only = " (read-only)"
 format = "[ $path]($style)[$read_only]($read_only_style)[ ]($style)"
 
 [git_branch]
-style = "bg:{{yellow}} fg:{{bg0}}"
+style = "bg:{{yellow}} fg:{{on_accent}}"
 symbol = ""
 format = "[ $symbol$branch ]($style)"
 
 [git_status]
-style = "bg:{{yellow}} fg:{{bg0}}"
+style = "bg:{{yellow}} fg:{{on_accent}}"
 untracked = "?"
 modified = "!"
 staged = "+"
@@ -29,7 +29,7 @@ format = "([$all_status$ahead_behind ]($style))"
 
 [time]
 disabled = false
-style = "bg:{{orange}} fg:{{bg0}}"
+style = "bg:{{orange}} fg:{{on_accent}}"
 time_format = "%H:%M"
 format = "[ $time ]($style)"
 

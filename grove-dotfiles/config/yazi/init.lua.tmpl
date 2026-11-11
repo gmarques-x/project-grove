@@ -4,7 +4,7 @@
 -- Terminal.app can't draw Nerd Font glyphs, so it gets the same blocks without
 -- them, like starship-plain.toml.
 
-local AQUA, GREEN, YELLOW, BG0, BORDER = "{{aqua}}", "{{green}}", "{{yellow}}", "{{bg0}}", "{{bg3}}"
+local AQUA, GREEN, YELLOW, BG0, BORDER = "{{aqua}}", "{{green}}", "{{yellow}}", "{{on_accent}}", "{{border}}"
 
 local plain = os.getenv("TERM_PROGRAM") == "Apple_Terminal"
 local OPEN = plain and " " or "\u{e0b6}"   -- rounded start
