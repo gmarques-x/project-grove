@@ -130,3 +130,24 @@ palette_rgb() {
     [ "$(grep -v '^#' "$out" | grep -v '^$')" = "$want" ] || { echo "$s:"; cat "$out"; false; }
   done
 }
+
+@test "with the avatar logo, the fetch config and hook take its image, size and threshold" {
+  local out="$BATS_TEST_TMPDIR/avatar"
+  mkdir -p "$out" "$GROVE_STATE"
+  echo avatar > "$GROVE_STATE/fetch-logo"
+  gt_render_file dark-medium "$PALETTES" "$GROVE_ROOT/config/fastfetch/config.jsonc.tmpl" "$out/config.jsonc"
+  gt_render_file light-soft "$PALETTES" "$GROVE_ROOT/config/zsh/conf.d/95-fetch.zsh.tmpl" "$out/95-fetch.zsh"
+  grep -q '"source": "~/.config/fastfetch/avatar.png"' "$out/config.jsonc"
+  grep -q '"width": 46,' "$out/config.jsonc"
+  grep -q '"height": 17,' "$out/config.jsonc"
+  grep -q '"top": 2 }' "$out/config.jsonc"
+  grep -q 'COLUMNS >= 108' "$out/95-fetch.zsh"
+  grep -q 'avatar-light-soft.png' "$out/95-fetch.zsh"
+}
+
+@test "every avatar image the renderer can name is tracked" {
+  local f
+  for f in avatar.png avatar-light-hard.png avatar-light-medium.png avatar-light-soft.png; do
+    git -C "$GROVE_ROOT" ls-files --error-unmatch "config/fastfetch/$f" >/dev/null || { echo "untracked: $f"; false; }
+  done
+}

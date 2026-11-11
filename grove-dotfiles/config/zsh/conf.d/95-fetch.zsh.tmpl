@@ -2,13 +2,13 @@
 # by every shell started from this one (nested shells, exec zsh, tools), so
 # they stay quiet. Turn it off with GROVE_NO_FETCH=1.
 #
-# The logo depends on the window: the Grove image in Ghostty when there's room
-# (140+ columns: image 76 + padding 4 + box 58), the text art when narrower or
+# The logo depends on the window: the chosen image in Ghostty when there's room
+# ({{fetch_min_cols}}+ columns: the image + padding 4 + box 58), the text art when narrower or
 # in Terminal.app (which can't show images), and none under 125 columns.
 _grove_fetch() {
   local dir="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch"
   local -a logo
-  if [[ "$TERM_PROGRAM" == ghostty ]] && (( COLUMNS >= 140 )) && [[ -r "$dir/{{fetch_image}}" ]]; then
+  if [[ "$TERM_PROGRAM" == ghostty ]] && (( COLUMNS >= {{fetch_min_cols}} )) && [[ -r "$dir/{{fetch_image}}" ]]; then
     logo=()
   elif (( COLUMNS >= 125 )); then
     logo=(--logo-type file --logo "$dir/grove.ascii" --logo-color-1 '{{aqua}}')

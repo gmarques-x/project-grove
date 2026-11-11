@@ -6,15 +6,16 @@
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
-    // The README banner's logo and lettering in the paper's light tone, on a
-    // transparent background; Ghostty reads the file itself. 76 x 15 cells,
-    // 3 rows down, so it sits centred beside the 22-row box.
+    // The chosen terminal logo (grove-themes logo): the README banner's
+    // lockup (76 x 15 cells, 3 rows down) or the GitHub avatar's drawing
+    // (46 x 17, 2 rows down), in the scheme's tone on a transparent
+    // background, centred beside the 22-row box. Ghostty reads the file itself.
     "type": "kitty-direct",
     "source": "~/.config/fastfetch/{{fetch_image}}",
-    "width": 76,
-    "height": 15,
+    "width": {{fetch_width}},
+    "height": {{fetch_height}},
     "preserveAspectRatio": true,
-    "padding": { "left": 1, "right": 3, "top": 3 }
+    "padding": { "left": 1, "right": 3, "top": {{fetch_pad_top}} }
   },
   "display": {
     "brightColor": false,
