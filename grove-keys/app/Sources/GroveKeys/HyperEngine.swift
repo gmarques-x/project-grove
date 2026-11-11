@@ -176,9 +176,9 @@ private final class TapSession: @unchecked Sendable {
         }
     }
 
-    /// Re-enables at once. A re-enable that fails (the tap is still off, or
-    /// is disabled again within `stickSeconds`) counts; the third failure in
-    /// a minute gives up.
+    /// Re-enables at once. If the tap is still off it gives up at once; a
+    /// re-enable that doesn't stick (disabled again within `stickSeconds`)
+    /// counts, and the third in a minute gives up.
     private func tapDisabled() {
         perform(machine.reset())
         removeTimer()
@@ -187,9 +187,13 @@ private final class TapSession: @unchecked Sendable {
         let didNotStick = now - lastEnabled < Self.stickSeconds
         CGEvent.tapEnable(tap: port, enable: true)
         lastEnabled = now
-        guard didNotStick || !CGEvent.tapIsEnabled(tap: port) else { return }
-        failures = failures.filter { now - $0 < 60 } + [now]
-        guard failures.count >= 3 else { return }
+        // Still off: no more tapDisabled events will come, so waiting for a
+        // third would leave the mapping on with no tap. Give up now.
+        if CGEvent.tapIsEnabled(tap: port) {
+            guard didNotStick else { return }
+            failures = failures.filter { now - $0 < 60 } + [now]
+            guard failures.count >= 3 else { return }
+        }
         gaveUp = true
         CGEvent.tapEnable(tap: port, enable: false)
         let onFailure = self.onFailure

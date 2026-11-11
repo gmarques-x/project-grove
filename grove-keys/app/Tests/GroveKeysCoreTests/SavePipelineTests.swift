@@ -117,6 +117,28 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
         #expect(left == ["keys.toml"])
     }
 
+    @Test func writeOverValidKeepsABrokenHandEdit() async throws {
+        let broken = "[hyper]\ntap = \"sideways\"\n"
+        let (paths, _) = try setUp(keys: broken)
+        let keys = try KeysFile(text: try fixture("keys.toml"))
+        let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace())
+        let error = await pipeline.writeOverValid(keys)
+        #expect(error?.line == 2)
+        #expect(try String(contentsOf: paths.keys, encoding: .utf8) == broken)
+    }
+
+    @Test func writeOverValidWritesOverAValidOrMissingFile() async throws {
+        let (paths, _) = try setUp()
+        var keys = try KeysFile(text: try fixture("keys.toml"))
+        keys.setLaunch(key: "t", bundleID: "com.mitchellh.ghostty")
+        let pipeline = SavePipeline(paths: paths, host: Self.host, aerospace: FakeAeroSpace())
+        #expect(await pipeline.writeOverValid(keys) == nil)
+        #expect(try String(contentsOf: paths.keys, encoding: .utf8) == keys.document.serialized())
+        try FileManager.default.removeItem(at: paths.keys)
+        #expect(await pipeline.writeOverValid(keys) == nil)
+        #expect(try String(contentsOf: paths.keys, encoding: .utf8) == keys.document.serialized())
+    }
+
     @Test func failedRestoreIsReportedAndRevalidated() async throws {
         let (paths, _) = try setUp()
         let folder = paths.output.deletingLastPathComponent()

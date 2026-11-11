@@ -46,6 +46,20 @@ public actor SavePipeline {
         try writeAtomically(Data(keys.document.serialized().utf8), to: paths.keys)
     }
 
+    /// The window's write: keys.toml is read again first and left alone when
+    /// it no longer parses (a hand edit the app hasn't seen yet), so a broken
+    /// hand edit is never overwritten. Returns that error, or a line-0 error
+    /// when the write fails; nil when written. A missing file is written.
+    public func writeOverValid(_ keys: KeysFile) -> TomlError? {
+        if let text = try? String(contentsOf: paths.keys, encoding: .utf8) {
+            do { _ = try KeysFile(text: text) } catch { return error }
+        }
+        do { try write(keys) } catch {
+            return TomlError(line: 0, message: "cannot write keys.toml: \(error.localizedDescription)")
+        }
+        return nil
+    }
+
     public func run() async -> SaveResult {
         guard let keysText = try? String(contentsOf: paths.keys, encoding: .utf8) else {
             return .keysInvalid(TomlError(line: 0, message: "keys.toml is missing"))

@@ -144,10 +144,13 @@ final class AppModel: ObservableObject {
 
     /// Mutate, write keys.toml, run the save path, publish the result. The
     /// change shows at once; edits made while earlier ones are still saving
-    /// build on them. Refused while keys.toml on disk is invalid, so a broken
-    /// hand edit is never overwritten (the red line stays up).
+    /// build on them. Refused while keys.toml on disk is invalid, and checked
+    /// again just before writing, so a broken hand edit is never overwritten
+    /// (the red line stays up).
     func edit(_ change: (inout KeysFile) -> Void) {
-        guard !keysInvalid else { return }
+        // Not before the first run has read the file (an edit would write the
+        // defaults), and not over a keys.toml with an error.
+        guard loaded, !keysInvalid else { return }
         let base = pendingKeys ?? keys
         var next = base
         change(&next)
@@ -157,9 +160,7 @@ final class AppModel: ObservableObject {
         publish(next)
         watcher?.ignoreNextChange(contents: Data(next.document.serialized().utf8))
         enqueue(edit: true) { [pipeline, next] in
-            do { try await pipeline.write(next) } catch {
-                return .keysInvalid(TomlError(line: 0, message: "cannot write keys.toml: \(error.localizedDescription)"))
-            }
+            if let error = await pipeline.writeOverValid(next) { return .keysInvalid(error) }
             return await pipeline.run()
         }
     }
