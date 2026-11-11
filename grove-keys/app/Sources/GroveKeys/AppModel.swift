@@ -303,9 +303,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The cheat sheet panel (Task 10).
-    func showCheatSheet() {}
-    func hideCheatSheet() {}
+    /// The cheat sheet panel (spec §7). The engine shows it for a hold;
+    /// the menu item shows it until the next key or click.
+    func showCheatSheet() { cheatSheet.show(untilInput: false) }
+    func hideCheatSheet() { cheatSheet.hide() }
+    func showCheatSheetFromMenu() { cheatSheet.show(untilInput: true) }
+    private lazy var cheatSheet = CheatSheetPanel(model: self)
 
     // MARK: State file
 

@@ -27,9 +27,8 @@ struct KeyboardView: View {
     private var showFocus = State(initialValue: false)
     private var editing = State<EditTarget?>(initialValue: nil)
 
-    /// Inside the window's 22 pt margins and the keyboard's 12 pt padding.
-    static let keyboardWidth: CGFloat = WindowView.width - 44 - 24
-    static let gap: CGFloat = 6
+    /// Inside the window margins; the grid takes its own padding out of this.
+    static let keyboardWidth: CGFloat = WindowView.width - 44
     static let capHeight: CGFloat = 54
 
     init(model: AppModel) {
@@ -105,58 +104,8 @@ struct KeyboardView: View {
 
     // MARK: Keyboard
 
-    /// A row's slots: one cap each, except up and down, which share one.
-    private func slots(_ row: [KeyboardLayout.Cap]) -> [[KeyboardLayout.Cap]] {
-        var result: [[KeyboardLayout.Cap]] = []
-        for cap in row {
-            if cap.stacked, let last = result.last?.last, last.stacked {
-                result[result.count - 1].append(cap)
-            } else {
-                result.append([cap])
-            }
-        }
-        return result
-    }
-
     private func keyboard(_ layer: Layer) -> some View {
-        let held = KeyboardLayout.held(layerID: layer.id)
-        return VStack(spacing: Self.gap) {
-            ForEach(Array(KeyboardLayout.rows.enumerated()), id: \.offset) { _, row in
-                let rowSlots = slots(row)
-                let units = rowSlots.reduce(0) { $0 + $1[0].width }
-                let unit = (Self.keyboardWidth - Self.gap * CGFloat(rowSlots.count - 1)) / CGFloat(units)
-                HStack(spacing: Self.gap) {
-                    ForEach(Array(rowSlots.enumerated()), id: \.offset) { _, slot in
-                        let width = unit * CGFloat(slot[0].width)
-                        if slot.count == 1 {
-                            cap(slot[0], layer: layer, held: held, width: width, height: Self.capHeight)
-                        } else {
-                            VStack(spacing: 2) {
-                                ForEach(Array(slot.enumerated()), id: \.offset) { _, c in
-                                    cap(c, layer: layer, held: held, width: width,
-                                        height: (Self.capHeight - 2) / CGFloat(slot.count))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding(12)
-        // The palette has no bg_dim: the well is bg0 with a bg1 rim, so the
-        // bg1 caps stand on it.
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(theme.bg1), lineWidth: 1))
-    }
-
-    @ViewBuilder
-    private func cap(_ cap: KeyboardLayout.Cap, layer: Layer, held: Set<Modifier>,
-                     width: CGFloat, height: CGFloat) -> some View {
-        let isCaps = cap.name == nil && cap.modifier == nil && cap.legend == "caps"
-        // Hyper is Caps Lock held; other layers light their modifier caps.
-        let isHeld = layer.id == "hyper" ? isCaps : cap.modifier.map(held.contains) ?? false
-        let legend = isCaps ? (layer.id == "hyper" ? "⇪ hyper" : "⇪") : cap.legend
-        if let name = cap.name {
+        KeyboardGrid(layer: layer, width: Self.keyboardWidth, capHeight: Self.capHeight) { _, name, legend, width, height in
             let target = EditTarget(layerID: layer.id,
                                     shortcut: KeyboardLayout.shortcut(layerID: layer.id, key: name))
             KeyCapView(legend: legend, binding: layer.bindings[name], isModifier: false, held: false,
@@ -171,9 +120,6 @@ struct KeyboardView: View {
                 .popover(isPresented: presented(target), arrowEdge: .bottom) {
                     editor(target, layer: layer)
                 }
-        } else {
-            KeyCapView(legend: legend, binding: nil, isModifier: true, held: isHeld, focused: false,
-                       width: width, height: height)
         }
     }
 
