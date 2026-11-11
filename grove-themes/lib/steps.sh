@@ -90,6 +90,24 @@ gt_step_borders() {
   fi
 }
 
+# gt_step_bar: SketchyBar (the Grove top bar) reloads its config, which
+# sources the freshly rendered colors.sh. Not running: next-launch (it reads
+# colors.sh when it starts). Seams: GROVE_PS, GROVE_SKETCHYBAR.
+gt_step_bar() {
+  local pid comm running=0
+  while read -r pid comm; do
+    [ "${comm##*/}" = sketchybar ] && running=1
+  done < <("${GROVE_PS:-ps}" -axo pid=,comm= 2>/dev/null)
+  if [ "$running" -eq 0 ]; then
+    _gt_line bar next-launch "sketchybar isn't running; it uses the new colours when it starts"
+  elif "${GROVE_SKETCHYBAR:-/opt/homebrew/bin/sketchybar}" --reload >/dev/null 2>&1; then
+    _gt_line bar live "reloaded"
+  else
+    _gt_line bar failed "could not reload the bar"
+    return 1
+  fi
+}
+
 # gt_step_appearance SCHEME
 gt_step_appearance() {
   local want=true

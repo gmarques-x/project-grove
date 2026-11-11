@@ -143,7 +143,7 @@ gt_copy_config() {
   run "$CLI" set --json dark-soft
   [ "$status" -eq 0 ]
   names="$(printf '%s' "$output" | grep -o '"name": "[a-z]*"' | sed 's/"name": //' | tr -d '"\n' )"
-  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodechromeyaziborders""appearanceaccentwallpaper" ]
+  [ "$names" = "configsghosttyzshstarshipezabatfastfetchvscodechromeyazibordersbar""appearanceaccentwallpaper" ]
 }
 
 borders_line() { printf '%s\n' "$output" | grep '^borders '; }
@@ -287,4 +287,32 @@ PY
   grep -q "^osascript - $(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-avatar-light-soft.png\$" "$CALLS"
   run "$CLI" set dark-hard
   grep -q "^osascript - $(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-avatar-dark-hard.png\$" "$CALLS"
+}
+
+bar_line() { printf '%s\n' "$output" | grep '^bar '; }
+
+@test "bar: reloads a running sketchybar" {
+  stub barps 'printf "%s\n" "  202 /usr/bin/zsh" "  707 /opt/homebrew/opt/sketchybar/bin/sketchybar"'
+  export GROVE_PS=barps
+  stub sketchybar 'echo "$*" >> "$BATS_TEST_TMPDIR/sketchybar-calls"'
+  export GROVE_SKETCHYBAR="$BATS_TEST_TMPDIR/stubs/sketchybar"
+  run "$CLI" set dark-hard
+  [[ "$(bar_line)" == *"live"*"reloaded"* ]] || false
+  [ "$(cat "$BATS_TEST_TMPDIR/sketchybar-calls")" = "--reload" ]
+}
+
+@test "bar: says next-launch when sketchybar isn't running" {
+  stub barps 'printf "%s\n" "  202 /usr/bin/zsh"'
+  export GROVE_PS=barps
+  run "$CLI" set dark-hard
+  [[ "$(bar_line)" == *"next-launch"* ]] || false
+}
+
+@test "bar: a failing reload fails the step" {
+  stub barps 'printf "%s\n" "  707 /opt/homebrew/bin/sketchybar"'
+  export GROVE_PS=barps
+  stub sketchybar 'exit 1'
+  export GROVE_SKETCHYBAR="$BATS_TEST_TMPDIR/stubs/sketchybar"
+  run "$CLI" set dark-hard
+  [[ "$(bar_line)" == *"failed"*"could not reload the bar"* ]] || false
 }
