@@ -2,8 +2,9 @@ import Foundation
 
 /// The `grovekeys://` links Grove Keys answers. The Grove bar opens two:
 /// `grove-menu` (the pine: the Grove menu) and `app-menu` (the app name: the
-/// front app's menus). AeroSpace opens `palette` and `cheatsheet` for their
-/// hotkeys. `menu` alone is no longer opened by the bar (its ⌘ glyph is gone)
+/// front app's menus). AeroSpace opens `cheatsheet` for its hotkey; `launcher` is the Grove
+/// Launcher (its key, ⌘Space, comes through the key tap, not a link; `palette`
+/// is its old name and still answered). `menu` alone is no longer opened by the bar (its ⌘ glyph is gone)
 /// but still answered, e.g. from a terminal. Anything else is ignored.
 public enum KeysURL: Equatable, Sendable {
     /// Grove Keys' own menu at the pointer (the pine's Grove Keys ▸ submenu).
@@ -15,8 +16,8 @@ public enum KeysURL: Equatable, Sendable {
     case groveMenu
     /// The front app's menus, directly.
     case appMenu
-    /// The Grove menu's rows in a type-to-filter panel.
-    case palette
+    /// The Grove Launcher: apps and the Grove menu's rows in a type-to-filter panel.
+    case launcher
     /// The cheat sheet, shown or put away.
     case cheatSheet
 
@@ -33,7 +34,7 @@ public enum KeysURL: Equatable, Sendable {
         case "menu": self = .menu
         case "grove-menu": self = .groveMenu
         case "app-menu": self = .appMenu
-        case "palette": self = .palette
+        case "launcher", "palette": self = .launcher
         case "cheatsheet": self = .cheatSheet
         default: return nil
         }

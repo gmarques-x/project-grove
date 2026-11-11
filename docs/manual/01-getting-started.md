@@ -53,7 +53,7 @@ A few things macOS does not let an installer do:
 | Try this | What happens |
 | --- | --- |
 | Click the pine at the left of the bar | The [Grove menu](03-the-grove-menu.md) opens |
-| Hold Caps Lock, press Space | The palette: type to find any Grove action |
+| ⌘Space | The Grove Launcher: type to open an app or find any Grove action |
 | Hold Caps Lock for half a second | The [cheat sheet](05-hotkeys.md#the-cheat-sheet) |
 | ⌥1 … ⌥9 | Go to a [workspace](02-the-desktop.md) |
 | ⌥H ⌥J ⌥K ⌥L | Move focus between windows |

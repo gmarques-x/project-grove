@@ -89,7 +89,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 
 "In the menu bar" in the two app rows means the native menu bar, which sits hidden behind the Grove bar. Both apps are reached from the pine at the left of the bar: Appearance › Grove Themes… and Grove Keys ▸.
 
-**The Grove menu** is `config/grove/menu.toml`: the pine's dropdown and the palette on Hyper + Space. Your own rows go in `config/grove/menu.local.toml`, which git ignores; the format is explained at the top of `menu.toml` and in the manual's [The Grove menu](../docs/manual/03-the-grove-menu.md).
+**The Grove menu** is `config/grove/menu.toml`: the pine's dropdown and the Grove Launcher on ⌘Space. Your own rows go in `config/grove/menu.local.toml`, which git ignores; the format is explained at the top of `menu.toml` and in the manual's [The Grove menu](../docs/manual/03-the-grove-menu.md).
 
 **Chrome** is themed by an unpacked extension that grove-themes renders to `~/.config/chrome-theme`; load it once (see `grove-themes/README.md`).
 

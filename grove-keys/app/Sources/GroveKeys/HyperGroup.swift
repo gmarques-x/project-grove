@@ -3,8 +3,8 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// Hyper key: on/off, what a tap sends, the two timings (spec §5), and what
-/// the right Option key does.
+/// Hyper key: on/off, what a tap sends, the two timings (spec §5), the launcher's
+/// key, and what the right Option key does.
 struct HyperGroup: View {
     @ObservedObject var model: AppModel
     @Environment(\.theme) private var theme
@@ -37,6 +37,15 @@ struct HyperGroup: View {
             setting("Cheat sheet after holding") {
                 MsField(value: h.cheatsheetMs) { ms in update { $0.cheatsheetMs = ms } }.id(h.cheatsheetMs)
                     .help("0 = no cheat sheet")
+            }
+            setting("⌘Space opens the launcher") {
+                Toggle("", isOn: Binding(get: { h.launcher == .cmdSpace },
+                                         set: { on in update { $0.launcher = on ? .cmdSpace : .none } }))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .tint(Color(theme.green))
+                    .labelsHidden()
+                    .help("On: ⌘Space opens the Grove Launcher, not Spotlight. Off: ⌘Space is macOS's again")
             }
             setting("Right ⌥ types characters") {
                 Toggle("", isOn: Binding(get: { h.rightOption == .characters },

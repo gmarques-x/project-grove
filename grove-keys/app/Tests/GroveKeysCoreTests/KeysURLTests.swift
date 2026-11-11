@@ -23,15 +23,17 @@ import Testing
         #expect(KeysURL(try #require(URL(string: "grovekeys://menu/"))) == .menu)
     }
 
-    @Test func thePaletteAndTheCheatSheetAreRecognised() throws {
-        #expect(KeysURL(try #require(URL(string: "grovekeys://palette"))) == .palette)
+    @Test func theLauncherAndTheCheatSheetAreRecognised() throws {
+        #expect(KeysURL(try #require(URL(string: "grovekeys://launcher"))) == .launcher)
+        // Its name until 2026-11-11, still answered.
+        #expect(KeysURL(try #require(URL(string: "grovekeys://palette"))) == .launcher)
         #expect(KeysURL(try #require(URL(string: "grovekeys://cheatsheet"))) == .cheatSheet)
         #expect(KeysURL(try #require(URL(string: "grovekeys://CheatSheet/"))) == .cheatSheet)
     }
 
     @Test func anythingElseIsIgnored() throws {
         for text in ["grovekeys://other", "http://menu", "grovekeys:", "grovekeys://", "grovekeys://menu/a/b",
-                     "grovekeys://palette/x", "grovekeys://cheatsheet/x", "http://palette"] {
+                     "grovekeys://launcher/x", "grovekeys://palette/x", "grovekeys://cheatsheet/x", "http://launcher"] {
             #expect(KeysURL(try #require(URL(string: text))) == nil, "\(text)")
         }
     }

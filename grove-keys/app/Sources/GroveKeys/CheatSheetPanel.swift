@@ -86,7 +86,7 @@ struct CheatSheetView: View {
 }
 
 extension View {
-    /// The card of the cheat sheets and the palette, on the scrim: bg0 a
+    /// The card of the cheat sheets and the launcher, on the scrim: bg0 a
     /// little see-through, a `border` outline, a shadow.
     func sheetCard(_ theme: ThemeColors) -> some View {
         background(Color(theme.bg0).opacity(0.94), in: RoundedRectangle(cornerRadius: GroveRadius.window))

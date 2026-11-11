@@ -9,7 +9,7 @@ Grove has six colour schemes, all from Everforest: dark or light, each in hard, 
 | From | Do this |
 | --- | --- |
 | The Grove menu | Pine › Appearance, then pick a scheme. The current one has a ✓ |
-| The palette | Hyper + Space, type part of the name (`light hard`), ↩ |
+| The launcher | ⌘Space, type part of the name (`light hard`), ↩ |
 | The gallery | Pine › Appearance › Grove Themes…, then click a card |
 | A terminal | `grove-themes set dark-soft` |
 

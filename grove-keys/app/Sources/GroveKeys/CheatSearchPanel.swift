@@ -9,7 +9,7 @@ import SwiftUI
 /// type. ↑/↓ move across the rows, Return runs the row where it can be run
 /// (a launcher, a binding) and closes, Escape or a click outside the card
 /// closes. The panel and the way the keyboard is handed back are the
-/// palette's (`KeyPanelHost`).
+/// launcher's (`KeyPanelHost`).
 @MainActor
 final class CheatSearchPanel: ObservableObject {
     static let shared = CheatSearchPanel()

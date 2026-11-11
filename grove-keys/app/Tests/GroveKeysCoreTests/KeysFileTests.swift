@@ -73,6 +73,17 @@ import Testing
         #expect(f.document.serialized().contains("right_option = \"characters\" # both alike"))
     }
 
+    @Test func theLauncherKeyIsCmdSpaceUnlessTheFileSaysNone() throws {
+        #expect(try KeysFile(text: "").hyper.launcher == .cmdSpace)
+        var f = try KeysFile(text: "[hyper]\nlauncher = \"none\"\n")
+        #expect(f.hyper.launcher == .none)
+        var h = f.hyper
+        h.launcher = .cmdSpace
+        f.setHyper(h)
+        #expect(f.document.serialized().contains("launcher = \"cmd-space\""))
+        #expect(try KeysFile(text: fixture("keys.toml")).hyper.launcher == .cmdSpace)
+    }
+
     /// Monitors moved to monitors.toml. A `[monitors."<host>"]` table still
     /// in someone's keys.toml is an unknown table: not validated (the `3`),
     /// and written back as it was.
@@ -102,6 +113,8 @@ import Testing
         #expect(line("[hyper]\nkey = \"right_shift\"\n") == 2)
         #expect(line("[hyper]\nright_option = \"letters\"\n") == 2)
         #expect(line("[hyper]\nright_option = true\n") == 2)
+        #expect(line("[hyper]\nlauncher = \"alt-space\"\n") == 2)
+        #expect(line("[hyper]\nlauncher = 1\n") == 2)
         #expect(line("[launch]\nt = 3\n") == 2)
         #expect(line("[aerospace.main]\na = 3\n") == 2)
     }

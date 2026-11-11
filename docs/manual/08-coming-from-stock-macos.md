@@ -7,9 +7,9 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 | On a stock Mac | With Grove |
 | --- | --- |
 | The menu bar (File, Edit, View …) | Click the app's name in the bar, or Pine › Global Menu. Keyboard shortcuts such as ⌘S and ⌘, work as before |
-| The Apple menu | The first item in those same menus. For Sleep, Restart, Shut Down, Log Out and Lock, Pine › System is quicker, or Hyper + Space and type the word |
-| System Settings | Apple menu › System Settings (as above), or Spotlight |
-| Spotlight | ⌘Space, as before |
+| The Apple menu | The first item in those same menus. For Sleep, Restart, Shut Down, Log Out and Lock, Pine › System is quicker, or ⌘Space and type the word |
+| System Settings | Pine › System › System Settings…, or ⌘Space and type `settings` |
+| Spotlight | ⌘Space opens the Grove Launcher now: it opens apps and runs Grove menu rows, and does not search files. Spotlight is still in Finder's search field; to have ⌘Space back for it, see [The Grove menu](03-the-grove-menu.md#the-grove-launcher) |
 | The Dock | Still there and unchanged, except that Ghostty has Terminal's place |
 | ⌘Tab | Still works. Switching to an app whose window is on another workspace takes you to that workspace |
 | Mission Control and Spaces | Use workspaces instead: ⌥1 … ⌥9, or click a number or an app icon in the bar. See [The desktop](02-the-desktop.md) |

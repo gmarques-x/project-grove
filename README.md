@@ -6,14 +6,14 @@
 
 A personal macOS overhaul in the [Everforest](https://github.com/sainnhe/everforest) colours by sainnhe: a tiling desktop with its own top bar, a keyboard layer on Caps Lock, a themed terminal and editor, and one menu that reaches all of it. An installer sets the whole thing up on a fresh Mac, and a switcher moves everything between six schemes (dark or light, each in hard, medium or soft contrast).
 
-<!-- Screenshots go here: the desktop with the bar and tiled windows, the Grove menu or palette, and the theme gallery. -->
+<!-- Screenshots go here: the desktop with the bar and tiled windows, the Grove menu or the launcher, and the theme gallery. -->
 
 ## What's inside
 
 | Folder | What it is |
 | --- | --- |
 | [`grove-dotfiles/`](grove-dotfiles/) | The `grove` installer and every config it manages: the tiling desktop (AeroSpace, with JankyBorders), the Grove bar (SketchyBar, in place of the menu bar), the Grove menu, the terminal (Ghostty, zsh, Starship, Yazi, fastfetch), VS Code and Chrome themes, git and SSH, fonts and Finder settings. It also builds and installs the two apps below. |
-| [`grove-keys/`](grove-keys/) | Grove Keys, the keyboard app: Caps Lock as a Hyper key, app launchers, the window-manager shortcuts, a cheat sheet, and the menus behind the bar (the Grove menu, the palette and each app's own menus). |
+| [`grove-keys/`](grove-keys/) | Grove Keys, the keyboard app: Caps Lock as a Hyper key, app launchers, the window-manager shortcuts, a cheat sheet, and the menus behind the bar (the Grove menu, the Grove Launcher on ⌘Space and each app's own menus). |
 | [`grove-themes/`](grove-themes/) | The `grove-themes` command and the Grove Themes app: switch the desktop between the six Everforest schemes, and choose the terminal logo and wallpaper. |
 | [`grove-wallpapers/`](grove-wallpapers/) | Two wallpapers for each scheme, 2880 × 1864: the Project Grove lockup and the avatar drawing. |
 | [`assets/`](assets/) | Images for this page. |

@@ -8,6 +8,7 @@ public struct HyperSettings: Equatable, Sendable {
     public var tapMs = 200
     public var cheatsheetMs = 500
     public var rightOption: RightOptionMode = .characters
+    public var launcher: LauncherKey = .cmdSpace
 
     public init() {}
 }
@@ -38,6 +39,7 @@ public struct KeysFile: Equatable, Sendable {
             case ("tap_ms", .int(let n)): h.tapMs = n
             case ("cheatsheet_ms", .int(let n)): h.cheatsheetMs = n
             case ("right_option", .string(let s)): h.rightOption = RightOptionMode(rawValue: s) ?? h.rightOption
+            case ("launcher", .string(let s)): h.launcher = LauncherKey(rawValue: s) ?? h.launcher
             default: break
             }
         }
@@ -66,6 +68,7 @@ public struct KeysFile: Equatable, Sendable {
         set(["hyper"], "cheatsheet_ms", .int(h.cheatsheetMs))
         set(["hyper"], "enabled", .bool(h.enabled))
         set(["hyper"], "right_option", .string(h.rightOption.rawValue))
+        set(["hyper"], "launcher", .string(h.launcher.rawValue))
     }
 
     public mutating func setLaunch(key: String, bundleID: String) {
@@ -170,7 +173,12 @@ public struct KeysFile: Equatable, Sendable {
             guard RightOptionMode(rawValue: s) != nil else {
                 throw TomlError(line: e.line, message: "right_option must be \"characters\" or \"shortcuts\"")
             }
-        case ("key", _), ("enabled", _), ("tap", _), ("tap_ms", _), ("cheatsheet_ms", _), ("right_option", _):
+        case ("launcher", .string(let s)):
+            guard LauncherKey(rawValue: s) != nil else {
+                throw TomlError(line: e.line, message: "launcher must be \"cmd-space\" or \"none\"")
+            }
+        case ("key", _), ("enabled", _), ("tap", _), ("tap_ms", _), ("cheatsheet_ms", _), ("right_option", _),
+             ("launcher", _):
             throw TomlError(line: e.line, message: "\(e.key) in [hyper] has the wrong kind of value")
         default:
             throw TomlError(line: e.line, message: "unknown setting \"\(e.key)\" in [hyper]")

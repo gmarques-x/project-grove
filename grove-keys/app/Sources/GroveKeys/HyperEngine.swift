@@ -69,6 +69,8 @@ private final class TapSession: @unchecked Sendable {
     private var machine: HyperMachine
     private var cheatsheetMs: Int
     private var rightOption: RightOptionMode
+    private var launcherKey: LauncherKey
+    private var chord = LauncherChord()
     /// Nil until the main thread hands one over, and for an input source without one.
     private var layout: TypingLayout?
     private var port: CFMachPort?
@@ -86,6 +88,7 @@ private final class TapSession: @unchecked Sendable {
         machine = HyperMachine(settings: settings, launchKeys: launchKeys)
         cheatsheetMs = settings.cheatsheetMs
         rightOption = settings.rightOption
+        launcherKey = settings.launcher
         self.onEffect = onEffect
         self.onFailure = onFailure
     }
@@ -151,6 +154,8 @@ private final class TapSession: @unchecked Sendable {
             machine = HyperMachine(settings: settings, launchKeys: launchKeys)
             cheatsheetMs = settings.cheatsheetMs
             rightOption = settings.rightOption
+            launcherKey = settings.launcher
+            chord.reset()
         }
     }
 
@@ -180,12 +185,24 @@ private final class TapSession: @unchecked Sendable {
         let code = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
         let kind: KeyEvent.Kind = type == .keyDown ? .down : .up
         let isRepeat = kind == .down && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
-        let (disposition, effects) = machine.handle(
-            KeyEvent(kind: kind, keyCode: code, time: ProcessInfo.processInfo.systemUptime, isRepeat: isRepeat))
+        let key = KeyEvent(kind: kind, keyCode: code, time: ProcessInfo.processInfo.systemUptime, isRepeat: isRepeat)
+        let (disposition, effects) = machine.handle(key)
         if code == HyperMachine.f18, kind == .down, !isRepeat {
             scheduleTick()
         }
         perform(effects)
+        // ⌘Space is the launcher's: taken here, before Spotlight's hotkey. Asked
+        // for every key, so a Space it took is swallowed to its key-up whatever
+        // Hyper does meanwhile; with Hyper held it starts nothing.
+        switch chord.handle(key, flags: event.flags.rawValue, key: launcherKey, disposition: disposition) {
+        case .toggle:
+            perform([.toggleLauncher])
+            return nil
+        case .swallow:
+            return nil
+        case .pass:
+            break
+        }
         switch disposition {
         case .pass:
             typeRightOption(event, code)
@@ -221,6 +238,7 @@ private final class TapSession: @unchecked Sendable {
     /// re-enable that doesn't stick (disabled again within `stickSeconds`)
     /// counts, and the third in a minute gives up.
     private func tapDisabled() {
+        chord.reset()
         perform(machine.reset())
         removeTimer()
         guard let port, !gaveUp else { return }

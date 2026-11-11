@@ -3,7 +3,7 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// The panel the palette and the searchable cheat sheet are drawn in: over
+/// The panel the launcher and the searchable cheat sheet are drawn in: over
 /// the focused screen, below the menu bar, non-activating and able to be
 /// key, so it takes the keyboard without Grove Keys coming forward.
 ///

@@ -16,8 +16,9 @@ Caps Lock no longer types capitals. To have it back for a while, choose Pine ›
 
 | Press | To |
 | --- | --- |
-| Hyper + Space | Open the [palette](03-the-grove-menu.md#the-palette) |
 | Hyper + K | Open the searchable cheat sheet |
+
+**⌘Space** opens the [Grove Launcher](03-the-grove-menu.md#the-grove-launcher), in Spotlight's place: type to open an app or run a Grove menu row.
 
 Hyper plus a key can also launch an app. Add launchers in the Grove Keys window; for example, Hyper + ↩ for Ghostty.
 
@@ -80,7 +81,7 @@ enter = "com.mitchellh.ghostty"
 
 [aerospace.main]               # AeroSpace's own syntax
 alt-h = "focus left"
-hyper-space = "exec-and-forget open grovekeys://palette"
+hyper-k = "exec-and-forget open grovekeys://cheatsheet"
 ```
 
 In the file, `alt` is ⌥ and `hyper-` means Caps Lock held. The right-hand side is an AeroSpace command; the Learn submenu has a link to AeroSpace's guide, which lists them.

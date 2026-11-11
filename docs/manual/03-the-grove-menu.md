@@ -5,7 +5,7 @@
 One menu reaches everything Grove can do. Open it two ways:
 
 - **With the mouse:** click the pine at the left of the bar.
-- **With the keyboard:** press Hyper + Space (hold Caps Lock, press Space) for the palette.
+- **With the keyboard:** press ⌘Space for the Grove Launcher.
 
 ## The tree
 
@@ -16,25 +16,29 @@ One menu reaches everything Grove can do. Open it two ways:
 | **Update** | Check, Update Grove, Run the Installer. See [Updates and undo](07-updates-and-undo.md) |
 | **Learn** | Keybindings (the cheat sheet), The Grove Manual, and the AeroSpace, Ghostty and Yazi documentation |
 | **About** | Grove's version, the current scheme and the date of the last update |
-| **System** | Lock, Sleep Display, Sleep, Log Out…, Restart…, Shut Down… |
+| **System** | System Settings… (macOS's own settings), then Lock, Sleep Display, Sleep, Log Out…, Restart…, Shut Down… |
 | **Global Menu** | The menus of the app in front, starting with the Apple menu |
 
 Log Out, Restart and Shut Down show macOS's usual confirmation before anything happens. Lock, Sleep Display and Sleep act at once.
 
 Rows that print something (Check, Update Grove, Run the Installer, About) open **the Grove window**: a small floating terminal titled `Grove · …` that runs the command, ends with `Done` or `Failed`, and closes when you press a key.
 
-## The palette
+## The Grove Launcher
 
-Press Hyper + Space. A panel opens in the middle of the screen with a text field and every action in the menu, written as a path: `Appearance › Dark Medium`, `System › Lock`.
+Press ⌘Space. A panel opens in the middle of the screen with a text field and every action in the menu, written as a path: `Appearance › Dark Medium`, `System › Lock`. Start typing and the apps on this Mac join the list, each with its icon. The launcher has ⌘Space in Spotlight's place.
 
 | Press | To |
 | --- | --- |
-| Any text | Filter the list. Case does not matter; every word you type must appear somewhere in the path |
+| Any text | Find apps and rows. Case and accents do not matter; every word you type must appear in the app's name or the row's path |
 | ↑ ↓ | Move through the list |
-| ↩ | Run the row and close |
-| Esc, or a click outside | Close |
+| ↩ | Open the app (or bring it forward if it is running), or run the row; then close |
+| Esc, ⌘Space again, or a click outside | Close |
 
-So `Hyper + Space`, `dark soft`, `↩` switches to the Dark Soft scheme, and `Hyper + Space`, `lock`, `↩` locks the screen. The palette has everything in the tree except Global Menu.
+The best match is first: a name that starts with what you typed, then a name with a word that starts with it, then the rest. An app comes before a menu row, and a shorter name before a longer one.
+
+So `⌘Space`, `saf`, `↩` opens Safari; `⌘Space`, `dark soft`, `↩` switches to the Dark Soft scheme; and `⌘Space`, `lock`, `↩` locks the screen. The launcher has every app in the Applications folders (yours, the system's, their Utilities, and the web apps Chrome installed) and everything in the tree except Global Menu.
+
+Grove Keys takes ⌘Space before macOS sees it, so Spotlight's own setting is untouched. If Spotlight opens as well, turn its shortcut off: System Settings › Keyboard › Keyboard Shortcuts… › Spotlight, and untick "Show Spotlight search". To give ⌘Space back to Spotlight, turn off "⌘Space opens the launcher" in the Grove Keys window (Bindings tab, Hyper key group), or set `launcher = "none"` under `[hyper]` in `keys.toml`; the launcher then opens with `open grovekeys://launcher`, which you can bind to a key of your own. The launcher's key needs Grove Keys running with its two permissions; pausing Hyper does not turn it off.
 
 ## Adding your own rows
 
@@ -92,7 +96,7 @@ title = "Screen Off"
 hidden = true
 ```
 
-Save the file and open the menu again. Learn now ends with Starship and has no Yazi row, a Tools submenu sits at the end of the menu, and both new Tools rows are in the palette as `Tools › Disk Space` and `Tools › Stay Awake for an Hour`.
+Save the file and open the menu again. Learn now ends with Starship and has no Yazi row, a Tools submenu sits at the end of the menu, and both new Tools rows are in the launcher as `Tools › Disk Space` and `Tools › Stay Awake for an Hour`.
 
 If the file has a mistake, the menu still opens: your file is ignored and the first row of the menu says what is wrong.
 

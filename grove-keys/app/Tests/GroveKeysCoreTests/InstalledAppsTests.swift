@@ -25,5 +25,20 @@ import Testing
         let apps = InstalledApps.scan(folders: [a, b, root.appendingPathComponent("missing")])
         #expect(apps.map(\.name) == ["Arc", "Ghostty", "zed"])
         #expect(apps.map(\.bundleID) == ["company.thebrowser.Browser", "com.mitchellh.ghostty", "dev.zed.Zed"])
+        // Where each is: the first folder's Ghostty.
+        #expect(apps[1].path.hasSuffix("/Applications/Ghostty.app"))
+        // A folder that is an app is that app (Finder, in CoreServices).
+        let one = InstalledApps.scan(folders: [a.appendingPathComponent("zed.app"), a.appendingPathComponent("Utilities")])
+        #expect(one.map(\.name) == ["Deep", "zed"])
+    }
+
+    @Test func theStandardFoldersHaveUtilitiesChromeAppsAndFinder() {
+        let paths = InstalledApps.standardFolders(home: URL(fileURLWithPath: "/Users/test")).map(\.path)
+        for path in ["/Applications", "/Applications/Utilities", "/Users/test/Applications",
+                     "/Users/test/Applications/Chrome Apps.localized", "/System/Applications",
+                     "/System/Applications/Utilities", "/System/Library/CoreServices/Finder.app"] {
+            #expect(paths.contains(path), "\(path)")
+        }
+        #expect(Set(paths).count == paths.count)
     }
 }

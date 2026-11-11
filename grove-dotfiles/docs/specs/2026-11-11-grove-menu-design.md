@@ -29,6 +29,8 @@ Initial tree: Appearance (Grove Themes…, the six schemes with ✓) · Grove Ke
 - **Hotkeys:** shipped in `keys.toml`'s main mode as AeroSpace bindings, since AeroSpace already receives Hyper chords: `hyper-space = "exec-and-forget open grovekeys://palette"` and `hyper-k = "exec-and-forget open grovekeys://cheatsheet"`.
 - The tree, the merge, the filter and the id lookup are pure code in GroveKeysCore with tests. Running rows and drawing are in the app target.
 
+> **2026-11-11, later:** the palette was renamed the **Grove Launcher** (`grovekeys://launcher`; `grovekeys://palette` still answers). It moved from Hyper + Space to ⌘Space, taken in Grove Keys' key tap before Spotlight (`launcher = "cmd-space"` under `[hyper]` in `keys.toml`; the `hyper-space` binding is gone), and it gained the installed apps, ranked with the menu's rows once something is typed. The System submenu gained a first row, System Settings….
+
 ## 3. The Grove window: `grove present`
 
 `grove present [--title T] <command…>` opens a new Ghostty window titled `Grove · <T>` (T defaults to the command's first word), which prints the Grove logo line, runs the command, then prints `Done` (green) or `Failed (N)` (red) and waits for a key before closing. AeroSpace floats and centres windows whose title starts with `Grove · ` (a rule in `aerospace.base.toml`). The window is its own Ghostty process that quits when its window closes, and it must not restore old windows or open a second one. Without Ghostty, the command runs in Terminal.app the same way.

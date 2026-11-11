@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Grove menu (the pine's dropdown and the palette), read from
+/// The Grove menu (the pine's dropdown and the launcher), read from
 /// `~/.config/grove/menu.toml` and the owner's `menu.local.toml` beside it.
 /// A table is a row; its dotted name is its id and its place in the tree.
 
@@ -159,7 +159,7 @@ public struct GroveMenu: Equatable, Sendable {
     }
 
     /// The menu with each `keys` builtin row turned into an ordinary submenu
-    /// of `items`, so the palette and `menu/<id>` reach them (`keys.pause`).
+    /// of `items`, so the launcher and `menu/<id>` reach them (`keys.pause`).
     public func expandingKeys(_ items: [KeysMenuItem]) -> GroveMenu {
         func expand(_ rows: [GroveMenuRow]) -> [GroveMenuRow] {
             rows.map { row in
@@ -355,7 +355,7 @@ extension GroveMenuAction {
     }
 
     /// The row brings a window forward itself or takes the keyboard (the
-    /// cheat sheet, the palette), so the app that was in front must not be
+    /// cheat sheet, the launcher), so the app that was in front must not be
     /// given the keyboard back when the menu closes.
     public var takesFocus: Bool {
         switch self {
@@ -410,10 +410,10 @@ public enum MenuShell {
     }
 }
 
-// MARK: The palette
+// MARK: The launcher
 
-/// A row as the palette lists it: "Appearance › Dark Medium".
-public struct PaletteEntry: Equatable, Sendable {
+/// A Grove menu row as the launcher lists it: "Appearance › Dark Medium".
+public struct LauncherEntry: Equatable, Sendable {
     public var id: String
     /// The titles from the top of the menu down to the row's own.
     public var path: [String]
@@ -427,32 +427,20 @@ public struct PaletteEntry: Equatable, Sendable {
 extension GroveMenu {
     /// Every row that does something, in menu order. The Global Menu isn't
     /// listed, and neither is a `keys` builtin that wasn't expanded.
-    public var paletteEntries: [PaletteEntry] {
-        func entries(_ rows: [GroveMenuRow], under path: [String]) -> [PaletteEntry] {
-            rows.flatMap { row -> [PaletteEntry] in
+    public var launcherEntries: [LauncherEntry] {
+        func entries(_ rows: [GroveMenuRow], under path: [String]) -> [LauncherEntry] {
+            rows.flatMap { row -> [LauncherEntry] in
                 let path = path + [row.title]
                 guard let action = row.action else { return entries(row.children, under: path) }
                 if action == .builtin(.keys) || action == .builtin(.globalMenu) { return [] }
-                return [PaletteEntry(id: row.id, path: path, action: action, checked: row.checked)]
+                return [LauncherEntry(id: row.id, path: path, action: action, checked: row.checked)]
             }
         }
         return entries(rows, under: [])
     }
 }
 
-public enum PaletteFilter {
-    /// The entries whose path has every typed word (case and accents don't
-    /// matter), those whose own title starts with the text first; menu order
-    /// otherwise. Nothing typed keeps them all.
-    public static func filter(_ entries: [PaletteEntry], _ query: String) -> [PaletteEntry] {
-        let typed = TypedWords(query)
-        guard !typed.isEmpty else { return entries }
-        let matches = entries.filter { typed.areAll(in: $0.text) }
-        return matches.filter { typed.start($0.title) } + matches.filter { !typed.start($0.title) }
-    }
-}
-
-/// What was typed into the palette's or the cheat sheet's field, as both
+/// What was typed into the launcher's or the cheat sheet's field, as both
 /// match it: by words, whatever the case and the accents.
 public struct TypedWords: Sendable {
     private let text: String
@@ -474,6 +462,17 @@ public struct TypedWords: Sendable {
     /// `text` starts with what was typed, spaces and all.
     public func start(_ text: String) -> Bool {
         Self.fold(text).hasPrefix(self.text)
+    }
+
+    /// How well a thing called `name`, found by `text` (a menu row's whole
+    /// path; an app's name), matches: nil when a typed word is missing from
+    /// `text`; 0 when `name` starts with what was typed; 1 when every typed
+    /// word starts a word of `name`; 2 otherwise.
+    public func rank(name: String, text: String) -> Int? {
+        guard areAll(in: text) else { return nil }
+        if start(name) { return 0 }
+        let nameWords = Self.fold(name).split { !$0.isLetter && !$0.isNumber }
+        return words.allSatisfy { word in nameWords.contains { $0.hasPrefix(word) } } ? 1 : 2
     }
 
     private static func fold(_ text: String) -> String {

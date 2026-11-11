@@ -51,8 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 /// What each `grovekeys://` link does. The Grove bar's pine and app name
-/// send `grove-menu` and `app-menu`, AeroSpace's hotkeys `palette` and
-/// `cheatsheet`; an `open` row of the Grove menu naming one of these links is
+/// send `grove-menu` and `app-menu`, AeroSpace's hotkey `cheatsheet`; `launcher` is for a
+/// terminal or a binding of one's own (its key, ⌘Space, comes through the key tap); an `open` row of the Grove menu naming one of these links is
 /// answered here too, without going round through macOS.
 @MainActor
 enum Links {
@@ -62,7 +62,7 @@ enum Links {
         case .row(let id): PointerMenu.shared.showRow(id: id)
         case .groveMenu: PointerMenu.shared.showGroveMenu()
         case .appMenu: PointerMenu.shared.showAppMenu()
-        case .palette: PalettePanel.shared.toggle()
+        case .launcher: LauncherPanel.shared.toggle()
         case .cheatSheet: CheatSearchPanel.shared.toggle()
         }
     }

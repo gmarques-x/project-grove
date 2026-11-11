@@ -139,14 +139,14 @@ public enum CheatSheet {
 
         let all = [CheatSection(id: "hyper", title: "Hyper", rows: hyper)] + modes + [
             CheatSection(id: "shell", title: "Shell", fixed: true, rows: shell),
-            CheatSection(id: "macos", title: "macOS", fixed: true, rows: macOS),
+            CheatSection(id: "macos", title: "macOS", fixed: true, rows: macOS(keys.hyper)),
             CheatSection(id: "ghostty", title: "Ghostty", fixed: true, rows: ghostty),
         ]
         return all.filter { !$0.rows.isEmpty }
     }
 
     /// The rows that have every typed word in their key, their text, their
-    /// detail or their section's title (the palette's rule), in place; a
+    /// detail or their section's title (the launcher's rule), in place; a
     /// section left without rows goes. Nothing typed keeps them all.
     public static func filter(_ sections: [CheatSection], _ query: String) -> [CheatSection] {
         let typed = TypedWords(query)
@@ -169,18 +169,30 @@ public enum CheatSheet {
         CheatRow(id: "shell/quick", keys: "⌃ `", text: "Quick terminal, from anywhere"),
     ]
 
-    static let macOS = [
-        CheatRow(id: "macos/shot-screen", keys: "⇧⌘ 3", text: "Screenshot of the screen"),
-        CheatRow(id: "macos/shot-area", keys: "⇧⌘ 4", text: "Screenshot of an area or a window"),
-        CheatRow(id: "macos/shot-options", keys: "⇧⌘ 5", text: "Screenshot and recording options"),
-        CheatRow(id: "macos/emoji", keys: "⌃⌘ Space", text: "Emoji and symbols"),
-        CheatRow(id: "macos/spotlight", keys: "⌘ Space", text: "Spotlight"),
-        CheatRow(id: "macos/lock", keys: "⌃⌘ Q", text: "Lock the screen"),
-        CheatRow(id: "macos/dictation", keys: "Fn Fn", text: "Dictation (the Fn/Globe key, twice)"),
-        // Grove Keys' doing (`right_option` in keys.toml): the left ⌥ is for shortcuts.
-        CheatRow(id: "macos/right-option", keys: "Right ⌥ + key", text: "@ € and other characters (left ⌥: shortcuts)",
-                 detail: "right option alt symbols at euro"),
-    ]
+    /// macOS's own keys, and the two Grove Keys changes under them: ⌘Space is
+    /// the Grove Launcher, not Spotlight, and the right ⌥ types characters
+    /// (each while its setting in keys.toml's `[hyper]` says so).
+    static func macOS(_ settings: HyperSettings) -> [CheatRow] {
+        let space = settings.launcher == .cmdSpace
+            ? CheatRow(id: "macos/launcher", keys: "⌘ Space", text: "Grove Launcher: apps and the Grove menu",
+                       detail: "open app find search spotlight")
+            : CheatRow(id: "macos/spotlight", keys: "⌘ Space", text: "Spotlight")
+        var rows = [
+            CheatRow(id: "macos/shot-screen", keys: "⇧⌘ 3", text: "Screenshot of the screen"),
+            CheatRow(id: "macos/shot-area", keys: "⇧⌘ 4", text: "Screenshot of an area or a window"),
+            CheatRow(id: "macos/shot-options", keys: "⇧⌘ 5", text: "Screenshot and recording options"),
+            CheatRow(id: "macos/emoji", keys: "⌃⌘ Space", text: "Emoji and symbols"),
+            space,
+            CheatRow(id: "macos/lock", keys: "⌃⌘ Q", text: "Lock the screen"),
+            CheatRow(id: "macos/dictation", keys: "Fn Fn", text: "Dictation (the Fn/Globe key, twice)"),
+        ]
+        if settings.rightOption == .characters {
+            rows.append(CheatRow(id: "macos/right-option", keys: "Right ⌥ + key",
+                                 text: "@ € and other characters (left ⌥: shortcuts)",
+                                 detail: "right option alt symbols at euro"))
+        }
+        return rows
+    }
 
     private static func hyperKeys(_ key: String) -> String {
         "Hyper " + Shortcut(modifiers: [], key: key).symbols
@@ -259,7 +271,7 @@ public enum CommandWords {
 
     private static func linkName(_ link: KeysURL) -> String? {
         switch link {
-        case .palette: return "Grove menu palette"
+        case .launcher: return "Grove Launcher"
         case .cheatSheet: return "Cheat sheet"
         case .groveMenu: return "Grove menu"
         case .appMenu: return "App menu"

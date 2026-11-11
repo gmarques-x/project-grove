@@ -7,6 +7,7 @@ tap_ms = 200 # a press shorter than this, with no other key, is a tap
 cheatsheet_ms = 500 # hold Caps Lock alone this long to show the cheat sheet; 0 = off
 enabled = true # false = Caps Lock is left alone
 right_option = "characters" # the right ⌥ types @ € and the layout's other characters; "shortcuts" = both ⌥ keys run shortcuts
+launcher = "cmd-space" # ⌘Space opens the Grove Launcher (apps and the Grove menu), not Spotlight; "none" = no key
 
 [launch] # Hyper + key → app bundle ID, e.g. t = "com.mitchellh.ghostty"
 enter = "com.mitchellh.ghostty"
@@ -45,7 +46,6 @@ alt-shift-9 = "move-node-to-workspace 9"
 alt-tab = "workspace-back-and-forth"
 alt-shift-tab = "move-workspace-to-monitor --wrap-around next"
 alt-shift-semicolon = "mode service"
-hyper-space = "exec-and-forget open grovekeys://palette" # the Grove menu, type to filter
 hyper-k = "exec-and-forget open grovekeys://cheatsheet" # every key, searchable
 
 [aerospace.service]

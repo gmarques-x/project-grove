@@ -1,7 +1,7 @@
 import AppKit
 import GroveKeysCore
 
-/// Does what a row of the Grove menu says, for the pine's menu, the palette
+/// Does what a row of the Grove menu says, for the pine's menu, the launcher
 /// and `grovekeys://menu/<id>` alike.
 @MainActor
 enum MenuRunner {

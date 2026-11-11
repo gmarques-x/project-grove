@@ -17,12 +17,11 @@ import Testing
 
         // The comment says what a binding does; the command is there to find it by.
         let hyper = all[0].rows
-        #expect(hyper.map(\.keys) == ["Hyper Space", "Hyper K"])
-        #expect(hyper.map(\.text) == ["The Grove menu, type to filter", "Every key, searchable"])
-        #expect(hyper[0].detail == "hyper-space exec-and-forget open grovekeys://palette")
-        #expect(hyper[0].action == .run([.link(.palette)]))
+        #expect(hyper.map(\.keys) == ["Hyper K"])
+        #expect(hyper.map(\.text) == ["Every key, searchable"])
+        #expect(hyper[0].detail == "hyper-k exec-and-forget open grovekeys://cheatsheet")
         // The sheet's own key: Return only closes the sheet.
-        #expect(hyper[1].action == .none)
+        #expect(hyper[0].action == .none)
 
         // Main has no Hyper rows, and each run of nine is one row.
         let main = all[1].rows
@@ -56,6 +55,16 @@ import Testing
             .allSatisfy { $0.action == .none })
         let ids = all.flatMap(\.rows).map(\.id)
         #expect(Set(ids).count == ids.count)
+        // ⌘Space is the Grove Launcher, as the file says.
+        #expect(all[4].rows.first { $0.keys == "⌘ Space" }?.id == "macos/launcher")
+    }
+
+    /// The two rows about Grove Keys' own doing follow keys.toml's settings.
+    @Test func theMacOSRowsFollowTheSettings() throws {
+        let off = try KeysFile(text: "[hyper]\nlauncher = \"none\"\nright_option = \"shortcuts\"\n")
+        let rows = try #require(sections(off).first { $0.id == "macos" }).rows
+        #expect(rows.first { $0.keys == "⌘ Space" }?.text == "Spotlight")
+        #expect(!rows.contains { $0.id == "macos/right-option" || $0.id == "macos/launcher" })
     }
 
     @Test func launchersLeadTheHyperSection() throws {
@@ -65,7 +74,7 @@ import Testing
         // The launcher wins the key, as on the drawn keyboard.
         keys.setBinding(mode: "main", key: "cmd-ctrl-alt-shift-t", value: .string("workspace 3"))
         let hyper = sections(keys)[0].rows
-        #expect(hyper.map(\.keys) == ["Hyper T", "Hyper ↩", "Hyper Space", "Hyper K"])
+        #expect(hyper.map(\.keys) == ["Hyper T", "Hyper ↩", "Hyper K"])
         #expect(hyper[0].text == "Ghostty")
         #expect(hyper[0].action == .launch(bundleID: "com.mitchellh.ghostty"))
         #expect(hyper[0].detail == "com.mitchellh.ghostty")
@@ -108,7 +117,8 @@ import Testing
         #expect(w("mode service") == "Service mode")
         #expect(w("reload-config") == "Reload config")
         #expect(w("fullscreen") == "Fullscreen")
-        #expect(w("exec-and-forget open grovekeys://palette") == "Grove menu palette")
+        #expect(w("exec-and-forget open grovekeys://launcher") == "Grove Launcher")
+        #expect(w("exec-and-forget open grovekeys://palette") == "Grove Launcher")
         #expect(w("exec-and-forget open grovekeys://cheatsheet") == "Cheat sheet")
         // No words for these: as they are written.
         #expect(w("focus --boundaries all-monitors-outer-frame left") == "focus --boundaries all-monitors-outer-frame left")
@@ -123,7 +133,7 @@ import Testing
     @Test func whatReturnRuns() {
         #expect(CheatStep(command: "focus left") == .aerospace(["focus", "left"]))
         #expect(CheatStep(command: " resize  smart +50 ") == .aerospace(["resize", "smart", "+50"]))
-        #expect(CheatStep(command: "exec-and-forget open grovekeys://palette") == .link(.palette))
+        #expect(CheatStep(command: "exec-and-forget open grovekeys://launcher") == .link(.launcher))
         #expect(CheatStep(command: "exec-and-forget open -a 'Google Chrome'") == .shell("open -a 'Google Chrome'"))
         #expect(CheatStep(command: "exec-and-forget open grovekeys://nope") == .shell("open grovekeys://nope"))
         #expect(CheatStep(command: "exec-and-forget") == nil)
@@ -134,7 +144,7 @@ import Testing
         #expect(CheatAction.launch(bundleID: "a.b").takesFocus)
         #expect(!CheatAction.run([.aerospace(["focus", "left"]), .aerospace(["mode", "main"])]).takesFocus)
         #expect(!CheatAction.run([.shell("say hi")]).takesFocus)
-        #expect(CheatAction.run([.link(.palette)]).takesFocus)
+        #expect(CheatAction.run([.link(.launcher)]).takesFocus)
     }
 
     @Test func theFilterKeepsTheRowsWithEveryWord() throws {
@@ -158,6 +168,8 @@ import Testing
         #expect(found("macos lock") == ["macos/lock"])
         #expect(found("right option") == ["macos/right-option"])
         #expect(found("euro") == ["macos/right-option"])
+        #expect(found("launcher") == ["macos/launcher"])
+        #expect(found("spotlight") == ["macos/launcher"])
         #expect(found("service join right") == ["mode:service/alt-shift-l"])
         // Across sections, in the sheet's order.
         #expect(found("quick terminal") == ["shell/quick", "ghostty/toggle_quick_terminal"])

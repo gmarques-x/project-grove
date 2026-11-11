@@ -23,6 +23,8 @@ public enum HyperEffect: Equatable, Sendable {
     case launch(key: String)
     case showCheatSheet
     case hideCheatSheet
+    /// The launcher's key was pressed (`LauncherChord`; not the machine's doing).
+    case toggleLauncher
 }
 
 /// Pure Hyper logic: F18 held adds ⌃⌥⇧⌘ to other keys, a quick unused tap

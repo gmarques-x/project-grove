@@ -10,7 +10,7 @@ import os
 /// applied, the save path, the Hyper engine and the Caps Lock mapping. The
 /// mapping is on only while both permissions are granted, the tap runs, and
 /// Hyper is enabled and not paused. (The tap also runs with Hyper off or
-/// paused, for the right Option's characters.)
+/// paused, for the right Option's characters and the launcher's key.)
 @MainActor
 final class AppModel: ObservableObject {
     static let shared = AppModel()
@@ -49,7 +49,7 @@ final class AppModel: ObservableObject {
     /// only let a process started after the grant watch the keyboard). Not for
     /// a keys.toml error, which a restart wouldn't change.
     var offersRestart: Bool { !permissions.granted || engineLine != nil }
-    /// Grove Keys' own menu as the pointer menus and the palette show it.
+    /// Grove Keys' own menu as the pointer menus and the launcher show it.
     var keysMenuItems: [KeysMenuItem] {
         KeysMenuItem.items(accessibility: permissions.accessibility, inputMonitoring: permissions.inputMonitoring,
                            redLine: redLine, offersRestart: offersRestart, paused: paused)
@@ -152,6 +152,8 @@ final class AppModel: ObservableObject {
         writeState()
         // The Wi-Fi name for the Grove bar; optional, apart from the rest.
         WifiNameWriter.shared.start()
+        // The apps for the Grove Launcher, so its first opening has them.
+        LauncherPanel.shared.refreshApps()
     }
 
     /// Every exit path: mapping off first, then the tap. Safe to call twice.
@@ -335,12 +337,12 @@ final class AppModel: ObservableObject {
     }
 
     /// Brings the tap and the mapping in line with the permissions, the file
-    /// and Pause. The tap runs for Hyper or for the right Option's characters
-    /// (Pause Hyper stops Hyper, not those); the Caps Lock mapping only for Hyper.
+    /// and Pause. The tap runs for Hyper, for the right Option's characters or
+    /// for the launcher's key (Pause Hyper stops Hyper, not those); the Caps Lock mapping only for Hyper.
     private func reconcile() {
         let settings = tapSettings
         let ready = loaded && keysKnown && permissions.granted && !tapGaveUp
-        let want = ready && (settings.enabled || settings.rightOption == .characters)
+        let want = ready && (settings.enabled || settings.rightOption == .characters || settings.launcher != .none)
         let wantMapping = want && settings.enabled
         if want {
             // Hyper off or paused while the tap stays: the mapping goes first,
@@ -417,6 +419,7 @@ final class AppModel: ObservableObject {
             }
         case .showCheatSheet: showCheatSheet()
         case .hideCheatSheet: hideCheatSheet()
+        case .toggleLauncher: LauncherPanel.shared.toggle()
         case .postEscape: break  // posted on the tap thread
         }
     }

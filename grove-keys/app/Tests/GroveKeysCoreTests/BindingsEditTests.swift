@@ -67,7 +67,7 @@ import Testing
                replacing: [.binding(mode: "main", key: "alt-1")])
         let after = f.modes[0].bindings
         #expect(after.filter { $0.key == "alt-1" }.map(\.value) == [.string("focus left")])
-        #expect(after.count == 34)
+        #expect(after.count == 33)
     }
 
     @Test func moveALauncher() throws {
@@ -96,7 +96,7 @@ import Testing
         let ws = BindingRows.rows(mode: f.modes[0].bindings, folded: true).first { $0.count == 9 }!
         f.remove(ws.keys.map { .binding(mode: "main", key: $0) })
         #expect(!f.modes[0].bindings.contains { $0.key.hasPrefix("alt-") && $0.value == .string("workspace 1") })
-        #expect(f.modes[0].bindings.count == 36 - 9)
+        #expect(f.modes[0].bindings.count == 35 - 9)
         f.remove([.launcher(key: "t")])
         #expect(f.launch.isEmpty)
     }

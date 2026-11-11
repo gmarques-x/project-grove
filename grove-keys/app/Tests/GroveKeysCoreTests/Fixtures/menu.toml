@@ -1,5 +1,5 @@
-# The Grove menu: the pine's menu in the bar, and the same rows in the palette
-# (Hyper + Space). Grove Keys reads this file and, after it, menu.local.toml
+# The Grove menu: the pine's menu in the bar, and the same rows in the Grove
+# Launcher (⌘Space). Grove Keys reads this file and, after it, menu.local.toml
 # beside it (yours, not tracked): a table there with the same name changes a
 # row, a new name adds one, and `hidden = true` removes one.
 #
@@ -103,8 +103,13 @@ present = "grove about"
 [system]
 title = "System"
 
+[system.settings]
+title = "System Settings…"
+open = "/System/Applications/System Settings.app"
+
 [system.lock]
 title = "Lock"
+separator = true
 builtin = "lock"
 
 [system.display-sleep]

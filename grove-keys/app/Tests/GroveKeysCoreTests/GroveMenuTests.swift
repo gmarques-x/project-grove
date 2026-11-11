@@ -9,7 +9,7 @@ import Testing
         let menu = try GroveMenu.strict(main: try fixture("menu.toml"))
         #expect(menu.rows.map(\.id) == ["appearance", "keys", "update", "learn", "about", "system", "global-menu"])
         #expect(menu.rows.map(\.title) == ["Appearance", "Grove Keys", "Update", "Learn", "About", "System", "Global Menu"])
-        #expect(menu.count == 28)
+        #expect(menu.count == 29)
 
         let appearance = menu.rows[0]
         #expect(appearance.action == nil)
@@ -26,6 +26,13 @@ import Testing
         #expect(menu.rows[1].action == .builtin(.keys))
         #expect(menu.row(id: "update.check")?.action == .present("grove check"))
         #expect(menu.row(id: "system.lock")?.action == .builtin(.lock))
+        // System Settings leads the System submenu, set apart from Lock and the rest.
+        #expect(menu.row(id: "system")?.children.first?.id == "system.settings")
+        #expect(menu.row(id: "system.settings")?.action == .open("/System/Applications/System Settings.app"))
+        #expect(menu.row(id: "system.settings")?.action?.takesFocus == true)
+        #expect(OpenTarget("/System/Applications/System Settings.app", home: home)
+            == .url(URL(fileURLWithPath: "/System/Applications/System Settings.app")))
+        #expect(menu.row(id: "system.lock")?.separator == true)
         #expect(menu.row(id: "system.logout")?.action
             == .run(#"osascript -e 'tell application "loginwindow" to «event aevtrlgo»'"#))
         let global = try #require(menu.rows.last)
@@ -233,7 +240,7 @@ import Testing
         #expect(GroveMenuAction.present("x").takesFocus)
         #expect(GroveMenuAction.open("https://ghostty.org/docs").takesFocus)
         #expect(GroveMenuAction.open("~/notes.md").takesFocus)
-        // The cheat sheet has a field to type in, as the palette.
+        // The cheat sheet has a field to type in, as the launcher.
         #expect(GroveMenuAction.open("grovekeys://cheatsheet").takesFocus)
         #expect(GroveMenuAction.keys(.open).takesFocus)
         #expect(GroveMenuAction.keys(.restart).takesFocus)
@@ -268,16 +275,16 @@ import Testing
             == "/Users/test/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
     }
 
-    // MARK: The palette
+    // MARK: The launcher
 
-    private func shippedEntries() throws -> [PaletteEntry] {
+    private func shippedEntries() throws -> [LauncherEntry] {
         let items = KeysMenuItem.items(accessibility: true, inputMonitoring: true, redLine: "bad", offersRestart: false, paused: false)
-        return try GroveMenu.strict(main: try fixture("menu.toml")).expandingKeys(items).paletteEntries
+        return try GroveMenu.strict(main: try fixture("menu.toml")).expandingKeys(items).launcherEntries
     }
 
-    @Test func thePaletteListsEveryLeafByItsPath() throws {
+    @Test func theLauncherListsEveryLeafByItsPath() throws {
         let entries = try shippedEntries()
-        #expect(entries.count == 25)
+        #expect(entries.count == 26)
         #expect(entries.prefix(3).map(\.text) == ["Appearance › Grove Themes…", "Appearance › Dark Hard", "Appearance › Dark Medium"])
         #expect(entries[1].id == "appearance.dark-hard" && entries[1].checked != nil)
         // Grove Keys' items are there (not its red line); the Global Menu is not.
@@ -287,22 +294,64 @@ import Testing
         #expect(entries.first { $0.id == "about" }?.path == ["About"])
 
         // A keys builtin that wasn't expanded has nothing to list.
-        let plain = try GroveMenu.strict(main: try fixture("menu.toml")).paletteEntries
-        #expect(plain.count == 22 && !plain.contains { $0.id == "keys" })
+        let plain = try GroveMenu.strict(main: try fixture("menu.toml")).launcherEntries
+        #expect(plain.count == 23 && !plain.contains { $0.id == "keys" })
     }
 
-    @Test func theFilterWantsEveryWordAndPutsTitleStartsFirst() throws {
+    private func ids(_ rows: [LauncherEntry], apps: [InstalledApps.App] = [], _ query: String) -> [String] {
+        LauncherFilter.filter(rows: rows, apps: apps, query).map(\.id)
+    }
+
+    @Test func theFilterWantsEveryWordAndPutsNameStartsFirst() throws {
         let entries = try shippedEntries()
-        #expect(PaletteFilter.filter(entries, "") == entries)
-        #expect(PaletteFilter.filter(entries, "   ") == entries)
-        #expect(PaletteFilter.filter(entries, "DARK med").map(\.id) == ["appearance.dark-medium"])
-        #expect(PaletteFilter.filter(entries, "soft appear").map(\.id) == ["appearance.dark-soft", "appearance.light-soft"])
-        #expect(PaletteFilter.filter(entries, "zzz").isEmpty)
-        #expect(PaletteFilter.filter(entries, "sh").map(\.title) == ["Show cheat sheet", "Shut Down…"])
+        #expect(LauncherFilter.filter(rows: entries, apps: [], "") == entries.map(LauncherItem.row))
+        #expect(LauncherFilter.filter(rows: entries, apps: [], "   ") == entries.map(LauncherItem.row))
+        #expect(ids(entries, "DARK med") == ["row:appearance.dark-medium"])
+        #expect(ids(entries, "soft appear") == ["row:appearance.dark-soft", "row:appearance.light-soft"])
+        #expect(ids(entries, "zzz").isEmpty)
+        // Both start with it: the shorter title first.
+        #expect(LauncherFilter.filter(rows: entries, apps: [], "sh").prefix(2).map(\.name) == ["Shut Down…", "Show cheat sheet"])
         // "up": Update Grove (a title start) comes before the Update rows that
         // only have it in their path, though those are earlier in the menu.
-        #expect(PaletteFilter.filter(entries, "up").map(\.id) == ["update.grove", "update.check", "update.install"])
+        #expect(ids(entries, "up") == ["row:update.grove", "row:update.check", "row:update.install"])
         // The whole text is the prefix, spaces and all.
-        #expect(PaletteFilter.filter(entries, "light s").map(\.id).first == "appearance.light-soft")
+        #expect(ids(entries, "light s").first == "row:appearance.light-soft")
+    }
+
+    private func app(_ name: String) -> InstalledApps.App {
+        InstalledApps.App(name: name, bundleID: "test." + name, path: "/Applications/\(name).app")
+    }
+
+    @Test func nothingTypedIsTheGroveMenuWithoutApps() throws {
+        let entries = try shippedEntries()
+        let all = LauncherFilter.filter(rows: entries, apps: [app("Safari"), app("Notes")], "")
+        #expect(all == entries.map(LauncherItem.row))
+    }
+
+    @Test func typingRanksAppsAndRowsTogether() throws {
+        let entries = try shippedEntries()
+        let apps = ["App Store", "Google Chrome", "Safari", "Settings Helper", "System Settings", "Visual Studio Code",
+                    "Shortcuts", "Ghostty"].map(app)
+        func names(_ query: String) -> [String] {
+            LauncherFilter.filter(rows: entries, apps: apps, query).map(\.name)
+        }
+        // A name that starts with it, apps before rows, shorter first.
+        #expect(names("sa") == ["Safari"])
+        #expect(names("s").prefix(5) == ["Safari", "Shortcuts", "Settings Helper", "System Settings", "Sleep"])
+        // A word of the name starts with it: after the name starts, before a mere substring.
+        #expect(names("chr") == ["Google Chrome"])
+        #expect(names("stu") == ["Visual Studio Code"])
+        #expect(names("sto") == ["App Store"])
+        #expect(names("code") == ["Visual Studio Code"])
+        // Each typed word starts a word: "vs c" doesn't, "vis co" does.
+        #expect(names("vis co") == ["Visual Studio Code"])
+        // An app and a Grove menu row of the same name: the app first.
+        #expect(names("system settings") == ["System Settings", "System Settings…"])
+        // Rows still match by their whole path, after the names that start with it.
+        #expect(names("system").prefix(1) == ["System Settings"])
+        #expect(names("system").contains("Lock"))
+        // Accents and case don't matter; the app before the Learn row of the same name.
+        #expect(LauncherFilter.filter(rows: entries, apps: apps, "GHÖ").map(\.id) == ["app:test.Ghostty", "row:learn.ghostty"])
+        #expect(LauncherFilter.filter(rows: entries, apps: apps, "ghost").first?.id == "app:test.Ghostty")
     }
 }

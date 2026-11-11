@@ -1,6 +1,6 @@
 # grove-keys
 
-Grove Keys is the keyboard app of Project Grove. It turns Caps Lock into Hyper (Cmd+Ctrl+Option+Shift; tap it alone and it sends Escape), launches apps with Hyper plus a key, shows a keyboard window and a cheat sheet, writes AeroSpace's config from one file, and draws the menus behind the Grove bar: the Grove menu, the palette, and the front app's own menus.
+Grove Keys is the keyboard app of Project Grove. It turns Caps Lock into Hyper (Cmd+Ctrl+Option+Shift; tap it alone and it sends Escape), launches apps with Hyper plus a key, shows a keyboard window and a cheat sheet, writes AeroSpace's config from one file, and draws the menus behind the Grove bar: the Grove menu, the Grove Launcher (⌘Space: apps and the menu's rows), and the front app's own menus.
 
 How to use it is in the manual: [Hotkeys](../docs/manual/05-hotkeys.md) and [The Grove menu](../docs/manual/03-the-grove-menu.md). This page is about how it is put together.
 
@@ -11,13 +11,13 @@ The app has no Dock icon, and its icon in the native menu bar is hidden behind t
 - the **pine** opens the Grove menu; its Grove Keys submenu has Open Grove Keys (the keyboard window), Show cheat sheet and Pause Hyper, plus a line for any missing permission;
 - the **app name** opens the front app's menus, read through Accessibility (the Global Menu).
 
-The bar and the hotkeys do this by opening links, which also work from a terminal (`open grovekeys://palette`):
+The bar and the hotkeys do this by opening links, which also work from a terminal (`open grovekeys://launcher`):
 
 | Link | What it does |
 | --- | --- |
 | `grovekeys://grove-menu` | The Grove menu at the pointer |
 | `grovekeys://app-menu` | The front app's menus at the pointer |
-| `grovekeys://palette` | The palette (Hyper + Space) |
+| `grovekeys://launcher` | The Grove Launcher (its key, ⌘Space, does not go through a link). `grovekeys://palette`, its old name, still works |
 | `grovekeys://cheatsheet` | The searchable cheat sheet (Hyper + K) |
 | `grovekeys://menu/<id>` | Runs one row of the Grove menu, or pops that submenu at the pointer |
 | `grovekeys://menu` | Grove Keys' own submenu at the pointer |
@@ -27,6 +27,8 @@ The bar and the hotkeys do this by opening links, which also work from a termina
 Bindings are in `~/.config/grove-keys/keys.toml` (tracked as `grove-dotfiles/config/grove-keys/keys.toml`). Edit it by hand or in the Grove Keys window; both write the same file. Every save renders `~/.config/aerospace/aerospace.toml` from `keys.toml` and `aerospace.base.toml` (settings and window rules), and reloads AeroSpace. `aerospace.toml` is generated and untracked: edit the other two. A mistake in `keys.toml` shows as `keys.toml line N: ...` under the tabs, and the last good config keeps running.
 
 The right Option key types characters. AeroSpace's hotkeys cannot tell the two Option keys apart, so `alt-2` took ⌥2 from every app and `@` could not be typed on a Portuguese keyboard. With `right_option = "characters"` under `[hyper]` (the default; also a switch in the window's Hyper key group), the key tap changes a key pressed with only the right Option (Shift allowed) before any hotkey sees it: the event loses its Option flag and carries the character the current layout has there (`UCKeyTranslate`), so no `alt-` binding matches and the app types it. Keys with no character (arrows, Delete, Tab) are left alone, dead keys type their accent on its own, and Hyper, Command or Control with the key leave it a shortcut. `"shortcuts"` makes both Option keys alike. The tap runs for this even when Hyper is off or paused.
+
+⌘Space opens the Grove Launcher. Spotlight owns that shortcut as a system hotkey, and Grove changes no system setting, so the same key tap swallows Space pressed with exactly ⌘ (the press, its repeats and its release) and toggles the launcher; `launcher = "cmd-space"` under `[hyper]` (also a switch in the window), `"none"` for no key. The launcher lists the Grove menu's rows and, once you type, the apps in /Applications, ~/Applications and /System/Applications (with their Utilities, Chrome's web apps, and Finder), ranked by `LauncherFilter`; the app list is scanned off the main thread when Grove Keys starts and again each time the launcher opens. The tap runs for the launcher's key, the right Option or Hyper, whichever is on; Pause Hyper stops only Hyper.
 
 No app is pinned to a workspace. The monitor each workspace goes to is this Mac's own business, so it lives in `~/.config/grove-keys/monitors.toml`, which git ignores: a `[monitors]` table with lines like `1 = "main"` (`"main"`, `"secondary"`, `"built-in"` or a display's name). The Monitors group in the window creates the file on the first change; no file means every workspace stays where AeroSpace puts it. It is rendered into `aerospace.toml` with the rest, and a mistake in it shows as `monitors.toml line N: ...`.
 
