@@ -8,6 +8,7 @@ cheatsheet_ms = 500 # hold Caps Lock alone this long to show the cheat sheet; 0 
 enabled = true # false = Caps Lock is left alone
 
 [launch] # Hyper + key → app bundle ID, e.g. t = "com.mitchellh.ghostty"
+enter = "com.mitchellh.ghostty"
 
 [aerospace.main] # AeroSpace syntax; "hyper-" means cmd-ctrl-alt-shift-
 alt-slash = "layout tiles horizontal vertical"

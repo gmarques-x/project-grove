@@ -631,8 +631,21 @@ ka_ready() {
   grep -q '^| `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |$' "$GROVE_ROOT/README.md"
 }
 
-@test "keys-app: the shipped keys.toml is the app's test fixture" {
-  cmp "$GROVE_ROOT/config/grove-keys/keys.toml" "$GROVE_ROOT/../grove-keys/app/Tests/GroveKeysCoreTests/Fixtures/keys.toml"
+# ka_defaults FILE: keys.toml without the entries of [launch] and the
+# [monitors."…"] sections, which hold the user's own launchers and screens.
+ka_defaults() {
+  awk '/^\[/ { own = ($0 ~ /^\[launch\]/ || $0 ~ /^\[monitors\./); print; next } !own' "$1"
+}
+
+@test "keys-app: the shipped keys.toml is the app's test fixture, apart from the user's launchers and screens" {
+  diff <(ka_defaults "$GROVE_ROOT/config/grove-keys/keys.toml") \
+    <(ka_defaults "$GROVE_ROOT/../grove-keys/app/Tests/GroveKeysCoreTests/Fixtures/keys.toml")
+}
+
+@test "keys-app: the guard still catches a change outside the launchers" {
+  local f="$BATS_TEST_TMPDIR/keys.toml"
+  sed 's/^tap_ms = 200/tap_ms = 250/' "$GROVE_ROOT/config/grove-keys/keys.toml" > "$f"
+  ! diff -q <(ka_defaults "$f") <(ka_defaults "$GROVE_ROOT/../grove-keys/app/Tests/GroveKeysCoreTests/Fixtures/keys.toml") >/dev/null
 }
 
 @test "keys-app: swift test passes" {
