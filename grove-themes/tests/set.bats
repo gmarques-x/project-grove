@@ -316,3 +316,9 @@ bar_line() { printf '%s\n' "$output" | grep '^bar '; }
   run "$CLI" set dark-hard
   [[ "$(bar_line)" == *"failed"*"could not reload the bar"* ]] || false
 }
+
+@test "bar: every test's baseline fakes sketchybar, so no test can reload the real bar" {
+  [ -n "${GROVE_SKETCHYBAR:-}" ]
+  [ "$GROVE_SKETCHYBAR" != /opt/homebrew/bin/sketchybar ]
+  [ -x "$GROVE_SKETCHYBAR" ]
+}

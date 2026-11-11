@@ -19,7 +19,7 @@ esac
 
 state="${TMPDIR:-/tmp}/grove-sketchybar-net"
 now="${SB_NOW:-$(date +%s)}"
-iface="$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
+iface="$(sb_timeout 2 route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
 read -r nin nout <<< "$(netstat -ibn 2>/dev/null | sb_iface_bytes "$iface")"
 read -r piface pin pout pt < "$state" 2>/dev/null || true
 down="$SB_NONE"; up="$SB_NONE"

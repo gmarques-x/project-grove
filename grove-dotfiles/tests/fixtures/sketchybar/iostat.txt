@@ -1,0 +1,4 @@
+      cpu    load average
+ us sy id   1m   5m   15m
+  4  4 92  1.96 2.19 2.09
+  6  4 91  1.96 2.19 2.09

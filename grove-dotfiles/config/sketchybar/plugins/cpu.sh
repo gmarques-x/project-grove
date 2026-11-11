@@ -17,7 +17,7 @@ case "${SENDER:-}" in
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
-cpu="$( { top -l 1 -n 0 2>/dev/null || true; } | sb_cpu)"
+cpu="$( { sb_timeout 3 iostat -n 0 -c 2 -w 1 2>/dev/null || true; } | sb_cpu)"
 mem="$( { vm_stat 2>/dev/null || true; } | sb_mem "$(sysctl -n hw.memsize 2>/dev/null)")"
 # load_color PERCENT: fg, yellow above 70, red above 90.
 load_color() {

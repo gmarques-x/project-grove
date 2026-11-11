@@ -1,6 +1,6 @@
 # SketchyBar · the Grove top bar
 
-**Status:** design for review, 2026-11-11
+**Status:** built 2026-11-11 (as shipped: §11 lists what changed from the first design)
 **Builds on:** [2026-11-10-aerospace-design.md](2026-11-10-aerospace-design.md) (workspaces, gaps), [2026-11-10-grove-themes-design.md](2026-11-10-grove-themes-design.md) (templates, switch steps), [2026-11-10-grove-keys-design.md](2026-11-10-grove-keys-design.md) (the Grove Keys menu)
 **Mockups:** `artifacts/sketchybar/mockups/` (private canvas https://claude.ai/artifact/6AgtzsESSmbThGs3CsqToE), style **B · Floating bar** chosen, on an opaque strip
 
@@ -134,3 +134,25 @@ grove-keys/app                                grovekeys://menu opens its menu ba
   - Workspace switches from the keyboard.
   - The network popup.
   - Logging out and back in.
+
+## 11. As shipped (changes made while building, with the user)
+
+- **Strip level:** `topmost=on`. `topmost=window` sat below the menu bar.
+- **Top gap:** windows start where the 48 pt strip ends, 8 pt below the floating bar: `gaps.outer.top = [{ monitor."built-in" = 11 }, 48]`. The built-in screen keeps 37.5 pt for the notch even when the menu bar hides.
+- **AeroSpace:** also triggers the bar from `on-focus-changed`, so moving a window or a pinned app opening refreshes the workspaces.
+- **Items:** `system` became `cpu` + `mem`, and `network` became `net.down` + `net.up` (one item can't colour two labels).
+- **Separators:**
+  - Bg3 bars `sep.*`: one between the tree and the workspaces.
+  - Between each right-side group, and left of cpu.
+- **Values:**
+  - Fixed label widths, so the separators never move; numbers are right-aligned.
+  - Compact rates (`2K`, `1.2M`).
+  - `bat 81%`: green while charging, yellow under 20%, red under 10%.
+  - cpu and mem turn yellow above 70% and red above 90%.
+- **CPU source:** the last of two 1 s `iostat` samples. `top`'s single sample reads high.
+- **Connection:** the `wifi` slot shows `wifi`, `eth`, `vpn` or `off`. macOS redacts Wi-Fi names from command-line tools without Location permission.
+- **Hover:** clickable items (tree, network, clock, ⌘) light a bg1 background. The tree's pine is its icon image (`pine-dark.png` / `pine-light.png`).
+- **Clock:** a click opens this month's calendar (`cal`) as a popup.
+- **Reloads:** volume and the front app fill in after a reload (`osascript` volume, `lsappinfo`).
+- **Hangs:** every slow source runs under a 2–3 s limit (`sb_timeout`).
+- **Install:** SketchyBar isn't in the Brewfile, because `brew bundle` refuses untrusted taps. Module 99 trusts the tap and installs it.

@@ -117,3 +117,7 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
 @test "aerospace: a workspace change triggers the Grove bar" {
   [ "$(as_q "c['exec-on-workspace-change']")" = '["/bin/bash", "-c", "/opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change FOCUSED=$AEROSPACE_FOCUSED_WORKSPACE"]' ]
 }
+
+@test "aerospace: a focus change (a window moved or opened elsewhere) also refreshes the bar" {
+  [ "$(as_q "c['on-focus-changed']")" = '["exec-and-forget /opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change"]' ]
+}

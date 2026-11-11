@@ -182,17 +182,17 @@ rc() {
 }
 
 @test "cpu and mem: one call sets both" {
-  fake top 'cat "'"$FX"'/top.txt"'
+  fake iostat 'cat "'"$FX"'/iostat.txt"'
   fake vm_stat 'cat "'"$FX"'/vm_stat.txt"'
   fake sysctl 'echo 25769803776'
   plugin cpu
   [ "$(ncalls)" -eq 1 ]
   . "$CFG/colors.sh"
-  [ "$(calls)" = "--set cpu label=13% label.color=$FG --set mem label=52% label.color=$FG" ]
+  [ "$(calls)" = "--set cpu label=9% label.color=$FG --set mem label=52% label.color=$FG" ]
 }
 
 @test "cpu and mem: a failing source shows —" {
-  fake top 'exit 1'
+  fake iostat 'exit 1'
   fake vm_stat 'exit 1'
   fake sysctl 'exit 1'
   plugin cpu
@@ -201,7 +201,7 @@ rc() {
 }
 
 @test "cpu and mem: yellow above 70%, red above 90%" {
-  fake top 'echo "CPU usage: 50.0% user, 30.0% sys, 20.0% idle"'
+  fake iostat 'printf "      cpu    load average\n us sy id   1m   5m   15m\n 50 30 20  1.00 1.00 1.00\n"'
   fake vm_stat 'cat "'"$FX"'/vm_stat.txt"'
   fake sysctl 'echo 14033844547'
   plugin cpu

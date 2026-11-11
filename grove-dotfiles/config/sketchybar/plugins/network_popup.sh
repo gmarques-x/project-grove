@@ -25,7 +25,7 @@ while read -r name tin tout; do
   args+=(--set "net.total.$i" drawing=on label="$name  ↓ $(sb_bytes "$tin")  ↑ $(sb_bytes "$tout")")
 done <<< "$(netstat -ibn 2>/dev/null | sb_totals)"
 for ((j = i + 1; j <= 4; j++)); do args+=(--set "net.total.$j" drawing=off); done
-apps="$(perl -e 'alarm 2; exec @ARGV' nettop -P -L 1 -x -J bytes_in,bytes_out 2>/dev/null | sb_top_apps 5)"
+apps="$(sb_timeout 2 nettop -P -L 1 -x -J bytes_in,bytes_out 2>/dev/null | sb_top_apps 5)"
 i=0
 if [ -z "$apps" ]; then
   i=1

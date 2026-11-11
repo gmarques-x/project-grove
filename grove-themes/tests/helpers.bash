@@ -15,7 +15,9 @@ gt_test_setup() {
   # Safety: `set` must never reach the real desktop. No-op fakes for everything
   # it calls; tests that care replace them.
   local c s
-  for c in osascript defaults kill killall ps; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
+  for c in osascript defaults kill killall ps sketchybar; do stub "$c" 'cat > /dev/null 2>&1 < /dev/null; exit 0'; done
+  # The bar step calls sketchybar by its Homebrew path: never the real bar.
+  export GROVE_SKETCHYBAR="$BATS_TEST_TMPDIR/stubs/sketchybar"
   export GROVE_KILL="$BATS_TEST_TMPDIR/stubs/kill"
   export GROVE_KILLALL="$BATS_TEST_TMPDIR/stubs/killall"
   # Never the real wallpaper store: a path that doesn't exist unless a test makes it.

@@ -17,8 +17,8 @@ case "${SENDER:-}" in
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
-used="$( { aerospace list-workspaces --monitor all --empty no 2>/dev/null || true; } | sb_workspaces)"
-focused="${FOCUSED:-$( { aerospace list-workspaces --focused 2>/dev/null || true; } | sb_workspaces)}"
+used="$( { sb_timeout 2 aerospace list-workspaces --monitor all --empty no 2>/dev/null || true; } | sb_workspaces)"
+focused="${FOCUSED:-$( { sb_timeout 2 aerospace list-workspaces --focused 2>/dev/null || true; } | sb_workspaces)}"
 # The focused workspace shows even while it's empty (AeroSpace keeps it).
 [ -n "$focused" ] && used="$used $focused"
 args=()

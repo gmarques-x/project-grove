@@ -17,7 +17,7 @@ case "${SENDER:-}" in
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
-iface="$(route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
-conn="$( { [ -n "$iface" ] && ipconfig getsummary "$iface" 2>/dev/null; } | sb_conn "$iface")"
+iface="$(sb_timeout 2 route -n get default 2>/dev/null | awk '/interface:/ { print $2 }')"
+conn="$( { [ -n "$iface" ] && sb_timeout 2 ipconfig getsummary "$iface" 2>/dev/null; } | sb_conn "$iface")"
 if [ "$conn" = off ]; then color="$GREY2"; else color="$BLUE"; fi
 "$SB" --set wifi label="$conn" label.color="$color"

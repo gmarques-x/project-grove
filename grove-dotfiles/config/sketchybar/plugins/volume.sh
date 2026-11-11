@@ -17,10 +17,10 @@ case "${SENDER:-}" in
   mouse.exited) "$SB" --set "$NAME" background.drawing=off; exit 0 ;;
 esac
 
-if [ "$(osascript -e "output muted of (get volume settings)" 2>/dev/null)" = true ]; then
+if [ "$(sb_timeout 2 osascript -e "output muted of (get volume settings)" 2>/dev/null)" = true ]; then
   "$SB" --set volume label=mute
 else
   # volume_change gives the level in INFO; a reload or the first run doesn't.
-  level="${INFO:-$(osascript -e "output volume of (get volume settings)" 2>/dev/null)}"
+  level="${INFO:-$(sb_timeout 2 osascript -e "output volume of (get volume settings)" 2>/dev/null)}"
   "$SB" --set volume label="$(sb_pct "$level")"
 fi

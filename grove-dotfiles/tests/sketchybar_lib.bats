@@ -48,10 +48,10 @@ setup() {
   [ "$(sb_rate_delta 1000 2000 0)" = "—" ]
 }
 
-@test "sb_cpu: used percentage from top, dot or comma decimals" {
-  [ "$(sb_cpu < "$FX/top.txt")" = 13 ]
-  [ "$(sb_cpu < "$FX/top-comma.txt")" = 13 ]
+@test "sb_cpu: used percentage (100 − idle) from the last iostat sample" {
+  [ "$(sb_cpu < "$FX/iostat.txt")" = 9 ]
   [ "$(echo nonsense | sb_cpu)" = "—" ]
+  [ "$(printf '      cpu    load average\n us sy id   1m   5m   15m\n' | sb_cpu)" = "—" ]
 }
 
 @test "sb_mem: active + wired + compressed pages over the memory size" {
@@ -119,6 +119,14 @@ setup() {
   [ "$(sb_pct 52)" = "52%" ]
   [ "$(sb_pct —)" = "—" ]
   [ "$(sb_pct "")" = "—" ]
+}
+
+@test "sb_timeout: a command that hangs is stopped after the limit" {
+  local start=$SECONDS
+  run sb_timeout 1 /bin/sleep 5
+  [ "$status" -ne 0 ]
+  [ $((SECONDS - start)) -lt 4 ]
+  [ "$(sb_timeout 2 /bin/echo ok)" = ok ]
 }
 
 @test "lib.sh passes shellcheck" {

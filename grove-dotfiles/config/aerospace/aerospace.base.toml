@@ -11,6 +11,9 @@ start-at-login = true
 after-startup-command = ['exec-and-forget /bin/sh ~/.config/borders/bordersrc']
 # The Grove bar (SketchyBar) redraws its workspaces at once on every change.
 exec-on-workspace-change = ['/bin/bash', '-c', '/opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change FOCUSED=$AEROSPACE_FOCUSED_WORKSPACE']
+# Moving a window to another workspace, or a pinned app opening there, changes
+# focus but not the workspace: refresh the bar then too.
+on-focus-changed = ['exec-and-forget /opt/homebrew/bin/sketchybar --trigger aerospace_workspace_change']
 
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true

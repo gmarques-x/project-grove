@@ -44,12 +44,20 @@ sb_rate_delta() {
   sb_rate "$(((new - old) / secs))"
 }
 
-# sb_cpu < `top -l 1 -n 0`: used percentage (100 − idle), whole number.
+# sb_cpu < `iostat -n 0 -c 2 -w 1`: used percentage (100 − idle) from the last
+# sample, which covers a whole second (top's single sample includes its own
+# start-up and reads high).
 sb_cpu() {
-  awk '/CPU usage:/ {
-    for (i = 1; i <= NF; i++) if ($i == "idle") { v = $(i - 1); gsub(/%/, "", v); gsub(/,/, ".", v); found = 1 }
-  }
-  END { if (found && v ~ /^[0-9.]+$/) printf "%.0f\n", 100 - v; else print "—" }'
+  awk '
+    / id / || /^ *us +sy +id/ { for (i = 1; i <= NF; i++) if ($i == "id") col = i; next }
+    col && $col ~ /^[0-9]+$/ { idle = $col }
+    END { if (idle != "") print 100 - idle; else print "—" }'
+}
+
+# sb_timeout SECONDS COMMAND…: run COMMAND, stopped after SECONDS (macOS has
+# no timeout(1)); SketchyBar doesn't reap a plugin stuck on a hung command.
+sb_timeout() {
+  perl -e 'alarm shift; exec @ARGV' "$@"
 }
 
 # sb_mem MEMSIZE < `vm_stat`: used percentage, (active + wired + compressed)
