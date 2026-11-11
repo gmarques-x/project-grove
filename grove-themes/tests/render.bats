@@ -169,3 +169,12 @@ fv() { gt_values "$1" "$PALETTES" | awk -F"\t" -v n="$2" '$1 == n { print $2 }';
   [ "$(fv light-soft fetch_image)" = avatar-light-soft.png ]
   [ "$(fv light-medium fetch_image)" = avatar-light-medium.png ]
 }
+
+@test "wallpaper: grove by default, avatar through whitespace, unknown is grove" {
+  [ "$(gt_wallpaper)" = grove ]
+  mkdir -p "$GROVE_STATE"; printf ' avatar\n' > "$GROVE_STATE/wallpaper"
+  [ "$(gt_wallpaper)" = avatar ]
+  echo banana > "$GROVE_STATE/wallpaper"
+  [ "$(gt_wallpaper)" = grove ]
+  [ "$(gt_wallpapers)" = "grove avatar" ]
+}

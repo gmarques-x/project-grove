@@ -109,3 +109,19 @@ fi'
 @test "wallpaper: the README lists the module" {
   grep -q '^| `85-macos-wallpaper` |' "$GROVE_ROOT/README.md"
 }
+
+@test "wallpaper: check expects the avatar file when it is chosen" {
+  load_module
+  mkdir -p "$GROVE_STATE"; echo avatar > "$GROVE_STATE/wallpaper"
+  [ "$(_wp_file)" = "$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers/wallpaper-avatar-dark-medium.png" ]
+  printf '%s\n' "$(_wp_file)" "$(_wp_file)" > "$BATS_TEST_TMPDIR/desktops"
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "wallpaper: the six avatar wallpapers are tracked" {
+  local s
+  for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
+    git -C "$GROVE_ROOT/.." ls-files --error-unmatch "grove-wallpapers/wallpaper-avatar-$s.png" >/dev/null || { echo "$s"; false; }
+  done
+}

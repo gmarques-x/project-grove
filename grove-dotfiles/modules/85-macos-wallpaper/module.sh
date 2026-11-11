@@ -1,6 +1,7 @@
 # shellcheck shell=bash
-# 85-macos-wallpaper: every screen shows grove-wallpapers/wallpaper-project-grove-<scheme>.png
-# for the current scheme (the first line of $GROVE_STATE/theme; empty, missing
+# 85-macos-wallpaper: every screen shows grove-wallpapers/wallpaper-<set>-<scheme>.png
+# (set: project-grove, or avatar when $GROVE_STATE/wallpaper says so, as grove-themes
+# reads it) for the current scheme (the first line of $GROVE_STATE/theme; empty, missing
 # or unknown means dark-medium), read straight from the repo (the installer clones all of project-grove).
 # macOS sets only the Space each screen is showing; other Spaces are a manual step.
 # Tests point GROVE_WALLPAPER_DIR elsewhere and fake osascript.
@@ -17,9 +18,17 @@ _wp_scheme() {
   esac
 }
 
+# _wp_set: project-grove, or avatar when $GROVE_STATE/wallpaper holds avatar
+# (whitespace trimmed), the same rule as grove-themes' gt_wallpaper.
+_wp_set() {
+  local v
+  v="$( { tr -d '[:space:]' < "$GROVE_STATE/wallpaper"; } 2>/dev/null || true)"
+  if [ "$v" = avatar ]; then printf 'avatar'; else printf 'project-grove'; fi
+}
+
 _wp_file() {
   local dir="${GROVE_WALLPAPER_DIR:-$(cd "$GROVE_ROOT/.." && pwd -P)/grove-wallpapers}"
-  printf '%s/wallpaper-project-grove-%s.png' "$dir" "$(_wp_scheme)"
+  printf '%s/wallpaper-%s-%s.png' "$dir" "$(_wp_set)" "$(_wp_scheme)"
 }
 
 # _wp_pictures: each screen's picture path, one per line.

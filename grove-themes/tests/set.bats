@@ -279,3 +279,12 @@ PY
   [ -n "$b" ]
   cmp "$b" "$BATS_TEST_TMPDIR/before.plist"
 }
+
+@test "set puts the avatar wallpaper on every screen when it is chosen" {
+  for s in dark-hard light-soft; do : > "$GROVE_WALLPAPER_DIR/wallpaper-avatar-$s.png"; done
+  mkdir -p "$GROVE_STATE"; echo avatar > "$GROVE_STATE/wallpaper"
+  run "$CLI" set light-soft
+  grep -q "^osascript - $(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-avatar-light-soft.png\$" "$CALLS"
+  run "$CLI" set dark-hard
+  grep -q "^osascript - $(cd "$GROVE_WALLPAPER_DIR" && pwd -P)/wallpaper-avatar-dark-hard.png\$" "$CALLS"
+}

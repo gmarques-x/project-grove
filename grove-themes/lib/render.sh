@@ -27,6 +27,17 @@ gt_logo() {
   case "$v" in avatar) echo avatar ;; *) echo grove ;; esac
 }
 
+# gt_wallpapers: the wallpaper sets, in menu order.
+gt_wallpapers() { echo "grove avatar"; }
+
+# gt_wallpaper: the chosen wallpaper set from $GROVE_STATE/wallpaper
+# (whitespace trimmed); a missing file or any other value is grove.
+gt_wallpaper() {
+  local v
+  v="$( { tr -d '[:space:]' < "$GROVE_STATE/wallpaper"; } 2>/dev/null || true)"
+  case "$v" in avatar) echo avatar ;; *) echo grove ;; esac
+}
+
 # gt_values SCHEME PALETTE_DIR: name<TAB>value lines, palette entries first,
 # then name_rgb ("R, G, B" in decimal) and name_argb (0xffRRGGBB, upper case)
 # for each #RRGGBB entry, then appearance,
