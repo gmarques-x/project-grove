@@ -285,3 +285,19 @@ actor SleepGate {
         #expect(model.error == .usage("usage: grove-themes"))
     }
 }
+
+@Suite @MainActor struct ThemesModelWallpaperTests {
+    @Test func pickWallpaperRunsTheCLIRecordsTheStepAndRefreshes() async throws {
+        var answers = try fixtureAnswers()
+        let json = #"{"wallpaper": "avatar", "steps": [{"name": "wallpaper", "result": "needs-you", "message": "allow it"}]}"#
+        answers["wallpaper"] = .ok(Data(json.utf8), status: 1)
+        let runner = FakeRunner(answers: answers)
+        let model = ThemesModel(client: GroveThemesClient(runner: runner), now: { Date(timeIntervalSince1970: 9_999_999_999) })
+        await model.pickWallpaper("avatar")
+        #expect(await runner.calls.first == ["wallpaper", "avatar", "--json"])
+        #expect(await runner.count("list") == 1)
+        #expect(model.busyWallpaper == nil)
+        #expect(model.lastSwitch?.exit == 1)
+        #expect(model.lastSwitch?.steps.first?.result == .needsYou)
+    }
+}

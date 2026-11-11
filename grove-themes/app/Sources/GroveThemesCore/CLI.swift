@@ -125,6 +125,13 @@ public struct GroveThemesClient: Sendable {
         return try decode(LogoAnswer.self, output).logo
     }
 
+    /// Switches the wallpaper set. Exit 1 (the step failed or needs you) still
+    /// returns the result: the choice was saved.
+    public func setWallpaper(_ name: String) async throws -> (WallpaperResult, exit: Int32) {
+        let output = try await call(["wallpaper", name, "--json"])
+        return (try decode(WallpaperResult.self, output), exit: output.status)
+    }
+
     /// Newest first. An entry that doesn't decode is dropped; the rest are kept.
     public func log(limit: Int) async throws -> [LogEntry] {
         let output = try await call(["log", "-n", String(limit), "--json"])

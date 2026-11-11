@@ -2,12 +2,14 @@
 /// it. The tiles (dropdown) and cards (gallery) are 2 rows × 3: Dark on top,
 /// Light below, Hard / Medium / Soft left to right. Both continue below with
 /// the "Terminal logo" row (Project Grove under the left two columns, Avatar
-/// under the right one); the dropdown then has "Open Grove Themes…" and
-/// "Quit", one column. Moves off an edge stay put (no wrap).
+/// under the right one) and the "Wallpaper" row (the same two columns, one
+/// remembered column for both); the dropdown then has "Open Grove Themes…"
+/// and "Quit", one column. Moves off an edge stay put (no wrap).
 public struct FocusGrid: Equatable, Sendable {
     public enum Item: Equatable, Sendable {
         case scheme(String)
         case logo(String)
+        case wallpaper(String)
         case openWindow
         case quit
     }
@@ -72,13 +74,25 @@ public struct FocusGrid: Equatable, Sendable {
                 focused = .scheme(Self.scheme(row: Self.rows.count - 1, column: column))
                 return
             case .down:
-                if layout == .dropdown { focused = .openWindow }
+                focused = .wallpaper(Self.logos[logo])
                 return
             }
             focused = .logo(Self.logos[logo])
+        case .wallpaper:
+            switch direction {
+            case .left: logo = 0
+            case .right: logo = Self.logos.count - 1
+            case .up:
+                focused = .logo(Self.logos[logo])
+                return
+            case .down:
+                if layout == .dropdown { focused = .openWindow }
+                return
+            }
+            focused = .wallpaper(Self.logos[logo])
         case .openWindow:
             switch direction {
-            case .up: focused = .logo(Self.logos[logo])
+            case .up: focused = .wallpaper(Self.logos[logo])
             case .down: focused = .quit
             case .left, .right: break
             }
@@ -183,7 +197,7 @@ public struct KeyboardFocus: Equatable, Sendable {
         case .activate:
             guard let item = grid?.focused else { return .handled }
             switch item {
-            case .scheme, .logo: if schemesDisabled { return .handled }
+            case .scheme, .logo, .wallpaper: if schemesDisabled { return .handled }
             case .openWindow, .quit: break
             }
             return .activate(item)

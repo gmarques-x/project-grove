@@ -43,19 +43,28 @@ public struct SchemeList: Decodable, Equatable, Sendable {
     /// A CLI older than the logo command sends neither: grove and both logos.
     public let logo: String
     public let logos: [String]
+    /// The wallpaper set (`grove` or `avatar`) and the choices; same defaults.
+    public let wallpaper: String
+    public let wallpapers: [String]
 
     public static let defaultLogos = ["grove", "avatar"]
+    public static let defaultWallpapers = ["grove", "avatar"]
 
     public init(current: String, schemes: [String], palettes: [String: Palette],
-                logo: String = "grove", logos: [String] = SchemeList.defaultLogos) {
+                logo: String = "grove", logos: [String] = SchemeList.defaultLogos,
+                wallpaper: String = "grove", wallpapers: [String] = SchemeList.defaultWallpapers) {
         self.current = current
         self.schemes = schemes
         self.palettes = palettes
         self.logo = logo
         self.logos = logos
+        self.wallpaper = wallpaper
+        self.wallpapers = wallpapers
     }
 
-    private enum CodingKeys: String, CodingKey { case current, schemes, palettes, logo, logos }
+    private enum CodingKeys: String, CodingKey {
+        case current, schemes, palettes, logo, logos, wallpaper, wallpapers
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -64,6 +73,19 @@ public struct SchemeList: Decodable, Equatable, Sendable {
         palettes = try c.decode([String: Palette].self, forKey: .palettes)
         logo = try c.decodeIfPresent(String.self, forKey: .logo) ?? "grove"
         logos = try c.decodeIfPresent([String].self, forKey: .logos) ?? Self.defaultLogos
+        wallpaper = try c.decodeIfPresent(String.self, forKey: .wallpaper) ?? "grove"
+        wallpapers = try c.decodeIfPresent([String].self, forKey: .wallpapers) ?? Self.defaultWallpapers
+    }
+}
+
+/// `grove-themes wallpaper NAME --json`: the set it saved and its one step.
+public struct WallpaperResult: Decodable, Equatable, Sendable {
+    public let wallpaper: String
+    public let steps: [Step]
+
+    public init(wallpaper: String, steps: [Step]) {
+        self.wallpaper = wallpaper
+        self.steps = steps
     }
 }
 

@@ -19,16 +19,26 @@ struct DropdownView: View {
             }
             if let list = model.list {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("TERMINAL LOGO")
-                        .font(GroveFont.mono(10))
-                        .tracking(0.8)
-                        .foregroundStyle(Color(theme.grey1))
+                    ChoiceRowLabel(title: "TERMINAL LOGO")
                     HStack(spacing: 8) {
                         ForEach(list.logos, id: \.self) { logo in
-                            LogoPill(logo: logo, isCurrent: logo == list.logo,
-                                     isBusy: model.busyLogo == logo,
-                                     isFocused: focus.wrappedValue.focused == .logo(logo)) {
+                            ChoicePill(name: logo, isCurrent: logo == list.logo,
+                                       isBusy: model.busyLogo == logo,
+                                       isFocused: focus.wrappedValue.focused == .logo(logo)) {
                                 run(.logo(logo))
+                            }
+                            .disabled(model.switchingDisabled)
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    ChoiceRowLabel(title: "WALLPAPER")
+                    HStack(spacing: 8) {
+                        ForEach(list.wallpapers, id: \.self) { wallpaper in
+                            ChoicePill(name: wallpaper, isCurrent: wallpaper == list.wallpaper,
+                                       isBusy: model.busyWallpaper == wallpaper,
+                                       isFocused: focus.wrappedValue.focused == .wallpaper(wallpaper)) {
+                                run(.wallpaper(wallpaper))
                             }
                             .disabled(model.switchingDisabled)
                         }
@@ -65,6 +75,8 @@ struct DropdownView: View {
             Task { await model.switchTo(scheme) }
         case .logo(let logo):
             Task { await model.pickLogo(logo) }
+        case .wallpaper(let wallpaper):
+            Task { await model.pickWallpaper(wallpaper) }
         case .openWindow:
             openWindow(id: "gallery")
             NSApp.activate()

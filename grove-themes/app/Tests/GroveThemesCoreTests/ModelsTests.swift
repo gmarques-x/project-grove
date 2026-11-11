@@ -32,6 +32,16 @@ import Testing
         #expect(list.logos == ["grove", "avatar"])
     }
 
+    @Test func decodesTheWallpaperFields() throws {
+        let json = #"{"current": "dark-medium", "schemes": [], "palettes": {}, "wallpaper": "avatar", "wallpapers": ["grove", "avatar"]}"#
+        let list = try decoder.decode(SchemeList.self, from: Data(json.utf8))
+        #expect(list.wallpaper == "avatar")
+        #expect(list.wallpapers == ["grove", "avatar"])
+        let old = try decoder.decode(SchemeList.self, from: Data(#"{"current": "x", "schemes": [], "palettes": {}}"#.utf8))
+        #expect(old.wallpaper == "grove")
+        #expect(old.wallpapers == ["grove", "avatar"])
+    }
+
     @Test func decodesSet() throws {
         let result = try decoder.decode(SwitchResult.self, from: Fixture.data("set.json"))
         #expect(result.scheme == "dark-medium")

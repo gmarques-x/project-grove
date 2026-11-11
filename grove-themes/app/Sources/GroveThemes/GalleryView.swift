@@ -6,12 +6,12 @@ import SwiftUI
 /// keeps the status line).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
-    /// The window fits the cards: 760 wide, as tall as they need (≈ 590 pt:
-    /// 46 above, two rows of ≈ 164, 12 between, the logo row ≈ 170 with its
-    /// label, 18 below), never shorter, so it keeps its size while the first
-    /// `list` loads or the CLI is missing.
+    /// The window fits the cards: 760 wide, as tall as they need (≈ 776 pt:
+    /// 46 above, two rows of ≈ 164, 12 between, the logo and wallpaper rows
+    /// ≈ 170 each with their labels, 18 below), never shorter, so it keeps its
+    /// size while the first `list` loads or the CLI is missing.
     static let width: CGFloat = 760
-    static let height: CGFloat = 590
+    static let height: CGFloat = 776
     static let buttonsClearance: CGFloat = 28
     /// `State` used directly: see GroveThemesApp on why not `@State`.
     private var focus = State(initialValue: KeyboardFocus(layout: .gallery))
@@ -41,17 +41,29 @@ struct GalleryView: View {
             }
             if let list = model.list {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("TERMINAL LOGO")
-                        .font(GroveFont.mono(10))
-                        .tracking(0.8)
-                        .foregroundStyle(Color(theme.grey1))
+                    ChoiceRowLabel(title: "TERMINAL LOGO")
                     HStack(spacing: 12) {
                         ForEach(list.logos, id: \.self) { logo in
-                            LogoCard(logo: logo, scheme: list.current,
-                                     isCurrent: logo == list.logo,
-                                     isBusy: model.busyLogo == logo,
-                                     isFocused: focus.wrappedValue.focused == .logo(logo)) {
+                            ChoiceCard(name: logo, image: logoImage(logo, scheme: list.current),
+                                       isCurrent: logo == list.logo,
+                                       isBusy: model.busyLogo == logo,
+                                       isFocused: focus.wrappedValue.focused == .logo(logo)) {
                                 Task { await model.pickLogo(logo) }
+                            }
+                            .disabled(model.switchingDisabled)
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    ChoiceRowLabel(title: "WALLPAPER")
+                    HStack(spacing: 12) {
+                        ForEach(list.wallpapers, id: \.self) { wallpaper in
+                            ChoiceCard(name: wallpaper, image: wallpaperImage(wallpaper, scheme: list.current),
+                                       isCurrent: wallpaper == list.wallpaper,
+                                       isBusy: model.busyWallpaper == wallpaper,
+                                       isFocused: focus.wrappedValue.focused == .wallpaper(wallpaper),
+                                       fills: true) {
+                                Task { await model.pickWallpaper(wallpaper) }
                             }
                             .disabled(model.switchingDisabled)
                         }
@@ -70,6 +82,7 @@ struct GalleryView: View {
             switch item {
             case .scheme(let scheme): Task { await model.switchTo(scheme) }
             case .logo(let logo): Task { await model.pickLogo(logo) }
+            case .wallpaper(let wallpaper): Task { await model.pickWallpaper(wallpaper) }
             case .openWindow, .quit: break
             }
         }

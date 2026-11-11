@@ -15,8 +15,10 @@ public final class ThemesModel {
 
     /// The logo being switched to; set while `logo` runs.
     public var busyLogo: String?
+    /// The wallpaper set being switched to; set while `wallpaper` runs.
+    public var busyWallpaper: String?
 
-    public var isBusy: Bool { busyScheme != nil || busyLogo != nil }
+    public var isBusy: Bool { busyScheme != nil || busyLogo != nil || busyWallpaper != nil }
 
     /// The switches to show, newest first: the log, led by the last switch made
     /// here when the CLI didn't log it and nothing was logged after it.
@@ -91,6 +93,24 @@ public final class ThemesModel {
         var failure: CLIError?
         do {
             _ = try await client.setLogo(logo)
+        } catch {
+            failure = Self.cliError(error)
+        }
+        await refresh()
+        if let failure { error = failure }
+    }
+
+    /// Switches the wallpaper set, then refreshes. Ignored while a switch runs.
+    /// Its step is kept as the last switch (as `switchTo` does), so a
+    /// needs-you or failed step shows the same way.
+    public func pickWallpaper(_ wallpaper: String) async {
+        guard !isBusy else { return }
+        busyWallpaper = wallpaper
+        defer { busyWallpaper = nil }
+        var failure: CLIError?
+        do {
+            let (result, exit) = try await client.setWallpaper(wallpaper)
+            lastSwitch = LogEntry(time: now(), scheme: list?.current ?? "", exit: Int(exit), steps: result.steps)
         } catch {
             failure = Self.cliError(error)
         }

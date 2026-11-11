@@ -28,6 +28,16 @@ import Testing
         #expect(await runner.calls == [["logo", "avatar", "--json"]])
     }
 
+    @Test func setWallpaperRunsWallpaperWithJSONAndKeepsTheExit() async throws {
+        let json = #"{"wallpaper": "avatar", "steps": [{"name": "wallpaper", "result": "needs-you", "message": "allow it"}]}"#
+        let runner = FakeRunner(answers: ["wallpaper": .ok(Data(json.utf8), status: 1)])
+        let (result, exit) = try await GroveThemesClient(runner: runner).setWallpaper("avatar")
+        #expect(result.wallpaper == "avatar")
+        #expect(result.steps == [Step(name: "wallpaper", result: .needsYou, message: "allow it")])
+        #expect(exit == 1)
+        #expect(await runner.calls == [["wallpaper", "avatar", "--json"]])
+    }
+
     @Test func logAsksForTheLimit() async throws {
         let runner = FakeRunner(answers: try fixtureAnswers())
         let entries = try await GroveThemesClient(runner: runner).log(limit: 5)
