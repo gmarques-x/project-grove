@@ -53,6 +53,8 @@ Grove Keys asks for two permissions in System Settings > Privacy & Security, and
 
 Until both are granted nothing is remapped and Caps Lock stays Caps Lock. The app writes what it has been granted to `$GROVE_STATE/keys.json`, which `grove check` reads. The Caps Lock to F18 mapping is made with `hidutil` and lasts only while the app runs.
 
+Grove Keys also asks once for Location Services. This one is optional and nothing else depends on it: macOS gives a Wi-Fi network's name only to an app allowed Location, and the Grove bar's Wi-Fi popup shows that name. When allowed, the app writes the name to `$GROVE_STATE/wifi-name` (removed when Wi-Fi is off and when the app quits); it is not sent anywhere, and your position is never read. Without the permission the popup says "Wi-Fi".
+
 ## Tests
 
 ```

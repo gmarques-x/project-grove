@@ -667,3 +667,11 @@ ka_defaults() {
   _ka_info_plist | grep -q '<string>grovekeys</string>'
   _ka_info_plist | plutil -lint - >/dev/null
 }
+
+@test "keys-app: the bundle says why it asks for Location (the Wi-Fi name in the bar)" {
+  load_module
+  _ka_info_plist > "$BATS_TEST_TMPDIR/Info.plist"
+  local why="Grove Keys reads the name of your Wi-Fi network to show it in the Grove bar. Your location is not used or stored."
+  [ "$(plutil -extract NSLocationUsageDescription raw "$BATS_TEST_TMPDIR/Info.plist")" = "$why" ]
+  [ "$(plutil -extract NSLocationWhenInUseUsageDescription raw "$BATS_TEST_TMPDIR/Info.plist")" = "$why" ]
+}

@@ -298,7 +298,9 @@ _ka_iconset() {
 }
 
 # _ka_info_plist: the app bundle's Info.plist. The icon is Grove Themes' for now;
-# grovekeys:// is how the Grove bar's key glyph opens the menu.
+# grovekeys:// is how the Grove bar's key glyph opens the menu. The two Location
+# lines are what macOS shows when the app asks to read the Wi-Fi network's name
+# (optional; the bar's Wi-Fi popup shows it).
 _ka_info_plist() {
   cat <<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -316,6 +318,8 @@ _ka_info_plist() {
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSLocationUsageDescription</key><string>Grove Keys reads the name of your Wi-Fi network to show it in the Grove bar. Your location is not used or stored.</string>
+  <key>NSLocationWhenInUseUsageDescription</key><string>Grove Keys reads the name of your Wi-Fi network to show it in the Grove bar. Your location is not used or stored.</string>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>

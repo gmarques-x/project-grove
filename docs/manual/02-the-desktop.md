@@ -60,6 +60,8 @@ The bar replaces the macOS menu bar. From left to right:
 
 A popup closes when you click its item again, switch app or switch workspace. Parts that react to a click light up under the pointer.
 
+The Wi-Fi popup shows the network's name only if Grove Keys is allowed Location Services (System Settings > Privacy & Security > Location Services); macOS hides the name otherwise, and the popup says "Wi-Fi". Your position is not read.
+
 The app name is how you reach an app's menus now that the menu bar is hidden. The same menus are in the Grove menu under Global Menu. For what is not reachable yet, see [Coming from stock macOS](08-coming-from-stock-macos.md).
 
 All of these keys can be changed: see [Hotkeys](05-hotkeys.md).

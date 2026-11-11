@@ -146,6 +146,8 @@ final class AppModel: ObservableObject {
         // grove install may have rendered it without AeroSpace reloading.
         enqueue { [pipeline] in await pipeline.run(forceReload: true) }
         writeState()
+        // The Wi-Fi name for the Grove bar; optional, apart from the rest.
+        WifiNameWriter.shared.start()
     }
 
     /// Every exit path: mapping off first, then the tap. Safe to call twice.
@@ -158,6 +160,7 @@ final class AppModel: ObservableObject {
         monitorsWatcher?.stop()
         baseWatcher?.stop()
         writeState()
+        WifiNameWriter.shared.stop()
     }
 
     func quit() {
