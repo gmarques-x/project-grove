@@ -24,6 +24,9 @@ struct GroveKeysApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+        // grovekeys:// links are answered by AppDelegate; without this SwiftUI
+        // also opens this window for every link (and the window closes the menu).
+        .handlesExternalEvents(matching: [])
     }
 }
 
