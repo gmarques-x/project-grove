@@ -38,7 +38,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated { PointerMenu.shared.start() }
     }
 
-    /// `grovekeys://menu` from the Grove bar's key glyph: the menu at the pointer.
+    /// The `grovekeys://` links (see `KeysURL`): each pops a menu up at the
+    /// pointer. The Grove bar's pine and app name send `grove-menu` and
+    /// `app-menu`; `menu` is only opened by hand now.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             switch KeysURL(url) {

@@ -33,8 +33,13 @@ final class AppModel: ObservableObject {
     /// `edit` would be applied: the first run has answered, and keys.toml has
     /// no error and is readable (or doesn't exist yet).
     var canEdit: Bool { loaded && !keysInvalid }
-    /// The menu glyph turns orange.
+    /// The menu bar glyph turns orange.
     var needsAttention: Bool { !permissions.granted || redLine != nil }
+    /// The menus show "Restart Grove Keys": a permission is missing or the
+    /// engine is in trouble, the two states a new process can fix (macOS may
+    /// only let a process started after the grant watch the keyboard). Not for
+    /// a keys.toml error, which a restart wouldn't change.
+    var offersRestart: Bool { !permissions.granted || engineLine != nil }
 
     /// This Mac's LocalHostName, for the window's header.
     let host: String
@@ -138,6 +143,15 @@ final class AppModel: ObservableObject {
     func quit() {
         shutdown()
         NSApp.terminate(nil)
+    }
+
+    /// The same cleanup as `quit` (the mapping off, then the tap), then a
+    /// failure exit: the LaunchAgent keeps Grove Keys alive after any exit
+    /// that isn't a success, so launchd starts it again. Run without the
+    /// LaunchAgent (bare from .build), this only quits.
+    func restart() {
+        shutdown()
+        exit(1)
     }
 
     func togglePause() {
@@ -299,7 +313,7 @@ final class AppModel: ObservableObject {
         reconcile()
     }
 
-    static let cannotStart = "Grove Keys can't watch the keyboard yet · quit and reopen it after granting the permissions"
+    static let cannotStart = "Grove Keys can't watch the keyboard yet · grant the permissions, then choose Restart Grove Keys in its menu"
 
     private func tapKeptStopping() {
         HIDMapping.clear()

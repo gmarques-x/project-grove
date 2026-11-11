@@ -74,14 +74,43 @@ final class GlobalMenu: NSObject, NSMenuDelegate {
     @objc private func press(_ sender: NSMenuItem) {
         guard let box = sender.representedObject as? PathBox else { return }
         let source = self.source, path = box.path, pid = self.pid
-        // After the menu closes, with the app brought forward first.
+        // After the menu closes, and once the app is in front again.
         DispatchQueue.main.async {
-            let pressed = MenuPress.run(path, in: source) {
-                NSRunningApplication(processIdentifier: pid)?.activate()
+            MainActor.assumeIsolated {
+                MenuPress.run(path, in: source, bringForward: { Self.whenFront(pid, $0) }) { pressed in
+                    if !pressed {
+                        NSLog("Grove Keys: menu item gone: %@", path.steps.map(\.title).joined(separator: " › "))
+                    }
+                }
             }
-            if !pressed {
-                NSLog("Grove Keys: menu item gone: %@", path.steps.map(\.title).joined(separator: " › "))
-            }
+        }
+    }
+
+    /// Brings `pid` forward and runs `action` once it is the front app: at
+    /// once when it already is, else when macOS says it was activated, or
+    /// after `timeout` anyway (an app that won't come forward still gets the
+    /// press, as before).
+    private static func whenFront(_ pid: pid_t, timeout: TimeInterval = 0.5, _ action: @escaping () -> Void) {
+        let app = NSRunningApplication(processIdentifier: pid)
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid {
+            // Activated all the same, in case that answer is out of date.
+            app?.activate()
+            action()
+            return
+        }
+        let once = Once(action)
+        let center = NSWorkspace.shared.notificationCenter
+        let token = center.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard app?.processIdentifier == pid else { return }
+            MainActor.assumeIsolated { once.run() }
+        }
+        once.cleanup = { center.removeObserver(token) }
+        app?.activate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+            MainActor.assumeIsolated { once.run() }
         }
     }
 

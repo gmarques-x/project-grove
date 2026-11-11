@@ -1,8 +1,10 @@
 import AppKit
 import GroveKeysCore
 
-/// The menu bar menu, popped up at the pointer: the Grove bar's key glyph
-/// opens `grovekeys://menu` (the native menu bar is hidden behind the bar).
+/// Grove Keys' menus popped up at the pointer, for the `grovekeys://` links
+/// (the native menu bar is hidden behind the Grove bar): the bar's pine opens
+/// `grove-menu` and its app name `app-menu`. Nothing in the bar opens `menu`
+/// any more; it still works, e.g. `open grovekeys://menu` from a terminal.
 @MainActor
 final class PointerMenu: NSObject {
     static let shared = PointerMenu()
@@ -61,12 +63,14 @@ final class PointerMenu: NSObject {
         return GlobalMenu.menu(for: app.pid, appName: running.localizedName ?? "this app")
     }
 
-    /// `grovekeys://menu`: the Grove Keys menu at the pointer.
+    /// `grovekeys://menu`: Grove Keys' own menu at the pointer (the pine's
+    /// Grove Keys ▸ submenu, on its own).
     func show() {
         popUpAtPointer(keysMenu())
     }
 
-    /// Grove Keys' own menu: permission lines, the red line, then its three items.
+    /// Grove Keys' own menu: permission lines, the red line, Restart while it
+    /// may help (`AppModel.offersRestart`), then its three items.
     private func keysMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -84,6 +88,9 @@ final class PointerMenu: NSObject {
             let info = NSMenuItem(title: line, action: nil, keyEquivalent: "")
             info.isEnabled = false
             menu.addItem(info)
+        }
+        if model.offersRestart {
+            menu.addItem(item("Restart Grove Keys", handsBack: false) { [model] in model.restart() })
         }
         if model.needsAttention { menu.addItem(.separator()) }
         menu.addItem(item("Open Grove Keys", handsBack: false) { [model] in
@@ -152,7 +159,7 @@ private final class MenuAction: NSObject {
 
 /// Runs its action the first time `run()` is called, then cleans up.
 @MainActor
-private final class Once {
+final class Once {
     private var action: (() -> Void)?
     var cleanup: (() -> Void)?
     init(_ action: @escaping () -> Void) { self.action = action }

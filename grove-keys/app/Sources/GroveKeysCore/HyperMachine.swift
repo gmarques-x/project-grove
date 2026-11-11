@@ -3,11 +3,14 @@ public struct KeyEvent: Sendable {
     public var kind: Kind
     public var keyCode: UInt16
     public var time: Double // seconds
+    /// A key-down sent by auto-repeat (the key is still held), not a new press.
+    public var isRepeat: Bool
 
-    public init(kind: Kind, keyCode: UInt16, time: Double) {
+    public init(kind: Kind, keyCode: UInt16, time: Double, isRepeat: Bool = false) {
         self.kind = kind
         self.keyCode = keyCode
         self.time = time
+        self.isRepeat = isRepeat
     }
 }
 
@@ -33,7 +36,8 @@ public struct HyperMachine: Sendable {
     private var pressStart = 0.0
     private var used = false
     private var sheetShown = false
-    /// Keys pressed while held: their key-up gets the same treatment.
+    /// Keys pressed while held: their repeats and their key-up get the same
+    /// treatment, also after Hyper is let go first.
     private var pending: [UInt16: Disposition] = [:]
 
     public init(settings: HyperSettings, launchKeys: Set<String>) {
@@ -48,6 +52,10 @@ public struct HyperMachine: Sendable {
             switch event.kind {
             case .down:
                 if !held {
+                    // A repeat with nothing held: the hold began before a reset
+                    // (the tap timed out, the settings changed). It isn't a new
+                    // press, so letting go must not send Escape.
+                    if event.isRepeat { return (.swallow, []) }
                     held = true
                     pressStart = event.time
                     used = false
@@ -69,8 +77,10 @@ public struct HyperMachine: Sendable {
 
         switch event.kind {
         case .down:
-            guard held else { return (.pass, []) }
+            // Before `held`: Hyper let go first, the key still down and
+            // repeating, must not reach the app as the plain key.
             if let repeated = pending[event.keyCode] { return (repeated, []) }
+            guard held else { return (.pass, []) }
             used = true
             var effects: [HyperEffect] = []
             if sheetShown {

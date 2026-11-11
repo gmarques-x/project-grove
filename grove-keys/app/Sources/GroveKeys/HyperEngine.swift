@@ -159,9 +159,10 @@ private final class TapSession: @unchecked Sendable {
         }
         let code = UInt16(truncatingIfNeeded: event.getIntegerValueField(.keyboardEventKeycode))
         let kind: KeyEvent.Kind = type == .keyDown ? .down : .up
+        let isRepeat = kind == .down && event.getIntegerValueField(.keyboardEventAutorepeat) != 0
         let (disposition, effects) = machine.handle(
-            KeyEvent(kind: kind, keyCode: code, time: ProcessInfo.processInfo.systemUptime))
-        if code == HyperMachine.f18, kind == .down, event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+            KeyEvent(kind: kind, keyCode: code, time: ProcessInfo.processInfo.systemUptime, isRepeat: isRepeat))
+        if code == HyperMachine.f18, kind == .down, !isRepeat {
             scheduleTick()
         }
         perform(effects)

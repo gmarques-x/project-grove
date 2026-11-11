@@ -2,7 +2,7 @@ import Testing
 @testable import GroveKeysCore
 
 @Suite struct AeroSpaceRendererTests {
-    static let host = "Gustavos-MacBook-Air"
+    static let host = "Test-Mac"
 
     func rendered() throws -> String {
         let keys = try KeysFile(text: try fixture("keys.toml"))

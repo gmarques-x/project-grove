@@ -9,6 +9,8 @@ import Testing
 
     func down(_ k: UInt16, _ t: Double) -> KeyEvent { KeyEvent(kind: .down, keyCode: k, time: t) }
     func up(_ k: UInt16, _ t: Double) -> KeyEvent { KeyEvent(kind: .up, keyCode: k, time: t) }
+    /// An auto-repeat key-down.
+    func again(_ k: UInt16, _ t: Double) -> KeyEvent { KeyEvent(kind: .down, keyCode: k, time: t, isRepeat: true) }
     func machine(_ edit: (inout HyperSettings) -> Void = { _ in }, launch: Set<String> = []) -> HyperMachine {
         var s = HyperSettings()
         edit(&s)
@@ -52,6 +54,27 @@ import Testing
         _ = m.handle(up(Self.f18, 0.08))
         #expect(m.handle(up(Self.one, 0.1)).0 == .passWithHyper)
         #expect(m.handle(down(Self.one, 0.2)).0 == .pass)
+    }
+
+    /// Hyper+key, Hyper let go first: the key's repeats stay Hyper (or stay
+    /// swallowed, for a launcher key) until its own key-up.
+    @Test func repeatsAfterReleaseKeepTheirTreatment() {
+        var m = machine()
+        _ = m.handle(down(Self.f18, 0))
+        #expect(m.handle(down(Self.one, 0.05)).0 == .passWithHyper)
+        _ = m.handle(up(Self.f18, 0.3))
+        #expect(m.handle(again(Self.one, 0.5)).0 == .passWithHyper)
+        #expect(m.handle(again(Self.one, 0.55)).0 == .passWithHyper)
+        #expect(m.handle(up(Self.one, 0.6)).0 == .passWithHyper)
+        #expect(m.handle(down(Self.one, 0.7)).0 == .pass)
+
+        var l = machine(launch: ["t"])
+        _ = l.handle(down(Self.f18, 0))
+        _ = l.handle(down(Self.t, 0.05))
+        _ = l.handle(up(Self.f18, 0.3))
+        let (d, e) = l.handle(again(Self.t, 0.5))
+        #expect(d == .swallow)
+        #expect(e == [])
     }
 
     @Test func cheatSheetShowsAndHides() {
@@ -102,6 +125,26 @@ import Testing
         #expect(m.handle(up(Self.f18, 1.1)).1 == [.postEscape])
     }
 
+    /// Caps Lock still down across a reset: its repeats aren't a new press,
+    /// so letting go sends no Escape and keys meanwhile pass plain.
+    @Test func repeatsAfterAResetAreNotANewPress() {
+        var m = machine()
+        _ = m.handle(down(Self.f18, 0))
+        _ = m.reset()
+        let (d, e) = m.handle(again(Self.f18, 1.0))
+        #expect(d == .swallow)
+        #expect(e == [])
+        #expect(m.tick(now: 2.0) == [])
+        #expect(m.handle(down(Self.one, 1.02)).0 == .pass)
+        #expect(m.handle(again(Self.f18, 1.05)).0 == .swallow)
+        let (upD, upE) = m.handle(up(Self.f18, 1.1))
+        #expect(upD == .swallow)
+        #expect(upE == [])
+        // The next real press is a tap again.
+        _ = m.handle(down(Self.f18, 2.0))
+        #expect(m.handle(up(Self.f18, 2.1)).1 == [.postEscape])
+    }
+
     @Test func disabledPassesEverything() {
         var m = machine { $0.enabled = false }
         for e in [down(Self.f18, 0), down(Self.one, 0.1), up(Self.one, 0.2), up(Self.f18, 0.3)] {
@@ -120,7 +163,7 @@ import Testing
         var m = machine(launch: ["t"])
         _ = m.handle(down(Self.f18, 0))
         #expect(m.handle(down(Self.t, 0.1)).1 == [.launch(key: "t")])
-        let (d, e) = m.handle(down(Self.t, 0.15))
+        let (d, e) = m.handle(again(Self.t, 0.15))
         #expect(d == .swallow)
         #expect(e == [])
     }
@@ -128,12 +171,12 @@ import Testing
     @Test func f18AutorepeatKeepsTiming() {
         var m = machine()
         _ = m.handle(down(Self.f18, 0))
-        #expect(m.handle(down(Self.f18, 0.05)).0 == .swallow)
+        #expect(m.handle(again(Self.f18, 0.05)).0 == .swallow)
         #expect(m.handle(up(Self.f18, 0.1)).1 == [.postEscape])
 
         var n = machine()
         _ = n.handle(down(Self.f18, 0))
-        _ = n.handle(down(Self.f18, 0.3))
+        _ = n.handle(again(Self.f18, 0.3))
         #expect(n.tick(now: 0.5) == [.showCheatSheet])
     }
 

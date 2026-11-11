@@ -54,4 +54,4 @@ alt-shift-j = ["join-with down", "mode main"]
 alt-shift-k = ["join-with up", "mode main"]
 alt-shift-l = ["join-with right", "mode main"]
 
-[monitors."Gustavos-MacBook-Air"] # workspace → "main" | "secondary" | "built-in" | a display name
+[monitors."Test-Mac"] # workspace → "main" | "secondary" | "built-in" | a display name

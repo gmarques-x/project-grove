@@ -1,10 +1,12 @@
 import Foundation
 
-/// The `grovekeys://` links Grove Keys answers, from the Grove bar: `menu`
-/// (the ⌘ glyph), `grove-menu` (the pine: Grove Themes, Grove Keys and Global Menu) and
-/// `app-menu` (the app name: the front app's menus). Anything else is ignored.
+/// The `grovekeys://` links Grove Keys answers. The Grove bar opens two:
+/// `grove-menu` (the pine: Grove Themes, Grove Keys and Global Menu) and
+/// `app-menu` (the app name: the front app's menus). `menu` is no longer
+/// opened by the bar (its ⌘ glyph is gone) but still answered, e.g. from a
+/// terminal. Anything else is ignored.
 public enum KeysURL: Equatable, Sendable {
-    /// Grove Keys' own menu at the pointer.
+    /// Grove Keys' own menu at the pointer (the pine's Grove Keys ▸ submenu).
     case menu
     /// The pine's dropdown: Grove Themes, Grove Keys and Global Menu ▸.
     case groveMenu

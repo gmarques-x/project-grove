@@ -46,14 +46,32 @@ final class Node {
 }
 
 @Suite struct MenuPressTests {
-    @Test func theAppIsBroughtForwardBeforeThePress() {
-        var events: [String] = []
-        let source = RecordingSource { events.append("press") }
-        let path = MenuPath(steps: [.init(title: "Edit", index: 0), .init(title: "Copy", index: 0)])
-        let pressed = MenuPress.run(path, in: source, activate: { events.append("activate") })
-        #expect(pressed)
-        #expect(events == ["activate", "press"])
+    let path = MenuPath(steps: [.init(title: "Edit", index: 0), .init(title: "Copy", index: 0)])
+
+    @Test func thePressWaitsUntilTheAppIsInFront() {
+        let events = Events()
+        let source = RecordingSource { events.list.append("press") }
+        var whenFront: (() -> Void)?
+        MenuPress.run(path, in: source, bringForward: { then in
+            events.list.append("activate")
+            whenFront = then
+        }, done: { events.list.append($0 ? "pressed" : "gone") })
+        // Activated, but not in front yet: nothing is pressed.
+        #expect(events.list == ["activate"])
+        whenFront?()
+        #expect(events.list == ["activate", "press", "pressed"])
     }
+
+    @Test func aVanishedItemIsReported() {
+        let events = Events()
+        let source = FakeMenuSource([:])
+        MenuPress.run(path, in: source, bringForward: { $0() }, done: { events.list.append($0 ? "pressed" : "gone") })
+        #expect(events.list == ["gone"])
+    }
+}
+
+final class Events {
+    var list: [String] = []
 }
 
 final class RecordingSource: MenuSource, @unchecked Sendable {

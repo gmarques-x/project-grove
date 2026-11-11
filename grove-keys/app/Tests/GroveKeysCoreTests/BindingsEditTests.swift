@@ -171,10 +171,10 @@ import Testing
 
     @Test func firstMonitorChangeCreatesTheSection() throws {
         var f = try KeysFile(text: "[hyper]\nenabled = true\n")
-        #expect(f.monitors(host: "Gustavos-MacBook-Air").isEmpty)
-        f.setMonitor(host: "Gustavos-MacBook-Air", workspace: "1", target: "main")
-        #expect(f.document.serialized().contains("[monitors.\"Gustavos-MacBook-Air\"]\n\"1\" = \"main\""))
-        let out = AeroSpaceRenderer.render(keys: f, base: "", host: "Gustavos-MacBook-Air")
+        #expect(f.monitors(host: "Test-Mac").isEmpty)
+        f.setMonitor(host: "Test-Mac", workspace: "1", target: "main")
+        #expect(f.document.serialized().contains("[monitors.\"Test-Mac\"]\n\"1\" = \"main\""))
+        let out = AeroSpaceRenderer.render(keys: f, base: "", host: "Test-Mac")
         #expect(out.contains("[workspace-to-monitor-force-assignment]\n\"1\" = \"main\""))
     }
 }

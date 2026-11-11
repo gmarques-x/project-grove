@@ -2,7 +2,9 @@ import AppKit
 import GroveThemesCore
 import SwiftUI
 
-/// The key glyph: orange while a permission is missing or a red line is up.
+/// The keyboard glyph in the native menu bar (hidden behind the Grove bar,
+/// which has no Grove Keys glyph of its own any more): orange while a
+/// permission is missing or a red line is up.
 struct MenuBarLabel: View {
     @ObservedObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
@@ -26,7 +28,8 @@ struct MenuBarLabel: View {
     }
 }
 
-/// Spec §7: permission lines, the red line, then the four items.
+/// Spec §7: permission lines, the red line, Restart while it may help, then
+/// the four items.
 struct MenuBarView: View {
     static let windowID = "main"
 
@@ -44,6 +47,9 @@ struct MenuBarView: View {
         }
         if let line = model.redLine {
             Text(line)
+        }
+        if model.offersRestart {
+            Button("Restart Grove Keys") { model.restart() }
         }
         if model.needsAttention {
             Divider()

@@ -16,7 +16,7 @@ final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
 }
 
 @Suite struct SavePipelineTests {
-    static let host = "Gustavos-MacBook-Air"
+    static let host = "Test-Mac"
 
     func setUp(keys: String? = nil, base: String? = nil) throws -> (KeysPaths, URL) {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gk-" + UUID().uuidString)

@@ -11,18 +11,18 @@ import Testing
         [aerospace.main]
         alt-1 = 'workspace 1'
         esc = ["reload-config", "mode main"]
-        [monitors."Gustavos-MacBook-Air"]
+        [monitors."Test-Mac"]
         "1" = "secondary"
         """
         let doc = try TomlDocument.parse(text)
-        #expect(doc.sections.map(\.path) == [["hyper"], ["aerospace", "main"], ["monitors", "Gustavos-MacBook-Air"]])
+        #expect(doc.sections.map(\.path) == [["hyper"], ["aerospace", "main"], ["monitors", "Test-Mac"]])
         let hyper = try #require(doc.section(["hyper"]))
         #expect(hyper.entries.map(\.value) == [.string("escape"), .int(200), .bool(true)])
         let main = try #require(doc.section(["aerospace", "main"]))
         #expect(main.entries[0].key == "alt-1")
         #expect(main.entries[0].value == .string("workspace 1"))
         #expect(main.entries[1].value == .array(["reload-config", "mode main"]))
-        let mon = try #require(doc.section(["monitors", "Gustavos-MacBook-Air"]))
+        let mon = try #require(doc.section(["monitors", "Test-Mac"]))
         #expect(mon.entries[0].key == "1")
         #expect(mon.entries[0].value == .string("secondary"))
         #expect(doc.section(["nope"]) == nil)

@@ -15,7 +15,7 @@ import Testing
         #expect(f.modes.map(\.name) == ["main", "service"])
         #expect(f.modes[1].bindings.first?.key == "esc")
         #expect(f.modes[1].bindings.first?.value == .array(["reload-config", "mode main"]))
-        #expect(f.monitors(host: "Gustavos-MacBook-Air").isEmpty)
+        #expect(f.monitors(host: "Test-Mac").isEmpty)
     }
 
     @Test func modesAreInFileOrderWithMainFirst() throws {

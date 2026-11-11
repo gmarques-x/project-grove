@@ -138,11 +138,17 @@ extension MenuPath {
     }
 }
 
-/// Choosing a Global Menu item: the app is brought forward first, because a
-/// menu action goes to the active app's key window (Grove Keys may be in front).
+/// Choosing a Global Menu item: the app is brought forward first and the press
+/// waits for it, because a menu action goes to the active app's key window
+/// (Grove Keys is in front while its menu is open) and activating is not
+/// immediate: a press sent at once can miss Paste, Close or Save.
 public enum MenuPress {
-    public static func run(_ path: MenuPath, in source: any MenuSource, activate: () -> Void) -> Bool {
-        activate()
-        return source.press(path)
+    /// `bringForward` activates the app and calls its argument once the app is
+    /// in front, or it has waited long enough. `done` gets false when the item
+    /// is gone.
+    public static func run(_ path: MenuPath, in source: any MenuSource,
+                           bringForward: (_ whenFront: @escaping () -> Void) -> Void,
+                           done: @escaping (Bool) -> Void) {
+        bringForward { done(source.press(path)) }
     }
 }
