@@ -30,10 +30,10 @@ import Testing
         let text = "# JankyBorders\nborders active_color=0xffA7C080 inactive_color=0xff475258 width=5.0 style=round hidpi=on\n"
         #expect(WindowBorders.width(bordersrc: text) == 5)
         #expect(WindowBorders.width(bordersrc: "borders width=6.0 style=round") == 6)
-        #expect(WindowBorders.width(bordersrc: "# width=9.0\nborders style=round") == 5)
-        #expect(WindowBorders.width(bordersrc: "borders width=wide") == 5)
-        #expect(WindowBorders.width(bordersrc: "borders width=0") == 5)
-        #expect(WindowBorders.width(bordersrc: nil) == 5)
+        #expect(WindowBorders.width(bordersrc: "# width=9.0\nborders style=round") == WindowBorders.defaultWidth)
+        #expect(WindowBorders.width(bordersrc: "borders width=wide") == WindowBorders.defaultWidth)
+        #expect(WindowBorders.width(bordersrc: "borders width=0") == WindowBorders.defaultWidth)
+        #expect(WindowBorders.width(bordersrc: nil) == WindowBorders.defaultWidth)
     }
 
     @Test func aBordersOuterEdgeIsItsWindowInsetByThePaddingAndHalfTheWidth() {
@@ -185,7 +185,7 @@ import Testing
         #expect(aerospace.contains("gaps.outer.bottom = \(number(WindowBorders.bottomGap))\n"))
         #expect(aerospace.contains("gaps.outer.top = [{ monitor.\"built-in\" = \(number(WindowBorders.topGapBuiltIn)) }, \(number(WindowBorders.topGap))]"))
         #expect(WindowBorders.width(bordersrc: borders) == WindowBorders.defaultWidth)
-        #expect(borders.contains("width=5.0"))
+        #expect(borders.contains("width=6.0"))
         #expect(bar.contains("--bar height=\(number(WindowBorders.stripHeight)) "))
     }
 }

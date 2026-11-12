@@ -284,7 +284,7 @@ prop() {
   # An item is as wide as its paddings, its icon slot and its label slot
   # (checked against `sketchybar --query <item>` bounding rects on the live
   # bar, where the right side measured 434 pt with the old ends, 4 + the
-  # bar's 8; the end is now one 6 pt gap and no bar padding: 428).
+  # bar's 8; the end is now one 5 pt gap and no bar padding: 427).
   local item total=0 w
   [ "$(prop cpu padding_right 5)" = 5 ]
   for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}'); do
@@ -297,7 +297,7 @@ prop() {
     fi
     total=$((total + w))
   done
-  [ "$total" -eq 428 ] || { echo "$total"; false; }
+  [ "$total" -eq 427 ] || { echo "$total"; false; }
   # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle:
   # the right side has ~860 pt.
   [ "$total" -le 860 ]
@@ -819,24 +819,24 @@ wifi_icon() {
   [ -z "$(opens)" ]
 }
 
-@test "ends: the pine pill's left outline and the clock pill's right outline are 6 pt from the screen's sides, on the window borders' lines" {
+@test "ends: the pine pill's left outline and the clock pill's right outline are 5 pt from the screen's sides, on the window borders' lines" {
   rc
   # No bar padding: the end gaps are all of it.
   calls | grep -qE -- '--bar .*padding_left=0 padding_right=0( |$)'
-  calls | grep -qx -- '--add item gap.l0 left --set gap.l0 width=6 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
-  calls | grep -qx -- '--add item gap.r0 right --set gap.r0 width=6 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
+  calls | grep -qx -- '--add item gap.l0 left --set gap.l0 width=5 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
+  calls | grep -qx -- '--add item gap.r0 right --set gap.r0 width=5 icon.drawing=off label.drawing=off padding_left=0 padding_right=0'
   # Nothing before the pine or after the clock but that gap, and neither item
   # has padding of its own outside its pill: the pill starts where the gap ends.
   [ "$(calls | grep -oE -- '--add item [a-z_.0-9]+ left' | sed -n 1p)" = "--add item gap.l0 left" ]
   [ "$(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | sed -n 1p)" = "--add item gap.r0 right" ]
   [ "$(prop grove padding_left 5)" = 0 ]
   # The line they sit on: AeroSpace's outer gap less what the border shows
-  # outside its window (half its width), 5.5 pt, which the bar rounds to 6.
+  # outside its window (half its width): 5 pt, a whole point.
   local gap width
   gap="$(sed -n 's/^gaps\.outer\.left = \([0-9]*\)$/\1/p' "$GROVE_ROOT/config/aerospace/aerospace.base.toml")"
   [ "$gap" = "$(sed -n 's/^gaps\.outer\.right = \([0-9]*\)$/\1/p' "$GROVE_ROOT/config/aerospace/aerospace.base.toml")" ]
   width="$(sed -n 's/.* width=\([0-9.]*\) .*/\1/p' "$GROVE_ROOT/config/borders/bordersrc.tmpl")"
-  [ "$(awk -v g="$gap" -v w="$width" 'BEGIN { printf "%d", g - w / 2 + 0.5 }')" = 6 ] || { echo "$gap $width"; false; }
+  [ "$(awk -v g="$gap" -v w="$width" 'BEGIN { print g - w / 2 }')" = 5 ] || { echo "$gap $width"; false; }
 }
 
 @test "sketchybar: the app name opens the app's menus" {

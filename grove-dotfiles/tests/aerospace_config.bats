@@ -58,7 +58,7 @@ service_key() { keys_q "k['aerospace']['service'].get('$1')"; }
   # menu bar hides, so 14 more is ~51.
   [ "$(as_q "c['gaps']['outer']['top']")" = '[{"monitor": {"built-in": 14}}, 51]' ]
   # The border width the 3 pt are sized for.
-  grep -q ' width=5.0 ' "$GROVE_ROOT/config/borders/bordersrc.tmpl"
+  grep -q ' width=6.0 ' "$GROVE_ROOT/config/borders/bordersrc.tmpl"
 }
 
 @test "aerospace: Option shortcuts" {

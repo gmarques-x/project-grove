@@ -128,7 +128,7 @@ palette_rgb() {
     # Unfocused windows take the border role: bg3 in dark, bg5 in light.
     border="$(sed -n 's/^border *= *#\(......\)$/\1/p' "$PALETTES/everforest-$s" | tr '[:lower:]' '[:upper:]')"
     [ -n "$green" ] && [ -n "$border" ]
-    want="borders active_color=0xff$green inactive_color=0xff$border width=5.0 style=round hidpi=on"
+    want="borders active_color=0xff$green inactive_color=0xff$border width=6.0 style=round hidpi=on"
     [ "$(grep -v '^#' "$out" | grep -v '^$')" = "$want" ] || { echo "$s:"; cat "$out"; false; }
   done
 }

@@ -26,7 +26,7 @@ public struct BorderLines: Equatable, Sendable {
 /// corners, and the window list), and how their lines are found again.
 public enum WindowBorders {
     /// `width=` in bordersrc as Grove ships it.
-    public static let defaultWidth = 5.0
+    public static let defaultWidth = 6.0
     /// JankyBorders makes each border's own window this much larger than the
     /// border on every side.
     public static let windowPadding = 8.0

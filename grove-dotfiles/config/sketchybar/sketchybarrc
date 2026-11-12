@@ -32,10 +32,11 @@ BOLD="JetBrains Mono:SemiBold:13.0"
 TRANSPARENT="$(sb_transparent)"
 # The bar's ends. The pine pill's left outline and the clock pill's right
 # outline sit on the tiled windows' border lines (the borders' outer edge is
-# 5.5 pt from the screen's side: AeroSpace's 8 pt gap less the 2.5 pt the
-# border shows outside its window; SketchyBar places on whole points, so 6),
+# 5 pt from the screen's side: AeroSpace's 8 pt gap less the 3 pt the
+# border shows outside its window, half its width of 6, chosen so the line
+# is on a whole point, where SketchyBar can place a pill),
 # and the panels hang on the same lines. No bar padding: the gap is all of it.
-EDGE=6
+EDGE=5
 # panel NAME: a click shows or puts away that panel of Grove Keys. -g: the
 # link doesn't bring Grove Keys forward.
 panel() {
