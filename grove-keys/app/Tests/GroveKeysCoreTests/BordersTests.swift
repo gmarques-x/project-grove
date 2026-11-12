@@ -93,4 +93,29 @@ import Testing
         #expect(!Borders.overviewIsUp(windows: [("WindowManager", 0), ("Finder", 19)]))
         #expect(!Borders.overviewIsUp(windows: []))
     }
+
+    @Test func theProbesAreWindowManagersParkedIconWindows() {
+        // As macOS 27 lists every window at rest (names left out, as without
+        // Screen Recording): parked icon windows are 0 by 0.
+        let rest = [
+            Borders.Window(id: 11, owner: "WindowManager", layer: -2147483624, onScreen: true, width: 1920, height: 1243),
+            Borders.Window(id: 8416, owner: "WindowManager", layer: -2147483603, onScreen: true, width: 1920, height: 1243),
+            Borders.Window(id: 29, owner: "WindowManager", layer: 0, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 42, owner: "WindowManager", layer: 0, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 8426, owner: "WindowManager", layer: 0, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 49, owner: "WindowManager", layer: 17, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 8379, owner: "WindowManager", layer: 17, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 8406, owner: "WindowManager", layer: 17, onScreen: false, width: 0, height: 0),
+            Borders.Window(id: 8233, owner: "WindowManager", layer: 19, onScreen: false, width: 1920, height: 1243),  // an old shield
+            Borders.Window(id: 8224, owner: "WindowManager", layer: 0, onScreen: false, width: 320, height: 24),      // a label
+            Borders.Window(id: 900, owner: "sketchybar", layer: 25, onScreen: true, width: 66, height: 82),
+        ]
+        // Layer 17 first, newest first.
+        #expect(Borders.probes(in: rest) == [8406, 8379, 49])
+        #expect(Borders.probes(in: []) == [])
+        // Only layer 0 ones parked: those.
+        #expect(Borders.probes(in: rest.filter { $0.layer != 17 }) == [8426, 42, 29])
+        // With an overview up they are on screen: nothing to pick then.
+        #expect(Borders.probes(in: rest.map { var w = $0; w.onScreen = true; return w }) == [])
+    }
 }

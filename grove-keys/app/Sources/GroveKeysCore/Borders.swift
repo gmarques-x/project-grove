@@ -26,9 +26,52 @@ public enum Borders {
     /// Whose notifications: the Dock and WindowManager, by bundle ID.
     public static let triggerApps = ["com.apple.dock", "com.apple.WindowManager"]
 
-    /// While an overview is up, how often to look for its end, in case the
-    /// notification for it is missed.
-    public static let recheck: TimeInterval = 0.5
+    /// While an overview is up, how often to look for its end: often, so the
+    /// borders are back as the windows land, and only for those few seconds.
+    public static let recheck: TimeInterval = 0.1
+
+    /// Those notifications come about half a second after an overview starts,
+    /// and the borders hung over it that long. What starts with it are
+    /// WindowManager's app icon windows, the icons under each group in the
+    /// overview: unlike the shield they are kept between overviews, parked
+    /// off screen, so their numbers are known beforehand, and asking whether
+    /// one window is on screen costs a twentieth of a millisecond. The watcher
+    /// asks this often about a few of them (`probes`), and takes a yes as a
+    /// reason to look.
+    public static let probeInterval: TimeInterval = 0.05
+    /// How many icon windows to ask about: more than one, since an app's
+    /// goes when the app quits.
+    public static let probeCount = 3
+    /// The probes are picked again this often (apps come and go).
+    public static let probeRefresh: TimeInterval = 20
+
+    /// A window as the watcher sees it, without Screen Recording permission
+    /// (so without its name).
+    public struct Window: Equatable, Sendable {
+        public var id: UInt32
+        public var owner: String
+        public var layer: Int
+        public var onScreen: Bool
+        public var width, height: Double
+
+        public init(id: UInt32, owner: String, layer: Int, onScreen: Bool, width: Double, height: Double) {
+            self.id = id; self.owner = owner; self.layer = layer; self.onScreen = onScreen
+            self.width = width; self.height = height
+        }
+    }
+
+    /// From every window there is (on screen or not) at rest: WindowManager's
+    /// parked app icon windows, by what they look like: off screen, in layer
+    /// 17 or 0, and no bigger than an icon with its label (parked, macOS 27
+    /// gives their size as 0 by 0). Layer 17 first (layer 0 ones may belong
+    /// to an app the overview won't show), then newest, `probeCount` at most.
+    public static func probes(in windows: [Window]) -> [UInt32] {
+        windows
+            .filter { $0.owner == "WindowManager" && !$0.onScreen && ($0.layer == 0 || $0.layer == 17)
+                && $0.width <= 140 && $0.height <= 110 }
+            .sorted { ($0.layer, $0.id) > ($1.layer, $1.id) }
+            .prefix(probeCount).map(\.id)
+    }
 
     /// An overview (Mission Control, App Exposé, Show Desktop) is on screen:
     /// WindowManager has a window in the layers it uses only then (the

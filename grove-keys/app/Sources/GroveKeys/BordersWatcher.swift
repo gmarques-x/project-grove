@@ -6,9 +6,12 @@ import GroveKeysCore
 /// Hides the window borders while Mission Control, App Exposé or Show
 /// Desktop is up, and puts them back when it ends (why: `Borders`). macOS
 /// doesn't announce an overview, so this looks for it (`Borders
-/// .overviewIsUp`) whenever the Dock or WindowManager post one of a few
-/// general Accessibility notifications, and every half second while one is
-/// up. What to do then is `BordersMachine`'s, and this runs it.
+/// .overviewIsUp`): when one of WindowManager's parked icon windows comes on
+/// screen (asked twenty times a second; nearly free, see `Borders
+/// .probeInterval`), when the Dock or WindowManager post one of a few
+/// general Accessibility notifications (they come late, but also for Show
+/// Desktop, which has no icons), and ten times a second while one is up.
+/// What to do then is `BordersMachine`'s, and this runs it.
 ///
 /// It needs the Accessibility permission Grove Keys has anyway. Until that
 /// is granted there are no observers; `ensure()` (called with the
@@ -29,6 +32,10 @@ final class BordersWatcher {
     /// A look is already queued (several notifications arrive together).
     private var lookQueued = false
     private var recheck: Timer?
+    /// The icon windows asked about, and the timers that ask and re-pick.
+    private var probes: [CGWindowID] = []
+    private var probeTimer: Timer?
+    private var refreshTimer: Timer?
     /// What the log last said, so each state is said once.
     private var logged: String?
     private let runner = Runner()
@@ -39,6 +46,52 @@ final class BordersWatcher {
         perform(machine.handle(.started))
         ensure()
         look()
+        pickProbes()
+        probeTimer = repeating(Borders.probeInterval) { $0.probe() }
+        refreshTimer = repeating(Borders.probeRefresh) { $0.pickProbes() }
+    }
+
+    private func repeating(_ interval: TimeInterval, _ action: @escaping @MainActor (BordersWatcher) -> Void) -> Timer {
+        let timer = Timer(timeInterval: interval, repeats: true) { _ in
+            MainActor.assumeIsolated { action(BordersWatcher.shared) }
+        }
+        timer.tolerance = interval / 5
+        RunLoop.main.add(timer, forMode: .common)
+        return timer
+    }
+
+    /// Picks the icon windows to ask about, from every window there is. Not
+    /// while an overview is up: they are on screen then.
+    private func pickProbes() {
+        guard !up else { return }
+        let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+        probes = Borders.probes(in: list.compactMap { info in
+            guard let id = info[kCGWindowNumber as String] as? UInt32 else { return nil }
+            let bounds = info[kCGWindowBounds as String] as? [String: Any] ?? [:]
+            return Borders.Window(id: id,
+                                  owner: info[kCGWindowOwnerName as String] as? String ?? "",
+                                  layer: info[kCGWindowLayer as String] as? Int ?? 0,
+                                  onScreen: info[kCGWindowIsOnscreen as String] as? Bool ?? false,
+                                  width: bounds["Width"] as? Double ?? 0, height: bounds["Height"] as? Double ?? 0)
+        })
+    }
+
+    /// Is one of the icon windows on screen? Then an overview is starting:
+    /// look. One that is gone (its app quit) is a reason to pick again.
+    private func probe() {
+        guard !up, !probes.isEmpty else { return }
+        var gone = false
+        for id in probes {
+            guard let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]])?.first else {
+                gone = true
+                continue
+            }
+            if info[kCGWindowIsOnscreen as String] as? Bool == true {
+                look()
+                return
+            }
+        }
+        if gone { pickProbes() }
     }
 
     /// Installs the observers that are missing, and drops those of a process
@@ -88,8 +141,10 @@ final class BordersWatcher {
             observers[key] = nil
         }
         if pid == nil {
-            recheck?.invalidate()
+            for timer in [recheck, probeTimer, refreshTimer] { timer?.invalidate() }
             recheck = nil
+            probeTimer = nil
+            refreshTimer = nil
         }
     }
 
@@ -122,6 +177,9 @@ final class BordersWatcher {
             }
             RunLoop.main.add(timer, forMode: .common)
             recheck = timer
+        } else {
+            // The overview may have made or dropped icon windows.
+            pickProbes()
         }
     }
 
