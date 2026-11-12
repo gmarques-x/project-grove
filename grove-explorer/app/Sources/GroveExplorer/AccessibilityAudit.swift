@@ -6,9 +6,12 @@ import GroveThemesCore
 /// window of a render's state, offscreen as a render does (no window is
 /// shown, the app never starts), walks the accessibility tree under it and
 /// prints every control that has nothing to say for itself: no label and
-/// no title. With `--tree`, the whole tree as VoiceOver would meet it.
-/// Exits 1 when a control is unlabelled, a tree could not be walked, or a
-/// command has no action.
+/// no title; and every cell, column, busy indicator or thing of no known
+/// kind that has no label, no value and nothing inside it (VoiceOver
+/// would stop on it and say nothing). With `--tree`, the whole tree as
+/// VoiceOver would meet it. Exits 1 on any of those, when a tree could
+/// not be walked, or a command has no action; 2 when it has not ended
+/// after a minute.
 ///
 /// What it can't tell: how VoiceOver words an element, what it announces
 /// when something changes, and anything of the menus. Those are by hand.
@@ -20,13 +23,21 @@ enum AccessibilityAudit {
         "AXIncrementor", "AXLink", "AXDisclosureTriangle", "AXComboBox", "AXTable", "AXOutline", "AXList",
         "AXProgressIndicator", "AXImage", "AXTabGroup", "AXSplitter", "AXValueIndicator",
     ]
-    /// Deeper than any window's tree goes: one that loops is said, not walked for ever.
+    /// What VoiceOver stops on whatever it is: it must say something or hold something.
+    private static let stops: Set<String> = ["AXCell", "AXColumn", "AXBusyIndicator", "AXUnknown"]
+    /// Deeper than any window's tree goes.
     private static let deepest = 60
+    /// The whole audit, in seconds: it ends by then, done or not.
+    private static let limit = 60
 
     private struct Count {
         var elements = 0
         var controls = 0
         var unlabelled: [String] = []
+        /// The nodes met: one that comes round again is not walked twice,
+        /// whether or not it is an element (a loop through things that are
+        /// none never gets deeper by the count of elements).
+        var seen: Set<ObjectIdentifier> = []
     }
 
     static func run(_ arguments: [String]) -> Never {
@@ -36,6 +47,12 @@ enum AccessibilityAudit {
             fail("usage: GroveExplorer --audit-accessibility <state>|all [--tree]\nstates: \(Render.stateNames)")
         }
         let states = names[0] == "all" ? Render.stateNames.components(separatedBy: ", ") : [names[0]]
+        // Off the main thread, which may be the one that is stuck.
+        let limit = limit
+        DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(limit)) {
+            FileHandle.standardError.write(Data("the audit has not ended after \(limit) seconds: given up\n".utf8))
+            exit(2)
+        }
         var failed = false
         for state in states {
             let (view, _, _) = Render.window(showing: state, colors: ThemeColors.fallback)
@@ -109,14 +126,37 @@ enum AccessibilityAudit {
         }
     }
 
+    /// A table answers two ways of asking, the older by attribute: an
+    /// assistive app served by that one must be given the same rows and
+    /// columns (the list's own, not the table's silent stand-ins).
+    private static func checkOlderAnswers(of table: NSObject, path: [String], into count: inout Count) {
+        let older = NSSelectorFromString("accessibilityAttributeValue:")
+        guard table.responds(to: older) else { return }
+        for (attribute, getter) in [
+            ("AXChildren", "accessibilityChildren"), ("AXRows", "accessibilityRows"),
+            ("AXVisibleRows", "accessibilityVisibleRows"), ("AXSelectedRows", "accessibilitySelectedRows"),
+            ("AXColumns", "accessibilityColumns"),
+        ] {
+            let old = table.perform(older, with: attribute as NSString)?.takeUnretainedValue() as? [NSObject] ?? []
+            let new = table.value(forKey: getter) as? [NSObject] ?? []
+            if old.count != new.count || zip(old, new).contains(where: { $0 !== $1 }) {
+                count.unlabelled.append(
+                    (path + ["\(attribute) asked the older way gives other elements"]).joined(separator: " › "))
+            }
+        }
+    }
+
     private static func walk(_ element: Any, depth: Int, path: [String], tree: Bool, into count: inout Count) {
-        guard let node = element as? NSObject else { return }
+        guard let node = element as? NSObject, count.seen.insert(ObjectIdentifier(node)).inserted else { return }
         guard depth < deepest else {
             count.unlabelled.append("the tree is deeper than \(deepest) under " + path.joined(separator: " › "))
             return
         }
         let role = text("accessibilityRole", of: node)
         let isElement = (value("isAccessibilityElement", key: "accessibilityElement", of: node) as? Bool) ?? false
+        // SwiftUI's hosting view has its nodes in the order VoiceOver walks them.
+        var children = (value("accessibilityChildrenInNavigationOrder", of: node) as? [Any]) ?? []
+        if children.isEmpty { children = (value("accessibilityChildren", of: node) as? [Any]) ?? [] }
         var path = path
         if isElement, !role.isEmpty {
             count.elements += 1
@@ -130,14 +170,14 @@ enum AccessibilityAudit {
                 count.controls += 1
                 // A text field's text is no name for it.
                 if name.isEmpty { count.unlabelled.append((path + [words]).joined(separator: " › ")) }
+            } else if stops.contains(role), name.isEmpty, said.isEmpty, children.isEmpty {
+                count.unlabelled.append((path + [words]).joined(separator: " › ") + " (says nothing, holds nothing)")
             }
+            if role == "AXTable" { checkOlderAnswers(of: node, path: path + [words], into: &count) }
             path.append(words)
             // A scroll bar is the system's own, parts and all.
             if role == "AXScrollBar" { return }
         }
-        // SwiftUI's hosting view has its nodes in the order VoiceOver walks them.
-        var children = (value("accessibilityChildrenInNavigationOrder", of: node) as? [Any]) ?? []
-        if children.isEmpty { children = (value("accessibilityChildren", of: node) as? [Any]) ?? [] }
         for child in children {
             walk(child, depth: depth + (isElement ? 1 : 0), path: path, tree: tree, into: &count)
         }
