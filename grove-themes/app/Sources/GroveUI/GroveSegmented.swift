@@ -122,6 +122,8 @@ public struct GroveSegmented<Value: Hashable>: View {
             .focused($focused)
             .focusBox(focused && ringShown, cornerRadius: GroveRadius.control, outset: 3)
             .onKeyPress(phases: [.down, .repeat]) { press in
+                // The bare arrows only: ⌘← and the like are someone else's.
+                guard press.modifiers.isDisjoint(with: [.command, .option, .control]) else { return .ignored }
                 switch press.key {
                 case .leftArrow: return move(-1)
                 case .rightArrow: return move(1)
