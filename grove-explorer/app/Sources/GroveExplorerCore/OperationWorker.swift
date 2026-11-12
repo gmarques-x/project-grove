@@ -7,6 +7,9 @@ private enum Placed {
     case taken
     /// The name is on another volume than the item.
     case otherVolume
+    /// A file of the user's named `._<name>` is at the target (its name is
+    /// carried), on a volume where macOS would overwrite it.
+    case inTheWay(String)
     case failed(Int32)
 }
 
@@ -106,7 +109,8 @@ final class Worker {
         let name = item.lastPathComponent
         guard name.hasPrefix("._"), copier.keepsAttributesBesideFiles(at: folder.path) else { return nil }
         let partner = String(name.dropFirst(2))
-        let coming = items.contains { $0.lastPathComponent == partner }
+        // Such volumes take "X.TXT" for "x.txt": so does this.
+        let coming = items.contains { OperationRunner.isSameName($0.lastPathComponent, partner) }
         return coming || OperationRunner.exists(folder.appendingPathComponent(partner)) ? partner : nil
     }
 
@@ -178,6 +182,12 @@ final class Worker {
                 }
                 replacing = true
             }
+        }
+
+        // Before anything is written.
+        if let name = fileInTheWay(of: target) {
+            fail(item, Self.inTheWay(name))
+            return
         }
 
         // Where the replaced item is in the Trash, once it is there.
@@ -305,6 +315,10 @@ final class Worker {
             fail(item, "no free name was found for it")
             return
         }
+        if let name = fileInTheWay(of: target) {
+            fail(item, Self.inTheWay(name))
+            return
+        }
         guard let partial = copyToPartial(item, for: target, on: item.deletingLastPathComponent()) else { return }
         switch place(partial.path, at: target, orAt: next) {
         case let .at(final):
@@ -348,6 +362,10 @@ final class Worker {
         reporter.begin(bytes: nil, items: 1)
         defer { reporter.itemFinished(bytes: 0) }
         let target = folder.appendingPathComponent(name, isDirectory: true)
+        if let name = fileInTheWay(of: target) {
+            fail(target, Self.inTheWay(name))
+            return
+        }
         // `mkdir` makes it or fails: it never touches what has the name.
         let code = mkdir(target.path, 0o777) == 0 ? 0 : errno
         switch code {
@@ -402,6 +420,25 @@ final class Worker {
         }
     }
 
+    /// On a volume that keeps attributes in `._name` files, macOS writes
+    /// that file the moment a `name` is made, renamed or copied there, over
+    /// whatever has the name. So where nothing is at `target` yet but a
+    /// file of the user's is at `._<target's name>` (not an attribute
+    /// file, by how it begins), the target's name can't be given: that
+    /// file's name is returned. (With an item at `target`, the `._` file
+    /// is that item's and goes where it goes: macOS carries it along.)
+    private func fileInTheWay(of target: URL) -> String? {
+        let folder = target.deletingLastPathComponent()
+        guard copier.keepsAttributesBesideFiles(at: folder.path), !OperationRunner.exists(target) else { return nil }
+        let name = "._" + target.lastPathComponent
+        let path = folder.appendingPathComponent(name, isDirectory: false).path
+        return FileIdentity.of(path) != nil && !TreeCopier.isAttributeFile(path) ? name : nil
+    }
+
+    private static func inTheWay(_ name: String) -> String {
+        "“\(name)” is in the way on this disk"
+    }
+
     /// Gives the item at `path` its final name, never in place of another
     /// item. When the name is taken and `next` is given (a name that only
     /// has to be free: a duplicate, "keep both"), the next free name is tried.
@@ -409,6 +446,7 @@ final class Worker {
         var target = target
         for _ in 0..<100 {
             watching?(.placing(target))
+            if let name = fileInTheWay(of: target) { return .inTheWay(name) }
             var code = renamex_np(path, target.path, UInt32(RENAME_EXCL)) == 0 ? 0 : errno
             // ExFAT and FAT have no such rename.
             if code == ENOTSUP { code = placeOverPlaceholder(path, at: target) }
@@ -536,6 +574,7 @@ final class Worker {
         case .at: return
         case .taken: reason = Self.appeared
         case .otherVolume: reason = Self.reason(EXDEV)
+        case let .inTheWay(name): reason = Self.inTheWay(name)
         case let .failed(code): reason = Self.reason(code)
         }
         guard let replaced, let target, !putBack(replaced, at: target) else {

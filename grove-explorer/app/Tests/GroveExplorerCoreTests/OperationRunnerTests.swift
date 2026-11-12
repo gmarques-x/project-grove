@@ -1966,6 +1966,24 @@ private final class Sandbox: @unchecked Sendable {
         let orphan = await box.run(.copy(items: [dotted], to: alone), on: runner)
         #expect(orphan.failures == [])
         #expect(box.text(alone.appendingPathComponent("._n0.txt")) == "real ._n0.txt")
+
+        // The volume takes "X.TXT" for "x.txt", so that is a pair there too:
+        // in a folder, and as two items.
+        let mixed = try box.makeFolder("Case")
+        let lower = try box.makeFile("Case/x.txt", "data")
+        box.setAttribute("com.projectgrove.test", "kept", on: lower)
+        let upper = try box.makeFile("Case/._X.TXT", "real")
+        let reason = "it can't be kept beside “X.TXT” on this disk"
+        let inFolder = await box.run(.copy(items: [mixed], to: stick), on: runner)
+        #expect(inFolder.changes == [.created(stick.appendingPathComponent("Case"))])
+        #expect(inFolder.failures == [ItemFailure(url: mixed.appendingPathComponent("._X.TXT"), reason: reason)])
+        #expect(box.text(stick.appendingPathComponent("Case/x.txt")) == "data")
+        for (index, items) in [[lower, upper], [upper, lower]].enumerated() {
+            let folder = try box.makeFolder(at: stick.appendingPathComponent("case-\(index)"))
+            let both = await box.run(.copy(items: items, to: folder), on: runner)
+            #expect(both.changes == [.created(folder.appendingPathComponent("x.txt"))])
+            #expect(both.failures == [ItemFailure(url: upper, reason: reason)])
+        }
     }
 
     @Test func aRealFileNamedLikeAnAttributeFileIsNotLostWhenItsNameMovesOffSuchAVolume() async throws {
@@ -2018,5 +2036,123 @@ private final class Sandbox: @unchecked Sendable {
         let only = await box.run(.copy(items: [dotted], to: a), on: runner)
         #expect(only.failures == [])
         #expect(box.text(a.appendingPathComponent("._y.txt")) == "real")
+    }
+
+    @Test func aFileOfTheUsersUnderAnAttributeFileNameIsNotOverwrittenByAnArrival() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let a = try volume("GroveA")
+        let runner = OperationRunner()
+        // On the stick, files of the user's named as macOS names its
+        // attribute files, with nothing beside them (yet).
+        let folder = try box.makeFolder(at: stick.appendingPathComponent("in"))
+        let reals = ["._n.txt", "._d", "._m copy.txt", "._k 2.txt"]
+        for name in reals { try box.makeFile(at: folder.appendingPathComponent(name), Data("real \(name)".utf8)) }
+        func inTheWay(_ name: String) -> String { "“\(name)” is in the way on this disk" }
+
+        // An arrival under the name beside one of them would have macOS
+        // write its attribute file over it. Each is refused, before anything
+        // is written: a copy, a move from another volume and on this one, a
+        // rename, a new folder, a duplicate, and "keep both"'s next name.
+        let file = try box.makeFile("n.txt", "data")
+        box.setAttribute("com.projectgrove.test", "kept", on: file)
+        let copied = await box.run(.copy(items: [file], to: folder), on: runner)
+        #expect(copied.changes == [])
+        #expect(copied.failures == [ItemFailure(url: file, reason: inTheWay("._n.txt"))])
+
+        let onA = try box.makeFile(at: a.appendingPathComponent("n.txt"), Data("data".utf8))
+        let moved = await box.run(.move(items: [onA], to: folder), on: runner)
+        #expect(moved.changes == [])
+        #expect(moved.failures == [ItemFailure(url: onA, reason: inTheWay("._n.txt"))])
+        #expect(box.text(onA) == "data")
+
+        let elsewhere = try box.makeFile(at: stick.appendingPathComponent("other/n.txt"), Data("data".utf8))
+        let within = await box.run(.move(items: [elsewhere], to: folder), on: runner)
+        #expect(within.changes == [])
+        #expect(within.failures == [ItemFailure(url: elsewhere, reason: inTheWay("._n.txt"))])
+        #expect(box.text(elsewhere) == "data")
+
+        let z = try box.makeFile(at: folder.appendingPathComponent("z.txt"), Data("z".utf8))
+        let renamed = await box.run(.rename(item: z, to: "n.txt"), on: runner)
+        #expect(renamed.changes == [])
+        #expect(renamed.failures == [ItemFailure(url: z, reason: inTheWay("._n.txt"))])
+        #expect(box.text(z) == "z")
+
+        let made = await box.run(.newFolder(in: folder, name: "d"), on: runner)
+        #expect(made.changes == [])
+        #expect(made.failures == [
+            ItemFailure(url: folder.appendingPathComponent("d", isDirectory: true), reason: inTheWay("._d"))
+        ])
+
+        let m = try box.makeFile(at: folder.appendingPathComponent("m.txt"), Data("m".utf8))
+        let duplicated = await box.run(.duplicate(items: [m]), on: runner)
+        #expect(duplicated.changes == [])
+        #expect(duplicated.failures == [ItemFailure(url: m, reason: inTheWay("._m copy.txt"))])
+
+        try box.makeFile(at: folder.appendingPathComponent("k.txt"), Data("old".utf8))
+        let k = try box.makeFile("k.txt", "new")
+        let kept = await box.run(.copy(items: [k], to: folder), on: runner, choice: .keepBoth)
+        #expect(kept.changes == [])
+        #expect(kept.failures == [ItemFailure(url: k, reason: inTheWay("._k 2.txt"))])
+
+        // Every one of them is as it was, and nothing else came.
+        for name in reals { #expect(box.text(folder.appendingPathComponent(name)) == "real \(name)") }
+        #expect(box.allNames(in: folder).filter { !$0.hasPrefix("._") } == ["k.txt", "m.txt", "z.txt"])
+        #expect(box.partials(in: folder) == [])
+
+        // What macOS does with such a file when the name beside it is
+        // renamed, moved or put in the Trash: it goes with it, under the
+        // new name. Nothing is lost, so that is not refused.
+        let pair = try box.makeFolder(at: stick.appendingPathComponent("pair"))
+        let x = try box.makeFile(at: pair.appendingPathComponent("x.txt"), Data("data".utf8))
+        try Data("real".utf8).write(to: pair.appendingPathComponent("._x.txt"))
+        let carried = await box.run(.rename(item: x, to: "y.txt"), on: runner)
+        #expect(carried.failures == [])
+        #expect(box.allNames(in: pair) == ["._y.txt", "y.txt"])
+        #expect(box.text(pair.appendingPathComponent("._y.txt")) == "real")
+        let along = await box.run(.move(items: [pair.appendingPathComponent("y.txt")], to: stick), on: runner)
+        #expect(along.failures == [])
+        #expect(box.allNames(in: pair) == [])
+        #expect(box.text(stick.appendingPathComponent("._y.txt")) == "real")
+        let trashed = await box.run(.trash(items: [stick.appendingPathComponent("y.txt")]), on: runner)
+        guard case let .trashed(_, inTrash)? = trashed.changes.first else {
+            Issue.record("not put in the Trash: \(trashed)")
+            return
+        }
+        #expect(box.text(inTrash.deletingLastPathComponent().appendingPathComponent("._y.txt")) == "real")
+        #expect(!box.exists(stick.appendingPathComponent("._y.txt")))
+    }
+
+    @Test func theSourceIsNotRemovedWhileAFileOfTheUsersWouldGoWithIt() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let a = try volume("GroveA")
+        func copier() -> TreeCopier {
+            TreeCopier(flag: CancelFlag(), reporter: Reporter(send: { _ in }, watching: nil), watching: nil)
+        }
+
+        // Beside the item itself: copied, and then a file of the user's
+        // appears under the name macOS would remove with it.
+        let file = try box.makeFile(at: stick.appendingPathComponent("y.txt"), Data("data".utf8))
+        let one = copier()
+        try one.copy(file.path, to: a.appendingPathComponent("y.txt").path, remembering: true)
+        #expect(one.isWhole(a.appendingPathComponent("y.txt").path, of: file.path))
+        let beside = stick.appendingPathComponent("._y.txt")
+        try Data("real".utf8).write(to: beside)
+
+        #expect(!one.removeSource(file.path, copiedTo: a.appendingPathComponent("y.txt").path))
+        #expect(box.text(file) == "data")
+        #expect(box.text(beside) == "real")
+
+        // Inside the item: the same, beside a file in the folder copied.
+        let folder = try box.makeFolder(at: stick.appendingPathComponent("Folder"))
+        let inner = try box.makeFile(at: folder.appendingPathComponent("x.txt"), Data("data".utf8))
+        let other = copier()
+        try other.copy(folder.path, to: a.appendingPathComponent("Folder").path, remembering: true)
+        #expect(other.isWhole(a.appendingPathComponent("Folder").path, of: folder.path))
+        let innerBeside = folder.appendingPathComponent("._x.txt")
+        try Data("real".utf8).write(to: innerBeside)
+
+        #expect(!other.removeSource(folder.path, copiedTo: a.appendingPathComponent("Folder").path))
+        #expect(box.text(inner) == "data")
+        #expect(box.text(innerBeside) == "real")
     }
 }

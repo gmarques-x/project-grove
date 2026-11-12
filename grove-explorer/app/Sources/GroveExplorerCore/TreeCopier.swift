@@ -125,10 +125,13 @@ final class TreeCopier {
                 // Before anything of the folder is written, and whatever
                 // the order of its names: a `._name` with its `name` can't
                 // both be kept there, so it is the one left out.
-                let all = Set(names)
-                let pairs = names.filter { Self.isBeside($0, in: all) }
-                leftOut += pairs.map { name in inner.map { $0 + "/" + name } ?? name }
-                names.removeAll { pairs.contains($0) }
+                // Such volumes take "X.TXT" for "x.txt": so does this.
+                let all = Set(names.map(OperationRunner.nameKey))
+                let pairs = Set(names.filter {
+                    $0.hasPrefix("._") && all.contains(OperationRunner.nameKey(String($0.dropFirst(2))))
+                })
+                leftOut += names.filter(pairs.contains).map { name in inner.map { $0 + "/" + name } ?? name }
+                names.removeAll(where: pairs.contains)
             }
             guard mkdir(destination, 0o700) == 0 else { throw .failed(inner: inner, code: errno) }
             for name in names {
@@ -255,7 +258,8 @@ final class TreeCopier {
         return names.filter { !(Self.isBeside($0, in: all) && Self.isAttributeFile(folder + "/" + $0)) }
     }
 
-    /// Whether `name` is a `._x` with its `x` among `names`.
+    /// Whether `name` is a `._x` with its `x` among `names`, letter for
+    /// letter: what macOS itself wrote beside a file is named exactly so.
     static func isBeside(_ name: String, in names: Set<String>) -> Bool {
         name.hasPrefix("._") && names.contains(String(name.dropFirst(2)))
     }

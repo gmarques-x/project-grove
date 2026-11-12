@@ -217,8 +217,13 @@ public actor OperationRunner {
     ///
     /// Task 9's `Conflict.sameName` takes the place of this.
     static func isSameName(_ one: String, _ other: String) -> Bool {
-        one.precomposedStringWithCanonicalMapping
-            .compare(other.precomposedStringWithCanonicalMapping, options: .caseInsensitive) == .orderedSame
+        nameKey(one) == nameKey(other)
+    }
+
+    /// A name without its capitals and with its accents written one way:
+    /// equal for two names exactly when `isSameName` holds.
+    static func nameKey(_ name: String) -> String {
+        name.precomposedStringWithCanonicalMapping.folding(options: .caseInsensitive, locale: nil)
     }
 
     /// Something is at the URL: a file, a folder, or a link, even to nothing.
