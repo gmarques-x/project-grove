@@ -36,12 +36,12 @@ public enum Borders {
     /// overview: unlike the shield they are kept between overviews, parked
     /// off screen, so their numbers are known beforehand, and asking whether
     /// one window is on screen costs a twentieth of a millisecond. The watcher
-    /// asks this often about a few of them (`probes`), and takes a yes as a
+    /// asks this often about two of them (`probes`), and takes a yes as a
     /// reason to look.
-    public static let probeInterval: TimeInterval = 0.05
+    public static let probeInterval: TimeInterval = 0.07
     /// How many icon windows to ask about: more than one, since an app's
     /// goes when the app quits.
-    public static let probeCount = 3
+    public static let probeCount = 2
     /// The probes are picked again this often (apps come and go).
     public static let probeRefresh: TimeInterval = 20
 

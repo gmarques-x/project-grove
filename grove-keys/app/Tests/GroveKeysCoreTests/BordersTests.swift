@@ -111,10 +111,10 @@ import Testing
             Borders.Window(id: 900, owner: "sketchybar", layer: 25, onScreen: true, width: 66, height: 82),
         ]
         // Layer 17 first, newest first.
-        #expect(Borders.probes(in: rest) == [8406, 8379, 49])
+        #expect(Borders.probes(in: rest) == [8406, 8379])
         #expect(Borders.probes(in: []) == [])
         // Only layer 0 ones parked: those.
-        #expect(Borders.probes(in: rest.filter { $0.layer != 17 }) == [8426, 42, 29])
+        #expect(Borders.probes(in: rest.filter { $0.layer != 17 }) == [8426, 42])
         // With an overview up they are on screen: nothing to pick then.
         #expect(Borders.probes(in: rest.map { var w = $0; w.onScreen = true; return w }) == [])
     }

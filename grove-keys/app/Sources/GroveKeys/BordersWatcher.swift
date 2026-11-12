@@ -7,7 +7,7 @@ import GroveKeysCore
 /// Desktop is up, and puts them back when it ends (why: `Borders`). macOS
 /// doesn't announce an overview, so this looks for it (`Borders
 /// .overviewIsUp`): when one of WindowManager's parked icon windows comes on
-/// screen (asked twenty times a second; nearly free, see `Borders
+/// screen (asked about fourteen times a second; nearly free, see `Borders
 /// .probeInterval`), when the Dock or WindowManager post one of a few
 /// general Accessibility notifications (they come late, but also for Show
 /// Desktop, which has no icons), and ten times a second while one is up.
@@ -77,21 +77,18 @@ final class BordersWatcher {
     }
 
     /// Is one of the icon windows on screen? Then an overview is starting:
-    /// look. One that is gone (its app quit) is a reason to pick again.
+    /// look. Asked about one window, macOS answers with nothing while it is
+    /// parked off screen (and when it is gone: the probes are picked again
+    /// every `Borders.probeRefresh` for that), so nothing is the usual answer.
     private func probe() {
-        guard !up, !probes.isEmpty else { return }
-        var gone = false
+        guard !up else { return }
         for id in probes {
-            guard let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]])?.first else {
-                gone = true
-                continue
-            }
-            if info[kCGWindowIsOnscreen as String] as? Bool == true {
+            let info = (CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]])?.first
+            if info?[kCGWindowIsOnscreen as String] as? Bool == true {
                 look()
                 return
             }
         }
-        if gone { pickProbes() }
     }
 
     /// Installs the observers that are missing, and drops those of a process
