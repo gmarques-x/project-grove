@@ -13,6 +13,11 @@ import GroveThemesCore
 /// not be walked, or a command has no action; 2 when it has not ended
 /// after a minute.
 ///
+/// Then each list is asked through the accessibility server, as an
+/// assistive app asks (`AccessibilityLive`): for that alone the
+/// application finishes launching and the window is ordered in, clear and
+/// far off every screen, and out again. Nothing is ever on a screen.
+///
 /// What it can't tell: how VoiceOver words an element, what it announces
 /// when something changes, and anything of the menus. Those are by hand.
 @MainActor
