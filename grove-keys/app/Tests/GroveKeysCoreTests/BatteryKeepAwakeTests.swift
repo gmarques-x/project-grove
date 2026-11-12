@@ -114,6 +114,38 @@ private final class FakeSystem: KeepAwakeSystem, @unchecked Sendable {
         #expect(!system.log.contains("pmset 1"))
     }
 
+    @Test func aLowBatteryAsksIgnoreLidOffOncePerFall() async {
+        let system = FakeSystem(), controller = KeepAwakeController(system: system)
+        controller.turnOn(now: now)
+        await controller.setIgnoreLid(true, refused: false)
+        #expect(controller.state.lidIgnored)
+        // Above the limit: nothing asked.
+        await controller.protect(refused: false)
+        #expect(system.log.filter { $0 == "pmset 0" }.isEmpty)
+        // Under it: asked off; the dialog is dismissed, so it stays on.
+        system.answers = [.cancelled]
+        await controller.protect(refused: true)
+        #expect(system.log.filter { $0 == "pmset 0" }.count == 1)
+        #expect(controller.state.lidIgnored)
+        #expect(controller.state.note == KeepAwakeController.refusedOnBattery)
+        // Not asked again while still low.
+        await controller.protect(refused: true)
+        #expect(system.log.filter { $0 == "pmset 0" }.count == 1)
+        // Recovered, then low again: asked again, and this time answered.
+        await controller.protect(refused: false)
+        await controller.protect(refused: true)
+        #expect(system.log.filter { $0 == "pmset 0" }.count == 2)
+        #expect(!controller.state.lidIgnored)
+    }
+
+    @Test func aLowBatteryLeavesAnotherToolsSettingAlone() async {
+        let system = FakeSystem(), controller = KeepAwakeController(system: system)
+        system.sleepDisabledNow = true
+        await controller.refreshLid()
+        await controller.protect(refused: true)
+        #expect(!system.log.contains("pmset 0"))
+    }
+
     @Test func ignoreLidOnAndOff() async {
         let system = FakeSystem(), controller = KeepAwakeController(system: system)
         var busy: [Bool] = []

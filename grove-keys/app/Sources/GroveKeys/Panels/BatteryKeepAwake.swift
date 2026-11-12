@@ -91,6 +91,8 @@ final class KeepAwake: ObservableObject {
 
     private let controller: KeepAwakeController
     private var end: Timer?
+    /// Runs only while Ignore Lid is on: the charge, once a minute.
+    private var guardTimer: Timer?
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     private init(system: any KeepAwakeSystem) {
@@ -138,6 +140,20 @@ final class KeepAwake: ObservableObject {
     private func follow(_ state: KeepAwakeState) {
         end?.invalidate()
         end = nil
+        // Battery protection: while Ignore Lid is on, look at the charge once
+        // a minute (one IOKit read) and ask it off under 20% on battery.
+        if state.isOn, state.lidIgnored {
+            if guardTimer == nil {
+                let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.protect() }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                guardTimer = timer
+            }
+        } else {
+            guardTimer?.invalidate()
+            guardTimer = nil
+        }
         guard state.isOn else {
             for observer in observers { observer.center.removeObserver(observer.token) }
             observers = []
@@ -162,6 +178,13 @@ final class KeepAwake: ObservableObject {
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.controller.releaseNow() }
         }))
+    }
+
+    private func protect() {
+        Task {
+            let refused = await Task.detached { BatterySampler.read().refusesIgnoreLid }.value
+            await controller.protect(refused: refused)
+        }
     }
 
     private func expire() {

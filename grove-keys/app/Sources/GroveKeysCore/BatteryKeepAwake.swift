@@ -148,6 +148,8 @@ public final class KeepAwakeController {
     public var onChange: (@MainActor (KeepAwakeState) -> Void)?
 
     private let system: any KeepAwakeSystem
+    /// `protect` has asked since the charge last was above the limit.
+    private var askedToProtect = false
 
     public init(system: any KeepAwakeSystem) {
         self.system = system
@@ -222,6 +224,22 @@ public final class KeepAwakeController {
             }
         }
         await change(lid: on)
+    }
+
+    /// Battery protection while Ignore Lid is on: when the charge falls under
+    /// 20% on battery (`refused`), Ignore Lid is asked off, once per fall (a
+    /// dismissed dialog isn't asked again until the charge has recovered).
+    /// macOS only changes it through its authorization dialog, so with the
+    /// lid shut the dialog waits unanswered: Grove can ask, not force.
+    public func protect(refused: Bool) async {
+        guard refused else {
+            askedToProtect = false
+            return
+        }
+        guard state.isOn, state.lidIgnored, !state.lidBusy, !askedToProtect else { return }
+        askedToProtect = true
+        await change(lid: false)
+        if state.lidIgnored { state.note = Self.refusedOnBattery }
     }
 
     /// The assertions and the file go, without a word to anyone else: for
