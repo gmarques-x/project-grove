@@ -298,9 +298,16 @@ final class AppModel: ObservableObject {
     }
 
     /// The pane that has the keys.
-    func activate(_ side: Side) {
-        // A click in a list takes the keyboard back from the sidebar.
+    /// A click in the pane's list: the pane has the keys, and the click
+    /// takes the keyboard back from the sidebar. (Not part of `activate`:
+    /// the list also activates its pane when it is handed the keyboard,
+    /// which ⌥⌘← does on its way to the sidebar.)
+    func clicked(_ side: Side) {
         if sidebarCursor != nil { sidebarCursor = nil }
+        activate(side)
+    }
+
+    func activate(_ side: Side) {
         guard browser.active != side, sides.contains(side) else { return }
         browser.active = side
         typeJump.reset()
@@ -308,7 +315,7 @@ final class AppModel: ObservableObject {
 
     /// Sorts the pane by `column`; by the column it is sorted by, the other way round.
     func sort(by column: SortColumn, in side: Side) {
-        activate(side)
+        clicked(side)
         browser.setSort(column)
         arrange(side)
     }
@@ -335,7 +342,7 @@ final class AppModel: ObservableObject {
 
     /// Reads the pane's folder and sorts it, off the main thread; the pane
     /// keeps what it shows until then. The folder is watched from here on.
-    private func load(_ side: Side) {
+    func load(_ side: Side) {
         guard let tab = browser.tab(side) else { return }
         let folder = tab.folder, sort = tab.sort, showHidden = browser.showHidden
         let sizes = sizes, sizesWere = sizesVersion
@@ -420,8 +427,14 @@ final class AppModel: ObservableObject {
 
     func watch(_ folder: URL, for side: Side) {
         let path = folder.standardizedFileURL.path
-        // A disk being ejected is let go of; `eject` watches again if it stays.
-        guard watchers[side]?.path != path, !isBeingEjected(folder) else { return }
+        guard watchers[side]?.path != path else { return }
+        // A disk being ejected is let go of: the pane watches nothing (not
+        // its last folder either) until `eject` watches again if the disk stays.
+        guard !isBeingEjected(folder) else {
+            watchers[side]?.watcher.stop()
+            watchers[side] = nil
+            return
+        }
         watchers[side]?.watcher.stop()
         // The call comes on the watcher's queue: over to the main actor.
         let watcher = FolderWatcher(folder: folder) { [weak self] in

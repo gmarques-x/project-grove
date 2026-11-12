@@ -225,8 +225,15 @@ extension AppModel {
             ejecting.remove(volume.id)
             guard let failure else { return }  // The unmount notification takes the row away.
             ejectFailures[volume.id] = failure
-            for side in sides {
-                if let folder = browser.tab(side)?.folder, watchers[side] == nil { watch(folder, for: side) }
+            // The disk stays: every pane not watching the folder it shows
+            // (it was let go of, or went onto the disk meanwhile) watches
+            // it and reads it again, for what changed while nobody looked.
+            var shown: [Side: URL] = [:]
+            for side in sides { shown[side] = browser.tab(side)?.folder }
+            for side in WatchPlan.stale(watched: watchers.mapValues(\.path), shown: shown) {
+                watchers[side]?.watcher.stop()
+                watchers[side] = nil
+                load(side)  // Watches the folder too.
             }
             wantSizes()
         }

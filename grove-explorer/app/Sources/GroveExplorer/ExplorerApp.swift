@@ -44,7 +44,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// menu sees it. The red button and ⌘Q close and quit as ever.
     private func keepCommandWForTabs() {
         commandW = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let stroke = CommandTable.stroke(of: event), stroke.key == "W", stroke.modifiers == [.command],
+            // Only in the Explorer window itself: in the About panel, a
+            // sheet, an alert or the Quick Look panel the key is theirs.
+            guard let window = event.window, window.canBecomeMain, window.attachedSheet == nil,
+                let stroke = CommandTable.stroke(of: event), stroke.key == "W", stroke.modifiers == [.command],
                 let self, let command = CommandTable.command("closeTab")
             else { return event }
             if command.isEnabled(self.model) { command.run(self.model) }
@@ -62,6 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// The session is saved a second after each change; this is the last one.
     func applicationWillTerminate(_ notification: Notification) {
+        if let commandW { NSEvent.removeMonitor(commandW) }
+        commandW = nil
         model.saveSession()
     }
 

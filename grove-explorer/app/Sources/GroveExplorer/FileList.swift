@@ -46,6 +46,7 @@ struct FileList: NSViewRepresentable {
         table.allowsTypeSelect = false
         table.onKey = { [weak coordinator] in coordinator?.key($0) ?? false }
         table.onActivate = { [weak coordinator] in coordinator?.activate() }
+        table.onClick = { [weak coordinator] in coordinator?.clicked() }
         table.onPointerRow = { [weak coordinator] in coordinator?.pointerMoved(to: $0) }
 
         let scroll = NSScrollView()
@@ -329,6 +330,8 @@ struct FileList: NSViewRepresentable {
 
         func activate() { model.activate(side) }
 
+        func clicked() { model.clicked(side) }
+
         func pointerMoved(to row: Int) {
             guard let table else { return }
             table.enumerateAvailableRowViews { view, at in (view as? FileRowView)?.isUnderPointer = at == row }
@@ -353,7 +356,10 @@ struct FileList: NSViewRepresentable {
 /// The table itself: it tells which row the pointer is over and when the
 /// pane is clicked (so it becomes the active one).
 final class FileTableView: NSTableView {
+    /// The list was handed the keyboard.
     var onActivate: (() -> Void)?
+    /// The list was clicked.
+    var onClick: (() -> Void)?
     /// A key was pressed: true when it was dealt with.
     var onKey: ((NSEvent) -> Bool)?
     var onPointerRow: ((Int) -> Void)?
@@ -389,7 +395,7 @@ final class FileTableView: NSTableView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        onActivate?()
+        onClick?()
         super.mouseDown(with: event)
     }
 
