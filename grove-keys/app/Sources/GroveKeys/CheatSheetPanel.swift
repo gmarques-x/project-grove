@@ -67,7 +67,7 @@ struct CheatSheetView: View {
                         .foregroundStyle(Color(theme.fg))
                     Spacer()
                     Text("⌃⌥⇧⌘ · release Caps Lock to close")
-                        .font(GroveFont.mono(12))
+                        .font(GroveFont.mono(GroveType.label))
                         .foregroundStyle(theme.quiet)
                 }
                 KeyboardGrid(layer: layer, width: Self.cardWidth - 32, capHeight: 46) { _, name, legend, width, height in
@@ -79,7 +79,7 @@ struct CheatSheetView: View {
             .frame(width: Self.cardWidth)
             .sheetCard(theme)
         }
-        .font(GroveFont.mono(12))
+        .font(GroveFont.mono(GroveType.label))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
     }

@@ -61,7 +61,7 @@ struct DropdownView: View {
         .frame(width: 320)
         .keyboardNavigation(focus.projectedValue, list: model.list,
                             schemesDisabled: model.switchingDisabled, activate: run)
-        .font(GroveFont.mono(13))
+        .font(GroveFont.mono(GroveType.heading))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0))
         .environment(\.theme, theme)
@@ -92,7 +92,7 @@ struct DropdownView: View {
                 .fill(Color(theme.green))
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: GroveSpace.s2) {
-                Text("Grove Themes").font(GroveFont.mono(15, .bold))
+                Text("Grove Themes").font(GroveFont.mono(GroveType.title, .bold))
                 if let list = model.list {
                     Text(StatusText.displayName(list.current)).modifier(SchemeNameStyle())
                 }
@@ -103,7 +103,7 @@ struct DropdownView: View {
     private func row(_ label: String, _ schemes: [String], _ theme: ThemeColors) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(GroveFont.mono(10))
+                .font(GroveFont.mono(GroveType.finePrint))
                 .tracking(0.8)
                 .foregroundStyle(theme.quiet)
             HStack(spacing: GroveSpace.s8) {

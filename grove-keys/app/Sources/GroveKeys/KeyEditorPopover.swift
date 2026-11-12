@@ -68,10 +68,10 @@ struct KeyEditorPopover: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text(Shortcut(aerospace: target.shortcut)?.symbols ?? target.shortcut)
-                    .font(GroveFont.mono(13, .semibold))
+                    .font(GroveFont.mono(GroveType.heading, .semibold))
                 Spacer()
                 Text("\(layerTitle) layer · \(kind.wrappedValue == .launcher ? "launch" : "aerospace.\(mode)")")
-                    .font(GroveFont.mono(11))
+                    .font(GroveFont.mono(GroveType.body))
                     .foregroundStyle(theme.quiet)
             }
             segments
@@ -91,7 +91,7 @@ struct KeyEditorPopover: View {
             .disabled(!model.canEdit)
             if let replaced = replacedText {
                 theme.marked(replaced, theme.orange)
-                    .font(GroveFont.mono(11))
+                    .font(GroveFont.mono(GroveType.body))
                     .lineLimit(1)
             }
             HStack {
@@ -103,13 +103,13 @@ struct KeyEditorPopover: View {
                 Spacer()
                 Text("esc").foregroundColor(Color(theme.fg)) + Text(" close")
             }
-            .font(GroveFont.mono(11))
+            .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
             .lineLimit(1)
         }
         .padding(14)
         .frame(width: 330)
-        .font(GroveFont.mono(12))
+        .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg1))
     }
@@ -196,7 +196,7 @@ struct KeyEditorPopover: View {
         VStack(alignment: .leading, spacing: GroveSpace.s8) {
             if !commandAllowed {
                 theme.marked("Main-mode shortcuts need ⌃, ⌥ or ⌘", theme.orange)
-                    .font(GroveFont.mono(11))
+                    .font(GroveFont.mono(GroveType.body))
             }
             Group { commandList }.disabled(!commandAllowed)
         }
@@ -227,7 +227,7 @@ struct KeyEditorPopover: View {
                     .textFieldStyle(.plain)
                     .focused($fieldFocused)
                     .onSubmit { set(.aerospace(command: text.wrappedValue)) }
-                Text("AeroSpace syntax · ↩ saves").foregroundStyle(theme.quiet).font(GroveFont.mono(11))
+                Text("AeroSpace syntax · ↩ saves").foregroundStyle(theme.quiet).font(GroveFont.mono(GroveType.body))
             }
             .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s8)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))

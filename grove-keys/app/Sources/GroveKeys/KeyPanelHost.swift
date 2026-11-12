@@ -121,7 +121,7 @@ struct FilterField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = GroveFont.monoNS(15)
+        field.font = GroveFont.monoNS(GroveType.title)
         field.usesSingleLineMode = true
         field.lineBreakMode = .byTruncatingTail
         field.delegate = context.coordinator
@@ -133,7 +133,7 @@ struct FilterField: NSViewRepresentable {
         if field.stringValue != text { field.stringValue = text }
         field.textColor = NSColor(theme.fg)
         field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [
-            .foregroundColor: NSColor(theme.dim), .font: GroveFont.monoNS(15),
+            .foregroundColor: NSColor(theme.dim), .font: GroveFont.monoNS(GroveType.title),
         ])
     }
 

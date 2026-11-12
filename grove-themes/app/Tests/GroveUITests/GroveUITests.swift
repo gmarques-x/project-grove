@@ -39,8 +39,10 @@ import Testing
                                                                      colors: colors)))
     }
 
-    /// The owner's scale: radii 4/6/10/16, spacing 2 and a 4 pt grid.
+    /// The owner's scale: radii 4/6/10/16, spacing 2 and a 4 pt grid, text
+    /// 10/11/12/13/15.
     @Test func tokensAreTheScale() {
+        #expect(GroveType.scale == [10, 11, 12, 13, 15])
         #expect([GroveRadius.inline, GroveRadius.control, GroveRadius.card, GroveRadius.window] == [4, 6, 10, 16])
         #expect(GroveSpace.scale == [2, 4, 8, 12, 16, 24])
     }

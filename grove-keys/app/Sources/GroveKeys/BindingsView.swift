@@ -113,7 +113,7 @@ struct BindingsView: View {
                                     .strikethrough(missing)
                                     .foregroundStyle(missing ? theme.quiet : Color(theme.fg))
                                 if missing {
-                                    Text("not installed").font(GroveFont.mono(11)).foregroundStyle(theme.quiet)
+                                    Text("not installed").font(GroveFont.mono(GroveType.body)).foregroundStyle(theme.quiet)
                                 }
                             }
                             .lineLimit(1)
@@ -184,7 +184,7 @@ struct BindingsView: View {
                         if r.count > 1 {
                             HStack(spacing: 6) {
                                 Text(r.action).lineLimit(1)
-                                Text("\(r.count) rows").font(GroveFont.mono(11)).foregroundStyle(theme.quiet)
+                                Text("\(r.count) rows").font(GroveFont.mono(GroveType.body)).foregroundStyle(theme.quiet)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .help("Show all to change one of them; − removes all \(r.count)")
@@ -206,7 +206,7 @@ struct BindingsView: View {
                     if open { expanded.wrappedValue.remove(mode) } else { expanded.wrappedValue.insert(mode) }
                 } label: {
                     Text(open ? "Fold runs of 1…9" : "Show all \(bindings.count) · runs of 1…9 fold into one row")
-                        .font(GroveFont.mono(11.5))
+                        .font(GroveFont.mono(GroveType.label))
                         .foregroundStyle(theme.quiet)
                         .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
                         .contentShape(Rectangle())
@@ -316,7 +316,7 @@ struct BindingsView: View {
         } label: {
             // "+ Add …": all green in dark; in light the + keeps the green.
             (Text("+").foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
-                .font(GroveFont.mono(12))
+                .font(GroveFont.mono(GroveType.label))
                 .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
                 .contentShape(Rectangle())
         }
@@ -339,7 +339,7 @@ struct BindingsView: View {
                 small("Replace", primary: true) { commit(from: c.from, to: c.to, replacing: c.clashes) }
                 small("Cancel", primary: false) { clash.wrappedValue = nil }
             }
-            .font(GroveFont.mono(11.5))
+            .font(GroveFont.mono(GroveType.body))
             .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
         }
     }
@@ -366,7 +366,7 @@ struct BindingsView: View {
     private func small(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(GroveFont.mono(11.5, .semibold))
+                .font(GroveFont.mono(GroveType.label, .semibold))
                 .foregroundStyle(Color(primary ? theme.onAccent : theme.fg))
                 .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
                 .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: GroveRadius.control))
@@ -378,7 +378,7 @@ struct BindingsView: View {
 
     private func hint(_ text: String) -> some View {
         Text(text)
-            .font(GroveFont.mono(11))
+            .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6)
@@ -396,11 +396,11 @@ struct BindingsGroup<Content: View>: View {
         VStack(alignment: .leading, spacing: GroveSpace.s8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title.uppercased())
-                    .font(GroveFont.mono(11, .semibold))
+                    .font(GroveFont.mono(GroveType.body, .semibold))
                     .tracking(1.1)
                     .foregroundStyle(theme.quiet)
                 Spacer()
-                Text(note).font(GroveFont.mono(11)).foregroundStyle(theme.quiet(dark: 0.8))
+                Text(note).font(GroveFont.mono(GroveType.body)).foregroundStyle(theme.quiet(dark: 0.8))
             }
             content
         }
@@ -441,7 +441,7 @@ private struct RowView<Action: View>: View {
                 .help(recordable ? "Click, then press the new shortcut · esc cancels" : "Show all to change one of them")
                 .frame(width: 128, alignment: .leading)
             action
-                .font(GroveFont.mono(12))
+                .font(GroveFont.mono(GroveType.label))
             if let conflict {
                 Circle().fill(Color(theme.orange)).frame(width: 7, height: 7).help(conflict)
             }

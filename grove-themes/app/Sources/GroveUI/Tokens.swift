@@ -14,6 +14,25 @@ public enum GroveRadius {
     public static let window: CGFloat = 16
 }
 
+/// Text sizes, named by what the text is. `GroveFont.mono` takes one of
+/// these; a literal size is for a drawing (the gallery's miniature desktop)
+/// or the wordmark (`GroveFont.lockup`).
+public enum GroveType {
+    /// 10: fine print (a caption, a count, a key cap's legend, small caps).
+    public static let finePrint: CGFloat = 10
+    /// 11: body text and rows (a note, a status line, a hint).
+    public static let body: CGFloat = 11
+    /// 12: labels, names and buttons; a window's own text.
+    public static let label: CGFloat = 12
+    /// 13: a heading; a panel's rows (the launcher, the cheat sheet).
+    public static let heading: CGFloat = 13
+    /// 15: a title; the launcher's field.
+    public static let title: CGFloat = 15
+
+    /// Every size, smallest first.
+    public static let scale: [CGFloat] = [finePrint, body, label, heading, title]
+}
+
 /// Padding and gaps: a 4 pt grid and one half step, named by their size
 /// (`s8` is 8 pt), since the same step does different jobs in different views.
 public enum GroveSpace {

@@ -54,7 +54,7 @@ struct WindowView: View {
         }
         .frame(width: Self.width, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
-        .font(GroveFont.mono(12))
+        .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())
         .background(WindowAccessor { $0.isMovableByWindowBackground = true })
@@ -93,7 +93,7 @@ struct WindowView: View {
                 Circle().fill(Color(statusDot(theme))).frame(width: 7, height: 7)
                 Text(status)
             }
-            .font(GroveFont.mono(11.5))
+            .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
         }
         .padding(.leading, Self.buttonsClearance)
@@ -128,7 +128,7 @@ private struct PermissionBanner: View {
             }
             Text("Caps Lock stays Caps Lock until both are on.")
                 .foregroundStyle(Color(theme.fg))
-                .font(GroveFont.mono(11.5))
+                .font(GroveFont.mono(GroveType.body))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
@@ -141,7 +141,7 @@ private struct PermissionBanner: View {
             Text(text).foregroundStyle(theme.ink(theme.orange)).fontWeight(.semibold)
             Button { NSWorkspace.shared.open(url) } label: {
                 Text("Open Settings")
-                    .font(GroveFont.mono(11.5, .semibold))
+                    .font(GroveFont.mono(GroveType.label, .semibold))
                     .foregroundStyle(Color(theme.onAccent))
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .background(Color(theme.orange), in: RoundedRectangle(cornerRadius: GroveRadius.control))

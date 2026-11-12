@@ -120,7 +120,7 @@ struct ChoicePill: View {
                 } else {
                     Circle().fill(isCurrent ? Color(theme.green) : theme.line).frame(width: 7, height: 7)
                 }
-                Text(choiceName(name)).font(GroveFont.mono(12))
+                Text(choiceName(name)).font(GroveFont.mono(GroveType.label))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
@@ -142,7 +142,7 @@ struct ChoiceRowLabel: View {
 
     var body: some View {
         Text(title)
-            .font(GroveFont.mono(10))
+            .font(GroveFont.mono(GroveType.finePrint))
             .tracking(0.8)
             .foregroundStyle(theme.quiet)
     }

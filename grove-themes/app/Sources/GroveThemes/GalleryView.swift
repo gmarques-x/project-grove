@@ -23,7 +23,7 @@ struct GalleryView: View {
         VStack(alignment: .leading, spacing: GroveSpace.s16) {
             if let error = model.error {
                 theme.marked(error.message, theme.red)
-                    .font(GroveFont.mono(12))
+                    .font(GroveFont.mono(GroveType.label))
                     .fixedSize(horizontal: false, vertical: true)
             }
             LazyVGrid(columns: columns, spacing: GroveSpace.s12) {
@@ -87,7 +87,7 @@ struct GalleryView: View {
             }
         }
         .ignoresSafeArea(.container, edges: .top)
-        .font(GroveFont.mono(12))
+        .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())
         .background(WindowAccessor { $0.isMovableByWindowBackground = true })

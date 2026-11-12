@@ -24,14 +24,14 @@ struct KeyCapView: View {
             ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
         layout {
             Text(legend)
-                .font(GroveFont.mono(compact ? 10 : 10.5))
+                .font(GroveFont.mono(GroveType.finePrint))
                 .foregroundStyle(legendColor)
                 .lineLimit(1)
                 .layoutPriority(1)
             Spacer(minLength: 0)
             if let binding, let accent, let tint {
                 Text(binding.label)
-                    .font(GroveFont.mono(compact ? 10 : 11.5, .semibold))
+                    .font(GroveFont.mono(compact ? GroveType.finePrint : GroveType.body, .semibold))
                     // A missing app's label stays quiet in light too.
                     .foregroundStyle(binding.missingApp ? tint : theme.ink(accent))
                     .strikethrough(binding.missingApp)

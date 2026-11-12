@@ -70,7 +70,7 @@ struct RecorderPill: View {
     var body: some View {
         Button(action: action) {
             Text(recording ? "press keys…" : text)
-                .font(GroveFont.mono(11.5))
+                .font(GroveFont.mono(GroveType.label))
                 .foregroundStyle(recording ? theme.ink(theme.green) : Color(theme.fg))
                 .lineLimit(1)
                 .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)

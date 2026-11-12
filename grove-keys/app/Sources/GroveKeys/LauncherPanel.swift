@@ -143,7 +143,7 @@ private struct LauncherView: View {
                     .padding(.top, screen.size.height * 0.22)
             }
         }
-        .font(GroveFont.mono(13))
+        .font(GroveFont.mono(GroveType.heading))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
     }

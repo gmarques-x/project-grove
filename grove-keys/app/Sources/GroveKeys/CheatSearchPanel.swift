@@ -139,7 +139,7 @@ private struct CheatSearchView: View {
                            height: min(Self.cardHeight, screen.size.height - 96))
             }
         }
-        .font(GroveFont.mono(12.5))
+        .font(GroveFont.mono(GroveType.heading))
         .environment(\.theme, theme)
         .preferredColorScheme(theme.colorScheme)
     }
@@ -151,7 +151,7 @@ private struct CheatSearchView: View {
                             onChange: { sheet.query = $0 }, onMove: sheet.move,
                             onReturn: sheet.runSelection, onEscape: sheet.close)
                 Text("↑↓ move · ↩ run · esc close")
-                    .font(GroveFont.mono(11))
+                    .font(GroveFont.mono(GroveType.body))
                     .foregroundStyle(theme.quiet)
                     .fixedSize()
             }
@@ -182,7 +182,7 @@ private struct CheatSearchView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(sections) { section in
                         Text(section.title)
-                            .font(GroveFont.mono(11, .semibold))
+                            .font(GroveFont.mono(GroveType.body, .semibold))
                             .foregroundStyle(theme.quiet)
                             .padding(.horizontal, 10)
                             .padding(.top, GroveSpace.s12)
@@ -209,7 +209,7 @@ private struct CheatSearchView: View {
     private func row(_ row: CheatRow, selected: Bool, _ theme: ThemeColors) -> some View {
         HStack(spacing: 10) {
             Text(row.keys)
-                .font(GroveFont.mono(11.5, .medium))
+                .font(GroveFont.mono(GroveType.body, .medium))
                 .foregroundStyle(Color(theme.fg))
                 .lineLimit(1)
                 .padding(.horizontal, GroveSpace.s8)

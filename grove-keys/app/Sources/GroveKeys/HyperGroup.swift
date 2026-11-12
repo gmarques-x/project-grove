@@ -73,13 +73,13 @@ struct HyperGroup: View {
             Spacer()
             control()
         }
-        .font(GroveFont.mono(12))
+        .font(GroveFont.mono(GroveType.label))
         .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
     }
 
     private func pill(_ text: String) -> some View {
         Text(text)
-            .font(GroveFont.mono(11.5))
+            .font(GroveFont.mono(GroveType.label))
             .foregroundStyle(Color(theme.fg))
             .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
@@ -113,7 +113,7 @@ private struct MsField: View {
                 .onSubmit(commit)
             Text("ms").foregroundStyle(theme.quiet)
         }
-        .font(GroveFont.mono(11.5))
+        .font(GroveFont.mono(GroveType.label))
         .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
         .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(valid ? theme.line : Color(theme.red), lineWidth: 1))

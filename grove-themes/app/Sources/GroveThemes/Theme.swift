@@ -25,7 +25,7 @@ struct OnMark: View {
 
     var body: some View {
         (Text("●").foregroundStyle(Color(theme.green)) + Text(" on").foregroundStyle(theme.ink(theme.green)))
-            .font(GroveFont.mono(12))
+            .font(GroveFont.mono(GroveType.label))
     }
 }
 
@@ -37,7 +37,7 @@ struct SchemeNameStyle: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .font(GroveFont.mono(12))
+            .font(GroveFont.mono(GroveType.label))
             .foregroundStyle(Color(theme.fg).opacity(theme.quietOpacity(dark: 0.75)))
     }
 }

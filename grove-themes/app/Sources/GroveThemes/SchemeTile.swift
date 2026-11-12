@@ -17,14 +17,14 @@ struct SchemeTile: View {
         let shape = RoundedRectangle(cornerRadius: 8)
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Aa").font(GroveFont.mono(15, .semibold))
+                Text("Aa").font(GroveFont.mono(GroveType.title, .semibold))
                 HStack(spacing: 3) {
                     ForEach(Array([colors.red, colors.yellow, colors.green, colors.aqua, colors.blue].enumerated()),
                             id: \.offset) { _, dot in
                         Circle().fill(Color(dot)).frame(width: 7, height: 7)
                     }
                 }
-                Text(contrastName(scheme)).font(GroveFont.mono(10.5))
+                Text(contrastName(scheme)).font(GroveFont.mono(GroveType.finePrint))
             }
             .foregroundStyle(Color(colors.fg))
             .padding(GroveSpace.s8)
@@ -35,7 +35,7 @@ struct SchemeTile: View {
                     ProgressView().controlSize(.small).padding(GroveSpace.s4)
                 } else if isCurrent {
                     Text("✓")
-                        .font(GroveFont.mono(11, .bold))
+                        .font(GroveFont.mono(GroveType.body, .bold))
                         .foregroundStyle(Color(colors.fg))
                         .padding(.top, 6)
                         .padding(.trailing, GroveSpace.s8)

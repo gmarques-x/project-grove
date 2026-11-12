@@ -9,7 +9,7 @@ public enum GroveFont {
     private static let hasMono = families.contains("JetBrains Mono")
     private static let lockupFamily = families.contains("Courier Prime") ? "Courier Prime" : "Courier New"
 
-    /// JetBrains Mono, else the system monospaced font.
+    /// JetBrains Mono, else the system monospaced font. `size` from `GroveType`.
     public static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         hasMono ? .custom("JetBrains Mono", size: size).weight(weight)
                 : .system(size: size, weight: weight, design: .monospaced)

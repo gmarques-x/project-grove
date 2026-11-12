@@ -105,7 +105,7 @@ struct KeyboardView: View {
     private var layerPicker: some View {
         HStack(spacing: GroveSpace.s4) {
             Text("LAYER")
-                .font(GroveFont.mono(10.5))
+                .font(GroveFont.mono(GroveType.finePrint))
                 .tracking(1)
                 .foregroundStyle(theme.quiet)
                 .padding(.trailing, GroveSpace.s8)
@@ -118,7 +118,7 @@ struct KeyboardView: View {
                     HStack(spacing: GroveSpace.s4) {
                         Text(layer.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                         Text(String(layer.bindings.count))
-                            .font(GroveFont.mono(10))
+                            .font(GroveFont.mono(GroveType.finePrint))
                             .foregroundStyle(theme.quiet(dark: 0.8))
                     }
                     .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s4)
@@ -173,7 +173,7 @@ struct KeyboardView: View {
             if !rows.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("NOT ON THE KEYBOARD")
-                        .font(GroveFont.mono(10.5)).tracking(1)
+                        .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
                         .foregroundStyle(theme.quiet)
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GroveSpace.s8, alignment: .leading), count: 4),
                               alignment: .leading, spacing: GroveSpace.s4) {
@@ -197,7 +197,7 @@ struct KeyboardView: View {
         return Button { editing.wrappedValue = target } label: {
             HStack(spacing: GroveSpace.s8) {
                 Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
-                    .font(GroveFont.mono(11.5))
+                    .font(GroveFont.mono(GroveType.body))
                     .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
                     .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
                     .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
@@ -230,7 +230,7 @@ struct KeyboardView: View {
             swatch(theme.orange, "mode · service")
             swatch(theme.bg2, "free", outlined: true)
         }
-        .font(GroveFont.mono(11))
+        .font(GroveFont.mono(GroveType.body))
         .foregroundStyle(theme.quiet)
     }
 
