@@ -32,7 +32,9 @@ struct PaneView: View {
             // Nothing to list: no column titles, since there is nothing under them.
             let bare = listing.map { $0.problem != nil || $0.shown.isEmpty } ?? false
             VStack(spacing: 0) {
-                Line(color: active ? Color(theme.green) : nil)
+                // Green on the pane that has the keys, and on one a drag
+                // would drop into (its list's empty space).
+                Line(color: active || model.dropMark == .pane(side) ? Color(theme.green) : nil)
                 TabStrip(model: model, side: side)
                 Line()
                 if let field = model.pathField, field.side == side {

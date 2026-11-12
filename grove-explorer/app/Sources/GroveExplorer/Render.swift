@@ -104,6 +104,12 @@ enum Render {
             size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["LICENSE"])],
             extras: Sample.Extras(
                 rename: "LICENSE", renameText: "docs/LICENSE", renameReason: "A name can't have a “/” in it."))),
+        // Three files dragged from the left pane over a folder in the right
+        // one: the row marked. (The drag's image and the pointer are the system's.)
+        ("drop-target", Scene(
+            size: CGSize(width: 1672, height: 668),
+            panes: [Sample.grove(selected: ["CHANGELOG.md", "LICENSE", "README.md"]), Sample.downloads(selected: [])],
+            extras: Sample.Extras(dropRow: "invoices-2026"))),
         // The folder with each of its marks, at list size.
         ("folder-marks", Scene(size: CGSize(width: 474, height: 300), panes: [Sample.knownFolders()])),
     ]

@@ -32,6 +32,8 @@ final class FileRowView: NSTableRowView {
     /// Whether this pane has the keys: the other pane's selection is quieter.
     var paneIsActive = true { didSet { if paneIsActive != oldValue { needsDisplay = true } } }
     var isUnderPointer = false { didSet { if isUnderPointer != oldValue { needsDisplay = true } } }
+    /// A drag of files is over this folder's row: the hover fill and a 1 pt green line.
+    var isDropTarget = false { didSet { if isDropTarget != oldValue { needsDisplay = true } } }
 
     override var isSelected: Bool { didSet { needsDisplay = true } }
     override var isPreviousRowSelected: Bool { didSet { needsDisplay = true } }
@@ -40,11 +42,20 @@ final class FileRowView: NSTableRowView {
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
 
     override func drawBackground(in dirtyRect: NSRect) {
-        guard isUnderPointer, !isSelected else { return }
+        guard isUnderPointer || isDropTarget, !isSelected else { return }
         shape(roundTop: true, roundBottom: true) { path in
             NSColor(theme.listHoverFill).setFill()
             path.fill()
+            if isDropTarget { outline(path, NSColor(theme.green)) }
         }
+    }
+
+    /// A 1 pt line just inside the shape.
+    private func outline(_ path: NSBezierPath, _ color: NSColor) {
+        color.setStroke()
+        path.lineWidth = 2  // Half of it is outside the shape and clipped away.
+        path.addClip()
+        path.stroke()
     }
 
     override func drawSelection(in dirtyRect: NSRect) {
@@ -56,10 +67,11 @@ final class FileRowView: NSTableRowView {
             // `lightOutline` gives a panel), which sets it apart from the
             // pointer's row and from the other pane's selection.
             guard theme.isLight, paneIsActive else { return }
-            NSColor(theme.line).setStroke()
-            path.lineWidth = 2  // Half of it is outside the shape and clipped away.
-            path.addClip()
-            path.stroke()
+            outline(path, NSColor(theme.line))
+        }
+        // A selected folder a drag is over: the green line round this row alone.
+        if isDropTarget {
+            shape(roundTop: true, roundBottom: true) { outline($0, NSColor(theme.green)) }
         }
     }
 
@@ -164,7 +176,26 @@ final class FileTableView: NSTableView {
     var pointerRow = -1 {
         didSet { if pointerRow != oldValue { onPointerRow?(pointerRow) } }
     }
+    /// The folder's row a drag of files is over; -1 for none.
+    var dropRow = -1 {
+        didSet {
+            guard dropRow != oldValue else { return }
+            enumerateAvailableRowViews { view, row in (view as? FileRowView)?.isDropTarget = row == dropRow }
+        }
+    }
+    /// A drag left the list or ended over it.
+    var onDragLeft: (() -> Void)?
     private var tracking: NSTrackingArea?
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        super.draggingExited(sender)
+        onDragLeft?()
+    }
+
+    override func draggingEnded(_ sender: any NSDraggingInfo) {
+        super.draggingEnded(sender)
+        onDragLeft?()
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()

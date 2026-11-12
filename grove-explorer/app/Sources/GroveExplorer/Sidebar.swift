@@ -42,6 +42,9 @@ struct Sidebar: View {
         }
         .frame(width: rail ? SidebarLayout.Mode.rail.width : SidebarLayout.Mode.full.width)
         .background(Color(theme.bg0))
+        // A folder dropped on the sidebar itself, between or below its rows,
+        // becomes a favourite; on a row it goes into that place.
+        .onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, target: .favourites))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Sidebar")
     }
@@ -64,6 +67,8 @@ struct Sidebar: View {
         let volume: Volume? = if case .volume(let volume) = place.kind { volume } else { nil }
         let busy = volume.map { model.ejecting.contains($0.id) } ?? false
         let pointed = hovered.wrappedValue == place.id
+        // A drag of files is over the row: it would drop into this place.
+        let marked = model.dropMark == .place(place.id)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: GroveSpace.s8) {
                 icon(place)
@@ -80,9 +85,10 @@ struct Sidebar: View {
             .frame(maxWidth: .infinity, alignment: rail ? .center : .leading)
             .frame(height: BarMetrics.control)
             .background(
-                lit ? theme.selectedFill(on: .base) : pointed ? theme.hoverFill(on: .base) : .clear,
+                lit ? theme.selectedFill(on: .base) : pointed || marked ? theme.hoverFill(on: .base) : .clear,
                 in: RoundedRectangle(cornerRadius: GroveRadius.control))
-            .lightOutline(cornerRadius: GroveRadius.control, when: lit)
+            .lightOutline(cornerRadius: GroveRadius.control, when: lit && !marked)
+            .dropOutline(marked)
             // The keyboard is here (⌥⌘←): the focus box, on the row's edge.
             .focusBox(cursor, cornerRadius: GroveRadius.control, outset: 0)
             .contentShape(Rectangle())
@@ -96,10 +102,15 @@ struct Sidebar: View {
             .accessibilityAddTraits(lit ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.open(place) }
             .contextMenu {
-                if place.kind == .favourite {
-                    Button("Remove from Sidebar") { model.removeFavourite(id: String(place.id.dropFirst("favourite.".count))) }
+                if place.kind != .trash {
+                    Button("Open in New Tab") { model.open(place, inNewTab: true) }
+                }
+                if let favourite = favourite(place) {
+                    Button("Remove from Sidebar") { model.removeFavourite(id: favourite) }
                 }
             }
+            .onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, target: dropTarget(place)))
+            .draggedOut(favourite(place), model: model)
             // The eject that failed (spec §13): why, under the row, until the next try.
             if let volume, let failure = model.ejectFailures[volume.id], !rail {
                 theme.marked(failure, theme.orange, size: GroveType.finePrint)
@@ -110,6 +121,17 @@ struct Sidebar: View {
                     .padding(.top, GroveSpace.s2).padding(.bottom, GroveSpace.s4)
             }
         }
+    }
+
+    /// The favourite's id in the config, for a favourite's row.
+    private func favourite(_ place: Place) -> String? {
+        place.kind == .favourite ? String(place.id.dropFirst("favourite.".count)) : nil
+    }
+
+    /// Files dropped on a row go into its place; the Trash takes none
+    /// (⌘⌫ is the way there).
+    private func dropTarget(_ place: Place) -> FileDropDelegate.Target {
+        place.kind == .trash ? .nothing : .folder(place.url, mark: .place(place.id), side: nil, tab: nil)
     }
 
     @ViewBuilder private func icon(_ place: Place) -> some View {
@@ -163,4 +185,43 @@ struct Sidebar: View {
 
     /// The row an eject button is in: the pointer is still over that row when it leaves the button.
     private func place(_ volume: Volume) -> String { "volume." + volume.id }
+}
+
+extension View {
+    /// The mark of the place a drag of files would drop into: a 1 pt green
+    /// line round the control (with the hover fill, which the caller draws).
+    func dropOutline(_ marked: Bool) -> some View {
+        overlay {
+            if marked { DropOutline() }
+        }
+    }
+
+    /// A favourite's row can be dragged out of the sidebar: let go over the
+    /// panes, the favourite is removed (`WindowView`). What it carries is
+    /// no file, so nothing takes it for one.
+    @ViewBuilder fileprivate func draggedOut(_ favourite: String?, model: AppModel) -> some View {
+        if let favourite {
+            onDrag {
+                model.drags.favourite = favourite
+                let provider = NSItemProvider()
+                provider.registerDataRepresentation(
+                    forTypeIdentifier: AppModel.favouriteDrag.identifier, visibility: .ownProcess
+                ) { done in
+                    done(Data(favourite.utf8), nil)
+                    return nil
+                }
+                return provider
+            }
+        } else {
+            self
+        }
+    }
+}
+
+private struct DropOutline: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(Color(theme.green), lineWidth: 1)
+    }
 }

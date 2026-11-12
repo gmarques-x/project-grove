@@ -56,6 +56,8 @@ struct TabStrip: View {
 
     private func tab(_ tab: GroveExplorerCore.Tab, at index: Int, current: Bool, closes: Bool) -> some View {
         let pointed = hovered.wrappedValue == tab.id || model.tabPointerStandIn[side] == index
+        // A drag of files is over the tab: it would drop into its folder.
+        let marked = model.dropMark == .tab(tab.id)
         return Text(verbatim: tab.title)
             .font(GroveFont.mono(GroveType.label))
             .foregroundStyle(current ? Color(theme.fg) : theme.quiet)
@@ -64,9 +66,10 @@ struct TabStrip: View {
             .padding(.leading, GroveSpace.s24).padding(.trailing, GroveSpace.s16)
             .frame(height: BarMetrics.control)
             .background(
-                current ? theme.selectedFill(on: .base) : pointed ? theme.hoverFill(on: .base) : .clear,
+                current ? theme.selectedFill(on: .base) : pointed || marked ? theme.hoverFill(on: .base) : .clear,
                 in: RoundedRectangle(cornerRadius: GroveRadius.control))
-            .lightOutline(cornerRadius: GroveRadius.control, when: current)
+            .lightOutline(cornerRadius: GroveRadius.control, when: current && !marked)
+            .dropOutline(marked)
             .contentShape(Rectangle())
             .onTapGesture { model.showTab(index, in: side) }
             .accessibilityElement(children: .ignore)
@@ -90,5 +93,10 @@ struct TabStrip: View {
                 if inside { hovered.wrappedValue = tab.id } else if hovered.wrappedValue == tab.id { hovered.wrappedValue = nil }
             }
             .help(tab.folder.path)
+            // Files dropped on a tab go into its folder; a drag held over a
+            // tab that isn't showing brings it forward after a second.
+            .onDrop(of: [.fileURL], delegate: FileDropDelegate(
+                model: model,
+                target: .folder(tab.folder, mark: .tab(tab.id), side: side, tab: (tab.id, index))))
     }
 }

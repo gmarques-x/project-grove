@@ -241,13 +241,24 @@ extension AppModel {
 
     // MARK: Favourites
 
-    /// Takes a favourite out of the sidebar and writes the list to
-    /// `explorer.local.toml`, the one config file the app writes. The list
-    /// written is made from the two files as they are now, every favourite
-    /// in them: not from the window's own, which leaves out the folders
-    /// that weren't there at launch (a disk not mounted) and knows nothing
-    /// of what was added to the files since.
+    /// Takes a favourite out of the sidebar.
     func removeFavourite(id: String) {
+        changeFavourites { $0.filter { $0.id != id } }
+    }
+
+    /// Folders dragged onto the sidebar: each becomes a favourite, at the
+    /// end, unless it is one already.
+    func addFavourites(_ folders: [URL]) {
+        changeFavourites { Favourites.adding(folders, to: $0) }
+    }
+
+    /// Changes the favourites and writes the list to `explorer.local.toml`,
+    /// the one config file the app writes. The list changed and written is
+    /// made from the two files as they are now, every favourite in them:
+    /// not from the window's own, which leaves out the folders that weren't
+    /// there at launch (a disk not mounted) and knows nothing of what was
+    /// added to the files since.
+    private func changeFavourites(_ change: ([Favourite]) -> [Favourite]) {
         guard live else { return }
         let folder = home.appendingPathComponent(".config/grove-explorer", isDirectory: true)
         let local = folder.appendingPathComponent("explorer.local.toml")
@@ -256,11 +267,15 @@ extension AppModel {
             // A local file that is there and can't be read is not taken for no file.
             let existing = FileManager.default.fileExists(atPath: local.path)
                 ? try String(contentsOf: local, encoding: .utf8) : nil
-            let kept = ExplorerConfig.allFavourites(tracked: tracked, local: existing, home: home).filter { $0.id != id }
-            let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: existing)
+            let before = ExplorerConfig.allFavourites(tracked: tracked, local: existing, home: home)
+            let after = change(before)
+            guard after != before else { return }
+            let text = try ExplorerConfig.localText(favourites: after, home: home, keeping: existing)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(text.utf8).write(to: local, options: .atomic)
-            config.favourites.removeAll { $0.id == id }
+            // The window's own list: without what went, with what is new.
+            let kept = Set(after.map(\.id)), old = Set(before.map(\.id))
+            config.favourites = config.favourites.filter { kept.contains($0.id) } + after.filter { !old.contains($0.id) }
             writeProblem = nil
         } catch let refused as ConfigWriteRefused {
             writeProblem = refused.description

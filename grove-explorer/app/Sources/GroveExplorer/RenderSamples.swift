@@ -45,6 +45,8 @@ enum Sample {
         var rename: String?
         var renameText: String?
         var renameReason: String?
+        /// The right pane's row of this name is where a drag would drop.
+        var dropRow: String?
     }
 
     static let backup = Volume(url: URL(fileURLWithPath: "/Volumes/Backup", isDirectory: true), name: "Backup", ejectable: true)
@@ -111,6 +113,9 @@ enum Sample {
             model.work.rename = RenameState(
                 id: UUID(), side: .left, url: entry.url, name: entry.name, isFolder: entry.kind == .folder,
                 reason: extras.renameReason, standIn: extras.renameText)
+        }
+        if let name = extras.dropRow, let entry = entries[.right]?.first(where: { $0.name == name }) {
+            model.dropMark = .row(.right, entry.url)
         }
         return model
     }

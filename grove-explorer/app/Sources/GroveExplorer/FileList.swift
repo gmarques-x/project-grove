@@ -65,6 +65,7 @@ struct FileList: NSViewRepresentable {
             coordinator, selector: #selector(Coordinator.scrolled(_:)), name: NSView.boundsDidChangeNotification,
             object: scroll.contentView)
         coordinator.table = table
+        coordinator.setUpDragging(table)
         return scroll
     }
 
@@ -82,11 +83,12 @@ struct FileList: NSViewRepresentable {
     /// shows and brings them in line with the model on every update.
     @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
-        private let model: AppModel
-        private let side: Side
+        let model: AppModel
+        let side: Side
         weak var table: FileTableView?
 
-        private var entries: [Entry] = []
+        /// The rows the table shows now.
+        private(set) var entries: [Entry] = []
         private var revision = -1
         private var columns: ListColumns?
         private var theme: ThemeColors?
@@ -189,6 +191,7 @@ struct FileList: NSViewRepresentable {
             if let url = model.takeReveal(for: side), let row = listing?.rows[url], row < table.numberOfRows {
                 table.scrollRowToVisible(row)
             }
+            putDropMark()
             let renaming = model.work.rename.flatMap { $0.side == side ? $0 : nil }
             rename.update(renaming, row: renaming.flatMap { listing?.rows[$0.url] }, in: table, theme: model.colors)
             takeKeyboardIfAsked(table, active: active)
@@ -258,6 +261,7 @@ struct FileList: NSViewRepresentable {
             view.theme = model.colors
             view.paneIsActive = paneIsActive
             view.isUnderPointer = row == table?.pointerRow
+            view.isDropTarget = row == table?.dropRow
             return view
         }
 

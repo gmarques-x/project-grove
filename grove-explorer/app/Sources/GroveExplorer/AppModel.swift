@@ -60,6 +60,9 @@ final class AppModel: ObservableObject {
     @Published var writeProblem: String?
     /// Goes up when the active pane's list should take the keyboard (again).
     @Published var listFocus = 1
+    /// The place a drag of files is over (`DragDrop.swift`).
+    @Published var dropMark: DropMark?
+    let drags = DragState()
 
     /// Renders only: the row, the tab and the sidebar row drawn as under
     /// the pointer, and icons for volumes that aren't there.

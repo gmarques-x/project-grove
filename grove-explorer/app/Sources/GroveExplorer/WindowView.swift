@@ -76,6 +76,8 @@ struct WindowView: View {
                 }
             }
             .coordinateSpace(name: PaneDivider.space)
+            // A favourite's row dragged out of the sidebar and let go here: it is removed.
+            .onDrop(of: [AppModel.favouriteDrag], isTargeted: nil) { _ in model.removeDraggedFavourite() }
         }
     }
 
