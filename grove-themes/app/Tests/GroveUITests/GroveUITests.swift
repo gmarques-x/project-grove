@@ -4,9 +4,9 @@ import Testing
 @testable import GroveUI
 
 @Suite struct GroveUITests {
-    /// The sixteen colours `ThemeColors` reads from a palette.
+    /// The seventeen colours `ThemeColors` reads from a palette.
     static let keys = ["bg0", "bg1", "bg2", "bg3", "fg", "grey1", "red", "orange", "yellow", "green", "aqua",
-                       "blue", "purple", "border", "on_accent", "dim"]
+                       "blue", "purple", "border", "on_accent", "dim", "lockup_ink"]
 
     /// grove-themes/app.
     static let package = URL(fileURLWithPath: #filePath)
@@ -37,6 +37,22 @@ import Testing
         for key in Self.keys { #expect(colors[key] != nil, "\(key) is not in the theme file") }
         #expect(ThemeColors.fallback == ThemeColors(palette: Palette(name: "Dark Medium", appearance: "dark",
                                                                      colors: colors)))
+    }
+
+    /// The stand-in for a CLI that doesn't send `lockup_ink` is what all six
+    /// theme files say. Skipped outside the repo, as above.
+    @Test func theWordmarksInkStandInIsTheThemeFiles() throws {
+        let theme = Self.package.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("grove-dotfiles/theme")
+        for appearance in ["dark", "light"] {
+            for contrast in ["hard", "medium", "soft"] {
+                let file = theme.appendingPathComponent("everforest-\(appearance)-\(contrast)")
+                guard let text = try? String(contentsOf: file, encoding: .utf8) else { return }
+                let line = try #require(text.split(separator: "\n").first { $0.hasPrefix("lockup_ink") })
+                let hex = try #require(line.split(separator: "=").last).trimmingCharacters(in: .whitespaces)
+                #expect(RGB(hex: hex) == ThemeColors.lockupInk(dark: appearance == "dark"), "\(file.lastPathComponent)")
+            }
+        }
     }
 
     /// The owner's scale: radii 4/6/10/16, spacing 2 and a 4 pt grid, text

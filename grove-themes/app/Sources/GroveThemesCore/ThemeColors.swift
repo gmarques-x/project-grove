@@ -18,7 +18,8 @@ public struct RGB: Equatable, Sendable {
     }
 }
 
-/// A scheme's palette as colours; nil unless all thirteen are there and readable.
+/// A scheme's palette as colours; nil unless all thirteen are there and readable
+/// (the roles have stand-ins).
 public struct ThemeColors: Equatable, Sendable {
     public let bg0, bg1, bg2, bg3, fg, grey1, red, orange, yellow, green, aqua, blue, purple: RGB
     /// The roles: what a colour is for, each scheme's own pick (grove-dotfiles'
@@ -28,6 +29,10 @@ public struct ThemeColors: Equatable, Sendable {
     /// sends none of them: those three stand in, so nothing changes until the
     /// CLI catches up.
     public let border, onAccent, dim: RGB
+    /// The Grove wordmark's ink (`lockup_ink`): the branding's own colour, not
+    /// an Everforest one; one for the dark schemes, one for the light. A CLI
+    /// older than the role sends none: `ThemeColors.lockupInk(dark:)`.
+    public let lockupInk: RGB
     /// The palette's `appearance` is "dark".
     public let isDark: Bool
     /// Not dark. The apps were tuned in the dark schemes: what only a pale
@@ -50,6 +55,15 @@ public struct ThemeColors: Equatable, Sendable {
         onAccent = color("on_accent") ?? bg0
         dim = color("dim") ?? grey1
         isDark = palette.appearance == "dark"
+        lockupInk = color("lockup_ink") ?? Self.lockupInk(dark: isDark)
+    }
+
+    /// What the theme files have as `lockup_ink` (ThemeColorsTests and
+    /// GroveUITests hold it to them), for a CLI that doesn't send the role
+    /// yet: DA C7 A2 on a dark scheme, 27 33 2A on a light one.
+    public static func lockupInk(dark: Bool) -> RGB {
+        dark ? RGB(red: 0xDA / 255, green: 0xC7 / 255, blue: 0xA2 / 255)
+             : RGB(red: 0x27 / 255, green: 0x33 / 255, blue: 0x2A / 255)
     }
 
     /// Quiet text's opacity. Some of it is dimmed further in the dark schemes

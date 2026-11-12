@@ -26,6 +26,7 @@ extension ThemeColors {
         "fg": "#D3C6AA", "grey1": "#859289", "red": "#E67E80", "orange": "#E69875",
         "yellow": "#DBBC7F", "green": "#A7C080", "aqua": "#83C092", "blue": "#7FBBB3",
         "purple": "#D699B6", "border": "#475258", "on_accent": "#2D353B", "dim": "#859289",
+        "lockup_ink": "#DAC7A2",
     ]))!
 
     /// For `.preferredColorScheme`, so the system's own controls match.
@@ -47,6 +48,19 @@ extension ThemeColors {
     /// strength in light (`quietOpacity`).
     public func quiet(dark opacity: Double) -> Color {
         Color(dim).opacity(quietOpacity(dark: opacity))
+    }
+
+    /// The backdrop of a panel over other apps (the cheat sheets, the
+    /// launcher): the desktop dimmed with bg0 in dark; in light bg0 would
+    /// whiten it, so the dark ink (`onAccent`), thinner.
+    public var scrim: Color {
+        isDark ? Color(bg0).opacity(0.6) : Color(onAccent).opacity(0.4)
+    }
+
+    /// The shadow of a card on the scrim: bg0 in dark; the dark ink in
+    /// light, where a bg0 shadow can't be seen.
+    public var cardShadow: Color {
+        isDark ? Color(bg0).opacity(0.5) : Color(onAccent).opacity(0.35)
     }
 
     /// Words set in an accent: the accent in dark, fg in light (`accentInk`).

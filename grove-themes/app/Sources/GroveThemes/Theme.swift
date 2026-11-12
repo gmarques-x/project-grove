@@ -5,12 +5,6 @@ import SwiftUI
 /// What only Grove Themes draws with; the shared roles, fonts and helpers
 /// are GroveUI's.
 extension ThemeColors {
-    /// The Grove lockup's ink: the branding's own colours, not the palette's.
-    var lockupInk: Color {
-        isDark ? Color(.sRGB, red: 0xDA / 255, green: 0xC7 / 255, blue: 0xA2 / 255)
-               : Color(.sRGB, red: 0x27 / 255, green: 0x33 / 255, blue: 0x2A / 255)
-    }
-
     /// A line the dark schemes draw as fg at `dark` opacity (the dropdown's
     /// tiles and divider); on a pale background that is too faint, so `border`.
     func softLine(dark opacity: Double) -> Color {

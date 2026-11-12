@@ -53,6 +53,10 @@ dim       = #829181
 hover     = #EDEADA
 # Text that steps back but is read: fg, since no grey here reaches 3.3:1.
 muted     = #5C6A72
+# The wordmark's ink ("Project Grove" and its pine, on this scheme's bg0): the
+# branding's dark ink, the same in every light scheme. The lockup's own
+# colour, not an Everforest one (near dark hard's bg0, #272E33, but not it).
+lockup_ink = #27332A
 # Terminal colors (ANSI 0-15), upstream maps normal and bright slots to the same
 # colors. Bright black (ANSI 8) is grey1 instead of upstream's fg, so dim
 # terminal text stays readable. Bright white (ANSI 15) is fg instead of

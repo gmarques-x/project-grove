@@ -18,18 +18,6 @@ extension ThemeColors {
         isDark ? accent.opacity(opacity) : accent
     }
 
-    /// The cheat sheet's backdrop: the desktop dimmed with bg0 in dark; in
-    /// light bg0 would whiten it, so the dark ink (`onAccent`), thinner.
-    var scrim: Color {
-        isDark ? Color(bg0).opacity(0.6) : Color(onAccent).opacity(0.4)
-    }
-
-    /// The cheat sheet's shadow: bg0 in dark; the dark ink in light, where a
-    /// bg0 shadow can't be seen.
-    var cardShadow: Color {
-        isDark ? Color(bg0).opacity(0.5) : Color(onAccent).opacity(0.35)
-    }
-
     /// A key's colour by palette name (BindingKind.tint).
     func named(_ name: String) -> RGB {
         switch name {

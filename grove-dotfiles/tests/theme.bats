@@ -40,7 +40,7 @@ palette_value() {
 @test "the palette's Grove additions are only the fill color, the roles and the terminal roles" {
   run sed -n '/^# Grove additions/,$p' "$GROVE_ROOT/$PALETTE_REL"
   [ "$status" -eq 0 ]
-  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|hover|muted|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
+  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|hover|muted|lockup_ink|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
 }
 
 # scheme_value SCHEME NAME: the hex for NAME in theme/everforest-SCHEME.
@@ -90,12 +90,16 @@ SCHEMES="dark-hard dark-medium dark-soft light-hard light-medium light-soft"
       [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey1)" ] || { echo "$s dim"; false; }
       [ "$(scheme_value "$s" hover)" = "$(scheme_value "$s" bg1)" ] || { echo "$s hover"; false; }
       [ "$(scheme_value "$s" muted)" = "$(scheme_value "$s" grey2)" ] || { echo "$s muted"; false; }
+      # The wordmark's ink is the branding's, not the scheme's: one paper
+      # tone on every dark scheme, one dark ink on every light one.
+      [ "$(scheme_value "$s" lockup_ink)" = "#DAC7A2" ] || { echo "$s lockup_ink"; false; }
     else
       [ "$(scheme_value "$s" border)" = "$(scheme_value "$s" bg5)" ] || { echo "$s border"; false; }
       [ "$(scheme_value "$s" on_accent)" = "$(scheme_value "dark-$c" bg0)" ] || { echo "$s on_accent"; false; }
       [ "$(scheme_value "$s" dim)" = "$(scheme_value "$s" grey2)" ] || { echo "$s dim"; false; }
       [ "$(scheme_value "$s" hover)" = "$(scheme_value "$s" bg3)" ] || { echo "$s hover"; false; }
       [ "$(scheme_value "$s" muted)" = "$(scheme_value "$s" fg)" ] || { echo "$s muted"; false; }
+      [ "$(scheme_value "$s" lockup_ink)" = "#27332A" ] || { echo "$s lockup_ink"; false; }
     fi
   done
 }

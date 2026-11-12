@@ -43,7 +43,7 @@ struct SchemeCard: View {
     }
 
     private var desktop: some View {
-        let ink = colors.lockupInk
+        let ink = Color(colors.lockupInk)
         return RoundedRectangle(cornerRadius: 6)
             .fill(Color(colors.bg0))
             .aspectRatio(16 / 9, contentMode: .fit)

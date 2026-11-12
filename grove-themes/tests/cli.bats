@@ -142,7 +142,7 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].appearance')" = light ]
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].colors.bg0')" = "#F3EAD3" ]
   [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","on_accent","orange","purple","red","yellow"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","lockup_ink","on_accent","orange","purple","red","yellow"]' ]
 }
 
 @test "list --json carries the three roles, each scheme's own pick" {
@@ -154,6 +154,13 @@ gt_copy_config() {
   # Light: bg5, the dark sibling's bg0 as ink, grey2.
   [ "$(printf '%s' "$output" | jq -c '.palettes["light-medium"].colors | [.border, .on_accent, .dim]')" = '["#BDC3AF","#2D353B","#829181"]' ]
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-hard"].colors.on_accent')" = "$(printf '%s' "$output" | jq -r '.palettes["dark-hard"].colors.bg0')" ]
+}
+
+@test "list --json carries the wordmark's ink: one on the dark schemes, one on the light" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("dark")) | .value.colors.lockup_ink] | unique')" = '["#DAC7A2"]' ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("light")) | .value.colors.lockup_ink] | unique')" = '["#27332A"]' ]
 }
 
 @test "logo prints grove by default" {

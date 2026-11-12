@@ -74,6 +74,29 @@ import Testing
         #expect(colors.dim == RGB(hex: "#ABCDEF"))
     }
 
+    /// The wordmark's ink the views drew before the role: these two literals,
+    /// by appearance. Every scheme's `lockup_ink` is the same colour, and so
+    /// is what an older CLI's palette (or an unreadable role) falls back to.
+    @Test func theWordmarksInkIsWhatTheViewsAlwaysDrew() throws {
+        let paper = RGB(red: 0xDA / 255, green: 0xC7 / 255, blue: 0xA2 / 255)
+        let ink = RGB(red: 0x27 / 255, green: 0x33 / 255, blue: 0x2A / 255)
+        let list = try GroveThemesClient.decoder.decode(SchemeList.self, from: Fixture.data("list.json"))
+        #expect(list.palettes.count == 6)
+        for (scheme, palette) in list.palettes {
+            let colors = try #require(ThemeColors(palette: palette))
+            #expect(palette.colors["lockup_ink"] == (colors.isDark ? "#DAC7A2" : "#27332A"), "\(scheme)")
+            #expect(colors.lockupInk == (colors.isDark ? paper : ink), "\(scheme)")
+        }
+        #expect(try #require(ThemeColors(palette: oldPalette("dark"))).lockupInk == paper)
+        #expect(try #require(ThemeColors(palette: oldPalette("light"))).lockupInk == ink)
+        var hex = oldPalette("light").colors
+        hex["lockup_ink"] = ""
+        #expect(try #require(ThemeColors(palette: Palette(name: "X", appearance: "light", colors: hex))).lockupInk == ink)
+        hex["lockup_ink"] = "#ABCDEF"
+        #expect(try #require(ThemeColors(palette: Palette(name: "X", appearance: "light", colors: hex))).lockupInk
+                == RGB(hex: "#ABCDEF"))
+    }
+
     @Test func darkKeepsItsTuningAndLightDropsIt() throws {
         let dark = try #require(ThemeColors(palette: oldPalette("dark")))
         let light = try #require(ThemeColors(palette: oldPalette("light")))
