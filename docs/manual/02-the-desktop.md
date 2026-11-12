@@ -2,7 +2,7 @@
 
 [Contents](README.md) · Previous: [Getting started](01-getting-started.md) · Next: [The Grove menu](03-the-grove-menu.md)
 
-Windows are tiled: they share the screen side by side with a gap between them and a coloured border on the one in focus. You move between them, and between nine numbered workspaces, with ⌥ (Option).
+Windows are tiled: they share the screen side by side with a gap between them and a coloured border on the one in focus. The borders step aside while Mission Control, App Exposé or Show Desktop is up, and come back when it ends. You move between them, and between nine numbered workspaces, with ⌥ (Option).
 
 ## Workspaces
 

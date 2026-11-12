@@ -154,6 +154,8 @@ final class AppModel: ObservableObject {
         WifiNameWriter.shared.start()
         // The apps for the Grove Launcher, so its first opening has them.
         LauncherPanel.shared.refreshApps()
+        // The window borders, hidden while Mission Control is up.
+        BordersWatcher.shared.start()
     }
 
     /// Every exit path: mapping off first, then the tap. Safe to call twice.
@@ -167,6 +169,8 @@ final class AppModel: ObservableObject {
         baseWatcher?.stop()
         writeState()
         WifiNameWriter.shared.stop()
+        // Borders hidden for an overview come back before the app goes.
+        BordersWatcher.shared.shutdown()
     }
 
     func quit() {
@@ -397,6 +401,8 @@ final class AppModel: ObservableObject {
     private func poll() {
         permissions = Permissions.current()  // a drop stops the tap in reconcile
         reconcile()
+        // Once Accessibility is granted, and again if the Dock restarted.
+        BordersWatcher.shared.ensure()
     }
 
     static let cannotStart = "Grove Keys can't watch the keyboard yet · grant the permissions, then choose Restart Grove Keys in its menu"
