@@ -172,8 +172,8 @@ private struct CheatSearchView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// The key in a cap, as the keyboard's; what it does; ↩ on the selected
-    /// row when Return runs it.
+    /// The key in a cap, as the keyboard's; what it does; the return
+    /// icon on the selected row when Return runs it.
     private func row(_ row: CheatRow, selected: Bool, _ theme: ThemeColors) -> some View {
         HStack(spacing: GroveSpace.s12) {
             Text(row.keys)
@@ -190,7 +190,7 @@ private struct CheatSearchView: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
             if selected, row.action != .none {
-                Text("↩").foregroundStyle(theme.quiet)
+                GroveIcon(.run, size: GroveType.heading).foregroundStyle(theme.quiet)
             }
         }
     }

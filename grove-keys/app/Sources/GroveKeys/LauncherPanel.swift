@@ -194,7 +194,7 @@ private struct LauncherView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if launcher.checked.contains(entry.id) {
-                    Text("✓").foregroundStyle(theme.ink(theme.green))
+                    GroveIcon(.current, size: GroveType.heading).foregroundStyle(theme.ink(theme.green))
                 }
             }
         }

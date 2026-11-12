@@ -424,13 +424,14 @@ struct BindingsView: View {
             draft.wrappedValue = Draft(group: group)
             record(row: row, from: nil, launcher: group == "launch", mode: group == "launch" ? "main" : group)
         } label: {
-            // "+ Add …": all green in dark; in light the + keeps the green.
-            (Text("+").foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
+            // The plus and "Add …": all green in dark; in light the plus keeps the green.
+            (GroveIcon.text(.add, size: GroveType.label).foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
                 .font(GroveFont.mono(GroveType.label))
                 .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 
     // MARK: Clash prompt
@@ -572,7 +573,9 @@ private struct RowView<Action: View>: View {
                 Circle().fill(Color(theme.orange)).frame(width: 7, height: 7).help(conflict)
             }
             Button(action: onRemove) {
-                Text("−").foregroundStyle(theme.quiet).frame(width: 18).contentShape(Rectangle())
+                // 18 pt wide whatever the symbol's own width, so the column stays put.
+                GroveIcon(.remove, size: GroveType.label).foregroundStyle(theme.quiet)
+                    .frame(width: 18).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Remove")

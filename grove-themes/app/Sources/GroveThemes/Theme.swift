@@ -12,13 +12,13 @@ extension ThemeColors {
     }
 }
 
-/// "● on" beside the current scheme or choice in the gallery: the dot in
+/// A dot and "on" beside the current scheme or choice in the gallery: the dot in
 /// green, the word with it in dark and in fg in light.
 struct OnMark: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        (Text("●").foregroundStyle(Color(theme.green)) + Text(" on").foregroundStyle(theme.ink(theme.green)))
+        (GroveIcon.text(.dot, size: GroveType.label).foregroundStyle(Color(theme.green)) + Text(" on").foregroundStyle(theme.ink(theme.green)))
             .font(GroveFont.mono(GroveType.label))
     }
 }

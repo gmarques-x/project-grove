@@ -15,10 +15,10 @@ public struct GroveSelectOption<Value: Hashable>: Identifiable {
 
 /// Grove's one select: a label in JetBrains Mono that opens a native menu
 /// of the values, the current one ticked by the system (an inline `Picker`
-/// inside the `Menu`). The label is the standard pill, "value ▾"
-/// (`GroveSelectPill`), or the caller's own (a Monitors cell). VoiceOver
-/// reads a pop-up button named `name` whose value is the current one; the
-/// typed ▾ is not read.
+/// inside the `Menu`). The label is the standard pill, the value and a
+/// chevron (`GroveSelectPill`), or the caller's own (a Monitors cell).
+/// VoiceOver reads a pop-up button named `name` whose value is the current
+/// one; the chevron is not read.
 ///
 /// Not `Picker(.menu)`, on purpose: the native pop-up button draws its label
 /// in the system font whatever `.font` says, and at its smallest is wider
@@ -69,7 +69,7 @@ public struct GroveSelect<Value: Hashable, Label: View>: View {
 }
 
 extension GroveSelect where Label == GroveSelectPill {
-    /// With the standard pill: the selected option's title and ▾.
+    /// With the standard pill: the selected option's title and the chevron.
     public init(_ name: String, options: [GroveSelectOption<Value>], selection: Value?,
                 onSelect: @escaping (Value) -> Void) {
         let title = options.first { $0.value == selection }?.title ?? ""
@@ -79,8 +79,8 @@ extension GroveSelect where Label == GroveSelectPill {
     }
 }
 
-/// The standard label of a `GroveSelect`: "value ▾" on a bg0 pill with a
-/// `border` outline.
+/// The standard label of a `GroveSelect`: the value and `GroveIcon`'s menu
+/// chevron on a bg0 pill with a `border` outline.
 public struct GroveSelectPill: View {
     let text: String
     @Environment(\.theme) private var theme
@@ -90,7 +90,7 @@ public struct GroveSelectPill: View {
     }
 
     public var body: some View {
-        Text(text + " ▾")
+        (Text(text + " ") + GroveIcon.text(.menu, size: GroveType.label))
             .font(GroveFont.mono(GroveType.label))
             .foregroundStyle(Color(theme.fg))
             .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)

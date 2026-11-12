@@ -31,7 +31,7 @@ struct SchemeCard: View {
             }
             .padding(GroveSpace.s8)
             .overlay {
-                // Current: a 1 pt green line and "● on". The 2 pt green box is the focus only.
+                // Current: a 1 pt green line and the dot and "on". The 2 pt green box is the focus only.
                 shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1)
             }
             .contentShape(shape)

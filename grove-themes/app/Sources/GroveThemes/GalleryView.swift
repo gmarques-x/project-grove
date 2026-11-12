@@ -26,7 +26,7 @@ struct GalleryView: View {
             GroveWindowHeader("Grove Themes") { status(theme) }
             VStack(alignment: .leading, spacing: GroveSpace.s16) {
                 if let error = model.error {
-                    theme.marked(error.message, theme.red)
+                    theme.marked(error.message, theme.red, size: GroveType.label)
                         .font(GroveFont.mono(GroveType.label))
                         .fixedSize(horizontal: false, vertical: true)
                 }

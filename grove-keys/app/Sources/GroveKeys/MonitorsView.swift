@@ -55,7 +55,7 @@ struct MonitorsView: View {
         } label: {
             VStack(spacing: GroveSpace.s4) {
                 Text(String(n)).font(GroveFont.mono(GroveType.heading, .semibold)).foregroundStyle(theme.ink(theme.green))
-                Text((target ?? "main") + " ▾")
+                (Text((target ?? "main") + " ") + GroveIcon.text(.menu, size: GroveType.finePrint))
                     .font(GroveFont.mono(GroveType.finePrint))
                     .foregroundStyle(theme.quiet)
                     .lineLimit(1).truncationMode(.middle)

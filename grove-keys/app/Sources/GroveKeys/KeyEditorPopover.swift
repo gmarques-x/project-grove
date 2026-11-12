@@ -85,7 +85,7 @@ struct KeyEditorPopover: View {
             }
             segments
             if !model.canEdit {
-                theme.marked(model.redLine ?? "keys.toml isn't loaded yet", theme.red)
+                theme.marked(model.redLine ?? "keys.toml isn't loaded yet", theme.red, size: GroveType.label)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Group {

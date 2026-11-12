@@ -94,10 +94,12 @@ extension ThemeColors {
 
     /// A sentence in an accent colour (an error in red, a warning in orange).
     /// Dark: as it was. Light: the accents are 1.9 to 3.3:1 as text, so a dot
-    /// carries the colour and the sentence is fg.
-    public func marked(_ text: String, _ accent: RGB) -> Text {
+    /// carries the colour and the sentence is fg. `size`: the size the
+    /// sentence is set in, for the dot (`GroveIcon`'s rule).
+    public func marked(_ text: String, _ accent: RGB, size: CGFloat = GroveType.body) -> Text {
         guard isLight else { return Text(text).foregroundStyle(Color(accent)) }
-        return (Text("● ").foregroundStyle(Color(accent)) + Text(verbatim: text)).foregroundStyle(Color(fg))
+        return (GroveIcon.text(.dot, size: size).foregroundStyle(Color(accent)) + Text(verbatim: " " + text))
+            .foregroundStyle(Color(fg))
     }
 }
 

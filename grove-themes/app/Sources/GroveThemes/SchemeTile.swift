@@ -34,15 +34,14 @@ struct SchemeTile: View {
                 if isBusy {
                     ProgressView().controlSize(.small).padding(GroveSpace.s4)
                 } else if isCurrent {
-                    Text("✓")
-                        .font(GroveFont.mono(GroveType.body, .bold))
+                    GroveIcon(.current, size: GroveType.body, weight: .bold)
                         .foregroundStyle(Color(colors.fg))
                         .padding(.top, GroveSpace.s8)
                         .padding(.trailing, GroveSpace.s8)
                 }
             }
             .overlay {
-                // Current: a 1 pt green line and the ✓. The 2 pt green box is the focus only.
+                // Current: a 1 pt green line and the tick. The 2 pt green box is the focus only.
                 shape.strokeBorder(isCurrent ? Color(theme.green) : theme.softLine(dark: 0.22), lineWidth: 1)
             }
             .contentShape(shape)

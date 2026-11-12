@@ -49,7 +49,7 @@ private func configFolder() -> URL {
 
 /// One choice in the gallery (a terminal logo or a wallpaper set): its image
 /// on a small panel in the current scheme, then its name; green border when
-/// (1 pt) and "● on" when chosen.
+/// (1 pt) and the dot and "on" when chosen.
 struct ChoiceCard: View {
     /// What is being chosen, for VoiceOver: "Terminal logo", "Wallpaper".
     let kind: String
@@ -92,7 +92,7 @@ struct ChoiceCard: View {
             }
             .padding(GroveSpace.s8)
             .overlay {
-                // Current: a 1 pt green line and "● on". The 2 pt green box is the focus only.
+                // Current: a 1 pt green line and the dot and "on". The 2 pt green box is the focus only.
                 shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1)
             }
             .contentShape(shape)

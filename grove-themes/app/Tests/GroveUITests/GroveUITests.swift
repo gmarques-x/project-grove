@@ -69,6 +69,13 @@ import Testing
         #expect(TintStrength.cap.rawValue == 0.16)
     }
 
+    /// Grove's icons, and the SF Symbol each one is (the owner's choice from
+    /// the renders of 2026-11-12).
+    @Test func theIconsAreTheseSymbols() {
+        #expect(GroveIcon.Name.allCases.map(\.symbol)
+            == ["minus", "plus", "chevron.down", "checkmark", "return", "circle.fill"])
+    }
+
     // MARK: WindowHeaderMetrics
 
     /// The buttons as macOS 27 puts them in an 800 × 600 window without a
