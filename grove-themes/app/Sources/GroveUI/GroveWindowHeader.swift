@@ -112,3 +112,35 @@ extension GroveWindowHeader where Middle == EmptyView {
         self.init(name, middle: { EmptyView() }, trailing: trailing)
     }
 }
+
+/// Lets a window's content run to its top edge, under the window buttons,
+/// without making the window taller. `.ignoresSafeArea(.container, edges:
+/// .top)` alone does the first half: SwiftUI still sizes the window as the
+/// content plus the hidden title bar, so that much empty space is left under
+/// the content (both Grove windows had about 28 pt too much at the bottom).
+/// This takes the title bar's height, measured from the window, off the
+/// height the content reports.
+private struct RunsUnderTitleBar: ViewModifier {
+    /// `State` used directly: the Command Line Tools ship no SwiftUI macros.
+    /// 28 pt is the title bar on macOS 27, worn until the window is measured.
+    private var titleBar = State(initialValue: CGFloat(28))
+
+    func body(content: Content) -> some View {
+        // Pulled up by the title bar's height instead of ignoring the safe
+        // area: the content then reports its own height less the title bar,
+        // and the window (that plus the title bar) comes out exactly as tall
+        // as the content.
+        content
+            .padding(.top, -titleBar.wrappedValue)
+            .background(WindowAccessor { [titleBar] window in
+                let height = window.frame.height - window.contentLayoutRect.height
+                if (1...80).contains(height), height != titleBar.wrappedValue { titleBar.wrappedValue = height }
+            })
+    }
+}
+
+extension View {
+    /// The content runs under the window's buttons (a window without a title
+    /// bar) and the window is exactly as tall as the content.
+    public func runsUnderTitleBar() -> some View { modifier(RunsUnderTitleBar()) }
+}

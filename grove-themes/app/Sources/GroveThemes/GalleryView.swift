@@ -97,7 +97,7 @@ struct GalleryView: View {
             case .openWindow, .quit: break
             }
         }
-        .ignoresSafeArea(.container, edges: .top)
+        .runsUnderTitleBar()
         .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())

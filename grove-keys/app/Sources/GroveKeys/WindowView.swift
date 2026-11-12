@@ -54,7 +54,7 @@ struct WindowView: View {
             }
         }
         .frame(width: Self.width, alignment: .top)
-        .ignoresSafeArea(.container, edges: .top)
+        .runsUnderTitleBar()
         .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())
