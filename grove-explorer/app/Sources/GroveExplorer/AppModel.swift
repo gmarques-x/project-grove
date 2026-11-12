@@ -103,6 +103,8 @@ final class AppModel: ObservableObject {
     private var partsCache: [String: [PathBar.Part]] = [:]
     private var revision = 0
     private var loads: [Side: Int] = [:]
+    /// One read of a pane's folder at a time (`ReadGate`).
+    private var reads: [Side: ReadGate] = [:]
     private var sorts: [Side: Int] = [:]
     var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
     let sizeQueue = SizeQueue()
@@ -233,6 +235,7 @@ final class AppModel: ObservableObject {
                     shownKeys[side] = nil
                     listings[side] = nil
                     loads[side] = (loads[side] ?? 0) + 1
+                    reads[side] = nil
                     watchers[side]?.watcher.stop()
                     watchers[side] = nil
                 }
@@ -447,14 +450,18 @@ final class AppModel: ObservableObject {
 
     // MARK: Reading
 
-    /// Reads the pane's folder and sorts it, off the main thread; the pane
-    /// keeps what it shows until then. The folder is watched from here on.
+    /// Reads the pane's folder and sorts it, off the main thread; a pane
+    /// that shows this folder already keeps its rows until then. The
+    /// folder is watched from here on.
+    /// A read begun here makes one still in flight void: for the pane
+    /// going to another folder, not for a watcher's tick (`changed`).
     func load(_ side: Side) {
         guard let tab = browser.tab(side) else { return }
         let folder = tab.folder, asked = arrangement(for: tab)
         let sizes = sizes, sizesWere = sizesVersion
         let number = (loads[side] ?? 0) + 1
         loads[side] = number
+        reads[side, default: ReadGate()].begin(folder)
         watch(folder, for: side)
         Task {
             let read = await Task.detached { FolderListing.read(by: asked, sizes: sizes) }.value
@@ -504,6 +511,8 @@ final class AppModel: ObservableObject {
                 arrange(side)
             }
             wantSizes()
+            // The folder changed while it was read: once more, now.
+            if reads[side]?.landed(folder) == true { load(side) }
         }
     }
 
@@ -572,7 +581,9 @@ final class AppModel: ObservableObject {
     private func changed(_ folder: URL, in side: Side) {
         guard let tab = browser.tab(side), tab.folder.standardizedFileURL.path == folder.standardizedFileURL.path
         else { return }
-        load(side)
+        // Not while a read of it is in flight: that one's landing reads
+        // again, once, however many ticks came meanwhile.
+        if reads[side, default: ReadGate()].changed(folder) { load(side) }
         sizeQueue.changed(folder)
     }
 }
