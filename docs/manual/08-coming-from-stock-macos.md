@@ -1,6 +1,6 @@
 # 8. Coming from stock macOS
 
-[Contents](README.md) · Previous: [Updates and undo](07-updates-and-undo.md)
+[Contents](README.md) · Previous: [Updates and undo](07-updates-and-undo.md) · Next: [Files](09-files.md)
 
 Most of macOS is untouched. This is where the things Grove moved have gone.
 
@@ -24,7 +24,7 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 | Force Quit | ⌥⌘Esc, as before, or Apple menu › Force Quit |
 | Screenshots | ⌘⇧3, ⌘⇧4, ⌘⇧5, as before |
 | Terminal | Ghostty; ⌃` from anywhere. See [The terminal](06-the-terminal.md) |
-| Finder | Unchanged, and its windows float. In a terminal, `y` opens Yazi |
+| Finder | Unchanged, and its windows float. Pine › Files opens Grove Explorer, a file browser with two panes, tabs and Finder's keys, whose window is tiled; see [Files](09-files.md). In a terminal, `y` opens Yazi |
 
 ## What you cannot reach yet
 

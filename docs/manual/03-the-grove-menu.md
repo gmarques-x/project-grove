@@ -12,6 +12,7 @@ One menu reaches everything Grove can do. Open it two ways:
 | Row | What is inside |
 | --- | --- |
 | **Appearance** | Grove Themes… (the gallery), then the six schemes; the current one has a ✓. See [Themes](04-themes.md) |
+| **Files** | Opens Grove Explorer, the file browser. See [Files](09-files.md) |
 | **Grove Keys** | Open Grove Keys (the keyboard window), Show cheat sheet, Pause Hyper / Resume Hyper. If Grove Keys is missing a permission, a line here says so and opens the right pane in System Settings |
 | **Update** | Check, Update Grove, Run the Installer. See [Updates and undo](07-updates-and-undo.md) |
 | **Learn** | Keybindings (the cheat sheet), The Grove Manual, and the AeroSpace, Ghostty and Yazi documentation |

@@ -12,6 +12,7 @@ For someone who has just installed Project Grove and wants to know what to press
 | [6. The terminal](06-the-terminal.md) | Ghostty, the prompt, the shell's shortcuts, and Yazi |
 | [7. Updates and undo](07-updates-and-undo.md) | `grove update`, `grove check`, `grove about`, "needs you", and removing Grove |
 | [8. Coming from stock macOS](08-coming-from-stock-macos.md) | Where the menu bar, the Dock, Mission Control and the status menus went |
+| [9. Files](09-files.md) | Grove Explorer: two panes and tabs, Finder's keys, copying between panes, undo, and what stays in Finder |
 
 ## Keys used in this manual
 
