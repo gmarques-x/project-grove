@@ -129,32 +129,14 @@ enum Render {
         ("folder-marks", Scene(size: CGSize(width: 474, height: 300), panes: [Sample.knownFolders()])),
     ]
 
+    static var stateNames: String { scenes.map(\.name).joined(separator: ", ") }
+
     static func run(_ arguments: [String]) -> Never {
-        let names = scenes.map(\.name).joined(separator: ", ")
         guard arguments.count == 2 || arguments.count == 3 else {
-            fail("usage: GroveExplorer --render <state> <out.png> [scheme]\nstates: \(names)")
-        }
-        guard let scene = scenes.first(where: { $0.name == arguments[0] })?.scene else {
-            fail("no state named \(arguments[0]); there are: \(names)")
+            fail("usage: GroveExplorer --render <state> <out.png> [scheme]\nstates: \(stateNames)")
         }
         let colors = theme(arguments.count == 3 ? arguments[2] : "dark-medium")
-
-        let app = NSApplication.shared
-        app.setActivationPolicy(.prohibited)
-        GroveIcons.load()
-        if let problem = GroveIcons.problem { fail(problem) }
-
-        let model = Sample.model(panes: scene.panes, showHidden: scene.showHidden, colors: colors, extras: scene.extras)
-        // Every command has its action, or the program stops here.
-        _ = CommandTable.all
-        let size = scene.size
-        let view = WindowView(model: model).content
-            .frame(width: size.width, height: size.height)
-            .overlay(alignment: .topLeading) { WindowButtonsStandIn() }
-            .clipShape(RoundedRectangle(cornerRadius: GroveRadius.window))
-            .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(colors.line, lineWidth: 1))
-            .environment(\.theme, colors)
-        let hosting = offscreen(view, size: size, colors: colors)
+        let (hosting, size, _) = window(showing: arguments[0], colors: colors)
         guard let bitmap = NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -169,6 +151,30 @@ enum Render {
         }
         print("\(arguments[1]) \(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
         exit(0)
+    }
+
+    /// The window of the state named `state`, on its sample data, laid out
+    /// in a window that is never shown; the app is never started
+    /// (activation policy `.prohibited`). For a render and for the
+    /// accessibility audit.
+    static func window(showing state: String, colors: ThemeColors) -> (view: NSView, size: CGSize, model: AppModel) {
+        guard let scene = scenes.first(where: { $0.name == state })?.scene else {
+            fail("no state named \(state); there are: \(stateNames)")
+        }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.prohibited)
+        GroveIcons.load()
+        if let problem = GroveIcons.problem { fail(problem) }
+
+        let model = Sample.model(panes: scene.panes, showHidden: scene.showHidden, colors: colors, extras: scene.extras)
+        let size = scene.size
+        let view = WindowView(model: model).content
+            .frame(width: size.width, height: size.height)
+            .overlay(alignment: .topLeading) { WindowButtonsStandIn() }
+            .clipShape(RoundedRectangle(cornerRadius: GroveRadius.window))
+            .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(colors.line, lineWidth: 1))
+            .environment(\.theme, colors)
+        return (offscreen(view, size: size, colors: colors), size, model)
     }
 
     /// `view` laid out and drawn in a window that is never shown.
