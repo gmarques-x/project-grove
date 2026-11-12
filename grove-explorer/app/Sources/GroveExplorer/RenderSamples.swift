@@ -36,6 +36,8 @@ enum Sample {
         /// What the status bar of `statusSide` says of an operation.
         var status: PaneStatus?
         var statusSide = Side.left
+        /// What that pane's status bar says for a few seconds meanwhile.
+        var notice: String?
         /// The list of failed items is open over that pane.
         var failuresShown = false
         /// The conflict prompt is up.
@@ -111,6 +113,7 @@ enum Sample {
             model.pathField = PathFieldState(side: extras.active, text: text, missing: extras.pathMissing)
         }
         if let status = extras.status { model.work.statuses[extras.statusSide] = status }
+        if let notice = extras.notice { model.notices[extras.statusSide] = notice }
         if extras.failuresShown { model.work.failuresShown = extras.statusSide }
         model.work.prompt = extras.prompt
         if let name = extras.rename, let entry = entries[.left]?.first(where: { $0.name == name }) {

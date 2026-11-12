@@ -35,6 +35,9 @@ struct StatusBar: View {
             // another operation's meter runs is otherwise never seen.
             if let notice {
                 theme.marked(notice, theme.orange).truncationMode(.middle)
+                // Over a running operation only its words and its bar give
+                // way: how far it is and the way to stop it stay.
+                if case let .running(_, _, _, percent)? = status { percentAndCancel(percent) }
             } else if case let .running(_, words, fraction, percent)? = status {
                 running(words, fraction, percent)
             } else if case let .done(summary, changed, hint)? = status {
@@ -74,6 +77,10 @@ struct StatusBar: View {
         .accessibilityElement()
         .accessibilityLabel("Progress")
         .accessibilityValue(percent)
+        percentAndCancel(percent)
+    }
+
+    @ViewBuilder private func percentAndCancel(_ percent: String) -> some View {
         Text(verbatim: percent).fixedSize()
         PanelButton("Cancel", icon: .close, action: onCancel)
             .help("Stop after the file it is on")
