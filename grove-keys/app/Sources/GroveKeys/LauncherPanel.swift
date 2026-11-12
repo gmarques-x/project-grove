@@ -8,7 +8,9 @@ import SwiftUI
 /// and every row of the Grove menu that does something, in a panel over the
 /// focused screen, filtered as you type (`LauncherFilter`). ↑/↓ move, Return
 /// opens the app or runs the row and closes, Escape or a click outside the
-/// card closes. macOS has no such control; this is Grove's one.
+/// card closes. macOS has no such control; the panel, the field, the card and
+/// the rows are GroveUI's key panel, and what is in a row and what Return
+/// does are here.
 @MainActor
 final class LauncherPanel: ObservableObject {
     static let shared = LauncherPanel()
@@ -19,7 +21,7 @@ final class LauncherPanel: ObservableObject {
         didSet { refilter() }
     }
     @Published private(set) var results: [LauncherItem] = []
-    @Published private(set) var selection = 0
+    @Published private(set) var selection = KeyPanelSelection<String>()
     /// The ids of the rows whose `checked` test has succeeded.
     @Published private(set) var checked: Set<String> = []
 
@@ -29,7 +31,7 @@ final class LauncherPanel: ObservableObject {
     private var apps: [InstalledApps.App] = []
     private var scanning = false
     private let icons = NSCache<NSString, NSImage>()
-    private let host = KeyPanelHost()
+    private let host = KeyPanelHost { PointerMenu.shared.previousApp }
     /// Counts openings, so a test started by an earlier one ticks nothing.
     private var opening = 0
 
@@ -70,21 +72,19 @@ final class LauncherPanel: ObservableObject {
             apps = scanned
             // Typed already: the list on screen is brought up to date, the selection kept.
             if host.isOpen, !query.isEmpty {
-                let selected = results.indices.contains(selection) ? results[selection].id : nil
                 results = found(for: query)
-                selection = selected.flatMap { id in results.firstIndex { $0.id == id } } ?? 0
+                selection.show(results.map(\.id), keepingSelection: true)
             }
         }
     }
 
     func move(_ step: Int) {
-        guard !results.isEmpty else { return }
-        selection = min(max(selection + step, 0), results.count - 1)
+        selection.move(step)
     }
 
     func runSelection() {
-        guard results.indices.contains(selection) else { return }
-        run(results[selection])
+        guard let index = selection.index, results.indices.contains(index) else { return }
+        run(results[index])
     }
 
     func run(_ item: LauncherItem) {
@@ -118,11 +118,11 @@ final class LauncherPanel: ObservableObject {
 
     private func refilter() {
         results = found(for: query)
-        selection = 0
+        selection.show(results.map(\.id))
     }
 }
 
-/// The scrim and the card: the field, a line, the rows.
+/// The launcher in GroveUI's key panel: the rows, or "Nothing matches".
 private struct LauncherView: View {
     @ObservedObject var launcher: LauncherPanel
     @ObservedObject var model: AppModel
@@ -135,29 +135,10 @@ private struct LauncherView: View {
 
     var body: some View {
         let theme = model.colors
-        GeometryReader { screen in
-            ZStack(alignment: .top) {
-                theme.scrim
-                    .contentShape(Rectangle())
-                    .onTapGesture { launcher.close() }
-                card(theme)
-                    // From a fixed height, so the field stays put as the list shrinks.
-                    .padding(.top, screen.size.height * 0.22)
-            }
-        }
-        .font(GroveFont.mono(GroveType.heading))
-        .environment(\.theme, theme)
-        .preferredColorScheme(theme.colorScheme)
-    }
-
-    private func card(_ theme: ThemeColors) -> some View {
-        VStack(spacing: 0) {
-            FilterField(text: launcher.query, placeholder: "Open an app, or find a Grove menu row", theme: theme,
-                        onChange: { launcher.query = $0 }, onMove: launcher.move,
-                        onReturn: launcher.runSelection, onEscape: { launcher.close() })
-                .padding(.horizontal, GroveSpace.s16)
-                .frame(height: 46)
-            Rectangle().fill(theme.line).frame(height: 1)
+        KeyPanelView(theme: theme, placement: .hanging(width: Self.cardWidth, fraction: 0.22),
+                     query: launcher.query, placeholder: "Open an app, or find a Grove menu row",
+                     onQuery: { launcher.query = $0 }, onMove: launcher.move,
+                     onReturn: launcher.runSelection, onClose: { launcher.close() }) {
             if launcher.results.isEmpty {
                 Text("Nothing matches")
                     .foregroundStyle(theme.quiet)
@@ -168,33 +149,24 @@ private struct LauncherView: View {
                 rows(theme)
             }
         }
-        .frame(width: Self.cardWidth)
-        .sheetCard(theme)
     }
 
     private func rows(_ theme: ThemeColors) -> some View {
         // With an app in the list every row keeps the icon's place, so the names line up.
         let icons = launcher.results.contains { if case .app = $0 { true } else { false } }
-        return ScrollViewReader { scroll in
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(Array(launcher.results.enumerated()), id: \.element.id) { index, item in
-                        row(item, selected: index == launcher.selection, icons: icons, theme)
-                            .id(item.id)
-                    }
-                }
-                .padding(Self.listInset)
-            }
-            .frame(height: CGFloat(min(launcher.results.count, Self.rowsShown)) * Self.rowHeight + 2 * Self.listInset)
-            .onChange(of: launcher.selection) { _, now in
-                if launcher.results.indices.contains(now) { scroll.scrollTo(launcher.results[now].id) }
-            }
+        return KeyPanelList(launcher.results, selection: launcher.selection.selected,
+                            position: launcher.selection.index, rowHeight: Self.rowHeight,
+                            insets: EdgeInsets(top: Self.listInset, leading: Self.listInset,
+                                               bottom: Self.listInset, trailing: Self.listInset),
+                            onClick: launcher.run) { item, _ in
+            row(item, icons: icons, theme)
         }
+        .frame(height: CGFloat(min(launcher.results.count, Self.rowsShown)) * Self.rowHeight + 2 * Self.listInset)
     }
 
     /// An app: its icon and name. A Grove menu row, "Appearance › Dark
     /// Medium": the way there quiet, the row's own title in fg.
-    private func row(_ item: LauncherItem, selected: Bool, icons: Bool, _ theme: ThemeColors) -> some View {
+    private func row(_ item: LauncherItem, icons: Bool, _ theme: ThemeColors) -> some View {
         HStack(spacing: GroveSpace.s8) {
             switch item {
             case .app(let app):
@@ -216,11 +188,5 @@ private struct LauncherView: View {
                 }
             }
         }
-        .padding(.horizontal, GroveSpace.s8)
-        .frame(height: Self.rowHeight)
-        .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
-        .lightOutline(cornerRadius: GroveRadius.control, when: selected)
-        .contentShape(Rectangle())
-        .onTapGesture { launcher.run(item) }
     }
 }

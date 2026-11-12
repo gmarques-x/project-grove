@@ -8,8 +8,9 @@ import SwiftUI
 /// cheat sheet): every key Grove relies on, in sections, filtered as you
 /// type. ↑/↓ move across the rows, Return runs the row where it can be run
 /// (a launcher, a binding) and closes, Escape or a click outside the card
-/// closes. The panel and the way the keyboard is handed back are the
-/// launcher's (`KeyPanelHost`).
+/// closes. The panel, the field, the card and the rows are GroveUI's key
+/// panel, as the launcher's; the sections, the two columns and what Return
+/// runs are here.
 @MainActor
 final class CheatSearchPanel: ObservableObject {
     static let shared = CheatSearchPanel()
@@ -18,11 +19,11 @@ final class CheatSearchPanel: ObservableObject {
         didSet { refilter(keepingSelection: false) }
     }
     @Published private(set) var results: [CheatSection] = []
-    /// The selected row's id.
-    @Published private(set) var selection: String?
+    /// Over every row of both columns, in the sections' order.
+    @Published private(set) var selection = KeyPanelSelection<String>()
 
     private var sections: [CheatSection] = []
-    private let host = KeyPanelHost()
+    private let host = KeyPanelHost { PointerMenu.shared.previousApp }
     /// Counts openings, so Ghostty's keys asked for by an earlier one are dropped.
     private var opening = 0
 
@@ -64,18 +65,16 @@ final class CheatSearchPanel: ObservableObject {
     }
 
     func move(_ step: Int) {
-        let ids = results.flatMap(\.rows).map(\.id)
-        guard !ids.isEmpty else { return }
-        let at = selection.flatMap(ids.firstIndex(of:)) ?? 0
-        selection = ids[min(max(at + step, 0), ids.count - 1)]
+        selection.move(step)
     }
 
     func select(_ row: CheatRow) {
-        selection = row.id
+        selection.select(row.id)
     }
 
     func runSelection() {
-        guard let row = results.flatMap(\.rows).first(where: { $0.id == selection }) else { return }
+        guard let id = selection.selected,
+              let row = results.flatMap(\.rows).first(where: { $0.id == id }) else { return }
         host.close(handBack: !row.action.takesFocus)
         switch row.action {
         case .none: break
@@ -109,16 +108,13 @@ final class CheatSearchPanel: ObservableObject {
 
     private func refilter(keepingSelection: Bool) {
         results = CheatSheet.filter(sections, query)
-        let rows = results.flatMap(\.rows)
-        if !keepingSelection || !rows.contains(where: { $0.id == selection }) {
-            selection = rows.first?.id
-        }
+        selection.show(results.flatMap(\.rows).map(\.id), keepingSelection: keepingSelection)
     }
 }
 
-/// The scrim and the card: the field, a line, the sections in two columns
-/// (keys.toml's on the left, the fixed lists on the right), each scrolling
-/// on its own. The card keeps its size as the rows are filtered.
+/// The sheet in GroveUI's key panel: the sections in two columns (keys.toml's
+/// on the left, the fixed lists on the right), each scrolling on its own.
+/// The card keeps its size as the rows are filtered.
 private struct CheatSearchView: View {
     @ObservedObject var sheet: CheatSearchPanel
     @ObservedObject var model: AppModel
@@ -129,35 +125,15 @@ private struct CheatSearchView: View {
 
     var body: some View {
         let theme = model.colors
-        GeometryReader { screen in
-            ZStack {
-                theme.scrim
-                    .contentShape(Rectangle())
-                    .onTapGesture { sheet.close() }
-                card(theme)
-                    .frame(width: min(Self.cardWidth, screen.size.width - 48),
-                           height: min(Self.cardHeight, screen.size.height - 96))
-            }
-        }
-        .font(GroveFont.mono(GroveType.heading))
-        .environment(\.theme, theme)
-        .preferredColorScheme(theme.colorScheme)
-    }
-
-    private func card(_ theme: ThemeColors) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: GroveSpace.s12) {
-                FilterField(text: sheet.query, placeholder: "Type to find a key", theme: theme,
-                            onChange: { sheet.query = $0 }, onMove: sheet.move,
-                            onReturn: sheet.runSelection, onEscape: sheet.close)
-                Text("↑↓ move · ↩ run · esc close")
-                    .font(GroveFont.mono(GroveType.body))
-                    .foregroundStyle(theme.quiet)
-                    .fixedSize()
-            }
-            .padding(.horizontal, GroveSpace.s16)
-            .frame(height: 46)
-            Rectangle().fill(theme.line).frame(height: 1)
+        KeyPanelView(theme: theme, placement: .centred(width: Self.cardWidth, height: Self.cardHeight),
+                     query: sheet.query, placeholder: "Type to find a key",
+                     onQuery: { sheet.query = $0 }, onMove: sheet.move,
+                     onReturn: sheet.runSelection, onClose: sheet.close) {
+            Text("↑↓ move · ↩ run · esc close")
+                .font(GroveFont.mono(GroveType.body))
+                .foregroundStyle(theme.quiet)
+                .fixedSize()
+        } content: {
             let columns = [sheet.results.filter { !$0.fixed }, sheet.results.filter(\.fixed)].filter { !$0.isEmpty }
             if columns.isEmpty {
                 Text("No key matches")
@@ -173,35 +149,23 @@ private struct CheatSearchView: View {
                 }
             }
         }
-        .sheetCard(theme)
     }
 
     private func column(_ sections: [CheatSection], _ theme: ThemeColors) -> some View {
-        ScrollViewReader { scroll in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(sections) { section in
-                        Text(section.title)
-                            .font(GroveFont.mono(GroveType.body, .semibold))
-                            .foregroundStyle(theme.quiet)
-                            .padding(.horizontal, GroveSpace.s8)
-                            .padding(.top, GroveSpace.s12)
-                            .padding(.bottom, GroveSpace.s4)
-                        ForEach(section.rows) { row in
-                            self.row(row, selected: row.id == sheet.selection, theme)
-                                .id(row.id)
-                        }
-                    }
-                }
+        KeyPanelList(sections.map { KeyPanelGroup(id: $0.id, title: $0.title, rows: $0.rows) },
+                     selection: sheet.selection.selected, rowHeight: Self.rowHeight,
+                     insets: EdgeInsets(top: 0, leading: GroveSpace.s8, bottom: GroveSpace.s8, trailing: GroveSpace.s8),
+                     onClick: sheet.select) { title in
+            Text(title)
+                .font(GroveFont.mono(GroveType.body, .semibold))
+                .foregroundStyle(theme.quiet)
                 .padding(.horizontal, GroveSpace.s8)
-                .padding(.bottom, GroveSpace.s8)
-            }
-            .frame(maxWidth: .infinity)
-            // A row of the other column isn't here, and nothing scrolls.
-            .onChange(of: sheet.selection) { _, now in
-                if let now { scroll.scrollTo(now) }
-            }
+                .padding(.top, GroveSpace.s12)
+                .padding(.bottom, GroveSpace.s4)
+        } row: { row, selected in
+            self.row(row, selected: selected, theme)
         }
+        .frame(maxWidth: .infinity)
     }
 
     /// The key in a cap, as the keyboard's; what it does; ↩ on the selected
@@ -225,11 +189,5 @@ private struct CheatSearchView: View {
                 Text("↩").foregroundStyle(theme.quiet)
             }
         }
-        .padding(.horizontal, GroveSpace.s8)
-        .frame(height: Self.rowHeight)
-        .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
-        .lightOutline(cornerRadius: GroveRadius.control, when: selected)
-        .contentShape(Rectangle())
-        .onTapGesture { sheet.select(row) }
     }
 }

@@ -1,39 +1,45 @@
 import AppKit
 import GroveThemesCore
-import GroveUI
 import SwiftUI
 
-/// The panel the launcher and the searchable cheat sheet are drawn in: over
-/// the focused screen, below the menu bar, non-activating and able to be
-/// key, so it takes the keyboard without Grove Keys coming forward.
+/// The panel a key panel (the launcher, the searchable cheat sheet) is drawn
+/// in: over the focused screen, below the menu bar, non-activating and able
+/// to be key, so it takes the keyboard without its app coming forward.
 ///
-/// `open` may bring Grove Keys forward all the same, so on closing the app
-/// that was in front is given the keyboard back, unless the caller says not
-/// to (the row run brings a window forward itself) or the panel closed
-/// because the keyboard went elsewhere.
+/// `open` may bring the app forward all the same, so on closing the app that
+/// was in front is given the keyboard back, unless the caller says not to
+/// (the row run brings a window forward itself) or the panel closed because
+/// the keyboard went elsewhere.
 @MainActor
-final class KeyPanelHost {
-    private var panel: KeyPanel?
+public final class KeyPanelHost {
+    private let previousApp: @MainActor () -> pid_t?
+    private var panel: KeyablePanel?
     private var handBackTo: pid_t?
     private var observers: [NSObjectProtocol] = []
     /// When the keyboard going elsewhere last closed the panel.
     private var lostKeyboard: Date?
 
-    var isOpen: Bool { panel != nil }
+    /// `previousApp`: the app to give the keyboard back to, asked each time
+    /// the panel opens (the last app in front that isn't this one).
+    public init(previousApp: @escaping @MainActor () -> pid_t?) {
+        self.previousApp = previousApp
+    }
+
+    public var isOpen: Bool { panel != nil }
 
     /// False when there is no screen to show it on.
-    func open(_ content: some View) -> Bool {
+    public func open(_ content: some View) -> Bool {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return false }
-        // Grove Keys' own window in front: nothing to hand back. In front
-        // without one (the pine's menu has just closed), there is.
-        handBackTo = NSApp.isActive && NSApp.mainWindow != nil ? nil : PointerMenu.shared.previousApp
+        // The app's own window in front: nothing to hand back. In front
+        // without one (a menu of its has just closed), there is.
+        handBackTo = NSApp.isActive && NSApp.mainWindow != nil ? nil : previousApp()
         lostKeyboard = nil
 
         let full = screen.frame
         let frame = NSRect(x: full.minX, y: full.minY, width: full.width,
                            height: max(0, screen.visibleFrame.maxY - full.minY))
-        let panel = KeyPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
-                             backing: .buffered, defer: false)
+        let panel = KeyablePanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                                 backing: .buffered, defer: false)
         panel.level = .statusBar
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -60,8 +66,8 @@ final class KeyPanelHost {
                 }
             })
         }
-        // If macOS didn't give a background app's panel the keyboard, Grove
-        // Keys comes forward for it, as it does for the pointer menus.
+        // If macOS didn't give a background app's panel the keyboard, the
+        // app comes forward for it.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [self] in
             guard self.panel === panel, !panel.isKeyWindow else { return }
             NSApp.activate(ignoringOtherApps: true)
@@ -70,7 +76,7 @@ final class KeyPanelHost {
         return true
     }
 
-    func close(handBack: Bool = true) {
+    public func close(handBack: Bool = true) {
         guard let panel else { return }
         self.panel = nil
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
@@ -80,10 +86,10 @@ final class KeyPanelHost {
     }
 
     /// A hotkey's link can close the panel before it arrives: `open` brings
-    /// Grove Keys' window forward, and the keyboard goes to it. True within
+    /// the app's window forward, and the keyboard goes to it. True within
     /// half a second of that: the link is that same "put away", not a new
     /// "show", and the app that was in front gets the keyboard back.
-    func closedByItsOwnLink() -> Bool {
+    public func closedByItsOwnLink() -> Bool {
         guard let lostKeyboard, Date().timeIntervalSince(lostKeyboard) < 0.5 else { return false }
         self.lostKeyboard = nil
         if NSApp.isActive { handBack() }
@@ -97,14 +103,14 @@ final class KeyPanelHost {
 }
 
 /// A borderless panel can't be key unless it says so.
-private final class KeyPanel: NSPanel {
+private final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
-/// The field of such a panel. AppKit's, so that it is the panel's first
+/// The field of a key panel. AppKit's, so that it is the panel's first
 /// responder from the start and ↑/↓, Return and Escape reach the panel's
 /// owner while the typing stays in the field.
-struct FilterField: NSViewRepresentable {
+public struct FilterField: NSViewRepresentable {
     let text: String
     let placeholder: String
     let theme: ThemeColors
@@ -114,9 +120,21 @@ struct FilterField: NSViewRepresentable {
     let onReturn: @MainActor () -> Void
     let onEscape: @MainActor () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(field: self) }
+    public init(text: String, placeholder: String, theme: ThemeColors,
+                onChange: @escaping @MainActor (String) -> Void, onMove: @escaping @MainActor (Int) -> Void,
+                onReturn: @escaping @MainActor () -> Void, onEscape: @escaping @MainActor () -> Void) {
+        self.text = text
+        self.placeholder = placeholder
+        self.theme = theme
+        self.onChange = onChange
+        self.onMove = onMove
+        self.onReturn = onReturn
+        self.onEscape = onEscape
+    }
 
-    func makeNSView(context: Context) -> NSTextField {
+    public func makeCoordinator() -> Coordinator { Coordinator(field: self) }
+
+    public func makeNSView(context: Context) -> NSTextField {
         let field = FirstResponderField()
         field.isBordered = false
         field.drawsBackground = false
@@ -128,7 +146,7 @@ struct FilterField: NSViewRepresentable {
         return field
     }
 
-    func updateNSView(_ field: NSTextField, context: Context) {
+    public func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.field = self
         if field.stringValue != text { field.stringValue = text }
         field.textColor = NSColor(theme.fg)
@@ -138,16 +156,16 @@ struct FilterField: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextFieldDelegate {
+    public final class Coordinator: NSObject, NSTextFieldDelegate {
         var field: FilterField
         init(field: FilterField) { self.field = field }
 
-        func controlTextDidChange(_ note: Notification) {
+        public func controlTextDidChange(_ note: Notification) {
             guard let text = (note.object as? NSTextField)?.stringValue else { return }
             field.onChange(text)
         }
 
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        public func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             switch selector {
             case #selector(NSResponder.moveUp(_:)): field.onMove(-1)
             case #selector(NSResponder.moveDown(_:)): field.onMove(1)
