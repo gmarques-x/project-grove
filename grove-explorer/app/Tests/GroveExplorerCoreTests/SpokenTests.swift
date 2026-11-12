@@ -59,6 +59,18 @@ import Testing
         #expect(row(app) == "Ghostty.app, Application, size not calculated yet, 10 Nov 2026 at 12:00")
     }
 
+    /// A folder no total will come for (it can't be walked) says nothing
+    /// of its size, rather than "not calculated yet" for ever.
+    @Test func aFolderNoTotalIsComingForSaysNothingOfItsSize() {
+        let folder = entry("private", .folder, modified: at(2026, 11, 10, 12, 0), type: "Folder")
+        #expect(
+            Spoken.row(folder, total: nil, now: now, calendar: calendar, locale: Self.london, shortDate: false, awaitsTotal: false)
+                == "private, Folder, 10 Nov 2026 at 12:00")
+        #expect(Spoken.row(folder, total: nil, date: nil, awaitsTotal: false) == "private, Folder")
+        // A total that is known is said all the same.
+        #expect(Spoken.row(folder, total: 4_096, date: nil, awaitsTotal: false) == "private, Folder, 4 KB")
+    }
+
     /// What the list writes as "--" is not said at all.
     @Test func whatHasNoSizeOrDateLeavesItOut() {
         #expect(row(entry("Backup", .volume, type: "Volume")) == "Backup, Volume")

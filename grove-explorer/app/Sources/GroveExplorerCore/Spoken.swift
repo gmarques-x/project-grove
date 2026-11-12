@@ -9,24 +9,27 @@ public enum Spoken {
     /// The name, the kind, the size and the date, each as the list writes
     /// it; the date long or short as the pane's dates are (`shortDate`: a
     /// pane too narrow for the full date, or for any). A folder's size is
-    /// its `total` once that is known. What the list writes as "--" is left
-    /// out; a hidden item says so last.
+    /// its `total` once that is known; until then it says the size is not
+    /// calculated yet, unless none is on its way (`awaitsTotal` false: the
+    /// folder can't be walked), when it says nothing of the size. What the
+    /// list writes as "--" is left out; a hidden item says so last.
     public static func row(
-        _ entry: Entry, total: Int64?, now: Date, calendar: Calendar, locale: Locale, shortDate: Bool
+        _ entry: Entry, total: Int64?, now: Date, calendar: Calendar, locale: Locale, shortDate: Bool,
+        awaitsTotal: Bool = true
     ) -> String {
         let date = entry.modified.map {
             Formatting.date($0, now: now, calendar: calendar, locale: locale, short: shortDate)
         }
-        return row(entry, total: total, date: date)
+        return row(entry, total: total, date: date, awaitsTotal: awaitsTotal)
     }
 
     /// The same from a date already written (the list keeps each row's).
-    public static func row(_ entry: Entry, total: Int64?, date: String?) -> String {
+    public static func row(_ entry: Entry, total: Int64?, date: String?, awaitsTotal: Bool = true) -> String {
         var parts = [entry.name]
         if !entry.typeDescription.isEmpty { parts.append(entry.typeDescription) }
         if let size = entry.size ?? total {
             parts.append(Formatting.size(size))
-        } else if SizeWanted.isMeasured(entry) {
+        } else if awaitsTotal, SizeWanted.isMeasured(entry) {
             parts.append("size not calculated yet")
         }
         if let date { parts.append(date) }
