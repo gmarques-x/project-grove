@@ -2,6 +2,7 @@ import AppKit
 import GroveExplorerCore
 import GroveThemesCore
 import GroveUI
+import SwiftUI
 
 /// The list's measures that aren't columns (those are `ListColumns`).
 @MainActor
@@ -40,28 +41,44 @@ final class FileRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         guard isUnderPointer, !isSelected else { return }
-        fill(NSColor(theme.listHover), roundTop: true, roundBottom: true)
+        shape(roundTop: true, roundBottom: true) { path in
+            NSColor(theme.listHoverFill).setFill()
+            path.fill()
+        }
     }
 
     override func drawSelection(in dirtyRect: NSRect) {
-        fill(NSColor(paneIsActive ? theme.listSelected : theme.listSelectedInactive),
-             roundTop: !isPreviousRowSelected, roundBottom: !isNextRowSelected)
+        shape(roundTop: !isPreviousRowSelected, roundBottom: !isNextRowSelected) { path in
+            NSColor(theme.listSelectionFill(active: paneIsActive)).setFill()
+            path.fill()
+            // In the light schemes the fills are a step apart at most: the
+            // selection of the pane that has the keys takes a 1 pt line (as
+            // `lightOutline` gives a panel), which sets it apart from the
+            // pointer's row and from the other pane's selection.
+            guard theme.isLight, paneIsActive else { return }
+            NSColor(theme.line).setStroke()
+            path.lineWidth = 2  // Half of it is outside the shape and clipped away.
+            path.addClip()
+            path.stroke()
+        }
     }
 
-    private func fill(_ color: NSColor, roundTop: Bool, roundBottom: Bool) {
-        let rect = bounds.insetBy(dx: ListMetrics.fillInset, dy: 0)
+    /// The row's part of a rounded shape: where a neighbour continues it
+    /// (`roundTop` or `roundBottom` false) the shape runs on past this row's
+    /// edge and is cut there, so its fill and its outline join the neighbour's.
+    private func shape(roundTop: Bool, roundBottom: Bool, draw: (NSBezierPath) -> Void) {
         let radius = GroveRadius.control
-        let path = NSBezierPath()
+        var rect = bounds.insetBy(dx: ListMetrics.fillInset, dy: 0)
         // The view is flipped: minY is the top.
-        let top = roundTop ? radius : 0, bottom = roundBottom ? radius : 0
-        path.move(to: NSPoint(x: rect.minX + top, y: rect.minY))
-        path.appendArc(withCenter: NSPoint(x: rect.maxX - top, y: rect.minY + top), radius: top, startAngle: 270, endAngle: 0)
-        path.appendArc(withCenter: NSPoint(x: rect.maxX - bottom, y: rect.maxY - bottom), radius: bottom, startAngle: 0, endAngle: 90)
-        path.appendArc(withCenter: NSPoint(x: rect.minX + bottom, y: rect.maxY - bottom), radius: bottom, startAngle: 90, endAngle: 180)
-        path.appendArc(withCenter: NSPoint(x: rect.minX + top, y: rect.minY + top), radius: top, startAngle: 180, endAngle: 270)
-        path.close()
-        color.setFill()
-        path.fill()
+        if !roundTop {
+            rect.origin.y -= 2 * radius
+            rect.size.height += 2 * radius
+        }
+        if !roundBottom { rect.size.height += 2 * radius }
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: bounds).addClip()
+        draw(NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius))
+        NSGraphicsContext.restoreGraphicsState()
     }
 }
 

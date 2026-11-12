@@ -12,6 +12,9 @@ enum IconMetrics {
     static let cell = GroveSpace.s16
     /// A hidden item's icon is dimmed to this (spec §6); its name takes `hiddenInk`.
     static let hiddenOpacity: CGFloat = 0.5
+    /// A hidden file's glyph is dimmed less: its strokes are thin, and at
+    /// half strength the glyph is nearly gone in the light schemes.
+    static let hiddenGlyphOpacity: CGFloat = 0.65
 }
 
 // MARK: Grove Icons: the font and the map
@@ -23,17 +26,18 @@ enum GroveIcons {
     /// The font's name once registered.
     static let fontName = "seti"
     private static var loaded = false
-    private static var loadedMap: IconMap?
+    /// Until the resources are read, and when they are missing: a map
+    /// without glyphs (a theme with no definitions always parses), so
+    /// folders are still Grove's and every file takes its macOS icon.
+    private static var loadedMap = try! IconMap(themeJSON: Data(#"{"iconDefinitions":{}}"#.utf8))
 
     /// What to tell the developer when the resources aren't there; nil when they are.
     private(set) static var problem: String?
 
-    /// The map; one without glyphs when the resources are missing, so folders
-    /// are still Grove's and every file takes its macOS icon.
+    /// The map; one without glyphs when the resources are missing.
     static var map: IconMap {
         load()
-        // The fallback always parses: a theme with no definitions.
-        return loadedMap ?? (try! IconMap(themeJSON: Data(#"{"iconDefinitions":{}}"#.utf8)))
+        return loadedMap
     }
 
     /// Registers the font for this process only and reads the map. Once.
@@ -198,7 +202,7 @@ enum EntryIcon {
             context.setFillColor(NSColor(theme.blue).withAlphaComponent(opacity).cgColor)
             context.fillPath()
         case .glyph(let glyph):
-            FileGlyph.draw(glyph, in: rect, opacity: opacity)
+            FileGlyph.draw(glyph, in: rect, opacity: dimmed ? IconMetrics.hiddenGlyphOpacity : 1)
         case .image(let image):
             image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: opacity, respectFlipped: true,
                        hints: [.interpolation: NSImageInterpolation.high.rawValue])
