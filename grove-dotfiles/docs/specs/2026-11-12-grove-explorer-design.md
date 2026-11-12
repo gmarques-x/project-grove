@@ -3,7 +3,7 @@
 **Status:** design for review, 2026-11-12
 **Builds on:** [2026-11-10-grove-themes-gui-design.md](2026-11-10-grove-themes-gui-design.md) (the app pattern), the shared `GroveUI` library, [2026-11-11-grove-menu-design.md](2026-11-11-grove-menu-design.md) (its row in the Grove menu)
 **Comes before:** stages 3 to 5 of Grove Explorer (§3), each with its own spec
-**Mock-ups:** `artifacts/grove-explorer/mockups/` (private), dark-medium and light-medium
+**Mock-ups:** `artifacts/grove-explorer/mockups/` (private), dark-medium and light-medium; the owner chose from them on 2026-11-12 (§2)
 
 ## 1. Goal
 
@@ -35,6 +35,12 @@ All chosen by the owner on 2026-11-12, from options put to him.
 | Deleting | Always the system Trash, never a direct delete | Anything removed can be put back from Finder. |
 | Icons | Grove Icons where the set has one; one Grove-drawn folder; the real macOS icon for apps, disks and unknown types | An app should still look like itself. |
 | Window | Tiled like any other app; no AeroSpace float rule | Two panes want the width. |
+| Window edges | The sidebar and panes run to the window's edge, 1 pt lines between; no `GroveWindow.margin` | From the mock-ups: a margin costs 48 pt of width and frames the panes inside the frame. The one Grove window without the margin. |
+| Tabs and path | Two rows of 32 pt: the tab strip, then the path bar | In one row the tabs are cut in a narrow pane. |
+| Active pane | The 1 pt line over its tab strip is green; the other pane's selection is quieter | One line, no new shape. A green outline round the pane would read as the focus box. |
+| Sidebar | Sections with fine-print captions (Favourites, iCloud, Locations); folders in one colour | Colour per place would be colour without a meaning. |
+| Rows | 24 pt, as a sidebar row and a tab; name at 12 pt, the other columns at 11 pt in the quiet colour | One rhythm in the window (drawn as the recommended option; not picked apart from the others). |
+| Folder icon | Solid, in the palette's blue | The colour a terminal lists directories in (drawn as the recommended option). |
 | Kind of app | An ordinary app that is opened and quit, in ⌘Tab like any other; no menu-bar item, no login agent | It has nothing to do while closed. |
 
 Taken from the owner's recorded Finder setup (`artifacts/finder-changes.md`) as the defaults: new windows on Home; folders on top; all extensions shown; folder sizes calculated; path bar and status bar always there; the filter looks in the current folder; sidebar favourites Applications, Home, Developer, Documents, Downloads; iCloud Drive; disks.
@@ -91,9 +97,9 @@ The app target draws and wires: the window (`GroveWindowHeader`), the sidebar, t
 
 One window, tiled by AeroSpace. From left to right: the sidebar, then one pane or two.
 
-**Header** (`GroveWindowHeader`): the name on the window buttons' line; in the middle back and forward for the active pane; trailing, the one-pane/two-pane toggle.
+**Header** (`GroveWindowHeader`): the name on the window buttons' line; in the middle back and forward for the active pane; trailing, the one-pane/two-pane switch (two icon segments). Below it the sidebar and the panes fill the window to its edges, divided by 1 pt lines.
 
-**Sidebar** (fixed width; hidden when the window is narrower than a pane and a half needs, and by ⌘⌥S):
+**Sidebar** (fixed width; it becomes a 48 pt rail of icons when the panes would otherwise be under 430 pt each, and ⌘⌥S hides or shows it):
 - *Favourites:* from the config (§9). Drag a folder onto the sidebar to add one; drag a row out to remove it. Both write `explorer.local.toml`.
 - *iCloud:* iCloud Drive when it exists.
 - *Locations:* mounted volumes, each with an eject button where it can be ejected; they come and go live.
@@ -101,10 +107,10 @@ One window, tiled by AeroSpace. From left to right: the sidebar, then one pane o
 - A click opens the place in the active pane's current tab; ⌘-click in a new tab; a drop on a row copies or moves there.
 
 **A pane**, top to bottom:
-1. *Tab strip.* The tab's title is the folder's name. "+" adds a tab on the same folder. A tab closes with its hover button or ⌘W; the last tab of a pane doesn't close. The active pane's strip carries a 1 pt green line; the other pane's does not, and its selection is drawn in the hover fill rather than the selected fill.
-2. *Path bar.* The folders from the volume (or Home, shown as "Home") down to the current one, each a click. ⌘L turns it into a text field with the full path selected; Return goes, Escape cancels, a path that doesn't exist marks the field red and stays.
+1. *Tab strip* (32 pt). The current tab is a pill in the selected fill. The tab's title is the folder's name. "+" adds a tab on the same folder. A tab closes with its hover button or ⌘W; the last tab of a pane doesn't close. The active pane's strip carries a 1 pt green line; the other pane's does not, and its selection is drawn in the inactive-selection fill (§6).
+2. *Path bar* (32 pt). The folders from the volume (or Home, shown as "Home") down to the current one, each a click. ⌘L turns it into a text field with the full path selected; Return goes, Escape cancels, a path that doesn't exist marks the field red and stays.
 3. *The list* (§6).
-4. *Status bar.* "212 items" or "3 of 212 selected · 48.2 MB"; the volume's free space at the right. While operations run: the current one's words ("Copying 1,204 items to Downloads"), a meter, and a cancel button. After one finishes: what it did and "⌘Z to undo", for a few seconds.
+4. *Status bar.* "212 items" or "3 of 212 selected · 48.2 MB"; the volume's free space at the right (left out under 640 pt). While operations run, in the target pane's bar: the current one's words ("Copying 1,204 items to Downloads"), a meter, and a cancel button. After one finishes: what it did and "⌘Z to undo", for a few seconds.
 
 With two panes the split is even; the divider can be dragged, and a double-click evens it.
 
@@ -112,14 +118,16 @@ With two panes the split is even; the divider can be dragged, and a double-click
 
 An AppKit table (`NSTableView` through `NSViewRepresentable`) under the Grove skin: the `Table` of SwiftUI is not used because of very large folders, type-to-jump, inline rename and drag and drop of files. Its header, rows, selection and focus are drawn with the tokens; the table gives scrolling, selection maths, column resizing and reuse of rows.
 
-- **Columns:** Name (icon and name; fills the width), Size, Date Modified, Kind. Size and dates are right-aligned in tabular figures. A narrow pane drops Kind, then Date Modified.
+- **Columns:** Name (icon and name), Size, Date Modified, Kind. Sizes are right-aligned in tabular figures. Name takes the width up to 560 pt; beyond that the other columns follow it and the rest of the row is empty, so a wide single pane doesn't put a screen's width between a name and its size. By the pane's own width: under 640 pt Kind goes and dates shorten ("Today 09:41", "9 Nov 2026"); under 430 pt the date goes too. A long name is cut in the middle, keeping its extension.
+- **Rows:** 24 pt. Selected rows that touch are drawn as one shape.
+- **Fills:** a list has the pointer and a selection at once, in two panes, so it needs three fills that can be told apart in every scheme, in this order of strength: the active pane's selection, the inactive pane's selection, the row under the pointer. The mock-ups showed today's roles don't give that (in dark the hover and the inactive selection are one colour; in light the hover is stronger than the selection). `GroveUI` gains list roles for the three (`listSelected`, `listSelectedInactive`, `listHover`), picked from each palette and checked in renders of all six schemes, with the selection always the strongest; hidden items get a `hiddenInk` role instead of an opacity.
 - **Sorting:** a click on a header sorts by it, a second click reverses; folders stay on top in either direction (Finder's "keep folders on top"). Each tab remembers its sort.
-- **Sizes:** files show their size; folders show "–" until `SizeCalculator` has the total, then the total. Totals are calculated for the folders in view first, a few at a time, and kept until the folder changes. Packages (apps, bundles) count as files.
+- **Sizes:** files show their size; folders show a quiet "···" until `SizeCalculator` has the total, then the total. Totals are calculated for the folders in view first, a few at a time, and kept until the folder changes. Packages (apps, bundles) count as files.
 - **Dates:** as Finder writes them: "Today at 09:41", "Yesterday at 18:02", then the date and time, in the user's locale.
-- **Names:** extensions always shown. Hidden items are left out until ⌘⇧. shows them, drawn in the quiet colour. The setting is per window and remembered.
+- **Names:** extensions always shown. Hidden items are left out until ⌘⇧. shows them, with the name in the quiet colour and the icon dimmed. The setting is per window and remembered.
 - **Selection:** click, ⇧-click, ⌘-click, ⇧-arrows, ⌘A. Typing letters selects the first name that starts with them (a second's pause starts again).
 - **Opening:** Return renames (Finder's rule); ⌘↓ or ⌘O or a double-click opens: a folder in this tab, a file in its default app, a package as its app. ⌘-double-click a folder: a new tab.
-- **Rename:** in place, the name without its extension selected. Return commits, Escape cancels; an empty name, a "/" or a name that exists marks the field red with one line of reason beneath.
+- **Rename:** in place, the name without its extension selected. The field takes a 1 pt green line (as the path and filter fields do), not the focus box. Return commits, Escape cancels; an empty name, a "/" or a name that exists marks the field red with one line of reason beneath.
 - **Filter (⌘F):** a `FilterField` above the list; the list shows the names containing every typed word; the status bar says "4 of 212". Escape clears it and gives the focus back to the list.
 - **Live:** `FolderWatcher` keeps the list current. The selection and scroll position survive a refresh.
 - **Empty and unreadable:** an empty folder says so. A folder macOS won't let the app read says which permission is missing and has a button for Privacy Settings.
@@ -164,18 +172,18 @@ Grove's:
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 
-The right-click menu (the system's `.contextMenu`): Open, Open With ▸, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder, Open in Ghostty; on empty space: New Folder, Paste, Show Hidden Items. The app's menu bar menus (reached through Grove's Global Menu) carry the same commands with their keys.
+The right-click menu is the system's (`.contextMenu`): its own font and the Mac's accent colour, as every native menu in Grove. Rows: Open, Open With ▸, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder, Open in Ghostty; on empty space: New Folder, Paste, Show Hidden Items. The app's menu bar menus (reached through Grove's Global Menu) carry the same commands with their keys.
 
 ## 8. File operations
 
 - **A value, then a run.** Each command makes an `Operation` (what, which items, where to). `OperationQueue` runs them one after the other on its own queue, with progress by bytes for copies and by items otherwise.
 - **Copy and move.** A move on the same volume is a rename (instant); across volumes it is a copy then a removal of the source once the copy is whole. A copy is written to a temporary name beside the target and renamed when complete, so a cancelled or failed copy leaves nothing half-written. Copies keep dates, permissions, extended attributes and tags (`FileManager`/`copyfile`).
-- **Conflicts.** Before anything is written, the names that already exist at the target are found. If there are any, one prompt: the first name, **Replace**, **Keep Both**, **Skip**, a box "Apply to all (N more)", and Cancel (the whole operation). Replacing a folder replaces it whole, as Finder does; it does not merge. A replaced item goes to the Trash, so the replace can be undone.
+- **Conflicts.** Before anything is written, the names that already exist at the target are found. If there are any, one prompt: the first name, the size and date of the item there and of the one coming, **Skip**, **Replace**, **Keep Both** (the default button: it loses nothing), a box "Apply to all (N more)", and Cancel (the whole operation). It is a card over the scrimmed window: an opaque fill, radius 10, a 1 pt line, no shadow. Replacing a folder replaces it whole, as Finder does; it does not merge. A replaced item goes to the Trash, so the replace can be undone.
 - **Cancel.** Stops after the current file; what was already copied stays and the status bar says how much.
 - **Errors.** One failed item doesn't stop the rest. At the end the status bar says "3 items could not be copied" in the marked style, with a click showing which and why.
 - **Trash.** `FileManager.trashItem`; the status bar says what went. No confirmation, as in Finder.
 - **Undo.** Every finished operation records its inverse: copies → the copies go to the Trash; moves → moved back; rename → the old name; new folder → to the Trash if still empty; trash → put back from the Trash to where it was; a replace → the replaced item returns. ⌘Z undoes the latest, ⌘⇧Z redoes. An undo that can no longer be done (the item changed or went since) says so and does nothing. The stack is per window and is not kept across launches.
-- **Drag and drop.** Within and between panes: a drop on a folder row or on a pane's empty space moves on the same volume and copies across volumes; ⌥ forces copy, ⌘ forces move (Finder's rules). To and from other apps through the file pasteboard types. A drag shows the system's drag image with a count. Drops go through the same queue, prompt and undo.
+- **Drag and drop.** Within and between panes: a drop on a folder row (marked with the hover fill and a 1 pt green line) or on a pane's empty space moves on the same volume and copies across volumes; ⌥ forces copy, ⌘ forces move (Finder's rules). To and from other apps through the file pasteboard types. A drag shows the system's drag image with a count. Drops go through the same queue, prompt and undo.
 - **The clipboard.** ⌘C puts file URLs on the general pasteboard, so paste works to and from Finder and other apps.
 
 ## 9. Config and state
@@ -214,9 +222,9 @@ Links: `groveexplorer://open?path=<percent-encoded path>` opens that folder in a
 ## 10. Icons
 
 `IconKind` decides, in this order:
-1. A folder: the Grove folder, drawn as a shape in palette colours (a `Shape`, as `PineShape` is), with a small mark for the known ones (Home, Developer, Documents, Downloads, Applications, Desktop, iCloud Drive). A package is not a folder.
+1. A folder: the Grove folder, one solid shape in the palette's blue (a `Shape`, as `PineShape` is), with a small mark cut out of it for the known ones (Home, Developer, Documents, Downloads, Applications, Desktop). In the mock-ups the marks for Developer and Documents were blobs at 16 pt: each mark is redrawn as a few strokes on the pixel grid and accepted only when it reads at list size in a render. A package is not a folder.
 2. An app, a volume, an alias to one, or a file with its own custom icon: the macOS icon (`NSWorkspace.icon(forFile:)`), cached per path.
-3. A name or extension Grove Icons knows: its glyph in its colour, dark or light set by the scheme. The map and the font are the ones the VS Code theme uses (`grove-dotfiles/config/vscode/grove-icons/`); the module copies them into the app's resources, and the font is registered for the process only.
+3. A name or extension Grove Icons knows: its glyph in its colour, dark or light set by the scheme. One rule of Grove Explorer's own on top of the set: a file's extension wins over its name, so README.md, CHANGELOG.md and notes.md all get the Markdown glyph (the set gives each a different one by name, which reads as noise in a list). A disk image keeps its macOS icon. The map and the font are the ones the VS Code theme uses (`grove-dotfiles/config/vscode/grove-icons/`); the module copies them into the app's resources, and the font is registered for the process only.
 4. Anything else: the macOS icon for its type, cached per extension.
 
 Icons are 16 pt in the list and the sidebar.
