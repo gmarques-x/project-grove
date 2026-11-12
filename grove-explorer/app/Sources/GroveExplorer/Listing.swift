@@ -20,6 +20,8 @@ struct Listing {
     var needsPermission = false
     /// Free room on the folder's volume, in bytes.
     var free: Int64?
+    /// Under a filter: how many items the list would show without it.
+    var filteredFrom: Int?
     /// Changes whenever `shown` does: what the table reloads by.
     var revision = 0
 }
@@ -38,6 +40,8 @@ enum FolderListing {
     struct Arranged: Sendable {
         var shown: [Entry] = []
         var rows: [URL: Int] = [:]
+        /// Under a filter: how many items there are without it.
+        var filteredFrom: Int?
     }
 
     struct Read: Sendable {
@@ -51,7 +55,7 @@ enum FolderListing {
     }
 
     static func read(
-        _ folder: URL, sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64]
+        _ folder: URL, sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64], filter: String
     ) -> Read {
         var read = Read()
         do {
@@ -68,19 +72,24 @@ enum FolderListing {
                 for: error, folder: folder, home: FileManager.default.homeDirectoryForCurrentUser,
                 refusedByMode: byMode, onNetworkVolume: !local)
         }
-        read.arranged = arranged(read.all, sort: sort, showHidden: showHidden, sizes: sizes)
+        read.arranged = arranged(read.all, sort: sort, showHidden: showHidden, sizes: sizes, filter: filter)
         let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         read.free = values?.volumeAvailableCapacityForImportantUsage
         return read
     }
 
+    /// `filter`: what the tab's ⌘F field says; words in it keep only the
+    /// names that have them all.
     static func arranged(
-        _ all: [Entry], sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64]
+        _ all: [Entry], sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64], filter: String
     ) -> Arranged {
-        let shown = Sorting.sorted(showHidden ? all : all.filter { !$0.isHidden }, by: sort, folderSizes: sizes)
+        let visible = showHidden ? all : all.filter { !$0.isHidden }
+        let filtering = filter.contains { !$0.isWhitespace }
+        let shown = Sorting.sorted(
+            filtering ? Filter.matches(visible, words: filter) : visible, by: sort, folderSizes: sizes)
         var rows: [URL: Int] = [:]
         rows.reserveCapacity(shown.count)
         for (row, entry) in shown.enumerated() { rows[entry.url] = row }
-        return Arranged(shown: shown, rows: rows)
+        return Arranged(shown: shown, rows: rows, filteredFrom: filtering ? visible.count : nil)
     }
 }

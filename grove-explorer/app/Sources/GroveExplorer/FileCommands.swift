@@ -8,7 +8,7 @@ extension AppModel {
     private typealias Decide = GroveExplorerCore.FileCommands
 
     /// A text field has the keyboard: the list's commands are not for it.
-    var isEditingText: Bool { work.rename != nil || pathField != nil }
+    var isEditingText: Bool { work.rename != nil || pathField != nil || filter.focused != nil }
 
     /// The active pane's selected items, in the list's order.
     var chosenItems: [Entry] {
@@ -95,6 +95,8 @@ extension AppModel {
     /// once the pane lists it.
     func newFolder() {
         let side = browser.active
+        // A filter would hide the new folder, and its name could not be typed.
+        clearFilter(in: side)
         let name = Decide.newFolderName(taken: listing(for: side)?.all.map(\.name) ?? [])
         perform(.newFolder(in: browser.activeTab.folder, name: name), in: side, thenRename: true)
     }

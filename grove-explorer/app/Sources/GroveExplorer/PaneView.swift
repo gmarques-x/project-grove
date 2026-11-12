@@ -43,6 +43,10 @@ struct PaneView: View {
                     PathBarView(model: model, side: side)
                 }
                 Line()
+                if let text = model.filterText(for: side) {
+                    FilterBar(model: model, side: side, text: text, showsHint: columns.showsDate)
+                    Line()
+                }
                 if !bare {
                     ColumnHeader(columns: columns, sort: model.browser.tab(side)?.sort ?? .byName) {
                         model.sort(by: $0, in: side)
@@ -97,7 +101,7 @@ struct PaneView: View {
                     PanelButton("Open Privacy Settings…") { model.openPrivacySettings() }
                 }
             } else {
-                Text(verbatim: "This folder is empty")
+                Text(verbatim: listing.filteredFrom == nil ? "This folder is empty" : "No name here matches the filter")
                     .font(GroveFont.mono(GroveType.label))
                     .foregroundStyle(theme.quiet)
             }

@@ -47,6 +47,8 @@ enum Sample {
         var renameReason: String?
         /// The right pane's row of this name is where a drag would drop.
         var dropRow: String?
+        /// The left pane's filter field is open, has the keyboard and says this.
+        var filter: String?
     }
 
     static let backup = Volume(url: URL(fileURLWithPath: "/Volumes/Backup", isDirectory: true), name: "Backup", ejectable: true)
@@ -87,7 +89,9 @@ enum Sample {
         let clock = ListClock(now: { now }, calendar: calendar, locale: Locale(identifier: "en_GB"))
         let model = AppModel.fixed(
             browser: browser, config: config, clock: clock, colors: colors, entries: entries, sizes: sizes,
-            free: 212_400_000_000, selected: selected, problems: problems)
+            free: 212_400_000_000, selected: selected, problems: problems,
+            filters: extras.filter.map { [.left: $0] } ?? [:])
+        if extras.filter != nil { model.filter.focused = .left }
         model.pointerStandIn = pointer
         for (side, pane) in zip(sides, panes) { model.tabPointerStandIn[side] = pane.pointerTab }
 
@@ -201,6 +205,22 @@ enum Sample {
             ("theme.swift", 9_000, date(2026, 11, 10, 12, 44)),
             ("wallpaper-forest.png", 6_300_000, date(2026, 11, 3, 21, 40)),
         ], selected: selected, pointer: pointer, otherTabs: [URL(fileURLWithPath: "/Applications", isDirectory: true)])
+    }
+
+    /// Downloads as the filter's mock-up has it: 212 items, four of them screenshots.
+    static func manyDownloads() -> Pane {
+        var pane = downloads(selected: [])
+        let folder = pane.folder
+        func file(_ name: String, _ size: Int64, _ modified: Date) -> Entry {
+            Entry(url: folder.appendingPathComponent(name), name: name, kind: .file, size: size, modified: modified,
+                  isHidden: false, typeDescription: name.hasSuffix(".png") ? "PNG Image" : "Plain Text")
+        }
+        pane.entries += [
+            file("Screenshot 2026-11-08 at 14.05.51.png", 1_100_000, date(2026, 11, 8, 14, 5)),
+            file("Screenshot 2026-11-10 at 22.48.19.png", 3_000_000, date(2026, 11, 10, 22, 48)),
+        ]
+        pane.entries += (pane.entries.count..<212).map { file("log-\($0).txt", 2_000, date(2026, 10, 1, 8, 0)) }
+        return pane
     }
 
     /// Documents, where the mock-ups' copy meets a "notes.md" that is there.

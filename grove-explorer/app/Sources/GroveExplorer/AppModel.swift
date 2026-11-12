@@ -63,6 +63,8 @@ final class AppModel: ObservableObject {
     /// The place a drag of files is over (`DragDrop.swift`).
     @Published var dropMark: DropMark?
     let drags = DragState()
+    /// The ⌘F filters (`FilterBar.swift`).
+    @Published var filter = FilterState()
 
     /// Renders only: the row, the tab and the sidebar row drawn as under
     /// the pointer, and icons for volumes that aren't there.
@@ -132,18 +134,20 @@ final class AppModel: ObservableObject {
     static func fixed(
         browser: Browser, config: ExplorerConfig, clock: ListClock, colors: ThemeColors,
         entries: [Side: [Entry]], sizes: [URL: Int64], free: Int64, selected: [Side: Set<URL>],
-        problems: [Side: (sentence: String, needsPermission: Bool)] = [:]
+        problems: [Side: (sentence: String, needsPermission: Bool)] = [:], filters: [Side: String] = [:]
     ) -> AppModel {
         let model = AppModel(browser: browser, config: config, clock: clock, live: false)
         model.colors = colors
         model.sizes = sizes
         for (side, all) in entries {
             guard let tab = browser.tab(side) else { continue }
-            let arranged = FolderListing.arranged(all, sort: tab.sort, showHidden: browser.showHidden, sizes: sizes)
+            if let text = filters[side] { model.filter.texts[tab.id] = text }
+            let arranged = FolderListing.arranged(
+                all, sort: tab.sort, showHidden: browser.showHidden, sizes: sizes, filter: filters[side] ?? "")
             model.listings[side] = Listing(
                 folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows,
                 problem: problems[side]?.sentence, needsPermission: problems[side]?.needsPermission ?? false,
-                free: free, revision: 1)
+                free: free, filteredFrom: arranged.filteredFrom, revision: 1)
             model.selections[tab.id] = selected[side] ?? []
         }
         model.revision = 1
@@ -180,6 +184,7 @@ final class AppModel: ObservableObject {
         guard next != browser else { return }
         let was = browser
         browser = next
+        filtersFollow(was, next)
         // Another folder, tab or pane has the keys now: letters typed for
         // the last one are not a name's start here, and a path field open
         // over it would say a folder that is no longer the one below it.
@@ -222,8 +227,11 @@ final class AppModel: ObservableObject {
             shownKeys[side] = key
             changed.append(side)
             // Rows of this folder that a pane already has are shown at once
-            // (the other pane's, or this pane's other tab's), in this tab's order.
-            if let known = before.values.first(where: { $0.folder.standardizedFileURL.path == path }) {
+            // (the other pane's, or this pane's other tab's), in this tab's
+            // order; not rows another tab's filter picked.
+            if let known = before.values.first(where: {
+                $0.folder.standardizedFileURL.path == path && $0.filteredFrom == nil
+            }) {
                 revision += 1
                 var listing = known
                 listing.revision = revision
@@ -274,7 +282,7 @@ final class AppModel: ObservableObject {
             if let total = bytes, let size = entry.size ?? sizes[url] { bytes = total + size } else { bytes = nil }
         }
         let text = GroveExplorerCore.StatusText.items(
-            total: listing.shown.count, selected: count, selectedBytes: bytes, filteredFrom: nil)
+            total: listing.shown.count, selected: count, selectedBytes: bytes, filteredFrom: listing.filteredFrom)
         statuses[side] = (tab, listing.revision, selectionVersion, sizesVersion, text)
         return text
     }
@@ -296,10 +304,24 @@ final class AppModel: ObservableObject {
 
     // MARK: What the views ask for
 
-    /// The pane's selection is now `urls`.
+    /// The pane's selection is now `urls`; under a filter, those of them
+    /// that it shows (no command acts on a row the user can't see).
     func select(_ urls: Set<URL>, in side: Side) {
+        var urls = urls
+        if let listing = listings[side], listing.filteredFrom != nil {
+            urls = Filter.visibleSelection(urls, among: listing.shown)
+        }
         guard let tab = browser.tab(side), selections[tab.id] ?? [] != urls else { return }
         selections[tab.id] = urls
+    }
+
+    /// The rows changed under a filter: what it hides is selected no more.
+    private func keepVisibleSelection(in side: Side) {
+        guard let tab = browser.tab(side), let listing = listings[side], listing.filteredFrom != nil,
+            let chosen = selections[tab.id], !chosen.isEmpty
+        else { return }
+        let kept = Filter.visibleSelection(chosen, among: listing.shown)
+        if kept != chosen { selections[tab.id] = kept }
     }
 
     /// The pane that has the keys.
@@ -350,12 +372,15 @@ final class AppModel: ObservableObject {
     func load(_ side: Side) {
         guard let tab = browser.tab(side) else { return }
         let folder = tab.folder, sort = tab.sort, showHidden = browser.showHidden
+        let filter = filter.texts[tab.id] ?? ""
         let sizes = sizes, sizesWere = sizesVersion
         let number = (loads[side] ?? 0) + 1
         loads[side] = number
         watch(folder, for: side)
         Task {
-            let read = await Task.detached { FolderListing.read(folder, sort: sort, showHidden: showHidden, sizes: sizes) }.value
+            let read = await Task.detached {
+                FolderListing.read(folder, sort: sort, showHidden: showHidden, sizes: sizes, filter: filter)
+            }.value
             // A later read of this pane answers instead.
             guard loads[side] == number else { return }
             // The folder went while it was shown, or back/forward landed on
@@ -375,10 +400,12 @@ final class AppModel: ObservableObject {
                 revision += 1
                 listings[side] = Listing(
                     folder: folder, all: read.all, shown: read.arranged.shown, rows: read.arranged.rows,
-                    problem: read.problem, needsPermission: read.needsPermission, free: read.free, revision: revision)
+                    problem: read.problem, needsPermission: read.needsPermission, free: read.free,
+                    filteredFrom: read.arranged.filteredFrom, revision: revision)
                 let present = Set(read.all.map(\.url))
                 let chosen = selections[tab.id] ?? []
                 if !chosen.isSubset(of: present) { selections[tab.id] = chosen.intersection(present) }
+                keepVisibleSelection(in: side)
                 IconCache.shared.forgetPaths()
             }
             if let name = selectWhenRead.removeValue(forKey: side),
@@ -389,10 +416,11 @@ final class AppModel: ObservableObject {
             }
             // What the last operation left here is selected.
             arrived(in: side)
-            // The header was clicked, hidden items were switched or a total
-            // arrived while this read was on its way: what it sorted by is
-            // no longer what the pane asks for.
+            // The header was clicked, hidden items were switched, the filter
+            // was typed in or a total arrived while this read was on its
+            // way: what it sorted by is no longer what the pane asks for.
             if let now = browser.tab(side), now.sort != sort || browser.showHidden != showHidden
+                || (self.filter.texts[now.id] ?? "") != filter
                 || (now.sort.column == .size && sizesVersion != sizesWere)
             {
                 arrange(side)
@@ -407,15 +435,16 @@ final class AppModel: ObservableObject {
     func arrange(_ side: Side) {
         guard let tab = browser.tab(side), let listing = listings[side] else { return }
         let all = listing.all, sort = tab.sort, showHidden = browser.showHidden, sizes = sizes
+        let filter = filter.texts[tab.id] ?? ""
         guard live else {
-            show(FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes), in: side)
+            show(FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes, filter: filter), in: side)
             return
         }
         let number = (sorts[side] ?? 0) + 1
         sorts[side] = number
         Task {
             let arranged = await Task.detached {
-                FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes)
+                FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes, filter: filter)
             }.value
             guard sorts[side] == number else { return }
             show(arranged, in: side)
@@ -423,11 +452,14 @@ final class AppModel: ObservableObject {
     }
 
     private func show(_ arranged: FolderListing.Arranged, in side: Side) {
-        guard arranged.shown != listings[side]?.shown else { return }
+        guard arranged.shown != listings[side]?.shown || arranged.filteredFrom != listings[side]?.filteredFrom
+        else { return }
         revision += 1
         listings[side]?.shown = arranged.shown
         listings[side]?.rows = arranged.rows
+        listings[side]?.filteredFrom = arranged.filteredFrom
         listings[side]?.revision = revision
+        keepVisibleSelection(in: side)
     }
 
     // MARK: Watching

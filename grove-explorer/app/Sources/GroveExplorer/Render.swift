@@ -104,6 +104,10 @@ enum Render {
             size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["LICENSE"])],
             extras: Sample.Extras(
                 rename: "LICENSE", renameText: "docs/LICENSE", renameReason: "A name can't have a “/” in it."))),
+        // ⌘F: the field over the list, the names that match, "4 of 212".
+        ("filter", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.manyDownloads()],
+            extras: Sample.Extras(filter: "shot"))),
         // Three files dragged from the left pane over a folder in the right
         // one: the row marked. (The drag's image and the pointer are the system's.)
         ("drop-target", Scene(

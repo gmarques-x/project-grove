@@ -18,10 +18,6 @@ enum CommandTable {
 
     private static func always(_ run: @escaping @MainActor (AppModel) -> Void) -> Action { (run, { _ in true }) }
 
-    /// A command a later task gives its action: in the table, so every key
-    /// of spec §7 has its row, and doing nothing yet.
-    private static let later: Action = ({ _ in }, { _ in false })
-
     /// A command on the files: not while a text field has the keyboard
     /// (⌘⌫ there deletes text, ⌘V pastes text), and only `when` it has
     /// something to work on.
@@ -61,7 +57,7 @@ enum CommandTable {
             "toggleSidebar": always { $0.toggleSidebar() },
             "focusSidebar": always { $0.focusSidebar() },
             "toggleHidden": always { $0.toggleHidden() },
-            "filter": later,  // Task 14
+            "filter": always { $0.beginFilter() },
             "nextTab": always { $0.nextTab() },
             "previousTab": always { $0.previousTab() },
             // Go
@@ -139,6 +135,11 @@ enum CommandTable {
         // Escape closes the list of what could not be done.
         if model.work.failuresShown != nil, stroke.key == "Escape", stroke.modifiers.isEmpty {
             model.work.failuresShown = nil
+            return true
+        }
+        // Escape in a filtered list clears the filter, as in its field.
+        if stroke.key == "Escape", stroke.modifiers.isEmpty, model.filterText(for: side) != nil {
+            model.clearFilter(in: side)
             return true
         }
         if model.sidebarCursor != nil {

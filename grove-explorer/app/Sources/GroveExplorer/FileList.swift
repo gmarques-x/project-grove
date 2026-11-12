@@ -369,7 +369,10 @@ struct FileList: NSViewRepresentable {
             CommandTable.command(id)?.isEnabled(model) ?? false
         }
 
-        func activate() { model.activate(side) }
+        func activate() {
+            model.activate(side)
+            model.listHasKeyboard()
+        }
 
         func clicked() { model.clicked(side) }
 

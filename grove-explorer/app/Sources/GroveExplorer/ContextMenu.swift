@@ -157,5 +157,6 @@ extension AppModel {
     /// will be when it shows.
     func listTakesKeyboard() {
         if pathField != nil { pathField = nil }
+        listHasKeyboard()
     }
 }
