@@ -160,7 +160,7 @@ private struct PaneDivider: View {
             }
             .zIndex(1)
             .accessibilityElement()
-            .accessibilityLabel("Divider between the panes")
+            .accessibilityLabel("Pane divider")
             .accessibilityAdjustableAction { direction in
                 let step = direction == .increment ? 0.05 : -0.05
                 model.split = SidebarLayout.split(

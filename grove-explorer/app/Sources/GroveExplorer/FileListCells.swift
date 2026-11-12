@@ -109,8 +109,8 @@ class TextCellView: NSView {
     /// The gap before the column, inside the cell.
     var leading: CGFloat = 0
 
-    /// Drawn, not a control: VoiceOver is told nothing by a cell of the
-    /// quiet columns. The row is said whole by its name's cell.
+    /// Drawn, not a control: VoiceOver is told nothing by a cell. The row
+    /// says itself whole (`FileRowView`).
     required override init(frame: NSRect) {
         super.init(frame: frame)
         setAccessibilityElement(false)
@@ -140,19 +140,6 @@ class TextCellView: NSView {
 /// its extension kept when it is too long.
 final class NameCellView: TextCellView {
     var icon: EntryIcon? { didSet { needsDisplay = true } }
-    /// The row as VoiceOver says it (`Spoken.row`): the name, the kind,
-    /// the size and the date, whichever columns the pane has room for.
-    var spoken = "" {
-        didSet { if spoken != oldValue { setAccessibilityValue(spoken) } }
-    }
-
-    required init(frame: NSRect) {
-        super.init(frame: frame)
-        setAccessibilityElement(true)
-        setAccessibilityRole(.staticText)
-    }
-
-    required init?(coder: NSCoder) { nil }
     var theme = ThemeColors.fallback
     /// A hidden item: its icon is dimmed.
     var dimmed = false
@@ -200,14 +187,21 @@ final class FileTableView: NSTableView {
     var onMenu: ((Int) -> NSMenu?)?
     /// The rename field over a row. It lies beside the table in the clip
     /// view (`RenameEditor`), where VoiceOver would not come by it: it is
-    /// counted among the table's own.
+    /// counted among the table's own (`ListAccessibility.swift`).
     weak var renameField: NSView?
+    /// The rows and columns as VoiceOver is given them, made when it first
+    /// asks and kept until the rows change.
+    var spokenRows: [ListRowElement]?
+    var spokenColumns: [ListColumnElement]?
 
-    override func accessibilityChildren() -> [Any]? {
-        guard let renameField else { return super.accessibilityChildren() }
-        return (super.accessibilityChildren() ?? []) + [renameField]
+    override func reloadData() {
+        spokenRows = nil
+        super.reloadData()
     }
 
+    /// A row as VoiceOver says it (`Spoken.row`), asked for when VoiceOver
+    /// comes to the row and not while it is drawn.
+    var onRowLabel: ((Int) -> String?)?
     /// The system's key for a context menu (⌃Return unless the user chose
     /// another), or VoiceOver's "show menu", came to the list.
     var onMenuKey: (() -> Void)?

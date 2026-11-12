@@ -36,6 +36,8 @@ struct FileList: NSViewRepresentable {
         table.focusRingType = .none
         for id in Column.allCases {
             let column = NSTableColumn(identifier: id.identifier)
+            // Not drawn (the header row is `PaneView`'s): what VoiceOver calls the column.
+            column.title = id.title
             column.resizingMask = []
             table.addTableColumn(column)
         }
@@ -85,6 +87,15 @@ struct FileList: NSViewRepresentable {
         case name, size, date, kind
 
         var identifier: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier(rawValue) }
+
+        var title: String {
+            switch self {
+            case .name: "Name"
+            case .size: "Size"
+            case .date: "Date Modified"
+            case .kind: "Kind"
+            }
+        }
     }
 
     /// The table's data source and delegate: it holds the rows the table
@@ -296,8 +307,6 @@ struct FileList: NSViewRepresentable {
                 cell.color = entry.isHidden ? NSColor(theme.hiddenText) : NSColor(theme.fg)
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
-                cell.spoken = Spoken.row(
-                    entry, total: model.sizes[entry.url], date: entry.modified == nil ? nil : date(of: entry))
                 return cell
             case .size:
                 let cell = detail(tableColumn.identifier, in: tableView, theme)
@@ -331,6 +340,15 @@ struct FileList: NSViewRepresentable {
             let cell = reused(TextCellView.self, id, in: table)
             cell.color = NSColor(theme.quiet)
             return cell
+        }
+
+        /// The row as VoiceOver says it; nil for a row that is not there.
+        func spoken(_ row: Int) -> String? {
+            guard entries.indices.contains(row) else { return nil }
+            let entry = entries[row]
+            return Spoken.row(
+                entry, total: model.sizes[entry.url], date: entry.modified == nil ? nil : date(of: entry),
+                awaitsTotal: model.awaitsTotal(entry.url))
         }
 
         private func date(of entry: Entry) -> String {

@@ -27,6 +27,10 @@ final class SizeQueue {
     /// The calculator walks two at once; two more wait there in order.
     private static let atOnce = 4
 
+    /// Asked and answered with nothing: no total is on its way for it
+    /// until its folder next changes.
+    func hasGivenUp(on url: URL) -> Bool { unanswered.contains(url) }
+
     /// `urls` are wanted, in this order; anything else waiting is dropped.
     /// Those on their way or left unanswered are not asked for twice.
     func want(_ urls: [URL]) {

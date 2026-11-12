@@ -197,6 +197,7 @@ extension FileList.Coordinator {
     /// The model can ask this list for its menu (⌃Return, ⇧F10).
     func offerMenuByKey() {
         model.reach.listMenus[side] = { [weak self] in self?.showMenuByKey() }
+        table?.onRowLabel = { [weak self] in self?.spoken($0) }
         // The system's own key for it comes to the table: the sidebar's
         // row when the keyboard is there, as with ⌃Return.
         table?.onMenuKey = { [weak self] in

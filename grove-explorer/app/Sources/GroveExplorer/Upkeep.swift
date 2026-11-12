@@ -34,6 +34,13 @@ extension AppModel {
         .filter { !isBeingEjected($0) }
     }
 
+    /// Whether a total may still come for the folder or package at `url`:
+    /// not when the walk came back with nothing (it can't be read), nor on
+    /// a disk being ejected, where nothing is walked.
+    func awaitsTotal(_ url: URL) -> Bool {
+        !sizeQueue.hasGivenUp(on: url) && !isBeingEjected(url)
+    }
+
     /// The rows in view: their totals come before the others'.
     func wantSizesFirst(for visible: [URL]) {
         sizeQueue.first(visible)
