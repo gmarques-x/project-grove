@@ -65,6 +65,7 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
         box.show(theme: theme, invalid: state.reason != nil)
 
         if state.reason != reason || (note != nil && note?.superview !== clip) {
+            if state.reason != nil, state.reason != reason { refused(box) }
             reason = state.reason
             note?.removeFromSuperview()
             note = nil
@@ -91,6 +92,18 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
         return NSRect(
             x: start, y: rowRect.minY + GroveSpace.s2, width: min(max(needed, Self.least), room),
             height: rowRect.height - GroveSpace.s4)
+    }
+
+    /// The name was refused: the field is the place to put it right. Its
+    /// editing may have ended meanwhile (a click elsewhere while the rename
+    /// waited for its turn): it counts again, and the field takes the
+    /// keyboard back, or no key would reach it and no command could run.
+    private func refused(_ box: RenameBox) {
+        done = false
+        DispatchQueue.main.async { [weak box] in
+            guard let box, let window = box.window, box.field.currentEditor() == nil else { return }
+            window.makeFirstResponder(box.field)
+        }
     }
 
     private func remove() {

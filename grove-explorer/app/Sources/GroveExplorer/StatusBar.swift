@@ -31,7 +31,7 @@ struct StatusBar: View {
 
     var body: some View {
         HStack(spacing: GroveSpace.s8) {
-            if case let .running(words, fraction, percent)? = status {
+            if case let .running(_, words, fraction, percent)? = status {
                 running(words, fraction, percent)
             } else if let notice {
                 theme.marked(notice, theme.orange).truncationMode(.middle)

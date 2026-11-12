@@ -66,6 +66,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
     }
 
+    /// Quitting (⌘Q, or the window's red button) while a file command is
+    /// in hand waits for it: its run is cancelled and stops after the file
+    /// it is on, an open prompt is answered with Cancel, what was queued is
+    /// dropped, and the app quits when that has ended (`Quitting.swift`).
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        model.quitMustWait() ? .terminateLater : .terminateNow
+    }
+
     /// The session is saved a second after each change; this is the last one.
     func applicationWillTerminate(_ notification: Notification) {
         if let commandW { NSEvent.removeMonitor(commandW) }

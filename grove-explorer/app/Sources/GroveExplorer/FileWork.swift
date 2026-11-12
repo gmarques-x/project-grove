@@ -1,20 +1,39 @@
 import AppKit
 import GroveExplorerCore
 
+/// One operation as a command issued it.
+struct OperationJob {
+    let operation: GroveExplorerCore.Operation
+    /// The pane whose status bar tells of it.
+    let side: Side
+    /// The rename field (`RenameState.id`) that waits for it: a refusal
+    /// shows there, in red.
+    var field: UUID?
+    /// What it makes is renamed in place once listed (⌘⇧N).
+    var thenRename = false
+    /// The command it is a part of, when that made several operations (a
+    /// paste of items from here and from elsewhere): Cancel in the prompt
+    /// of one gives up the others too.
+    var group: UUID?
+}
+
 /// One command that changes files, waiting for its turn or in hand.
 enum FileJob {
-    /// `side` is the pane whose status bar tells of it. `fromField`: the
-    /// rename field waits for it (a refusal shows there, in red).
-    /// `thenRename`: what it makes is renamed in place once listed (⌘⇧N).
-    case operation(GroveExplorerCore.Operation, side: Side, fromField: Bool = false, thenRename: Bool = false)
+    case operation(OperationJob)
     case undo(side: Side)
     case redo(side: Side)
+
+    var group: UUID? {
+        if case let .operation(job) = self { return job.group }
+        return nil
+    }
 }
 
 /// What a pane's status bar says of an operation.
 enum PaneStatus: Equatable {
-    /// It runs: the words, the meter from 0 to 1, "37%".
-    case running(words: String, fraction: Double, percent: String)
+    /// It runs: the words, the meter from 0 to 1, "37%"; `run` is the
+    /// run's number, which the Cancel button drawn for it stops and no other.
+    case running(run: Int, words: String, fraction: Double, percent: String)
     /// It is done: the summary. `changed`: something was done (the line is
     /// in the marked style); `hint`: ⌘Z would take it back, and it says so.
     case done(String, changed: Bool, hint: Bool)
@@ -87,6 +106,11 @@ final class FileWork: ObservableObject {
     /// comes in after its run has ended is not shown.
     var run = 0
     var runInHand: Int?
+    /// The app was asked to quit and waits for the command in hand to end:
+    /// nothing new is taken in, and nothing not yet running starts.
+    var quitting = false
+    /// It has waited ten seconds: the status bar says what for.
+    var quitIsSlow = false
     var statusTimers: [Side: Task<Void, Never>] = [:]
     var arrivals: Arrivals?
     /// Every folder a run of this window changed: an undo or a redo may

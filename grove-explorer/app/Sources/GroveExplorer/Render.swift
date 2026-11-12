@@ -78,7 +78,7 @@ enum Render {
         // and Cancel; what a move did, with ⌘Z; the items a copy could not
         // do, with the list a click shows.
         ("copying", Scene(size: wide, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
-            status: .running(words: "Copying 128 of 342 to Downloads", fraction: 0.37, percent: "37%")))),
+            status: .running(run: 1, words: "Copying 128 of 342 to Downloads", fraction: 0.37, percent: "37%")))),
         ("undo-line", Scene(
             size: wide, panes: [Sample.downloads(selected: ["config.toml", "data-export.csv", "everforest-master.zip"])],
             extras: Sample.Extras(status: .done("Moved 3 items to Downloads", changed: true, hint: true)))),

@@ -48,10 +48,7 @@ extension AppModel {
     func paste(moving: Bool) {
         guard live else { return }
         let items = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: Self.fileURLs) as? [URL] ?? []
-        let side = browser.active
-        for operation in Decide.paste(items, into: browser.activeTab.folder, moving: moving) {
-            perform(operation, in: side)
-        }
+        issue(Decide.paste(items, into: browser.activeTab.folder, moving: moving), in: browser.active)
     }
 
     /// ⌘⌥C: the selection's paths as text, one to a line.
@@ -71,7 +68,14 @@ extension AppModel {
         let items = chosenItems.map(\.url)
         guard let folder = otherPaneFolder, !items.isEmpty else { return }
         let other: Side = browser.active == .left ? .right : .left
-        for operation in Decide.paste(items, into: folder, moving: moving) { perform(operation, in: other) }
+        issue(Decide.paste(items, into: folder, moving: moving), in: other)
+    }
+
+    /// The operations one command made: several are one group, which
+    /// Cancel in the prompt of any gives up whole.
+    private func issue(_ operations: [GroveExplorerCore.Operation], in side: Side) {
+        let group = operations.count > 1 ? UUID() : nil
+        for operation in operations { perform(operation, in: side, group: group) }
     }
 
     func duplicateSelection() {
@@ -153,7 +157,7 @@ extension AppModel {
         } else {
             work.rename?.reason = nil
             work.rename?.committing = true
-            perform(operation, in: state.side, fromField: true)
+            perform(operation, in: state.side, field: state.id)
         }
     }
 
@@ -204,29 +208,44 @@ extension AppModel {
         }
     }
 
-    /// ⌘I: Finder's information window for each selected item; for the
-    /// folder itself with nothing selected. macOS asks once whether Grove
-    /// Explorer may control Finder; refused, the status bar says where to
-    /// allow it. On the main thread, where AppleScript belongs: the window
-    /// waits while macOS asks.
+    /// Every AppleScript is made and run on this one queue, never on the
+    /// main thread: the window doesn't wait for Finder, nor for macOS's
+    /// question about controlling it.
+    private static let scripts = DispatchQueue(label: "com.projectgrove.explorer.scripts")
+
+    /// ⌘I: Finder's information windows for the selected items, ten at
+    /// most, by one script; for the folder itself with nothing selected.
+    /// macOS asks once whether Grove Explorer may control Finder; refused,
+    /// the status bar says where to allow it.
     func getInfo() {
         guard live else { return }
         let side = browser.active
         let chosen = chosenItems.map(\.url)
-        for item in chosen.isEmpty ? [browser.activeTab.folder] : chosen {
-            var error: NSDictionary?
-            NSAppleScript(source: Decide.getInfoScript(for: item))?.executeAndReturnError(&error)
-            guard let error else { continue }
-            // errAEEventNotPermitted: the user said no, now or earlier.
-            if error[NSAppleScript.errorNumber] as? Int == -1743 {
-                say("Allow Grove Explorer to control Finder in Privacy Settings to use Get Info", in: side)
-            } else {
-                let why = error[NSAppleScript.errorMessage] as? String ?? "Finder didn't answer"
-                say("Get Info for \(item.lastPathComponent) didn't open: \(why)", in: side)
-            }
+        let items = chosen.isEmpty ? [browser.activeTab.folder] : chosen
+        guard items.count <= Decide.getInfoLimit else {
+            say(Decide.getInfoTooMany, in: side)
             return
         }
-        // The windows are Finder's: it comes forward with them.
-        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first?.activate()
+        let source = Decide.getInfoScript(for: items)
+        Self.scripts.async { [weak self] in
+            var error: NSDictionary?
+            NSAppleScript(source: source)?.executeAndReturnError(&error)
+            let number = error?[NSAppleScript.errorNumber] as? Int
+            let message = error?[NSAppleScript.errorMessage] as? String
+            let failed = error != nil
+            Task { @MainActor [weak self] in
+                guard failed else {
+                    // The windows are Finder's: it comes forward with them.
+                    NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first?.activate()
+                    return
+                }
+                // errAEEventNotPermitted: the user said no, now or earlier.
+                if number == -1743 {
+                    self?.say("Allow Grove Explorer to control Finder in Privacy Settings to use Get Info", in: side)
+                } else {
+                    self?.say("Get Info didn't open: \(message ?? "Finder didn't answer")", in: side)
+                }
+            }
+        }
     }
 }

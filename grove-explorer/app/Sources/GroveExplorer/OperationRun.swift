@@ -11,16 +11,20 @@ import GroveExplorerCore
 /// queue), in between.
 extension AppModel {
     /// Issues `operation`; `side` is the pane whose status bar tells of it.
+    /// `field`: the rename field that waits for it; `group`: the command
+    /// it is one part of (see `OperationJob`).
     func perform(
-        _ operation: GroveExplorerCore.Operation, in side: Side, fromField: Bool = false, thenRename: Bool = false
+        _ operation: GroveExplorerCore.Operation, in side: Side, field: UUID? = nil, thenRename: Bool = false,
+        group: UUID? = nil
     ) {
-        enqueue(.operation(operation, side: side, fromField: fromField, thenRename: thenRename))
+        enqueue(.operation(OperationJob(
+            operation: operation, side: side, field: field, thenRename: thenRename, group: group)))
     }
 
     /// Takes `job` in: started now when nothing is in hand, else it waits
     /// for the ones before it. Nothing is ever done in a render.
     func enqueue(_ job: FileJob) {
-        guard live, let first = work.pending.add(job) else { return }
+        guard live, !work.quitting, let first = work.pending.add(job) else { return }
         work.busy = true
         Task { await drain(from: first) }
     }
@@ -30,8 +34,8 @@ extension AppModel {
         var job: FileJob? = first
         while let next = job {
             switch next {
-            case let .operation(operation, side, fromField, thenRename):
-                await run(operation, in: side, fromField: fromField, thenRename: thenRename)
+            case let .operation(job):
+                await run(job)
             case let .undo(side):
                 await takeBack(redo: false, in: side)
             case let .redo(side):
@@ -44,16 +48,17 @@ extension AppModel {
         // No suspension since `finished` said none waits: a command issued
         // from here on starts a drain of its own.
         work.busy = false
+        quitIfAsked()
     }
 
     // MARK: One operation
 
-    private func run(
-        _ operation: GroveExplorerCore.Operation, in side: Side, fromField: Bool, thenRename: Bool
-    ) async {
+    private func run(_ job: OperationJob) async {
+        let operation = job.operation, side = job.side
         let runner = work.runner
-        /// The rename field still waits for this one (Escape may have closed it).
-        var field: Bool { fromField && work.rename?.committing == true }
+        /// This job's rename field still waits for it (Escape may have
+        /// closed it; another row's field is not this one's).
+        var field: Bool { job.field != nil && work.rename?.id == job.field && work.rename?.committing == true }
 
         // 1. Does it make sense at all.
         do {
@@ -68,8 +73,12 @@ extension AppModel {
         var asking = ConflictAsking(existing: [])
         if !existing.isEmpty {
             if FileCommands.asksAboutNames(operation) {
-                // Cancel gives up the whole operation: nothing runs.
-                guard let asked = await ask(about: existing, for: operation) else { return }
+                // Cancel gives up the whole operation: nothing runs, and
+                // nothing of the other operations the same command made.
+                guard let asked = await ask(about: existing, for: operation) else {
+                    if let group = job.group { work.pending.dropWaiting { $0.group == group } }
+                    return
+                }
                 asking = asked
             } else if field, case let .rename(_, name) = operation {
                 renameRefused(OperationStatus.nameTaken(name))
@@ -79,6 +88,8 @@ extension AppModel {
             // the name in use, and the failure is told below.
         }
         let plan = asking.plan, answers = asking.answers
+        // Asked to quit meanwhile: what has not begun doesn't begin.
+        guard !work.quitting else { return }
 
         // 4. The run, of the very operation the names were looked up for.
         work.run += 1
@@ -94,7 +105,7 @@ extension AppModel {
         await work.undo.record(outcome, words: outcome.summary, operation: operation, answers: answers)
         work.runInHand = nil
 
-        finished(operation, outcome, in: side, field: field, thenRename: thenRename)
+        finished(operation, outcome, in: side, field: field, thenRename: job.thenRename)
     }
 
     /// Progress of the run numbered `run`. Shown once the run has taken a
@@ -104,17 +115,23 @@ extension AppModel {
         _ progress: GroveExplorerCore.Progress, of operation: GroveExplorerCore.Operation, in side: Side, run: Int,
         since started: Date
     ) {
-        guard work.runInHand == run, Date().timeIntervalSince(started) >= 0.2 else { return }
+        guard work.runInHand == run else { return }
+        // A quit asked for before the run had begun: its cancel found
+        // nothing to stop then.
+        if work.quitting { Task { await work.runner.cancel() } }
+        guard Date().timeIntervalSince(started) >= 0.2 || work.quitIsSlow else { return }
         show(
             .running(
-                words: OperationStatus.running(operation, progress), fraction: OperationStatus.fraction(progress),
-                percent: OperationStatus.percent(progress)),
+                run: run, words: work.quitIsSlow ? Self.finishingToQuit : OperationStatus.running(operation, progress),
+                fraction: OperationStatus.fraction(progress), percent: OperationStatus.percent(progress)),
             in: side, for: nil)
     }
 
-    /// The cancel button of a status bar: the run in hand stops after the
-    /// file it is on.
-    func cancelRun() {
+    /// The Cancel button of a status bar, drawn for the run numbered `run`:
+    /// that run stops after the file it is on. A click that comes when it
+    /// has ended stops nothing (not the run after it).
+    func cancelRun(_ run: Int) {
+        guard work.runInHand == run else { return }
         Task { await work.runner.cancel() }
     }
 
@@ -166,6 +183,11 @@ extension AppModel {
             // Refused: the sentence says why, and whether the entry is gone.
             say(error.sentence, in: side)
         }
+        // What it put back or made again is selected, as after a run.
+        let restored = await work.undo.restored
+        work.arrivals = restored.isEmpty
+            ? nil : Arrivals(items: restored, renameIn: nil, until: Date().addingTimeInterval(3))
+        for side in sides { arrived(in: side) }
         // The stack doesn't tell which folders it changed: any a run of
         // this window touched may be among them.
         filesChanged(in: Array(work.touched.values))
@@ -189,6 +211,8 @@ extension AppModel {
             let question = await Task.detached {
                 Conflict.Question(incoming: incoming, existing: current, remaining: remaining)
             }.value
+            // Asked to quit while the disk was read: as Cancel.
+            guard !work.quitting else { return nil }
             let reply = await withCheckedContinuation { continuation in
                 work.reply = continuation
                 work.prompt = ConflictPromptState(

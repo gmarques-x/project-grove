@@ -56,7 +56,9 @@ struct PaneView: View {
                 StatusBar(
                     text: model.status(for: side), notice: model.notices[side], status: work.statuses[side],
                     free: listing?.free, showsFree: columns.showsKind, failuresShown: work.failuresShown == side,
-                    onCancel: { model.cancelRun() },
+                    onCancel: {
+                        if case let .running(run, _, _, _)? = work.statuses[side] { model.cancelRun(run) }
+                    },
                     onFailures: { work.failuresShown = work.failuresShown == side ? nil : side })
             }
         }
