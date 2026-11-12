@@ -62,8 +62,9 @@ struct CheatSheetView: View {
             theme.scrim
             VStack(alignment: .leading, spacing: GroveSpace.s12) {
                 HStack(alignment: .firstTextBaseline) {
+                    // Mono, as all app text: the typewriter face is the Grove wordmark's alone.
                     Text("Hyper")
-                        .font(GroveFont.lockup(17))
+                        .font(GroveFont.mono(GroveType.title, .bold))
                         .foregroundStyle(Color(theme.fg))
                     Spacer()
                     Text("⌃⌥⇧⌘ · release Caps Lock to close")
