@@ -1,0 +1,329 @@
+{
+  "information_for_contributors": [
+    "This file has been generated from data in https://github.com/jesseweed/seti-ui",
+    "- icon definitions: https://github.com/jesseweed/seti-ui/blob/master/styles/_fonts/seti.less",
+    "- icon colors: https://github.com/jesseweed/seti-ui/blob/master/styles/ui-variables.less",
+    "- file associations: https://github.com/jesseweed/seti-ui/blob/master/styles/components/icons/mapping.less",
+    "If you want to provide a fix or improvement, please create a pull request against the jesseweed/seti-ui repository.",
+    "Once accepted there, we are happy to receive an update request."
+  ],
+  "fonts": [
+    {
+      "id": "seti",
+      "src": [
+        {
+          "path": "./seti.woff",
+          "format": "woff"
+        }
+      ],
+      "weight": "normal",
+      "style": "normal",
+      "size": "150%"
+    }
+  ],
+  "iconDefinitions": {
+    "_c_light": {
+      "fontCharacter": "\\E00C",
+      "fontColor": "#3A94C5"
+    },
+    "_c": {
+      "fontCharacter": "\\E00C",
+      "fontColor": "#7FBBB3"
+    },
+    "_c_1_light": {
+      "fontCharacter": "\\E00C",
+      "fontColor": "#DF69BA"
+    },
+    "_c_1": {
+      "fontCharacter": "\\E00C",
+      "fontColor": "#D699B6"
+    },
+    "_clock_light": {
+      "fontCharacter": "\\E012",
+      "fontColor": "#3A94C5"
+    },
+    "_clock": {
+      "fontCharacter": "\\E012",
+      "fontColor": "#7FBBB3"
+    },
+    "_config_light": {
+      "fontCharacter": "\\E019",
+      "fontColor": "#939F91"
+    },
+    "_config": {
+      "fontCharacter": "\\E019",
+      "fontColor": "#859289"
+    },
+    "_cpp_1_light": {
+      "fontCharacter": "\\E01A",
+      "fontColor": "#DF69BA"
+    },
+    "_cpp_1": {
+      "fontCharacter": "\\E01A",
+      "fontColor": "#D699B6"
+    },
+    "_css_light": {
+      "fontCharacter": "\\E01D",
+      "fontColor": "#3A94C5"
+    },
+    "_css": {
+      "fontCharacter": "\\E01D",
+      "fontColor": "#7FBBB3"
+    },
+    "_default_light": {
+      "fontCharacter": "\\E023",
+      "fontColor": "#5C6A72"
+    },
+    "_default": {
+      "fontCharacter": "\\E023",
+      "fontColor": "#D3C6AA"
+    },
+    "_docker_light": {
+      "fontCharacter": "\\E025",
+      "fontColor": "#3A94C5"
+    },
+    "_docker": {
+      "fontCharacter": "\\E025",
+      "fontColor": "#7FBBB3"
+    },
+    "_git_light": {
+      "fontCharacter": "\\E034",
+      "fontColor": "#A6B0A0"
+    },
+    "_git": {
+      "fontCharacter": "\\E034",
+      "fontColor": "#7A8478"
+    },
+    "_image_light": {
+      "fontCharacter": "\\E04C",
+      "fontColor": "#DF69BA"
+    },
+    "_image": {
+      "fontCharacter": "\\E04C",
+      "fontColor": "#D699B6"
+    },
+    "_info_light": {
+      "fontCharacter": "\\E04D",
+      "fontColor": "#3A94C5"
+    },
+    "_info": {
+      "fontCharacter": "\\E04D",
+      "fontColor": "#7FBBB3"
+    },
+    "_javascript_light": {
+      "fontCharacter": "\\E051",
+      "fontColor": "#DFA000"
+    },
+    "_javascript": {
+      "fontCharacter": "\\E051",
+      "fontColor": "#DBBC7F"
+    },
+    "_json_light": {
+      "fontCharacter": "\\E055",
+      "fontColor": "#DFA000"
+    },
+    "_json": {
+      "fontCharacter": "\\E055",
+      "fontColor": "#DBBC7F"
+    },
+    "_karma_light": {
+      "fontCharacter": "\\E057",
+      "fontColor": "#8DA101"
+    },
+    "_karma": {
+      "fontCharacter": "\\E057",
+      "fontColor": "#A7C080"
+    },
+    "_kotlin_light": {
+      "fontCharacter": "\\E058",
+      "fontColor": "#F57D26"
+    },
+    "_kotlin": {
+      "fontCharacter": "\\E058",
+      "fontColor": "#E69875"
+    },
+    "_license_light": {
+      "fontCharacter": "\\E05A",
+      "fontColor": "#DFA000"
+    },
+    "_license": {
+      "fontCharacter": "\\E05A",
+      "fontColor": "#DBBC7F"
+    },
+    "_makefile_light": {
+      "fontCharacter": "\\E05F",
+      "fontColor": "#F57D26"
+    },
+    "_makefile": {
+      "fontCharacter": "\\E05F",
+      "fontColor": "#E69875"
+    },
+    "_markdown_light": {
+      "fontCharacter": "\\E060",
+      "fontColor": "#3A94C5"
+    },
+    "_markdown": {
+      "fontCharacter": "\\E060",
+      "fontColor": "#7FBBB3"
+    },
+    "_pdf_light": {
+      "fontCharacter": "\\E06D",
+      "fontColor": "#F85552"
+    },
+    "_pdf": {
+      "fontCharacter": "\\E06D",
+      "fontColor": "#E67E80"
+    },
+    "_python_light": {
+      "fontCharacter": "\\E07B",
+      "fontColor": "#3A94C5"
+    },
+    "_python": {
+      "fontCharacter": "\\E07B",
+      "fontColor": "#7FBBB3"
+    },
+    "_shell_light": {
+      "fontCharacter": "\\E089",
+      "fontColor": "#8DA101"
+    },
+    "_shell": {
+      "fontCharacter": "\\E089",
+      "fontColor": "#A7C080"
+    },
+    "_swift_light": {
+      "fontCharacter": "\\E092",
+      "fontColor": "#F57D26"
+    },
+    "_swift": {
+      "fontCharacter": "\\E092",
+      "fontColor": "#E69875"
+    },
+    "_todo_light": {
+      "fontCharacter": "\\E096",
+      "fontColor": "#5C6A72"
+    },
+    "_todo": {
+      "fontCharacter": "\\E096",
+      "fontColor": "#D3C6AA"
+    },
+    "_typescript_light": {
+      "fontCharacter": "\\E099",
+      "fontColor": "#3A94C5"
+    },
+    "_typescript": {
+      "fontCharacter": "\\E099",
+      "fontColor": "#7FBBB3"
+    },
+    "_typescript_1_light": {
+      "fontCharacter": "\\E099",
+      "fontColor": "#F57D26"
+    },
+    "_typescript_1": {
+      "fontCharacter": "\\E099",
+      "fontColor": "#E69875"
+    },
+    "_yarn_light": {
+      "fontCharacter": "\\E0A6",
+      "fontColor": "#3A94C5"
+    },
+    "_yarn": {
+      "fontCharacter": "\\E0A6",
+      "fontColor": "#7FBBB3"
+    },
+    "_yml_light": {
+      "fontCharacter": "\\E0A7",
+      "fontColor": "#DF69BA"
+    },
+    "_yml": {
+      "fontCharacter": "\\E0A7",
+      "fontColor": "#D699B6"
+    },
+    "_zip_1_light": {
+      "fontCharacter": "\\E0A9",
+      "fontColor": "#939F91"
+    },
+    "_zip_1": {
+      "fontCharacter": "\\E0A9",
+      "fontColor": "#859289"
+    }
+  },
+  "file": "_default",
+  "fileExtensions": {
+    "h": "_c_1",
+    "hpp": "_cpp_1",
+    "toml": "_config",
+    "png": "_image",
+    "jpg": "_image",
+    "pdf": "_pdf",
+    "zip": "_zip_1",
+    "kt": "_kotlin",
+    "spec.ts": "_typescript_1",
+    "css.map": "_css",
+    "gitattributes": "_git"
+  },
+  "fileNames": {
+    "readme.md": "_info",
+    "readme": "_info",
+    "changelog.md": "_clock",
+    "license": "_license",
+    "todo.txt": "_todo",
+    "yarn.lock": "_yarn",
+    "karma.conf.js": "_karma"
+  },
+  "languageIds": {
+    "swift": "_swift",
+    "markdown": "_markdown",
+    "makefile": "_makefile",
+    "dockerfile": "_docker",
+    "json": "_json",
+    "javascript": "_javascript",
+    "typescript": "_typescript",
+    "python": "_python",
+    "shellscript": "_shell",
+    "c": "_c",
+    "css": "_css",
+    "yaml": "_yml",
+    "ignore": "_git"
+  },
+  "light": {
+    "file": "_default_light",
+    "fileExtensions": {
+      "h": "_c_1_light",
+      "hpp": "_cpp_1_light",
+      "toml": "_config_light",
+      "png": "_image_light",
+      "jpg": "_image_light",
+      "pdf": "_pdf_light",
+      "zip": "_zip_1_light",
+      "kt": "_kotlin_light",
+      "spec.ts": "_typescript_1_light",
+      "css.map": "_css_light",
+      "gitattributes": "_git_light"
+    },
+    "fileNames": {
+      "readme.md": "_info_light",
+      "readme": "_info_light",
+      "changelog.md": "_clock_light",
+      "license": "_license_light",
+      "todo.txt": "_todo_light",
+      "yarn.lock": "_yarn_light",
+      "karma.conf.js": "_karma_light"
+    },
+    "languageIds": {
+      "swift": "_swift_light",
+      "markdown": "_markdown_light",
+      "makefile": "_makefile_light",
+      "dockerfile": "_docker_light",
+      "json": "_json_light",
+      "javascript": "_javascript_light",
+      "typescript": "_typescript_light",
+      "python": "_python_light",
+      "shellscript": "_shell_light",
+      "c": "_c_light",
+      "css": "_css_light",
+      "yaml": "_yml_light",
+      "ignore": "_git_light"
+    }
+  },
+  "version": "https://github.com/jesseweed/seti-ui/commit/2d6c5e68b4ded73c92dac291845ee44e1182d511"
+}
