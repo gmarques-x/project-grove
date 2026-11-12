@@ -276,7 +276,7 @@ struct BindingsView: View {
             if d.slot == nil, recorder.recording != row, clash.wrappedValue?.row != row {
                 hint("Click the first box and press the shortcut")
             } else if d.slot != nil {
-                hint("↩ saves · a, b runs both")
+                hint(GroveIcon.text(.run, size: GroveType.body) + Text(" saves · a, b runs both"))
             }
         }
     }
@@ -496,8 +496,10 @@ struct BindingsView: View {
         .buttonStyle(.plain)
     }
 
-    private func hint(_ text: String) -> some View {
-        Text(text)
+    private func hint(_ text: String) -> some View { hint(Text(text)) }
+
+    private func hint(_ text: Text) -> some View {
+        text
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
             .frame(maxWidth: .infinity, alignment: .leading)

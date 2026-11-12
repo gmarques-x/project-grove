@@ -133,7 +133,7 @@ private struct CheatSearchView: View {
                      query: sheet.query, placeholder: "Type to find a key",
                      onQuery: { sheet.query = $0 }, onMove: sheet.move,
                      onReturn: sheet.runSelection, onClose: sheet.close) {
-            Text("↑↓ move · ↩ run · esc close")
+            (Text("↑↓ move · ") + GroveIcon.text(.run, size: GroveType.body) + Text(" run · esc close"))
                 .font(GroveFont.mono(GroveType.body))
                 .foregroundStyle(theme.quiet)
                 .fixedSize()

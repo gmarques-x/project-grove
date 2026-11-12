@@ -262,7 +262,8 @@ struct KeyEditorPopover: View {
                                 set(.aerospace(command: text.wrappedValue))
                             },
                             onEscape: { dismiss() })
-                Text("AeroSpace syntax · ↩ saves").foregroundStyle(theme.quiet).font(GroveFont.mono(GroveType.body))
+                (Text("AeroSpace syntax · ") + GroveIcon.text(.run, size: GroveType.body) + Text(" saves"))
+                    .foregroundStyle(theme.quiet).font(GroveFont.mono(GroveType.body))
                     .fixedSize()
             }
             .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s8)

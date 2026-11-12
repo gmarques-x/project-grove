@@ -4,8 +4,10 @@ import SwiftUI
 ///
 /// Decided by the owner from comparison renders on 2026-11-12: Grove's icons
 /// are SF Symbols, not characters typed in the text face (− + ▾ ✓ ↩ ●, as
-/// they were until then). Key legends (⌥ ⇧ ⌘ ← ↩ in a key's name or a hint)
-/// are text and stay text; Grove's own marks are shapes (`PineShape`).
+/// they were until then), the Return mark in a hint line included. Key
+/// legends (⌥ ⇧ ⌘ ← in a key's name) are text and stay text, as does
+/// anything in a tooltip, which can only hold text; Grove's own marks are
+/// shapes (`PineShape`).
 ///
 /// One sizing rule for every icon: the system font at the size of the text
 /// the icon sits beside (a `GroveType` value), weight `.medium` (`.bold`
