@@ -83,7 +83,7 @@ final class CheatSearchPanel: ObservableObject {
         switch row.action {
         case .none: break
         case .launch(let bundleID): _ = Launcher.open(bundleID: bundleID)
-        case .run(let steps): Self.run(steps)
+        case .run(let steps): Self.run(steps, row: row.keys + " " + row.text)
         }
     }
 
@@ -91,7 +91,7 @@ final class CheatSearchPanel: ObservableObject {
     /// shell commands follow in order, off the main thread, after a moment:
     /// they act on the focused window, and the app that was in front must
     /// have the keyboard back by then.
-    private static func run(_ steps: [CheatStep]) {
+    private static func run(_ steps: [CheatStep], row: String) {
         for case .link(let link) in steps { Links.answer(link) }
         let commands = steps.filter { step in
             if case .link = step { return false }
@@ -103,7 +103,7 @@ final class CheatSearchPanel: ObservableObject {
             for command in commands {
                 switch command {
                 case .aerospace(let arguments): aerospace.run(arguments)
-                case .shell(let shell): MenuShell.spawn(shell)
+                case .shell(let shell): MenuShell.spawn(shell, row: row)
                 case .link: break  // answered above
                 }
             }

@@ -49,7 +49,7 @@ final class PointerMenu: NSObject {
     /// popped up at the pointer.
     func showRow(id: String) {
         guard let row = groveMenu().row(id: id) else {
-            NSLog("Grove Keys: no row \"%@\" in the Grove menu", id)
+            FailureNotice.show(.unknownRow(id: id))
             return
         }
         if let action = row.action {

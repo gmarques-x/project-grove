@@ -79,7 +79,7 @@ final class GlobalMenu: NSObject, NSMenuDelegate {
             MainActor.assumeIsolated {
                 MenuPress.run(path, in: source, bringForward: { Self.whenFront(pid, $0) }) { pressed in
                     if !pressed {
-                        NSLog("Grove Keys: menu item gone: %@", path.steps.map(\.title).joined(separator: " › "))
+                        FailureNotice.show(.menuItemGone(path: path.steps.map(\.title)))
                     }
                 }
             }

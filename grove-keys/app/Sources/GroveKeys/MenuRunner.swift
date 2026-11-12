@@ -9,7 +9,7 @@ enum MenuRunner {
 
     static func run(_ action: GroveMenuAction, title: String) {
         if let command = action.shellCommand(title: title) {
-            MenuShell.spawn(command)
+            MenuShell.spawn(command, row: title)
             return
         }
         let model = AppModel.shared
@@ -20,7 +20,7 @@ enum MenuRunner {
             switch OpenTarget(text, home: home) {
             case .link(let link): Links.answer(link)
             case .url(let url): NSWorkspace.shared.open(url)
-            case nil: NSLog("Grove Keys: nothing to open in \"%@\"", text)
+            case nil: FailureNotice.show(.nothingToOpen(row: title, target: text))
             }
         case .builtin(.lock): ScreenLock.lock()
         case .builtin(.keys): PointerMenu.shared.show()
@@ -53,10 +53,11 @@ extension MenuShell {
         return process
     }
 
-    /// Starts the command and doesn't wait for it.
-    static func spawn(_ command: String) {
+    /// Starts the command and doesn't wait for it. `row`: what the user
+    /// chose, for the notice if it can't be started.
+    static func spawn(_ command: String, row: String) {
         do { try process(command).run() } catch {
-            NSLog("Grove Keys: cannot run \"%@\": %@", command, error.localizedDescription)
+            FailureNotice.show(.cannotStart(row: row, reason: error.localizedDescription))
         }
     }
 }
@@ -104,7 +105,7 @@ enum ScreenLock {
         pmset.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
         pmset.arguments = ["displaysleepnow"]
         do { try pmset.run() } catch {
-            NSLog("Grove Keys: cannot lock the screen: %@", error.localizedDescription)
+            FailureNotice.show(.cannotLock(reason: error.localizedDescription))
         }
     }
 }
