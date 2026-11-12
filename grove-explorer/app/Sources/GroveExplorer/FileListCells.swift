@@ -100,7 +100,6 @@ class TextCellView: NSView {
     var text = "" {
         didSet {
             guard text != oldValue else { return }
-            setAccessibilityValue(text)
             needsDisplay = true
         }
     }
@@ -110,10 +109,11 @@ class TextCellView: NSView {
     /// The gap before the column, inside the cell.
     var leading: CGFloat = 0
 
+    /// Drawn, not a control: VoiceOver is told nothing by a cell of the
+    /// quiet columns. The row is said whole by its name's cell.
     required override init(frame: NSRect) {
         super.init(frame: frame)
-        setAccessibilityElement(true)
-        setAccessibilityRole(.staticText)
+        setAccessibilityElement(false)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -140,6 +140,19 @@ class TextCellView: NSView {
 /// its extension kept when it is too long.
 final class NameCellView: TextCellView {
     var icon: EntryIcon? { didSet { needsDisplay = true } }
+    /// The row as VoiceOver says it (`Spoken.row`): the name, the kind,
+    /// the size and the date, whichever columns the pane has room for.
+    var spoken = "" {
+        didSet { if spoken != oldValue { setAccessibilityValue(spoken) } }
+    }
+
+    required init(frame: NSRect) {
+        super.init(frame: frame)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+    }
+
+    required init?(coder: NSCoder) { nil }
     var theme = ThemeColors.fallback
     /// A hidden item: its icon is dimmed.
     var dimmed = false
@@ -185,6 +198,16 @@ final class FileTableView: NSTableView {
     }
     /// A right-click on a row (-1: on the list's empty space): the menu to show.
     var onMenu: ((Int) -> NSMenu?)?
+    /// The rename field over a row. It lies beside the table in the clip
+    /// view (`RenameEditor`), where VoiceOver would not come by it: it is
+    /// counted among the table's own.
+    weak var renameField: NSView?
+
+    override func accessibilityChildren() -> [Any]? {
+        guard let renameField else { return super.accessibilityChildren() }
+        return (super.accessibilityChildren() ?? []) + [renameField]
+    }
+
     /// The system's key for a context menu (⌃Return unless the user chose
     /// another), or VoiceOver's "show menu", came to the list.
     var onMenuKey: (() -> Void)?

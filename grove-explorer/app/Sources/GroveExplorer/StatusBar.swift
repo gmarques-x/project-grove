@@ -49,6 +49,7 @@ struct StatusBar: View {
                 }
                 .buttonStyle(.plain)
                 .help("Show which, and why")
+                .accessibilityHint("Shows which, and why")
                 .accessibilityValue(failuresShown ? "list shown" : "")
                 if changed { Text(verbatim: "· " + OperationStatus.undoHint).fixedSize() }
             } else {
@@ -86,6 +87,7 @@ struct StatusBar: View {
         PanelButton("Cancel", icon: .close, action: onCancel)
             .fixedSize()
             .help("Stop after the file it is on")
+            .accessibilityLabel("Cancel the operation")
     }
 }
 

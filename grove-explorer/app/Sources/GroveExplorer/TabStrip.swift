@@ -76,6 +76,10 @@ struct TabStrip: View {
             .accessibilityLabel(tab.title)
             .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.showTab(index, in: side) }
+            // The close mark is there only under the pointer: VoiceOver has it as the tab's action.
+            .accessibilityActions {
+                if closes { Button(Spoken.closeTab(tab.title)) { model.closeTab(index, in: side) } }
+            }
             .overlay(alignment: .leading) {
                 if pointed, closes {
                     Button { model.closeTab(index, in: side) } label: {
@@ -85,7 +89,7 @@ struct TabStrip: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Close \(tab.title)")
+                    .accessibilityLabel(Spoken.closeTab(tab.title))
                     .help("Close tab")
                 }
             }

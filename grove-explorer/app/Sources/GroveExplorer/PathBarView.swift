@@ -61,6 +61,8 @@ struct PathBarView: View {
             if inside { hovered.wrappedValue = part.url } else if hovered.wrappedValue == part.url { hovered.wrappedValue = nil }
         }
         .accessibilityLabel(part.title)
+        // The folder showing is the current one of the path.
+        .accessibilityAddTraits(last ? .isSelected : [])
     }
 }
 
@@ -78,6 +80,7 @@ struct PathField: View {
     var body: some View {
         HStack(spacing: GroveSpace.s8) {
             PathTextField(model: model, text: state.text, theme: theme)
+                .accessibilityLabel(state.missing ? "Path, there is no such folder" : "Path")
             if showsHint {
                 (GroveIcon.text(.run, size: GroveType.finePrint) + Text(verbatim: " go · esc cancel · tab completes"))
                     .font(GroveFont.mono(GroveType.finePrint))

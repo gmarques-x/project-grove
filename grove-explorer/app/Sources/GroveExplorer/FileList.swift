@@ -34,7 +34,6 @@ struct FileList: NSViewRepresentable {
         table.columnAutoresizingStyle = .noColumnAutoresizing
         // The selection shows where the keys are; no ring round the list.
         table.focusRingType = .none
-        table.setAccessibilityLabel("Files")
         for id in Column.allCases {
             let column = NSTableColumn(identifier: id.identifier)
             column.resizingMask = []
@@ -174,6 +173,8 @@ struct FileList: NSViewRepresentable {
                     if folder != nil { scrollToTop(table) }
                     folder = path
                 }
+                // The table is called by its folder's name.
+                table.setAccessibilityLabel(model.browser.tab(side)?.title ?? listing.folder.lastPathComponent)
                 reportVisible()
             }
             if reloadVisible {
@@ -295,6 +296,8 @@ struct FileList: NSViewRepresentable {
                 cell.color = entry.isHidden ? NSColor(theme.hiddenText) : NSColor(theme.fg)
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
+                cell.spoken = Spoken.row(
+                    entry, total: model.sizes[entry.url], date: entry.modified == nil ? nil : date(of: entry))
                 return cell
             case .size:
                 let cell = detail(tableColumn.identifier, in: tableView, theme)

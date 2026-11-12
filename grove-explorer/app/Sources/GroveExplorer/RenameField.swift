@@ -61,12 +61,18 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
         // row views over anything of its own, and takes them out on a
         // reload. Laid out in the table's measures, so it scrolls with the row.
         if box.superview !== clip { clip.addSubview(box, positioned: .above, relativeTo: table) }
+        if let list = table as? FileTableView, list.renameField !== box.field {
+            list.renameField = box.field
+            box.field.setAccessibilityParent(table)
+        }
         box.frame = clip.convert(frame(for: box.field.stringValue, row: row, in: table), from: table)
         box.show(theme: theme, invalid: state.reason != nil)
 
         if state.reason != reason || (note != nil && note?.superview !== clip) {
             if state.reason != nil, state.reason != reason { refused(box) }
             reason = state.reason
+            // The reason beneath is the field's to say.
+            box.say(state.reason.map { "Name, " + $0 } ?? "Name")
             note?.removeFromSuperview()
             note = nil
             if let reason = state.reason {
@@ -177,8 +183,15 @@ private final class RenameBox: NSView {
         field.lineBreakMode = .byClipping
         field.cell?.usesSingleLineMode = true
         field.cell?.isScrollable = true
-        field.setAccessibilityLabel("Name")
         addSubview(field)
+        say("Name")
+    }
+
+    /// What VoiceOver calls the field. Its cell is the element VoiceOver
+    /// meets, and has no words of the field's unless told too.
+    func say(_ label: String) {
+        field.setAccessibilityLabel(label)
+        field.cell?.setAccessibilityLabel(label)
     }
 
     required init?(coder: NSCoder) { nil }

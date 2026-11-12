@@ -73,6 +73,10 @@ struct PaneView: View {
             }
         }
         .background(Color(theme.bg0))
+        // One thing to VoiceOver, with its tabs, path, list and status
+        // inside: "Left pane, active".
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Spoken.pane(side, of: model.sides.count, active: model.browser.active == side))
     }
 
     /// The items the pane's last operation could not do, over the foot of
@@ -159,7 +163,9 @@ private struct ColumnHeader: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Sort by \(name)")
-        .accessibilityValue(sorted ? (sort.ascending ? "ascending" : "descending") : "")
+        // "Name, sorted ascending"; what a click does is the hint.
+        .accessibilityLabel(name)
+        .accessibilityValue(Spoken.sorted(sorted, ascending: sort.ascending))
+        .accessibilityHint(sorted ? "Reverses the order" : "Sorts by \(name)")
     }
 }
