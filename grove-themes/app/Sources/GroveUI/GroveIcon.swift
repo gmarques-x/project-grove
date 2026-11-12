@@ -112,6 +112,18 @@ public struct GroveIcon: View {
         /// The column a list is sorted by, ascending; turned upside down
         /// (by the header that draws it) for descending.
         case sorted = "chevron.up"
+        /// Close this (a tab's own button).
+        case close = "xmark"
+        /// Eject a disk.
+        case eject = "eject.fill"
+        /// The Trash.
+        case trash = "trash"
+        /// iCloud Drive.
+        case cloud = "icloud"
+        /// The window shows one pane.
+        case onePane = "rectangle"
+        /// The window shows two panes side by side.
+        case twoPanes = "rectangle.split.2x1"
 
         /// The SF Symbol's name.
         public var symbol: String { rawValue }

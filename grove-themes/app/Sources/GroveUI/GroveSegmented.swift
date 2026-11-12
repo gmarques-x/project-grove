@@ -5,6 +5,9 @@ import SwiftUI
 public struct GroveSegment<Value: Hashable>: Identifiable {
     public var value: Value
     public var title: String
+    /// Drawn in the title's place (the title is then what VoiceOver and the
+    /// tooltip say): a segment that is a picture, as the one-pane/two-pane switch.
+    public var icon: GroveIcon.Name?
     /// A second label after the title, smaller and quieter (a count).
     public var detail: String?
     /// False: drawn at `GroveSegmentedMetrics.disabledOpacity`, skipped by
@@ -17,10 +20,11 @@ public struct GroveSegment<Value: Hashable>: Identifiable {
 
     public var id: Value { value }
 
-    public init(_ value: Value, _ title: String, detail: String? = nil, enabled: Bool = true, help: String = "",
-                shortcut: KeyEquivalent? = nil) {
+    public init(_ value: Value, _ title: String, icon: GroveIcon.Name? = nil, detail: String? = nil,
+                enabled: Bool = true, help: String = "", shortcut: KeyEquivalent? = nil) {
         self.value = value
         self.title = title
+        self.icon = icon
         self.detail = detail
         self.enabled = enabled
         self.help = help
@@ -35,6 +39,9 @@ public enum GroveSegmentedStyle: Sendable {
     case pill(Surface)
     /// No pill behind the segments (the layer picker).
     case bare
+    /// A 1 pt line round the segments and nothing behind them: a small
+    /// switch in a window's header, on the window's own background.
+    case outlined
 }
 
 /// What a `GroveSegmented` is to VoiceOver.
@@ -49,6 +56,9 @@ public enum GroveSegmentedRole: Sendable {
 public enum GroveSegmentedMetrics {
     /// A segment that can't be chosen: faded to this.
     public static let disabledOpacity: Double = 0.4
+    /// A segment that is an icon: a little wider than a 24 pt control is
+    /// tall, and 4 pt less high, so the outlined switch is 24 pt in all.
+    public static let iconSegment = CGSize(width: GroveSpace.s24 + GroveSpace.s4, height: GroveSpace.s24 - GroveSpace.s4)
 }
 
 /// Which segment ←/→ move to. Pure.
@@ -111,7 +121,7 @@ public struct GroveSegmented<Value: Hashable>: View {
     }
 
     public var body: some View {
-        let row = HStack(spacing: fillsWidth ? GroveSpace.s2 : GroveSpace.s4) {
+        let row = HStack(spacing: fillsWidth || isOutlined ? GroveSpace.s2 : GroveSpace.s4) {
             ForEach(segments) { segment in
                 self.segment(segment)
             }
@@ -146,30 +156,51 @@ public struct GroveSegmented<Value: Hashable>: View {
                 .lightOutline(cornerRadius: GroveRadius.control)
         case .bare:
             row
+        case .outlined:
+            row.padding(GroveSpace.s2)
+                .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
+        }
+    }
+
+    private var isOutlined: Bool {
+        if case .outlined = style { return true }
+        return false
+    }
+
+    /// A segment's inside: its icon in a fixed cell, or its title (and detail).
+    @ViewBuilder
+    private func label(_ segment: GroveSegment<Value>, on: Bool) -> some View {
+        if let icon = segment.icon {
+            GroveIcon(icon, size: GroveType.label)
+                .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
+                .frame(width: GroveSegmentedMetrics.iconSegment.width, height: GroveSegmentedMetrics.iconSegment.height)
+        } else {
+            HStack(spacing: GroveSpace.s4) {
+                Text(segment.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
+                if let detail = segment.detail {
+                    Text(detail)
+                        .font(GroveFont.mono(GroveType.finePrint))
+                        .foregroundStyle(theme.quiet(dark: 0.8))
+                }
+            }
+            .lineLimit(1)
+            .frame(maxWidth: fillsWidth ? .infinity : nil)
+            .padding(.horizontal, fillsWidth ? 0 : GroveSpace.s12).padding(.vertical, GroveSpace.s4)
         }
     }
 
     private func segment(_ segment: GroveSegment<Value>) -> some View {
         let on = segment.value == selection
-        return HStack(spacing: GroveSpace.s4) {
-            Text(segment.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
-            if let detail = segment.detail {
-                Text(detail)
-                    .font(GroveFont.mono(GroveType.finePrint))
-                    .foregroundStyle(theme.quiet(dark: 0.8))
-            }
-        }
-        .lineLimit(1)
-        .frame(maxWidth: fillsWidth ? .infinity : nil)
-        .padding(.horizontal, fillsWidth ? 0 : GroveSpace.s12).padding(.vertical, GroveSpace.s4)
+        return label(segment, on: on)
         // Lit as on a panel wherever it sits: the three sites were tuned at bg3.
-        .background(on ? theme.selectedFill(on: .panel) : .clear,
+        // (The outlined switch sits on the window itself: lit as on bg0.)
+        .background(on ? theme.selectedFill(on: isOutlined ? .base : .panel) : .clear,
                     in: RoundedRectangle(cornerRadius: GroveRadius.inline))
         .lightOutline(cornerRadius: GroveRadius.inline, when: on)
         .contentShape(Rectangle())
         .onTapGesture { if segment.enabled { onSelect(segment.value) } }
         .opacity(segment.enabled ? 1 : GroveSegmentedMetrics.disabledOpacity)
-        .help(segment.help)
+        .help(segment.help.isEmpty && segment.icon != nil ? segment.title : segment.help)
         // A trait, not a `Button`: each button would be a Tab stop of its own.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(segment.detail.map { "\(segment.title), \($0)" } ?? segment.title)
