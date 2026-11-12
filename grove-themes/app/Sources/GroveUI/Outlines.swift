@@ -11,9 +11,10 @@ extension View {
     }
 
     /// The keyboard focus box: a 2 pt rounded outline in the current scheme's
-    /// green, `outset` points outside the view (tiles and cards: 5, a 3 pt gap
-    /// outside their own 2 pt border; menu rows: 0, on the row's edge). The
-    /// one focus style in both apps.
+    /// green, `outset` points outside the view (tiles and cards: 5, clear
+    /// of their own 1 pt line; menu rows: 0, on the row's edge). The one
+    /// focus style in both apps, and the only 2 pt green outline: "current"
+    /// is a 1 pt green line and a mark.
     public func focusBox(_ shown: Bool, cornerRadius: CGFloat, outset: CGFloat) -> some View {
         modifier(FocusBox(shown: shown, cornerRadius: cornerRadius, outset: outset))
     }

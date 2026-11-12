@@ -49,8 +49,10 @@ private func configFolder() -> URL {
 
 /// One choice in the gallery (a terminal logo or a wallpaper set): its image
 /// on a small panel in the current scheme, then its name; green border when
-/// chosen.
+/// (1 pt) and "● on" when chosen.
 struct ChoiceCard: View {
+    /// What is being chosen, for VoiceOver: "Terminal logo", "Wallpaper".
+    let kind: String
     let name: String
     let image: NSImage?
     let isCurrent: Bool
@@ -90,8 +92,8 @@ struct ChoiceCard: View {
             }
             .padding(GroveSpace.s8)
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
-                                   lineWidth: isCurrent ? 2 : 1)
+                // Current: a 1 pt green line and "● on". The 2 pt green box is the focus only.
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1)
             }
             .contentShape(shape)
         }
@@ -99,11 +101,15 @@ struct ChoiceCard: View {
         .focusable(false)
         .focusEffectDisabled()
         .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
+        .accessibilityLabel(kind + ": " + choiceName(name))
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }
 
 /// A choice in the dropdown: its name, a dot when chosen.
 struct ChoicePill: View {
+    /// What is being chosen, for VoiceOver: "Terminal logo", "Wallpaper".
+    let kind: String
     let name: String
     let isCurrent: Bool
     let isBusy: Bool
@@ -132,6 +138,8 @@ struct ChoicePill: View {
         .focusable(false)
         .focusEffectDisabled()
         .focusBox(isFocused, cornerRadius: GroveRadius.control, outset: 3)
+        .accessibilityLabel(kind + ": " + choiceName(name))
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }
 
@@ -145,5 +153,6 @@ struct ChoiceRowLabel: View {
             .font(GroveFont.mono(GroveType.finePrint))
             .tracking(0.8)
             .foregroundStyle(theme.quiet)
+            .accessibilityAddTraits(.isHeader)
     }
 }

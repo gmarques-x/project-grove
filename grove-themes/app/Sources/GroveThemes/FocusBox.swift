@@ -8,6 +8,13 @@ import SwiftUI
 /// system focus ring, turns arrows and Ctrl+h/j/k/l, Return/Space and Esc into
 /// focus commands, and hides the box on a mouse click in the window or when
 /// the window opens, closes or stops being key.
+///
+/// A focus model of its own, not `@FocusState` on each tile, on purpose,
+/// in the gallery too (an ordinary window, where native focus would work):
+/// the dropdown and the gallery share one model and one set of tests; the
+/// moves are two-dimensional (↓ from a scheme lands on the logo under it),
+/// which the system's Tab order doesn't do; Ctrl+H/J/K/L move as the arrows
+/// do; and in a `.window` MenuBarExtra native focus is unreliable.
 struct KeyboardNavigation: ViewModifier {
     let focus: Binding<KeyboardFocus>
     let current: String

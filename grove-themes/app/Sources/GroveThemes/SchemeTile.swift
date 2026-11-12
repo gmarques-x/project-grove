@@ -42,8 +42,8 @@ struct SchemeTile: View {
                 }
             }
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.softLine(dark: 0.22),
-                                   lineWidth: isCurrent ? 2 : 1)
+                // Current: a 1 pt green line and the ✓. The 2 pt green box is the focus only.
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.softLine(dark: 0.22), lineWidth: 1)
             }
             .contentShape(shape)
         }
@@ -52,5 +52,8 @@ struct SchemeTile: View {
         .focusEffectDisabled()
         .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
         .help(StatusText.displayName(scheme))
+        // "Dark Medium", not the tile's "Aa" and "Medium".
+        .accessibilityLabel(StatusText.displayName(scheme))
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 }

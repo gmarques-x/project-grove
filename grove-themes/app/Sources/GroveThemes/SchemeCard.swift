@@ -31,8 +31,8 @@ struct SchemeCard: View {
             }
             .padding(GroveSpace.s8)
             .overlay {
-                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
-                                   lineWidth: isCurrent ? 2 : 1)
+                // Current: a 1 pt green line and "● on". The 2 pt green box is the focus only.
+                shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1)
             }
             .contentShape(shape)
         }
@@ -40,6 +40,8 @@ struct SchemeCard: View {
         .focusable(false)
         .focusEffectDisabled()
         .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
+        .accessibilityLabel(StatusText.displayName(scheme))
+        .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
 
     private var desktop: some View {
@@ -73,5 +75,7 @@ struct SchemeCard: View {
                 .padding(.leading, 8)
                 .padding(.bottom, 7)
             }
+            // A drawing: its "Project Grove" and "❯ ls" are not the card's name.
+            .accessibilityHidden(true)
     }
 }

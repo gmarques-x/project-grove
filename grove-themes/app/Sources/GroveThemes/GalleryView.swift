@@ -3,8 +3,8 @@ import GroveUI
 import SwiftUI
 
 /// The "Grove Themes" window: the six desktop cards, then the terminal logo
-/// row (the switch log stays in the CLI, `grove-themes log`; the dropdown
-/// keeps the status line).
+/// and wallpaper rows. A CLI error is said in one line at the top, here and
+/// in the dropdown; the switch log stays in the CLI (`grove-themes log`).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
     /// The window fits the cards: 760 wide, as tall as they need (≈ 762 pt:
@@ -46,7 +46,7 @@ struct GalleryView: View {
                     ChoiceRowLabel(title: "TERMINAL LOGO")
                     HStack(spacing: GroveSpace.s12) {
                         ForEach(list.logos, id: \.self) { logo in
-                            ChoiceCard(name: logo, image: logoImage(logo, scheme: list.current),
+                            ChoiceCard(kind: "Terminal logo", name: logo, image: logoImage(logo, scheme: list.current),
                                        isCurrent: logo == list.logo,
                                        isBusy: model.busyLogo == logo,
                                        isFocused: focus.wrappedValue.focused == .logo(logo)) {
@@ -60,7 +60,7 @@ struct GalleryView: View {
                     ChoiceRowLabel(title: "WALLPAPER")
                     HStack(spacing: GroveSpace.s12) {
                         ForEach(list.wallpapers, id: \.self) { wallpaper in
-                            ChoiceCard(name: wallpaper, image: wallpaperImage(wallpaper, scheme: list.current),
+                            ChoiceCard(kind: "Wallpaper", name: wallpaper, image: wallpaperImage(wallpaper, scheme: list.current),
                                        isCurrent: wallpaper == list.wallpaper,
                                        isBusy: model.busyWallpaper == wallpaper,
                                        isFocused: focus.wrappedValue.focused == .wallpaper(wallpaper),

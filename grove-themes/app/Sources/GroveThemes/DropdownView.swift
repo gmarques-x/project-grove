@@ -14,6 +14,13 @@ struct DropdownView: View {
         let theme = model.currentColors
         VStack(alignment: .leading, spacing: GroveSpace.s12) {
             header(theme)
+            // The CLI missing or failing: said here, as in the gallery, not
+            // only by tiles that take no clicks.
+            if let error = model.error {
+                theme.marked(error.message, theme.red)
+                    .font(GroveFont.mono(GroveType.body))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             VStack(alignment: .leading, spacing: GroveSpace.s8) {
                 row("DARK", model.schemes(dark: true), theme)
                 row("LIGHT", model.schemes(dark: false), theme)
@@ -23,7 +30,7 @@ struct DropdownView: View {
                     ChoiceRowLabel(title: "TERMINAL LOGO")
                     HStack(spacing: GroveSpace.s8) {
                         ForEach(list.logos, id: \.self) { logo in
-                            ChoicePill(name: logo, isCurrent: logo == list.logo,
+                            ChoicePill(kind: "Terminal logo", name: logo, isCurrent: logo == list.logo,
                                        isBusy: model.busyLogo == logo,
                                        isFocused: focus.wrappedValue.focused == .logo(logo)) {
                                 run(.logo(logo))
@@ -36,7 +43,7 @@ struct DropdownView: View {
                     ChoiceRowLabel(title: "WALLPAPER")
                     HStack(spacing: GroveSpace.s8) {
                         ForEach(list.wallpapers, id: \.self) { wallpaper in
-                            ChoicePill(name: wallpaper, isCurrent: wallpaper == list.wallpaper,
+                            ChoicePill(kind: "Wallpaper", name: wallpaper, isCurrent: wallpaper == list.wallpaper,
                                        isBusy: model.busyWallpaper == wallpaper,
                                        isFocused: focus.wrappedValue.focused == .wallpaper(wallpaper)) {
                                 run(.wallpaper(wallpaper))
@@ -47,10 +54,11 @@ struct DropdownView: View {
                 }
             }
             VStack(alignment: .leading, spacing: GroveSpace.s2) {
-                MenuRow(title: "Open Grove Themes…", isFocused: focus.wrappedValue.focused == .openWindow) {
+                MenuRow(title: "Open Grove Themes…", shortcut: ",",
+                        isFocused: focus.wrappedValue.focused == .openWindow) {
                     run(.openWindow)
                 }
-                MenuRow(title: "Quit", isFocused: focus.wrappedValue.focused == .quit) { run(.quit) }
+                MenuRow(title: "Quit", shortcut: "q", isFocused: focus.wrappedValue.focused == .quit) { run(.quit) }
             }
             .padding(.top, GroveSpace.s8)
             .overlay(alignment: .top) {
@@ -123,9 +131,17 @@ struct DropdownView: View {
     }
 }
 
-/// "Open Grove Themes…" and "Quit": menu-like rows that light up in bg2 on hover.
+/// "Open Grove Themes…" and "Quit": menu-like rows that light up in bg2 on
+/// hover, with a menu's shortcuts (⌘, and ⌘Q, as in Grove Keys' menu) while
+/// the dropdown is open.
+///
+/// Built by hand, on purpose: the dropdown is a `.window` MenuBarExtra,
+/// because it holds the scheme tiles and the choice pills, and an `NSMenu`
+/// can't hold those. So its two commands can't be menu items either.
 private struct MenuRow: View {
     let title: String
+    /// With ⌘.
+    let shortcut: KeyEquivalent
     /// The keyboard focus box is on this row.
     let isFocused: Bool
     let action: () -> Void
@@ -143,6 +159,7 @@ private struct MenuRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(shortcut, modifiers: .command)
         .focusable(false)
         .focusEffectDisabled()
         .focusBox(isFocused, cornerRadius: GroveRadius.control, outset: 0)
