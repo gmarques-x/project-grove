@@ -216,8 +216,8 @@ private struct LauncherView: View {
         }
         .padding(.horizontal, 10)
         .frame(height: Self.rowHeight)
-        .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: 8))
-        .lightOutline(cornerRadius: 8, when: selected)
+        .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+        .lightOutline(cornerRadius: GroveRadius.control, when: selected)
         .contentShape(Rectangle())
         .onTapGesture { launcher.run(item) }
     }

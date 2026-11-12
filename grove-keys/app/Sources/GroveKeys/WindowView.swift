@@ -35,8 +35,8 @@ struct WindowView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
-                        .background(Color(theme.red).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-                        .lightOutline(cornerRadius: 8, accent: theme.red)
+                        .background(Color(theme.red).opacity(0.14), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+                        .lightOutline(cornerRadius: GroveRadius.card, accent: theme.red)
                 }
                 if !model.permissions.granted {
                     PermissionBanner(permissions: model.permissions)
@@ -85,8 +85,8 @@ struct WindowView: View {
                 }
             }
             .padding(3)
-            .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: 8))
-            .lightOutline(cornerRadius: 8)
+            .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control)
             .padding(.leading, 22)
             Spacer()
             HStack(spacing: GroveSpace.s8) {
@@ -132,8 +132,8 @@ private struct PermissionBanner: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
-        .background(Color(theme.yellow).opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
-        .lightOutline(cornerRadius: 8, accent: theme.orange)
+        .background(Color(theme.yellow).opacity(0.14), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+        .lightOutline(cornerRadius: GroveRadius.card, accent: theme.orange)
     }
 
     private func line(_ text: String, _ url: URL) -> some View {

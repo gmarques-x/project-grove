@@ -14,7 +14,7 @@ struct SchemeTile: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8)
+        let shape = RoundedRectangle(cornerRadius: GroveRadius.card)
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Aa").font(GroveFont.mono(GroveType.title, .semibold))
@@ -50,7 +50,7 @@ struct SchemeTile: View {
         .buttonStyle(.plain)
         .focusable(false)
         .focusEffectDisabled()
-        .focusBox(isFocused, cornerRadius: 8, outset: 5)
+        .focusBox(isFocused, cornerRadius: GroveRadius.card, outset: 5)
         .help(StatusText.displayName(scheme))
     }
 }

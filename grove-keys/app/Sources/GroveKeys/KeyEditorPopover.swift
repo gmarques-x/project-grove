@@ -138,8 +138,9 @@ struct KeyEditorPopover: View {
                 .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, GroveSpace.s4)
-                .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
-                .lightOutline(cornerRadius: GroveRadius.control, when: on)
+                // One step inside the container's `control` radius.
+                .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.inline))
+                .lightOutline(cornerRadius: GroveRadius.inline, when: on)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

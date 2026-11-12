@@ -43,8 +43,8 @@ struct KeyboardGrid<Named: View>: View {
         .padding(12)
         // The palette has no bg_dim: the well is bg0 with a bg1 rim, so the
         // bg1 caps stand on it (in light the rim is `border`: bg1 can't be seen).
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(theme.capLine(dark: theme.bg1), lineWidth: 1))
+        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+        .overlay(RoundedRectangle(cornerRadius: GroveRadius.card).strokeBorder(theme.capLine(dark: theme.bg1), lineWidth: 1))
     }
 
     /// A row's slots: one cap each, except up and down, which share one.
