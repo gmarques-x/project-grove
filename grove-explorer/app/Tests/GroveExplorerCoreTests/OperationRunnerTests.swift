@@ -295,7 +295,7 @@ private final class Sandbox: @unchecked Sendable {
         let first = await box.run(.duplicate(items: [file, folder, dotFile, archive]), on: runner)
         #expect(first.changes == [
             .created(box.path("src/notes copy.md")), .created(box.path("src/docs copy")),
-            .created(box.path("src/.env copy")), .created(box.path("src/archive.tar copy.gz")),
+            .created(box.path("src/.env copy")), .created(box.path("src/archive copy.tar.gz")),
         ])
         #expect(first.summary == "Duplicated 4 items")
         #expect(box.text(box.path("src/notes copy.md")) == "notes")
@@ -309,7 +309,7 @@ private final class Sandbox: @unchecked Sendable {
         #expect(third.changes == [.created(box.path("src/notes copy 3.md"))])
         #expect(third.summary == "Duplicated notes.md")
         #expect(box.names(in: src) == [
-            ".env", ".env copy", "archive.tar copy.gz", "archive.tar.gz", "docs", "docs copy",
+            ".env", ".env copy", "archive copy.tar.gz", "archive.tar.gz", "docs", "docs copy",
             "docs copy 2", "notes copy 2.md", "notes copy 3.md", "notes copy.md", "notes.md",
         ])
     }
@@ -886,6 +886,19 @@ private final class Sandbox: @unchecked Sendable {
             cancelled: false, summary: "Moved 1 of 2 items (1 skipped)"))
         #expect(box.text(old) == "old")
         #expect(box.text(file) == "new")
+    }
+
+    /// ".tar.gz" is one extension: the number goes before it, as Finder's does.
+    @Test func keepBothNumbersATarArchiveBeforeItsWholeExtension() async throws {
+        let archive = try box.makeFile("src/archive.tar.gz", "new")
+        try box.makeFile("dest/archive.tar.gz", "old")
+
+        let copied = await box.run(.copy(items: [archive], to: dest), on: runner, choice: .keepBoth)
+
+        #expect(copied.changes == [.created(dest.appendingPathComponent("archive 2.tar.gz"))])
+        #expect(box.text(dest.appendingPathComponent("archive.tar.gz")) == "old")
+        #expect(box.text(dest.appendingPathComponent("archive 2.tar.gz")) == "new")
+        #expect(box.names(in: dest) == ["archive 2.tar.gz", "archive.tar.gz"])
     }
 
     @Test func keepBothTakesTheNextFreeNameAndKeepsTheExtension() async throws {

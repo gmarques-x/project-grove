@@ -71,7 +71,10 @@ import Testing
         #expect(Conflict.duplicateName(for: ".env", isFolder: false, upTo: 9, taken: free) == ".env copy")
         #expect(
             Conflict.duplicateName(for: "archive.tar.gz", isFolder: false, upTo: 9, taken: free)
-                == "archive.tar copy.gz")
+                == "archive copy.tar.gz")
+        #expect(
+            Conflict.duplicateName(for: "archive.tar.gz", isFolder: false, upTo: 9) { $0 == "archive copy.tar.gz" }
+                == "archive copy 2.tar.gz")
         #expect(Conflict.duplicateName(for: "notes.md", isFolder: false, upTo: 2) { _ in true } == nil)
     }
 

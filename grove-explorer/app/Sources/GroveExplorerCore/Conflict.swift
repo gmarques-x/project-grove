@@ -81,11 +81,11 @@ public enum Conflict {
 
     /// The name a duplicate gets, beside its original: "notes copy.md",
     /// then "notes copy 2.md", "notes copy 3.md"; nil when all of them up
-    /// to the one numbered `last` are taken. Another rule than `freeName`'s:
-    /// here the extension is only what follows the last dot ("archive.tar
-    /// copy.gz").
+    /// to the one numbered `last` are taken. The extension is `freeName`'s:
+    /// "copy" goes before it, ".tar.gz" being one ("archive copy.tar.gz",
+    /// as Finder names it).
     static func duplicateName(for name: String, isFolder: Bool, upTo last: Int, taken: (String) -> Bool) -> String? {
-        let (stem, ending) = parts(of: name, isFolder: isFolder, tarIsExtension: false)
+        let (stem, ending) = parts(of: name, isFolder: isFolder, tarIsExtension: true)
         return firstFree(stem + " copy", ending, from: 1, upTo: last, taken: taken)
     }
 
