@@ -7,12 +7,14 @@ import SwiftUI
 /// keeps the status line).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
-    /// The window fits the cards: 760 wide, as tall as they need (≈ 776 pt:
-    /// 46 above, two rows of ≈ 164, 12 between, the logo and wallpaper rows
-    /// ≈ 170 each with their labels, 18 below), never shorter, so it keeps its
-    /// size while the first `list` loads or the CLI is missing.
+    /// The window fits the cards: 760 wide, as tall as they need (≈ 774 pt:
+    /// 44 above, two rows of ≈ 165, 12 between, the logo and wallpaper rows
+    /// ≈ 170 each with their labels, 16 below), never shorter, so it keeps its
+    /// size while the first `list` loads or the CLI is missing. (776 with the
+    /// 18 pt margins: 4 less above and below, and each row of cards, 4 pt
+    /// wider in all, is 0.75 taller.)
     static let width: CGFloat = 760
-    static let height: CGFloat = 776
+    static let height: CGFloat = 774
     static let buttonsClearance: CGFloat = 28
     /// `State` used directly: see GroveThemesApp on why not `@State`.
     private var focus = State(initialValue: KeyboardFocus(layout: .gallery))
@@ -73,7 +75,7 @@ struct GalleryView: View {
         }
         // No title bar (GroveThemesApp): the content runs to the window's top
         // edge, and the extra 28 pt keep the cards clear of the window buttons.
-        .padding(18)
+        .padding(GroveSpace.s16)
         .padding(.top, Self.buttonsClearance)
         .frame(width: Self.width, alignment: .top)
         .frame(minHeight: Self.height, alignment: .top)

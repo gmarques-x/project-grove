@@ -58,7 +58,7 @@ struct BindingsView: View {
             if !model.canEdit, model.redLine == nil {
                 Text("keys.toml isn't loaded yet")
                     .foregroundStyle(theme.quiet)
-                    .padding(.horizontal, 22)
+                    .padding(.horizontal, GroveSpace.s24)
             }
             ScrollView {
                 HStack(alignment: .top, spacing: GroveSpace.s16) {
@@ -76,9 +76,9 @@ struct BindingsView: View {
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
                 .disabled(!model.canEdit)
-                .padding(.horizontal, 22)
+                .padding(.horizontal, GroveSpace.s24)
                 .padding(.top, 6)
-                .padding(.bottom, 22)
+                .padding(.bottom, GroveSpace.s24)
             }
         }
         .frame(height: Self.height)

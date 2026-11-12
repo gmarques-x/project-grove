@@ -8,7 +8,8 @@ import SwiftUI
 /// permission banner and the tab.
 struct WindowView: View {
     @ObservedObject var model: AppModel
-    static let width: CGFloat = 900
+    /// The keyboard's 856 pt and a 24 pt margin each side.
+    static let width: CGFloat = 904
     /// Clears the window buttons, which sit over the header.
     private static let buttonsClearance: CGFloat = 78
 
@@ -42,7 +43,7 @@ struct WindowView: View {
                     PermissionBanner(permissions: model.permissions)
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, GroveSpace.s24)
             .padding(.bottom, model.redLine == nil && model.permissions.granted ? 0 : 10)
 
             switch tab.wrappedValue {
@@ -87,7 +88,7 @@ struct WindowView: View {
             .padding(3)
             .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             .lightOutline(cornerRadius: GroveRadius.control)
-            .padding(.leading, 22)
+            .padding(.leading, GroveSpace.s24)
             Spacer()
             HStack(spacing: GroveSpace.s8) {
                 Circle().fill(Color(statusDot(theme))).frame(width: 7, height: 7)

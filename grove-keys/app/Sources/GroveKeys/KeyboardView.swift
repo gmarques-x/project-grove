@@ -34,7 +34,7 @@ struct KeyboardView: View {
     private var tookKeys = State(initialValue: false)
 
     /// Inside the window margins; the grid takes its own padding out of this.
-    static let keyboardWidth: CGFloat = WindowView.width - 44
+    static let keyboardWidth: CGFloat = WindowView.width - 2 * GroveSpace.s24
     static let capHeight: CGFloat = 54
 
     init(model: AppModel) {
@@ -62,9 +62,9 @@ struct KeyboardView: View {
             }
             legend
         }
-        .padding(.horizontal, 22)
+        .padding(.horizontal, GroveSpace.s24)
         .padding(.top, 6)
-        .padding(.bottom, 22)
+        .padding(.bottom, GroveSpace.s24)
         .focusable(interactions: .edit)
         .focusEffectDisabled()
         .focused($hasKeys)
