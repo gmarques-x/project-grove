@@ -60,8 +60,17 @@ final class AppModel: ObservableObject {
     @Published var writeProblem: String?
     /// Goes up when the active pane's list should take the keyboard (again).
     @Published var listFocus = 1
-    /// The place a drag of files is over (`DragDrop.swift`).
-    @Published var dropMark: DropMark?
+    /// The place a drag of files is over (`DragDrop.swift`). A list marks
+    /// its own row itself; the window is drawn again only for the marks
+    /// SwiftUI draws (a pane's line, a sidebar row, a tab).
+    var dropMark: DropMark? {
+        willSet {
+            guard newValue != dropMark else { return }
+            if case .row? = newValue, dropMark == nil { return }
+            if case .row? = dropMark, newValue.map({ if case .row = $0 { true } else { false } }) ?? true { return }
+            objectWillChange.send()
+        }
+    }
     let drags = DragState()
     /// The ⌘F filters (`FilterBar.swift`).
     @Published var filter = FilterState()

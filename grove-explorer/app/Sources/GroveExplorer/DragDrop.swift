@@ -65,6 +65,12 @@ private enum DragBoard {
     private static var firstVolume: VolumeID?
     private static var folders: [URL]?
     private static var volumes: [String: VolumeID?] = [:]
+    /// The items' standardized paths, made when first asked for.
+    private static var paths: Set<String>?
+    /// What the drop would be, per target folder and verb: a drag of
+    /// thousands of items is gone through once per target, not per move
+    /// of the pointer.
+    private static var plans: [String: [GroveExplorerCore.Operation]] = [:]
 
     private static func bring(_ board: NSPasteboard) {
         guard board.changeCount != change else { return }
@@ -75,6 +81,26 @@ private enum DragBoard {
         firstVolume = items.first.flatMap { VolumeID($0) }
         folders = nil
         volumes = [:]
+        paths = nil
+        plans = [:]
+    }
+
+    /// Whether `url` is one of the dragged items.
+    static func contains(_ url: URL, on board: NSPasteboard) -> Bool {
+        bring(board)
+        let known = paths ?? Set(items.map { $0.standardizedFileURL.path })
+        paths = known
+        return known.contains(url.standardizedFileURL.path)
+    }
+
+    /// `Drop.operations` for the drag, into `folder`.
+    static func operations(into folder: URL, verb: Drop.Verb, on board: NSPasteboard) -> [GroveExplorerCore.Operation] {
+        bring(board)
+        let key = (verb == .move ? "move " : "copy ") + folder.path
+        if let known = plans[key] { return known }
+        let made = Drop.operations(for: items, into: folder, verb: verb)
+        plans[key] = made
+        return made
     }
 
     static func items(on board: NSPasteboard) -> [URL] {
@@ -88,11 +114,15 @@ private enum DragBoard {
         return firstVolume
     }
 
-    /// The dragged items that are folders: what the sidebar can keep.
+    /// The dragged items that are folders: what the sidebar can keep. Not
+    /// an app or another package, which is a folder only on the disk.
     static func folders(on board: NSPasteboard) -> [URL] {
         bring(board)
         if let folders { return folders }
-        let found = items.filter { Disk.isFolder($0) }
+        let found = items.filter { item in
+            guard Disk.isFolder(item) else { return false }
+            return (try? item.resourceValues(forKeys: [.isPackageKey]))?.isPackage != true
+        }
         folders = found
         return found
     }
@@ -140,7 +170,7 @@ extension AppModel {
             firstItemVolume: DragBoard.firstVolume(on: board), targetVolume: DragBoard.volume(of: folder, on: board),
             modifiers: modifiers, fromThisApp: fromThisApp, allowsCopy: allowsCopy, allowsMove: allowsMove)
         else { return nil }
-        let operations = Drop.operations(for: items, into: folder, verb: verb)
+        let operations = DragBoard.operations(into: folder, verb: verb, on: board)
         return operations.isEmpty ? nil : DropPlan(verb: verb, operations: operations)
     }
 
@@ -151,17 +181,30 @@ extension AppModel {
         for operation in plan.operations { perform(operation, in: side) }
     }
 
+    /// Whether the drag on `board` carries `url` itself.
+    func isDragged(_ url: URL, on board: NSPasteboard) -> Bool { DragBoard.contains(url, on: board) }
+
     /// The mark goes when it is still `mark` (the pointer may be over the
     /// next place already).
     func clearDropMark(_ mark: DropMark) {
         if dropMark == mark { dropMark = nil }
     }
 
+    /// A drag is over: no place stays marked, in any list (a row's mark
+    /// alone is not published, so the lists are told here).
+    func clearDropMarkEverywhere() {
+        guard dropMark != nil else { return }
+        objectWillChange.send()
+        dropMark = nil
+    }
+
     // MARK: Drops on the sidebar and the tabs
 
     /// What a drop on a sidebar row or a tab would be. SwiftUI doesn't say
     /// what the drag's source allows: a drag from another app is only ever
-    /// copied here.
+    /// copied here. Nor can its `DropProposal` answer with the generic
+    /// operation, which is all ⌘ may leave of the source's mask: whether a
+    /// ⌘-drop here moves, copies or is refused is to be seen in a live run.
     func dropPlan(into folder: URL) -> DropPlan? {
         let own = dragIsOwn
         return dropPlan(on: NSPasteboard(name: .drag), into: folder, fromThisApp: own, allowsCopy: true, allowsMove: own)
@@ -305,8 +348,7 @@ extension FileList.Coordinator {
         model.drags.ownDrag = nil
         // Over: whatever place it last marked, here or in the sidebar or the tabs.
         model.drags.spring?.cancel()
-        if model.dropMark != nil { model.dropMark = nil }
-        putDropMark()
+        model.clearDropMarkEverywhere()
     }
 
     // MARK: Destination
@@ -319,7 +361,11 @@ extension FileList.Coordinator {
             listing.problem == nil, listing.folder.standardizedFileURL.path == tab.folder.standardizedFileURL.path
         else { return nil }
         let row = table.row(at: table.convert(info.draggingLocation, from: nil))
-        if entries.indices.contains(row), Drop.takesDrop(entries[row].kind) {
+        // A folder being dragged is no place to drop itself: over its own
+        // row the drag is over the pane (where it already is: nothing).
+        if entries.indices.contains(row), Drop.takesDrop(entries[row].kind),
+            !model.isDragged(entries[row].url, on: info.draggingPasteboard)
+        {
             return (entries[row].url, .row(side, entries[row].url))
         }
         return (tab.folder, .pane(side))
@@ -358,9 +404,12 @@ extension FileList.Coordinator {
         dropOperation: NSTableView.DropOperation
     ) -> Bool {
         // Worked out again now, from the pointer's place and the keys held.
+        // And only into the place that was marked: after a reload under the
+        // drag the mark may be on another row than the pointer.
         let dropped = plan(info, in: tableView)
+        let marked = model.dropMark
         dragLeft()
-        guard let dropped else { return false }
+        guard let dropped, dropped.mark == marked else { return false }
         model.issue(drop: dropped.plan, in: side)
         return true
     }
