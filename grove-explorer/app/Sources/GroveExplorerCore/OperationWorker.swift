@@ -67,6 +67,36 @@ final class Worker {
                 cancelled: cancelled, shortage: shortage))
     }
 
+    // MARK: Putting back, for Undo
+
+    /// Moves `item` to exactly `place`: the folder and the name it had
+    /// before (out of the Trash, or back from where it was moved to). It is
+    /// a move like any other, to another volume too, but under the name
+    /// given, and with nobody to ask: a name that is taken fails it.
+    /// Made with a move of `item` as the operation and nothing `known`.
+    func put(at place: URL) -> Outcome {
+        guard case let .move(items, folder) = operation, let item = items.first else {
+            preconditionFailure("put(at:) is for a worker made for one move")
+        }
+        reporter.begin(bytes: nil, items: 1)
+        if let (identity, kind) = FileIdentity.of(folder.path, followingLinks: true), kind == S_IFDIR {
+            if let partner = pairedName(of: place, among: [], in: folder) {
+                fail(item, Self.cannotBeBeside(partner))
+            } else {
+                transfer(item, to: folder, on: identity.device, moving: true, named: place.lastPathComponent)
+            }
+        } else {
+            fail(item, "the folder “\(folder.lastPathComponent)” is not there")
+        }
+        reporter.itemFinished(bytes: 0)
+        reporter.finish()
+        return Outcome(
+            changes: changes, failures: failures, cancelled: cancelled,
+            summary: Wording.summary(
+                of: operation, done: done, skipped: skipped, failed: failures.count,
+                cancelled: cancelled, shortage: shortage))
+    }
+
     // MARK: Copy and move
 
     private func transfer(_ items: [URL], to folder: URL, moving: Bool) {
@@ -128,13 +158,15 @@ final class Worker {
         return !copier.leftOut.isEmpty
     }
 
-    private func transfer(_ item: URL, to folder: URL, on volume: dev_t, moving: Bool) {
+    private func transfer(
+        _ item: URL, to folder: URL, on volume: dev_t, moving: Bool, named name: String? = nil
+    ) {
         var code: Int32 = 0
         guard let (source, kind) = FileIdentity.of(item.path, code: &code) else {
             fail(item, code: code)
             return
         }
-        var target = OperationRunner.target(for: item, in: folder)
+        var target = OperationRunner.target(for: item, in: folder, named: name)
         var replacing = false
         var nextFree: (() -> URL?)?
 

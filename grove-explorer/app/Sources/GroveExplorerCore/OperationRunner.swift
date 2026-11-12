@@ -124,6 +124,34 @@ public actor OperationRunner {
         return outcome
     }
 
+    /// For Undo: moves `item` back to exactly `place`, the folder and the
+    /// name it had (out of the Trash, or from where a move left it). A run
+    /// like any other: in its turn, by the same steps as a move, so never
+    /// in place of another item. Nothing is asked: when something is at
+    /// `place`, the item stays where it is and the outcome says so.
+    func put(_ item: URL, at place: URL) async -> Outcome {
+        if busy {
+            await withCheckedContinuation { waiting.append($0) }
+        } else {
+            busy = true
+        }
+        let flag = CancelFlag()
+        current = flag
+        let outcome = await Self.putting(item, at: place, files: files, flag: flag, watching: watching)
+        current = nil
+        if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
+        return outcome
+    }
+
+    @concurrent private static func putting(
+        _ item: URL, at place: URL, files: Files, flag: CancelFlag, watching: (@Sendable (Stage) -> Void)?
+    ) async -> Outcome {
+        Worker(
+            operation: .move(items: [item], to: place.deletingLastPathComponent()), known: [],
+            files: files.manager, flag: flag, watching: watching, resolve: { _ in .skip }, progress: { _ in }
+        ).put(at: place)
+    }
+
     /// Stops the run in hand after the file it is on. What was done stays;
     /// the item it was in the middle of is left as it was. With nothing
     /// running, nothing happens.
