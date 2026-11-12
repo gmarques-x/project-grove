@@ -1,6 +1,6 @@
 # Project Grove: grove-dotfiles
 
-Project Grove is a personal macOS overhaul built on the [Everforest](https://github.com/sainnhe/everforest) color scheme by sainnhe, in six schemes (dark or light, each hard, medium or soft). Its principal font is JetBrains Mono, with SF Pro as the companion. This folder, `grove-dotfiles`, holds the `grove` installer and the configs it manages. One command sets up a fresh Mac: tools, fonts, shell, git, GitHub, Finder, the terminal, VS Code, the tiling desktop (AeroSpace), the Grove bar (SketchyBar) with the Grove menu, and the Grove Keys and Grove Themes apps. Run it again any time; anything already done is left alone.
+Project Grove is a personal macOS overhaul built on the [Everforest](https://github.com/sainnhe/everforest) color scheme by sainnhe, in six schemes (dark or light, each hard, medium or soft). Its principal font is JetBrains Mono, with SF Pro as the companion. This folder, `grove-dotfiles`, holds the `grove` installer and the configs it manages. One command sets up a fresh Mac: tools, fonts, shell, git, GitHub, Finder, the terminal, VS Code, the tiling desktop (AeroSpace), the Grove bar (SketchyBar) with the Grove menu, and the Grove Keys, Grove Themes and Grove Explorer apps. Run it again any time; anything already done is left alone.
 
 How to use the result is in the [manual](../docs/manual/README.md). This page is about the installer.
 
@@ -42,7 +42,7 @@ There is no uninstaller. Files are linked or moved aside, never deleted, so the 
 
 - **Links:** `~/.config`, `~/.zshenv`, `~/.ssh/config`, `~/.local/bin/grove`, `~/.local/bin/grove-themes`, and VS Code's `~/Library/Application Support/Code/User/settings.json` (`rm` on a link removes only the link).
 - **Backups:** what those links and the shell setup replaced (`~/.zshrc`, `~/.zprofile`, `~/.gitconfig`, `~/.zsh_history`, `~/.zsh_sessions`, a Ghostty config in Application Support) is in `~/.local/state/grove/backup/<run>/`. Paths inside a run folder are relative to `$HOME` (`<run>/.zshrc` goes back to `~/.zshrc`).
-- **Apps and login items:** `~/Applications/Grove Keys.app` and `Grove Themes.app`, with the LaunchAgents `com.projectgrove.keys` and `com.projectgrove.themes` in `~/Library/LaunchAgents`; AeroSpace starts at login by its own setting; SketchyBar runs as a Homebrew service.
+- **Apps and login items:** `~/Applications/Grove Keys.app`, `Grove Themes.app` and `Grove Explorer.app` (no login item), with the LaunchAgents `com.projectgrove.keys` and `com.projectgrove.themes` in `~/Library/LaunchAgents`; AeroSpace starts at login by its own setting; SketchyBar runs as a Homebrew service.
 - **Keychain:** the "Grove Code Signing" certificate and key in the login keychain, and the SSH key's passphrase.
 - **macOS settings:** the menu bar set to hide (`NSGlobalDomain _HIHideMenuBar`), "Displays have separate Spaces" off (`com.apple.spaces spans-displays`), the Finder settings in `modules/80-macos-finder/settings.txt`, Ghostty's tile in the Dock, the wallpaper, and from the theme switcher the appearance, accent and highlight colours. None of these has a backup.
 - **Installed:** Homebrew, the Brewfile's packages and SketchyBar; fonts in `~/Library/Fonts`; two VS Code extensions; an SSH key in `~/.ssh` (if you had none) and its copy on GitHub as a signing key.
@@ -81,13 +81,14 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
 | `85-macos-wallpaper` | Desktop wallpaper: `grove-wallpapers/wallpaper-<set>-<scheme>.png` for the current scheme on every screen (other Spaces are a manual step); the set is `project-grove`, or `avatar` after `grove-themes wallpaper avatar` |
 | `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |
+| `94-explorer-app` | Grove Explorer, the file browser: builds the app and installs it to ~/Applications (it is opened like any app; nothing starts it at login) |
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |
 | `97-themes-app` | Grove Themes in the menu bar: builds the app, installs it to ~/Applications and starts it at login |
 | `98-aerospace` | AeroSpace tiles the desktop: numbered workspaces, Option shortcuts and JankyBorders in the scheme's colours (Accessibility is a manual step) |
 | `99-sketchybar` | The Grove top bar: SketchyBar (trusted felixkratz/formulae tap) as a floating bar on a strip that hides the auto-hidden menu bar; workspaces, the front app and system status in the scheme's colours |
 
-"In the menu bar" in the two app rows means the native menu bar, which sits hidden behind the Grove bar. Both apps are reached from the pine at the left of the bar: Appearance › Grove Themes… and Grove Keys ▸.
+"In the menu bar" in the Grove Keys and Grove Themes rows means the native menu bar, which sits hidden behind the Grove bar. All three apps are reached from the pine at the left of the bar: Appearance › Grove Themes…, Grove Keys ▸ and Files, which opens Grove Explorer (the manual's [Files](../docs/manual/09-files.md)).
 
 **The Grove menu** is `config/grove/menu.toml`: the pine's dropdown and the Grove Launcher on ⌘Space. Your own rows go in `config/grove/menu.local.toml`, which git ignores; the format is explained at the top of `menu.toml` and in the manual's [The Grove menu](../docs/manual/03-the-grove-menu.md).
 
