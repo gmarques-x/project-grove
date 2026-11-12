@@ -299,15 +299,15 @@ struct SoundPanel: View {
         }
     }
 
-    /// `GroveIcon.Name` has the mock-ups' three (laptop, AirPods, display);
-    /// the others take the nearest until it has headphones, AirPlay and USB.
     private static func icon(_ kind: SoundDeviceKind) -> GroveIcon.Name {
         switch kind {
         case .speakers: .laptop
-        case .headphones, .airPods: .airpods
-        case .display, .airPlay: .display
-        case .usb: .ethernet
-        case .bluetooth, .other: .soundLow
+        case .airPods: .airpods
+        case .headphones: .headphones
+        case .display: .display
+        case .airPlay: .airPlay
+        case .usb: .usbAudio
+        case .bluetooth, .other: .speaker
         }
     }
 }

@@ -83,6 +83,14 @@ public struct GroveIcon: View {
         case airpods = "airpodspro"
         /// A display (its speakers).
         case display = "display"
+        /// Headphones or a headset.
+        case headphones = "headphones"
+        /// An AirPlay receiver.
+        case airPlay = "airplayaudio"
+        /// A sound device on USB.
+        case usbAudio = "cable.connector.horizontal"
+        /// A speaker that is none of the above (Bluetooth, an aggregate).
+        case speaker = "hifispeaker"
         /// Sound input.
         case microphone = "mic"
         /// The Grove menu's Appearance row.

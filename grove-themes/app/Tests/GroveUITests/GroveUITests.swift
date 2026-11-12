@@ -79,7 +79,8 @@ import Testing
                 "cpu", "memorychip", "bolt.fill", "wifi", "cable.connector", "lock.shield", "wifi.slash",
                 "speaker.wave.2.fill", "speaker.fill", "speaker.wave.3.fill", "speaker.slash.fill", "calendar",
                 "arrow.down", "arrow.up", "chevron.right", "chevron.left", "doc.on.doc", "arrow.clockwise",
-                "laptopcomputer", "airpodspro", "display", "mic", "paintpalette", "keyboard",
+                "laptopcomputer", "airpodspro", "display", "headphones", "airplayaudio",
+             "cable.connector.horizontal", "hifispeaker", "mic", "paintpalette", "keyboard",
                 "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle"])
     }
 
