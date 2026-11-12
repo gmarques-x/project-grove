@@ -60,10 +60,12 @@ enum GroveIcons {
     /// In the installed app the two files are in Contents/Resources; in a
     /// `swift build` they are in the package's resource bundle.
     private static func resourceFolder() -> URL? {
-        let candidates = [Bundle.main.resourceURL, Bundle.module.resourceURL?.appendingPathComponent("Resources")]
-        return candidates.compactMap { $0 }.first {
-            FileManager.default.fileExists(atPath: $0.appendingPathComponent("seti.woff").path)
+        func holds(_ folder: URL?) -> URL? {
+            folder.flatMap { FileManager.default.fileExists(atPath: $0.appendingPathComponent("seti.woff").path) ? $0 : nil }
         }
+        // The package's bundle is asked only when the app's own has nothing:
+        // `Bundle.module` stops the program where there is no such bundle.
+        return holds(Bundle.main.resourceURL) ?? holds(Bundle.module.resourceURL?.appendingPathComponent("Resources"))
     }
 }
 
