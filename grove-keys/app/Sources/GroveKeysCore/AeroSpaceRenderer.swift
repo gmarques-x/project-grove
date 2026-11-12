@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// Turns keys.toml, this Mac's monitors.toml and aerospace.base.toml into the
 /// aerospace.toml AeroSpace reads.

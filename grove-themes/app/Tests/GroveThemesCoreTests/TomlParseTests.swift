@@ -1,5 +1,5 @@
 import Testing
-@testable import GroveKeysCore
+@testable import GroveThemesCore
 
 @Suite struct TomlParseTests {
     @Test func parsesHeadersKeysAndValues() throws {

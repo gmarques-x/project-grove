@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// The Grove menu (the pine's dropdown and the launcher), read from
 /// `~/.config/grove/menu.toml` and the owner's `menu.local.toml` beside it.

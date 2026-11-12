@@ -1,3 +1,5 @@
+import GroveThemesCore
+
 /// What one key does in one layer, as the Keyboard tab's editor sets it.
 public enum KeyAction: Equatable, Sendable {
     case launcher(bundleID: String)

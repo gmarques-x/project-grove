@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import GroveKeysCore
+import GroveThemesCore
 
 @Suite struct MonitorsFileTests {
     @Test func readsAssignmentsInFileOrder() throws {

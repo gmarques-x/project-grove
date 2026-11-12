@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 public enum BindingKind: Sendable {
     case workspace, focusMove, launcher, layout, mode, other

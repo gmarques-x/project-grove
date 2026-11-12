@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// What Return does on a row of the searchable cheat sheet.
 public enum CheatAction: Equatable, Sendable {

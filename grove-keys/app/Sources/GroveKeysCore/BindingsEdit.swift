@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// One entry the Bindings tab edits: a `[launch]` key or a binding in an
 /// `[aerospace.<mode>]` table (its key text as written, e.g. "cmd-ctrl-alt-shift-t").

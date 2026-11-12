@@ -1,3 +1,5 @@
+import GroveThemesCore
+
 public enum TapAction: String, Sendable {
     case escape, none
 }

@@ -1,5 +1,6 @@
 import Testing
 @testable import GroveKeysCore
+import GroveThemesCore
 
 @Suite struct AeroSpaceRendererTests {
     func rendered() throws -> String {

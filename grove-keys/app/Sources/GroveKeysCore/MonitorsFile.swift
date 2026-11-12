@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// monitors.toml as the app sees it: this Mac's workspace → monitor table,
 /// a validated TomlDocument like KeysFile (comments and unknown tables are

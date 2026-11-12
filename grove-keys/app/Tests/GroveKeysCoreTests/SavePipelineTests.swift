@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import GroveKeysCore
+import GroveThemesCore
 
 final class FakeAeroSpace: AeroSpaceRunning, @unchecked Sendable {
     private let lock = NSLock()

@@ -1,3 +1,5 @@
+import GroveThemesCore
+
 /// One line of the Bindings tab: a shortcut and its action, or a folded 1…9 run.
 public struct BindingRow: Equatable, Sendable {
     public var shortcuts: String

@@ -1,5 +1,6 @@
 import Testing
 @testable import GroveKeysCore
+import GroveThemesCore
 
 @Suite struct BindingRowsTests {
     func main() throws -> [(key: String, value: TomlValue)] {

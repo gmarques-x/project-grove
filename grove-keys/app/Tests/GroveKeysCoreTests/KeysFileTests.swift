@@ -1,11 +1,20 @@
 import Testing
 @testable import GroveKeysCore
+import GroveThemesCore
 
 @Suite struct KeysFileTests {
     @Test func defaultsWhenHyperMissing() throws {
         let f = try KeysFile(text: "[launch]\n")
         #expect(f.hyper == HyperSettings())
         #expect(f.hyper.enabled && f.hyper.tap == .escape && f.hyper.tapMs == 200 && f.hyper.cheatsheetMs == 500)
+    }
+
+    /// The shared TOML reader (GroveThemesCore) writes the shipped file back
+    /// as it read it. Here and not with the reader's own tests: the file is
+    /// this package's fixture.
+    @Test func roundTripsShippedFile() throws {
+        let text = try fixture("keys.toml")
+        #expect(try TomlDocument.parse(text).serialized() == text)
     }
 
     @Test func readsShippedFile() throws {

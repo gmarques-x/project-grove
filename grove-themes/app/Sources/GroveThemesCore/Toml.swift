@@ -1,6 +1,7 @@
 import Foundation
 
-/// The TOML subset keys.toml uses: comments, `[a.b]` / `[a."quoted"]` tables,
+/// The TOML subset the Grove apps' config files use (Grove Keys' keys.toml,
+/// Grove Explorer's explorer.toml): comments, `[a.b]` / `[a."quoted"]` tables,
 /// bare and quoted keys, strings, string arrays, integers and booleans.
 
 public enum TomlValue: Equatable, Sendable {

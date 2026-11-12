@@ -1,12 +1,7 @@
 import Testing
-@testable import GroveKeysCore
+@testable import GroveThemesCore
 
 @Suite struct TomlWriteTests {
-    @Test func roundTripsShippedFile() throws {
-        let text = try fixture("keys.toml")
-        #expect(try TomlDocument.parse(text).serialized() == text)
-    }
-
     @Test func editKeepsComments() throws {
         var doc = try TomlDocument.parse("""
         [hyper]
