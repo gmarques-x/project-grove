@@ -40,7 +40,7 @@ palette_value() {
 @test "the palette's Grove additions are only the fill color, the roles and the terminal roles" {
   run sed -n '/^# Grove additions/,$p' "$GROVE_ROOT/$PALETTE_REL"
   [ "$status" -eq 0 ]
-  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|hover|muted|lockup_ink|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
+  [ -z "$(printf '%s\n' "$output" | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' | grep -vE '^(fill|border|on_accent|dim|hover|muted|list_selected|list_selected_inactive|list_hover|hidden_ink|lockup_ink|term([0-9]|1[0-5]))[[:space:]]*=[[:space:]]*#[0-9A-F]{6}$')" ]
 }
 
 # scheme_value SCHEME NAME: the hex for NAME in theme/everforest-SCHEME.
@@ -135,6 +135,49 @@ at_least() { awk -v r="$1" -v m="$2" 'BEGIN { exit !(r >= m) }'; }
   [ "$(contrast '#FFFFFF' '#000000')" = "21.00" ]
   [ "$(contrast '#2d353b' '#2D353B')" = "1.00" ]
   [ "$(contrast '#2D353B' '#DFA000')" = "5.44" ]
+}
+
+# lum_distance A B: how far apart two #RRGGBB colours are in WCAG relative
+# luminance, four decimals.
+lum_distance() {
+  awk -v a="$1" -v b="$2" '
+    function ch(h, i,   v) {
+      v = (index("0123456789ABCDEF", toupper(substr(h, i, 1))) - 1) * 16 + index("0123456789ABCDEF", toupper(substr(h, i + 1, 1))) - 1
+      v /= 255
+      return v <= 0.03928 ? v / 12.92 : exp(2.4 * log((v + 0.055) / 1.055))
+    }
+    function lum(h) { return 0.2126 * ch(h, 2) + 0.7152 * ch(h, 4) + 0.0722 * ch(h, 6) }
+    BEGIN { d = lum(a) - lum(b); if (d < 0) d = -d; printf "%.4f\n", d }'
+}
+
+# more_than A B: 0 when A > B.
+more_than() { awk -v a="$1" -v b="$2" 'BEGIN { exit !(a > b) }'; }
+
+@test "lum_distance is the gap in relative luminance" {
+  [ "$(lum_distance '#000000' '#FFFFFF')" = "1.0000" ]
+  [ "$(lum_distance '#FFFFFF' '#000000')" = "1.0000" ]
+  [ "$(lum_distance '#2d353b' '#2D353B')" = "0.0000" ]
+  [ "$(lum_distance '#2D353B' '#343F44')" = "0.0128" ]
+}
+
+# A list has a selection, the other pane's selection and the pointer at once:
+# each fill stands further from bg0 than the next, and the weakest is not bg0.
+@test "list roles: on bg0 the selection is stronger than the inactive selection, that than the hover; hidden ink is at least 3:1" {
+  local s bg0 role sel inactive hover r
+  for s in $SCHEMES; do
+    bg0="$(scheme_value "$s" bg0)"
+    for role in list_selected list_selected_inactive list_hover hidden_ink; do
+      [ -n "$(scheme_value "$s" "$role")" ] || { echo "$s has no $role"; false; }
+    done
+    sel="$(lum_distance "$(scheme_value "$s" list_selected)" "$bg0")"
+    inactive="$(lum_distance "$(scheme_value "$s" list_selected_inactive)" "$bg0")"
+    hover="$(lum_distance "$(scheme_value "$s" list_hover)" "$bg0")"
+    more_than "$sel" "$inactive" || { echo "$s: list_selected ($sel) is not stronger than list_selected_inactive ($inactive)"; false; }
+    more_than "$inactive" "$hover" || { echo "$s: list_selected_inactive ($inactive) is not stronger than list_hover ($hover)"; false; }
+    more_than "$hover" 0 || { echo "$s: list_hover is bg0's luminance"; false; }
+    r="$(contrast "$(scheme_value "$s" hidden_ink)" "$bg0")"
+    at_least "$r" 3 || { echo "$s: hidden_ink on bg0 is $r:1"; false; }
+  done
 }
 
 @test "light schemes: text on the prompt's and yazi's accent blocks is at least 3:1, the border at least 1.5:1 on bg0" {

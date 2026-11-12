@@ -142,7 +142,7 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].appearance')" = light ]
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].colors.bg0')" = "#F3EAD3" ]
   [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","hover","lockup_ink","on_accent","orange","purple","red","yellow"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","hidden_ink","hover","list_hover","list_selected","list_selected_inactive","lockup_ink","on_accent","orange","purple","red","yellow"]' ]
 }
 
 @test "list --json carries the three roles, each scheme's own pick" {
@@ -168,6 +168,14 @@ gt_copy_config() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("dark")) | .value.colors | .hover == .bg1] | unique')" = '[true]' ]
   [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("light")) | .value.colors | .hover == .bg3] | unique')" = '[true]' ]
+}
+
+@test "list --json carries a list's roles: three fills that differ from bg0 and each other, and the hidden ink" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-medium"].colors | [.list_selected, .list_selected_inactive, .list_hover, .hidden_ink]')" = '["#475258","#3D484D","#343F44","#859289"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["light-soft"].colors | [.list_selected, .list_selected_inactive, .list_hover, .hidden_ink]')" = '["#D8D3BA","#DDD8BE","#E5DFC5","#5C6A72"]' ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes[].colors | [.bg0, .list_selected, .list_selected_inactive, .list_hover] | unique | length] | unique')" = '[4]' ]
 }
 
 @test "logo prints grove by default" {

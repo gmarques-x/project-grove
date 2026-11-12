@@ -27,6 +27,8 @@ extension ThemeColors {
         "yellow": "#DBBC7F", "green": "#A7C080", "aqua": "#83C092", "blue": "#7FBBB3",
         "purple": "#D699B6", "border": "#475258", "on_accent": "#2D353B", "dim": "#859289",
         "lockup_ink": "#DAC7A2", "hover": "#343F44",
+        "list_selected": "#475258", "list_selected_inactive": "#3D484D", "list_hover": "#343F44",
+        "hidden_ink": "#859289",
     ]))!
 
     /// For `.preferredColorScheme`, so the system's own controls match.

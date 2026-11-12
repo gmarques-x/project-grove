@@ -53,6 +53,18 @@ dim       = #829181
 hover     = #DDD8BE
 # Text that steps back but is read: fg, since no grey here reaches 3.3:1.
 muted     = #5C6A72
+# A file list's three fills, strongest first: the selection in the pane that
+# has the keys, the selection in the other pane, the row under the pointer. A
+# list shows all three at once, so they are three steps: bg4, bg3, bg2 (about
+# 1.25, 1.2 and 1.1:1 on bg0). Not bg1 (1.06:1), and not `hover`'s bg3 under
+# the pointer, which is stronger than a bg2 selection.
+list_selected          = #D8D3BA
+list_selected_inactive = #DDD8BE
+list_hover             = #E5DFC5
+# A hidden item's name when a list shows them: fg, since grey2 is 2.8:1 on
+# this bg0 and nothing else here reaches 3:1. The row's dimmed icon is then
+# what marks it.
+hidden_ink = #5C6A72
 # The wordmark's ink ("Project Grove" and its pine, on this scheme's bg0): the
 # branding's dark ink, the same in every light scheme. The lockup's own
 # colour, not an Everforest one (near dark hard's bg0, #272E33, but not it).

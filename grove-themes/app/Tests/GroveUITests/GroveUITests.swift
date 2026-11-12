@@ -5,9 +5,10 @@ import Testing
 @testable import GroveUI
 
 @Suite struct GroveUITests {
-    /// The eighteen colours `ThemeColors` reads from a palette.
+    /// The twenty-two colours `ThemeColors` reads from a palette.
     static let keys = ["bg0", "bg1", "bg2", "bg3", "fg", "grey1", "red", "orange", "yellow", "green", "aqua",
-                       "blue", "purple", "border", "on_accent", "dim", "lockup_ink", "hover"]
+                       "blue", "purple", "border", "on_accent", "dim", "lockup_ink", "hover",
+                       "list_selected", "list_selected_inactive", "list_hover", "hidden_ink"]
 
     /// grove-themes/app.
     static let package = URL(fileURLWithPath: #filePath)

@@ -38,6 +38,17 @@ public struct ThemeColors: Equatable, Sendable {
     /// older than the role sends none: those two stand in, as the theme
     /// files have them.
     public let hover: RGB
+    /// A file list's three fills, in order of strength on bg0 (`list_selected`,
+    /// `list_selected_inactive`, `list_hover`): the selection in the pane that
+    /// has the keys, the selection in the other pane, the row under the
+    /// pointer. A list shows all three at once, so each scheme picks three it
+    /// can tell apart (grove-dotfiles' theme.bats holds the order). A CLI older
+    /// than the roles sends none: bg3, bg2 and bg1 stand in, in that order.
+    public let listSelected, listSelectedInactive, listHover: RGB
+    /// The name of a hidden item, when a list shows them (`hidden_ink`): text
+    /// that steps back but is at least 3:1 on bg0, where an opacity would not
+    /// be. A CLI older than the role sends none: `dim` stands in.
+    public let hiddenInk: RGB
     /// The palette's `appearance` is "dark".
     public let isDark: Bool
     /// Not dark. The apps were tuned in the dark schemes: what only a pale
@@ -62,6 +73,10 @@ public struct ThemeColors: Equatable, Sendable {
         isDark = palette.appearance == "dark"
         lockupInk = color("lockup_ink") ?? Self.lockupInk(dark: isDark)
         hover = color("hover") ?? (isDark ? bg1 : bg3)
+        listSelected = color("list_selected") ?? bg3
+        listSelectedInactive = color("list_selected_inactive") ?? bg2
+        listHover = color("list_hover") ?? bg1
+        hiddenInk = color("hidden_ink") ?? dim
     }
 
     /// What the theme files have as `lockup_ink` (ThemeColorsTests and
