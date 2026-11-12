@@ -1,0 +1,20 @@
+[general]
+start = "~"
+show_hidden = false
+two_panes = false
+
+[favourites.applications]
+path = "/Applications"
+
+[favourites.home]
+path = "~"
+title = "Home"
+
+[favourites.developer]
+path = "~/Developer"
+
+[favourites.documents]
+path = "~/Documents"
+
+[favourites.downloads]
+path = "~/Downloads"

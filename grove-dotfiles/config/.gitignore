@@ -22,6 +22,9 @@
 !/grove/
 /grove/*
 !/grove/menu.toml
+!/grove-explorer/
+/grove-explorer/*
+!/grove-explorer/explorer.toml
 !/starship.toml.tmpl
 !/starship-plain.toml.tmpl
 
