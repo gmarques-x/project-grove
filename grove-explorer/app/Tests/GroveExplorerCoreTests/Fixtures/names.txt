@@ -1,0 +1,30 @@
+_archive
+-draft.txt
+.gitignore
+(old) notes.txt
+[2026] taxes.pdf
+1.txt
+2 copy.txt
+2.txt
+10.txt
+100 things.md
+2026-11-09 report.pdf
+a.txt
+A2.txt
+a10.txt
+Ábaco 2.txt
+ábaco.txt
+abc.txt
+Café 9.txt
+café 10.txt
+eclair.txt
+Eclair2.txt
+éclair10.txt
+file 1.txt
+file2.txt
+File3.TXT
+file10.txt
+naïve.md
+naive2.md
+Zoo
+日本語.txt

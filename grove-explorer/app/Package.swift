@@ -33,6 +33,7 @@ let package = Package(
         .testTarget(
             name: "GroveExplorerCoreTests",
             dependencies: ["GroveExplorerCore"],
+            exclude: ["Fixtures"],
             swiftSettings: testSettings
         ),
     ]
