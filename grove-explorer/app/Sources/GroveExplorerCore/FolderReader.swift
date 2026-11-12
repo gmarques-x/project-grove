@@ -39,16 +39,28 @@ public struct FolderReader: Sendable {
     }
 
     /// What macOS calls each type, asked once per type in a read rather than
-    /// once per item: the words are the type's (5,000 system items of 58
-    /// types gave one description per type), and asking for every item is
-    /// most of the time a large folder takes (1.1 s of 1.3 s for 50,000).
-    private struct TypeDescriptions {
+    /// once per item: asking for every item is most of the time a large
+    /// folder takes (1.1 s of 1.3 s for 50,000). That the description
+    /// depends only on the content type is an assumption Apple doesn't
+    /// document; 5,000 system items of 58 types gave one description per type.
+    struct TypeDescriptions {
         private var byType: [String: String] = [:]
+        private let ask: (URL) -> String?
+
+        /// `ask` is the question put to macOS; tests put their own.
+        init(ask: @escaping (URL) -> String? = TypeDescriptions.askSystem) {
+            self.ask = ask
+        }
+
+        static func askSystem(_ url: URL) -> String? {
+            (try? url.resourceValues(forKeys: [.localizedTypeDescriptionKey]))?.localizedTypeDescription
+        }
 
         mutating func description(of url: URL, type: UTType?) -> String {
             if let type, let known = byType[type.identifier] { return known }
-            let asked = try? url.resourceValues(forKeys: [.localizedTypeDescriptionKey])
-            let description = asked?.localizedTypeDescription ?? ""
+            // Only an answer is kept: an item that went away since the
+            // listing must not leave the rest of its type without words.
+            guard let description = ask(url) else { return "" }
             if let type { byType[type.identifier] = description }
             return description
         }

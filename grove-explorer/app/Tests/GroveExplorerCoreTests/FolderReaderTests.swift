@@ -1,6 +1,7 @@
 import Foundation
-import GroveExplorerCore
+@testable import GroveExplorerCore
 import Testing
+import UniformTypeIdentifiers
 
 /// Reading real folders: each test gets its own temporary folder, removed
 /// when the test ends, passed or failed.
@@ -168,6 +169,29 @@ import Testing
         }
         #expect(entries["Folder"]?.typeDescription != entries["a.txt"]?.typeDescription)
         #expect(entries["c.png"]?.typeDescription != entries["a.txt"]?.typeDescription)
+    }
+
+    /// The first item of a type went away before it could be asked about:
+    /// it has no words, and the next of its type is asked again, and kept.
+    @Test func aFailedTypeDescriptionIsNotKeptForTheType() {
+        var asked: [String] = []
+        var descriptions = FolderReader.TypeDescriptions { url in
+            asked.append(url.lastPathComponent)
+            return url.lastPathComponent == "gone.txt" ? nil : "Plain Text"
+        }
+        let folder = URL(fileURLWithPath: "/nowhere")
+        func describe(_ name: String, _ type: UTType?) -> String {
+            descriptions.description(of: folder.appendingPathComponent(name, isDirectory: false), type: type)
+        }
+        #expect(describe("gone.txt", .plainText) == "")
+        #expect(describe("b.txt", .plainText) == "Plain Text")
+        #expect(describe("c.txt", .plainText) == "Plain Text")
+        #expect(asked == ["gone.txt", "b.txt"])
+        // Another type is asked for itself; an item with no type every time.
+        #expect(describe("d.png", .png) == "Plain Text")
+        #expect(describe("e", nil) == "Plain Text")
+        #expect(describe("f", nil) == "Plain Text")
+        #expect(asked == ["gone.txt", "b.txt", "d.png", "e", "f"])
     }
 
     @Test func everyItemIsListedOnce() throws {
