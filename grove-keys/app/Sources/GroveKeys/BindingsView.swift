@@ -103,7 +103,7 @@ struct BindingsView: View {
                 }
                 .disabled(!model.canEdit)
                 .padding(.horizontal, GroveSpace.s24)
-                .padding(.top, GroveSpace.s8)
+                .padding(.top, GroveWindow.contentGap)
                 .padding(.bottom, GroveSpace.s24)
             }
             .onChange(of: selected.wrappedValue) { _, row in

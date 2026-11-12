@@ -69,7 +69,7 @@ struct KeyboardView: View {
             legend
         }
         .padding(.horizontal, GroveSpace.s24)
-        .padding(.top, GroveSpace.s8)
+        .padding(.top, GroveWindow.contentGap)
         .padding(.bottom, GroveSpace.s24)
         .focusable(interactions: .edit)
         .focusEffectDisabled()

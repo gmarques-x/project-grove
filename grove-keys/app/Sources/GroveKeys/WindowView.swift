@@ -4,15 +4,13 @@ import GroveUI
 import SwiftUI
 
 /// The Grove Keys window (spec §7, mockup §1): no title bar, the header with
-/// the name, the two tabs and the Hyper status, then the red line, the
-/// permission banner and the tab.
+/// the name, the two tabs and the Hyper status (`GroveWindowHeader`, as
+/// Grove Themes' window), then the red line, the permission banner and the
+/// tab.
 struct WindowView: View {
     @ObservedObject var model: AppModel
     /// The keyboard's 856 pt and a 24 pt margin each side.
     static let width: CGFloat = 904
-    /// Clears the window buttons, which sit over the header.
-    private static let buttonsClearance: CGFloat = 78
-
     enum Tab: String, CaseIterable {
         case keyboard = "Keyboard", bindings = "Bindings"
     }
@@ -67,25 +65,21 @@ struct WindowView: View {
         .preferredColorScheme(theme.colorScheme)
     }
 
+    /// GroveUI's window header: the name, the two tabs (⌘1, ⌘2), the Hyper status.
     private func header(_ theme: ThemeColors) -> some View {
-        HStack(spacing: 0) {
-            Text("Grove Keys").font(GroveFont.lockup(15))
-            // ⌘1, ⌘2.
+        GroveWindowHeader("Grove Keys") {
             GroveSegmented("Tabs", segments: Tab.allCases.enumerated().map { i, t in
                 GroveSegment(t, t.rawValue, shortcut: KeyEquivalent(Character(String(i + 1))))
             }, selection: tab.wrappedValue, style: .pill(.panel), role: .tabs) { tab.wrappedValue = $0 }
-            .padding(.leading, GroveSpace.s24)
-            Spacer()
+        } trailing: {
             HStack(spacing: GroveSpace.s8) {
                 Circle().fill(Color(statusDot(theme))).frame(width: 7, height: 7)
                 Text(status)
             }
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
+            .accessibilityElement(children: .combine)
         }
-        .padding(.leading, Self.buttonsClearance)
-        .padding(.trailing, GroveSpace.s16)
-        .frame(height: 44)
     }
 
     private var status: String {

@@ -69,6 +69,33 @@ import Testing
         #expect(TintStrength.cap.rawValue == 0.16)
     }
 
+    // MARK: WindowHeaderMetrics
+
+    /// The buttons as macOS 27 puts them in an 800 × 600 window without a
+    /// title bar: 14 pt, 9 below the top, at x = 9, 32 and 55.
+    @Test func theHeaderIsMeasuredFromTheWindowsButtons() {
+        let buttons = [9.0, 32, 55].map { CGRect(x: $0, y: 577, width: 14, height: 14) }
+        let metrics = WindowHeaderMetrics(windowHeight: 600, buttons: buttons)
+        #expect(metrics == WindowHeaderMetrics(centerY: 16, buttonsEnd: 69))
+        #expect(metrics == .standard)
+        #expect(metrics.bandHeight == 32)
+        #expect(metrics.nameLeading == 85)
+        // An older title bar: 28 pt, the buttons centred at 14 and ending at 61.
+        let older = WindowHeaderMetrics(windowHeight: 400, buttons: [7.0, 27, 47].map {
+            CGRect(x: $0, y: 379, width: 14, height: 14)
+        })
+        #expect(older == WindowHeaderMetrics(centerY: 14, buttonsEnd: 61))
+        #expect(older.bandHeight == 28)
+    }
+
+    @Test func aWindowWithoutUsableButtonsWearsTheStandardHeader() {
+        #expect(WindowHeaderMetrics(windowHeight: 600, buttons: []) == .standard)
+        #expect(WindowHeaderMetrics(windowHeight: 600, buttons: [.zero]) == .standard)
+        // Not laid out yet: the buttons at the bottom of a window with no height.
+        #expect(WindowHeaderMetrics(windowHeight: 0, buttons: [CGRect(x: 9, y: 577, width: 14, height: 14)]) == .standard)
+        #expect(WindowHeaderMetrics(windowHeight: 600, buttons: [CGRect(x: 700, y: 577, width: 14, height: 14)]) == .standard)
+    }
+
     // MARK: GroveSegmented
 
     @Test func arrowsStepToTheNextEnabledSegmentAndStopAtTheEnds() {

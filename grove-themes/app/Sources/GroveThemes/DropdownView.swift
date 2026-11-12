@@ -100,7 +100,8 @@ struct DropdownView: View {
                 .fill(Color(theme.green))
                 .frame(width: 26, height: 26)
             VStack(alignment: .leading, spacing: GroveSpace.s2) {
-                Text("Grove Themes").font(GroveFont.mono(GroveType.title, .bold))
+                // The app's name as the window's header has it.
+                Text("Grove Themes").font(GroveWindow.nameFont)
                 if let list = model.list {
                     Text(StatusText.displayName(list.current)).modifier(SchemeNameStyle())
                 }
