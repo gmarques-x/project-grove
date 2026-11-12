@@ -41,7 +41,9 @@ struct WindowView: View {
                     PermissionBanner(permissions: model.permissions)
                 }
             }
-            .padding(.horizontal, GroveSpace.s24)
+            .padding(.horizontal, GroveWindow.margin)
+            // Clear of the header as the tab's content is; nothing when there is no banner.
+            .padding(.top, model.redLine == nil && model.permissions.granted ? 0 : GroveWindow.contentGap)
             .padding(.bottom, model.redLine == nil && model.permissions.granted ? 0 : GroveSpace.s12)
 
             switch tab.wrappedValue {
