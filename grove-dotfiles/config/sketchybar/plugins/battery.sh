@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · battery: a bolt filled with the charge; hidden without a battery. A click opens its popup (battery_popup.sh).
+# Grove bar · battery: a bolt filled with the charge; hidden without a battery. A click opens its panel (Grove Keys).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.

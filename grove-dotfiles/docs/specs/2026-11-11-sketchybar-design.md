@@ -158,3 +158,5 @@ grove-keys/app                                grovekeys://menu opens its menu ba
 - **Reloads:** volume and the front app fill in after a reload (`osascript` volume, `lsappinfo`).
 - **Hangs:** every slow source runs under a 2–3 s limit (`sb_timeout`).
 - **Install:** SketchyBar isn't in the Brewfile, because `brew bundle` refuses untrusted taps. Module 99 trusts the tap and installs it.
+
+> **2026-11-12:** the popups are gone. Every dropdown of the bar is now a panel drawn by Grove Keys (`grovekeys://panel/<name>`, sent by the pill's click), and the bar's end gaps moved so its outer pills sit on the window borders' lines: see `2026-11-12-bar-panels-design.md`. The bar keeps its pills, icons and labels as described here; `popup.sh`, the `*_popup.sh` fills, the sampler and the parsers only they used were removed.

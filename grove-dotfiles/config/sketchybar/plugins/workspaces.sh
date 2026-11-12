@@ -11,12 +11,11 @@ export PATH="${SB_PATH:-/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 . "$CONFIG_DIR/colors.sh"
 SB="${SKETCHYBAR_BIN:-sketchybar}"
 
-# An app or workspace switch closes the open popup, whichever it is. Here
-# because this is the one plugin that gets both events;
-# first, so the popup doesn't wait for AeroSpace's answers.
-case "${SENDER:-}" in
-  front_app_switched | aerospace_workspace_change) sb_popup_close ;;
-esac
+# A workspace change puts away the open panel (Grove Keys draws the bar's
+# dropdowns; it sees an app switch itself, but not AeroSpace's workspaces).
+# First, so the panel doesn't wait for AeroSpace's answers; one file test
+# when none is open.
+[ "${SENDER:-}" != aerospace_workspace_change ] || sb_panel_close
 
 used="$( { sb_timeout 2 aerospace list-workspaces --monitor all --empty no 2>/dev/null || true; } | sb_workspaces)"
 focused="${FOCUSED:-$( { sb_timeout 2 aerospace list-workspaces --focused 2>/dev/null || true; } | sb_workspaces)}"

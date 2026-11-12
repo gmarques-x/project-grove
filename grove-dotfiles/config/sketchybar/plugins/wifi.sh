@@ -1,5 +1,5 @@
 #!/bin/bash
-# Grove bar · the connection, an icon: Wi-Fi by signal, a cable or a tunnel through the default route, or off. A click opens its popup (network_popup.sh).
+# Grove bar · the connection, an icon: Wi-Fi by signal, a cable or a tunnel through the default route, or off. A click opens its panel (Grove Keys).
 # shellcheck shell=bash
 # SketchyBar starts plugins with a minimal environment: PATH is set here, and
 # tests point SB_PATH / SKETCHYBAR_BIN at fakes.
