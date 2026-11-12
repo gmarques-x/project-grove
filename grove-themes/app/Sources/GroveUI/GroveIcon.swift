@@ -107,6 +107,8 @@ public struct GroveIcon: View {
         case power = "power"
         /// The Grove menu's Global Menu row: the front app's menus.
         case globalMenu = "menubar.rectangle"
+        /// The Grove menu's Files row: Grove Explorer.
+        case folder = "folder"
 
         // Grove Explorer (spec 2026-11-12-grove-explorer-design).
         /// The column a list is sorted by, ascending; turned upside down

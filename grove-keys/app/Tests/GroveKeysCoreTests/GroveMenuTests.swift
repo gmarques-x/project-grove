@@ -7,9 +7,10 @@ import Testing
 
     @Test func readsTheShippedFileInFileOrder() throws {
         let menu = try GroveMenu.strict(main: try fixture("menu.toml"))
-        #expect(menu.rows.map(\.id) == ["appearance", "keys", "update", "learn", "about", "system", "global-menu"])
-        #expect(menu.rows.map(\.title) == ["Appearance", "Grove Keys", "Update", "Learn", "About", "System", "Global Menu"])
-        #expect(menu.count == 29)
+        #expect(menu.rows.map(\.id) == ["appearance", "files", "keys", "update", "learn", "about", "system", "global-menu"])
+        #expect(menu.rows.map(\.title) == ["Appearance", "Files", "Grove Keys", "Update", "Learn", "About", "System",
+                                            "Global Menu"])
+        #expect(menu.count == 30)
 
         let appearance = menu.rows[0]
         #expect(appearance.action == nil)
@@ -23,7 +24,9 @@ import Testing
         #expect(hard.action == .run("grove-themes set dark-hard"))
         #expect(hard.checked == #"test "$(grove-themes current)" = dark-hard"#)
 
-        #expect(menu.rows[1].action == .builtin(.keys))
+        // Files opens Grove Explorer, an app like any other.
+        #expect(menu.rows[1].action == .run("open -a 'Grove Explorer'"))
+        #expect(menu.rows[2].action == .builtin(.keys))
         #expect(menu.row(id: "update.check")?.action == .present("grove check"))
         #expect(menu.row(id: "system.lock")?.action == .builtin(.lock))
         // System Settings leads the System submenu, set apart from Lock and the rest.
@@ -41,7 +44,7 @@ import Testing
 
     @Test func theShippedTopLevelRowsEachHaveAnIcon() throws {
         let menu = try GroveMenu.strict(main: try fixture("menu.toml"))
-        #expect(menu.rows.map(\.icon) == ["paintpalette", "keyboard", "arrow.triangle.2.circlepath", "book",
+        #expect(menu.rows.map(\.icon) == ["paintpalette", "folder", "keyboard", "arrow.triangle.2.circlepath", "book",
                                           "info.circle", "power", "menubar.rectangle"])
         // Only the top level: the names are held to Grove's icons by `--check-menu`.
         #expect(menu.icons.map(\.id) == menu.rows.map(\.id))
@@ -159,7 +162,7 @@ import Testing
         #expect(menu.row(id: "system") == nil && menu.row(id: "system.lock") == nil)
         #expect(menu.row(id: "learn")?.children.last?.id == "learn.mine")
         // New top rows go last; missing parents are made, named by their id.
-        #expect(menu.rows.map(\.id) == ["appearance", "keys", "update", "learn", "about", "global-menu", "work"])
+        #expect(menu.rows.map(\.id) == ["appearance", "files", "keys", "update", "learn", "about", "global-menu", "work"])
         let work = try #require(menu.rows.last)
         #expect(work.title == "work" && work.children[0].title == "vpn")
         #expect(work.children[0].children[0].action == .run("vpn on"))
@@ -339,7 +342,7 @@ import Testing
 
     @Test func theLauncherListsEveryLeafByItsPath() throws {
         let entries = try shippedEntries()
-        #expect(entries.count == 26)
+        #expect(entries.count == 27)
         #expect(entries.prefix(3).map(\.text) == ["Appearance › Grove Themes…", "Appearance › Dark Hard", "Appearance › Dark Medium"])
         #expect(entries[1].id == "appearance.dark-hard" && entries[1].checked != nil)
         // Grove Keys' items are there (not its red line); the Global Menu is not.
@@ -347,10 +350,12 @@ import Testing
         #expect(!entries.contains { $0.text.contains("Global Menu") })
         #expect(entries.last?.text == "System › Shut Down…")
         #expect(entries.first { $0.id == "about" }?.path == ["About"])
+        // Files is a row of its own: typing "files" in the launcher opens Grove Explorer.
+        #expect(entries.first { $0.id == "files" }?.text == "Files")
 
         // A keys builtin that wasn't expanded has nothing to list.
         let plain = try GroveMenu.strict(main: try fixture("menu.toml")).launcherEntries
-        #expect(plain.count == 23 && !plain.contains { $0.id == "keys" })
+        #expect(plain.count == 24 && !plain.contains { $0.id == "keys" })
     }
 
     private func ids(_ rows: [LauncherEntry], apps: [InstalledApps.App] = [], _ query: String) -> [String] {

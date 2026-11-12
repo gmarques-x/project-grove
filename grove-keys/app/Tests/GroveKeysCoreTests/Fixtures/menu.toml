@@ -58,6 +58,11 @@ title = "Light Soft"
 run = "grove-themes set light-soft"
 checked = "test \"$(grove-themes current)\" = light-soft"
 
+[files]
+title = "Files"
+icon = "folder"
+run = "open -a 'Grove Explorer'"
+
 [keys]
 title = "Grove Keys"
 icon = "keyboard"

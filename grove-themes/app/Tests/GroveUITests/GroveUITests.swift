@@ -82,7 +82,7 @@ import Testing
                 "arrow.down", "arrow.up", "chevron.right", "chevron.left", "doc.on.doc", "arrow.clockwise",
                 "laptopcomputer", "airpodspro", "display", "headphones", "airplayaudio",
              "cable.connector.horizontal", "hifispeaker", "mic", "paintpalette", "keyboard",
-                "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle",
+                "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle", "folder",
                 // Grove Explorer.
                 "chevron.up", "xmark", "eject.fill", "trash", "icloud", "rectangle", "rectangle.split.2x1",
                 "magnifyingglass"])
