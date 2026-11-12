@@ -107,25 +107,37 @@ private final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
-/// The field of a key panel. AppKit's, so that it is the panel's first
-/// responder from the start and ↑/↓, Return and Escape reach the panel's
-/// owner while the typing stays in the field.
+/// The field of a key panel, and of any Grove list filtered or walked from
+/// a field (the key editor's). AppKit's, so that it is the window's first
+/// responder from the start and ↑/↓, Return and Escape reach the owner
+/// while the typing stays in the field.
 public struct FilterField: NSViewRepresentable {
     let text: String
     let placeholder: String
     let theme: ThemeColors
+    let size: CGFloat
+    let takesFocus: Bool
+    let focus: Int
     let onChange: @MainActor (String) -> Void
     /// −1 for ↑, 1 for ↓.
     let onMove: @MainActor (Int) -> Void
     let onReturn: @MainActor () -> Void
     let onEscape: @MainActor () -> Void
 
-    public init(text: String, placeholder: String, theme: ThemeColors,
+    /// `size`: the text's, from `GroveType`. `takesFocus`: false leaves the
+    /// keyboard where it is when the field appears. `focus`: a count; when
+    /// it goes up the field takes the keyboard (a click on something that
+    /// means "type here").
+    public init(text: String, placeholder: String, theme: ThemeColors, size: CGFloat = GroveType.title,
+                takesFocus: Bool = true, focus: Int = 0,
                 onChange: @escaping @MainActor (String) -> Void, onMove: @escaping @MainActor (Int) -> Void,
                 onReturn: @escaping @MainActor () -> Void, onEscape: @escaping @MainActor () -> Void) {
         self.text = text
         self.placeholder = placeholder
         self.theme = theme
+        self.size = size
+        self.takesFocus = takesFocus
+        self.focus = focus
         self.onChange = onChange
         self.onMove = onMove
         self.onReturn = onReturn
@@ -136,10 +148,12 @@ public struct FilterField: NSViewRepresentable {
 
     public func makeNSView(context: Context) -> NSTextField {
         let field = FirstResponderField()
+        field.takesFocus = takesFocus
+        context.coordinator.focus = focus
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.font = GroveFont.monoNS(GroveType.title)
+        field.font = GroveFont.monoNS(size)
         field.usesSingleLineMode = true
         field.lineBreakMode = .byTruncatingTail
         field.delegate = context.coordinator
@@ -150,14 +164,20 @@ public struct FilterField: NSViewRepresentable {
         context.coordinator.field = self
         if field.stringValue != text { field.stringValue = text }
         field.textColor = NSColor(theme.fg)
+        field.isEnabled = context.environment.isEnabled
         field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [
-            .foregroundColor: NSColor(theme.dim), .font: GroveFont.monoNS(GroveType.title),
+            .foregroundColor: NSColor(theme.dim), .font: GroveFont.monoNS(size),
         ])
+        if focus != context.coordinator.focus {
+            context.coordinator.focus = focus
+            field.window?.makeFirstResponder(field)
+        }
     }
 
     @MainActor
     public final class Coordinator: NSObject, NSTextFieldDelegate {
         var field: FilterField
+        var focus = 0
         init(field: FilterField) { self.field = field }
 
         public func controlTextDidChange(_ note: Notification) {
@@ -179,8 +199,10 @@ public struct FilterField: NSViewRepresentable {
 }
 
 private final class FirstResponderField: NSTextField {
+    var takesFocus = true
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        window?.makeFirstResponder(self)
+        if takesFocus { window?.makeFirstResponder(self) }
     }
 }

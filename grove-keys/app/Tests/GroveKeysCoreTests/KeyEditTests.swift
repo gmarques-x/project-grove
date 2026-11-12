@@ -119,4 +119,16 @@ import Testing
         f.assign(.none, layerID: "none", shortcut: "q")
         #expect(f.action(layerID: "none", shortcut: "q") == KeyAction.none)
     }
+
+    @Test func theCommandListsRowsAndTheRowATextBelongsTo() {
+        let rows = CommandCatalog.rows(key: "3")
+        #expect(rows.count == CommandCatalog.entries.count + 1)
+        #expect(rows[0] == CommandCatalog.Row(id: "workspace N", title: "workspace", command: "workspace 3", number: "3"))
+        #expect(rows.last == CommandCatalog.Row(id: "custom", title: "Custom command…", command: nil, number: ""))
+        #expect(CommandCatalog.rowID(for: "workspace 3", in: rows) == "workspace N")
+        #expect(CommandCatalog.rowID(for: " focus left ", in: rows) == "focus left")
+        #expect(CommandCatalog.rowID(for: "workspace 4", in: rows) == "custom")
+        #expect(CommandCatalog.rowID(for: "", in: rows) == "custom")
+        #expect(CommandCatalog.rows(key: "h")[1].command == "move-node-to-workspace 1")
+    }
 }
