@@ -1,0 +1,238 @@
+import Foundation
+
+/// One tab: a folder, how it is sorted, and where it has been.
+public struct Tab: Equatable, Codable, Sendable, Identifiable {
+    public let id: UUID
+    /// As it was navigated to: a link stays a link, `/var/x` stays `/var/x`.
+    public var folder: URL
+    public var sort: SortOrder
+    /// The folders before this one, the latest last.
+    public var back: [URL]
+    /// The folders gone back from, the next one last.
+    public var forward: [URL]
+
+    public init(
+        id: UUID = UUID(), folder: URL, sort: SortOrder = .byName,
+        back: [URL] = [], forward: [URL] = []
+    ) {
+        self.id = id
+        self.folder = folder
+        self.sort = sort
+        self.back = back
+        self.forward = forward
+    }
+
+    /// The folder's name; "Home" for the user's home folder.
+    public var title: String {
+        folder.isSameFolder(as: FileManager.default.homeDirectoryForCurrentUser)
+            ? "Home" : folder.lastPathComponent
+    }
+}
+
+/// One pane: its tabs, and which one shows. There is always at least one tab.
+public struct Pane: Equatable, Codable, Sendable {
+    public var tabs: [Tab]
+    public var current: Int
+
+    public init(tabs: [Tab], current: Int) {
+        self.tabs = tabs
+        self.current = current
+    }
+}
+
+public enum Side: Int, Codable, Sendable {
+    case left, right
+
+    public var other: Side { self == .left ? .right : .left }
+}
+
+/// The window's state: one pane or two, their tabs, and which pane is active.
+/// Every change is made to the active pane's current tab unless it says
+/// otherwise. Nothing here reads the disk.
+public struct Browser: Equatable, Codable, Sendable {
+    /// One or two; with one, it is the left.
+    public var panes: [Pane]
+    public var active: Side
+    public var showHidden: Bool
+
+    public init(start: URL, twoPanes: Bool, showHidden: Bool) {
+        panes = (twoPanes ? [Side.left, .right] : [.left]).map { _ in
+            Pane(tabs: [Tab(folder: start)], current: 0)
+        }
+        active = .left
+        self.showHidden = showHidden
+    }
+
+    public var activeTab: Tab { pane.tabs[pane.current] }
+
+    /// The tab showing on that side; nil when there is no pane there.
+    public func tab(_ side: Side) -> Tab? {
+        guard panes.indices.contains(side.rawValue) else { return nil }
+        let pane = panes[side.rawValue]
+        return pane.tabs[pane.current]
+    }
+
+    // MARK: Folders
+
+    /// Shows `folder` in the active tab: the one it leaves goes on the
+    /// history, and there is no longer anything to go forward to. Going to
+    /// the folder already shown changes nothing.
+    public mutating func go(to folder: URL) {
+        guard !folder.isSameFolder(as: activeTab.folder) else { return }
+        var tab = activeTab
+        tab.back.append(tab.folder)
+        tab.forward = []
+        tab.folder = folder
+        pane.tabs[pane.current] = tab
+    }
+
+    /// False when there is nothing to go back to.
+    @discardableResult
+    public mutating func goBack() -> Bool {
+        var tab = activeTab
+        guard let folder = tab.back.popLast() else { return false }
+        tab.forward.append(tab.folder)
+        tab.folder = folder
+        pane.tabs[pane.current] = tab
+        return true
+    }
+
+    /// False when there is nothing to go forward to.
+    @discardableResult
+    public mutating func goForward() -> Bool {
+        var tab = activeTab
+        guard let folder = tab.forward.popLast() else { return false }
+        tab.back.append(tab.folder)
+        tab.folder = folder
+        pane.tabs[pane.current] = tab
+        return true
+    }
+
+    /// To the folder that holds this one, as `go(to:)` does. False at a
+    /// volume's root, where there is nothing above to show.
+    @discardableResult
+    public mutating func goUp() -> Bool {
+        let folder = activeTab.folder
+        guard !folder.isVolumeRoot else { return false }
+        go(to: folder.deletingLastPathComponent())
+        return true
+    }
+
+    // MARK: Tabs
+
+    /// A tab after the current one, which becomes the current one: on
+    /// `folder`, or on the folder showing when none is given. It takes the
+    /// current tab's sort and starts without history.
+    public mutating func newTab(folder: URL? = nil) {
+        let tab = Tab(folder: folder ?? activeTab.folder, sort: activeTab.sort)
+        pane.tabs.insert(tab, at: pane.current + 1)
+        pane.current += 1
+    }
+
+    /// Closes the current tab; the one after it shows, or the one before
+    /// when it was the last in the row. False when it is the pane's only tab,
+    /// which doesn't close.
+    @discardableResult
+    public mutating func closeTab() -> Bool {
+        guard pane.tabs.count > 1 else { return false }
+        pane.tabs.remove(at: pane.current)
+        pane.current = min(pane.current, pane.tabs.count - 1)
+        return true
+    }
+
+    /// Shows the tab at `index`, counted from 0; nothing when there is none.
+    public mutating func selectTab(_ index: Int) {
+        guard pane.tabs.indices.contains(index) else { return }
+        pane.current = index
+    }
+
+    /// The tab to the right; from the last, round to the first.
+    public mutating func nextTab() {
+        pane.current = (pane.current + 1) % pane.tabs.count
+    }
+
+    /// The tab to the left; from the first, round to the last.
+    public mutating func previousTab() {
+        pane.current = (pane.current + pane.tabs.count - 1) % pane.tabs.count
+    }
+
+    // MARK: Panes
+
+    /// One pane to two: the new one opens at the right with one tab on the
+    /// active tab's folder, and the left stays active. Two to one: the active
+    /// pane stays, with its tabs.
+    public mutating func togglePanes() {
+        if panes.count == 1 {
+            let tab = Tab(folder: activeTab.folder, sort: activeTab.sort)
+            panes.append(Pane(tabs: [tab], current: 0))
+        } else {
+            panes = [pane]
+            active = .left
+        }
+    }
+
+    /// Makes the other pane the active one, opening it when there is one.
+    public mutating func switchPane() {
+        if panes.count == 1 { togglePanes() }
+        active = active.other
+    }
+
+    // MARK: Sort
+
+    /// Sorts the active tab by `column`, ascending; by the column it is
+    /// already sorted by, the other way round.
+    public mutating func setSort(_ column: SortColumn) {
+        let sort = activeTab.sort
+        pane.tabs[pane.current].sort = SortOrder(
+            column: column, ascending: sort.column == column ? !sort.ascending : true)
+    }
+
+    // MARK: Repair
+
+    /// Moves every tab whose folder is gone to its nearest parent that
+    /// exists. A tab on a volume that is gone (ejected) moves to `home`
+    /// rather than to `/Volumes`, and so does one with nothing left above it.
+    /// The histories are left as they are.
+    public mutating func repair(exists: (URL) -> Bool, home: URL) {
+        for pane in panes.indices {
+            for tab in panes[pane].tabs.indices {
+                let folder = panes[pane].tabs[tab].folder
+                guard !exists(folder) else { continue }
+                panes[pane].tabs[tab].folder = Self.nearest(to: folder, exists: exists) ?? home
+            }
+        }
+    }
+
+    /// The closest folder above `folder` that exists and is on its volume.
+    private static func nearest(to folder: URL, exists: (URL) -> Bool) -> URL? {
+        var folder = folder
+        // A path has no more parents than it has parts.
+        for _ in folder.pathComponents {
+            guard !folder.isVolumeRoot else { return nil }
+            folder = folder.deletingLastPathComponent()
+            if exists(folder) { return folder }
+        }
+        return nil
+    }
+
+    /// The active pane.
+    private var pane: Pane {
+        get { panes[active.rawValue] }
+        set { panes[active.rawValue] = newValue }
+    }
+}
+
+extension URL {
+    /// Whether both are the same folder by path, however each was written
+    /// (a trailing slash, `..`). Folders are kept as they were navigated to
+    /// and only compared this way.
+    func isSameFolder(as other: URL) -> Bool {
+        standardizedFileURL.path == other.standardizedFileURL.path
+    }
+
+    /// `/`, or a disk's folder in `/Volumes`: told from the path alone.
+    var isVolumeRoot: Bool {
+        let parts = standardizedFileURL.pathComponents
+        return parts.count <= 1 || (parts.count == 3 && parts[1] == "Volumes")
+    }
+}
