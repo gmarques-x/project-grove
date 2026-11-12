@@ -35,7 +35,7 @@ public actor OperationRunner {
     }
 
     /// `FileManager` is safe to use from any thread; the type doesn't say so.
-    private struct Files: @unchecked Sendable {
+    fileprivate struct Files: @unchecked Sendable {
         let manager: FileManager
     }
 
@@ -108,6 +108,16 @@ public actor OperationRunner {
             return Outcome(changes: [], failures: [], cancelled: false, summary: refusal.sentence)
         }
 
+        return await inTurn { flag in
+            await Self.work(
+                operation, known: known, files: files, flag: flag, watching: watching,
+                resolve: resolve, progress: progress)
+        }
+    }
+
+    /// Waits for the run in hand, if any, then does `work` as the run in
+    /// hand: one turn of the queue.
+    private func inTurn<Result: Sendable>(_ work: (CancelFlag) async -> Result) async -> Result {
         if busy {
             // Resumed by the run before this one, which leaves `busy` set.
             await withCheckedContinuation { waiting.append($0) }
@@ -116,40 +126,75 @@ public actor OperationRunner {
         }
         let flag = CancelFlag()
         current = flag
-        let outcome = await Self.work(
-            operation, known: known, files: files, flag: flag, watching: watching,
-            resolve: resolve, progress: progress)
+        let result = await work(flag)
         current = nil
         if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
-        return outcome
+        return result
     }
 
-    /// For Undo: moves `item` back to exactly `place`, the folder and the
-    /// name it had (out of the Trash, or from where a move left it). A run
-    /// like any other: in its turn, by the same steps as a move, so never
-    /// in place of another item. Nothing is asked: when something is at
-    /// `place`, the item stays where it is and the outcome says so.
-    func put(_ item: URL, at place: URL) async -> Outcome {
-        if busy {
-            await withCheckedContinuation { waiting.append($0) }
-        } else {
-            busy = true
+    // MARK: Several steps in one turn, for Undo
+
+    /// What can be done within one turn of the queue: each call is done at
+    /// once, on the thread of the turn, by the same worker as a run.
+    struct Turn: Sendable {
+        fileprivate let files: Files
+        fileprivate let flag: CancelFlag
+        fileprivate let watching: (@Sendable (Stage) -> Void)?
+
+        /// The targets of the operation that exist now, as `existingNames` has them.
+        func existing(for operation: Operation) -> [URL] {
+            OperationRunner.existing(for: operation)
         }
-        let flag = CancelFlag()
-        current = flag
-        let outcome = await Self.putting(item, at: place, files: files, flag: flag, watching: watching)
-        current = nil
-        if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
-        return outcome
+
+        /// The operation, as `run` does it. `resolve` is asked only about
+        /// the targets in `asked`: any other that exists fails its item.
+        func run(
+            _ operation: Operation, asked: [URL] = [], resolve: @escaping (URL) -> Conflict.Choice = { _ in .skip }
+        ) -> Outcome {
+            if let refusal = OperationRunner.refusal(of: operation) {
+                return Outcome(changes: [], failures: [], cancelled: false, summary: refusal.sentence)
+            }
+            return Worker(
+                operation: operation, known: Set(asked.map(OperationRunner.key)), files: files.manager,
+                flag: flag, watching: watching, resolve: resolve, progress: { _ in }
+            ).run()
+        }
+
+        /// Moves `item` back to exactly `place`, the folder and the name it
+        /// had (out of the Trash, or from where a move left it): by the
+        /// steps of a move, so never in place of another item. Nothing is
+        /// asked: when something is at `place`, the item stays where it is
+        /// and the outcome says so.
+        func put(_ item: URL, at place: URL) -> Outcome {
+            Worker(
+                operation: .move(items: [item], to: place.deletingLastPathComponent()), known: [],
+                files: files.manager, flag: flag, watching: watching, resolve: { _ in .skip }, progress: { _ in }
+            ).put(at: place)
+        }
     }
 
-    @concurrent private static func putting(
-        _ item: URL, at place: URL, files: Files, flag: CancelFlag, watching: (@Sendable (Stage) -> Void)?
-    ) async -> Outcome {
-        Worker(
-            operation: .move(items: [item], to: place.deletingLastPathComponent()), known: [],
-            files: files.manager, flag: flag, watching: watching, resolve: { _ in .skip }, progress: { _ in }
-        ).put(at: place)
+    /// For Undo: does `steps` as one turn of the queue, off the actor. No
+    /// other run comes between them, and what they look at first is as
+    /// fresh as what they then do: the turn waits before `steps` begin,
+    /// not inside them. `cancel` stops them as it stops a run.
+    ///
+    /// What `existingNames` remembered is forgotten, before and after, as a
+    /// run forgets it: the turn may change what is at those names. So the
+    /// app must not offer undo or redo between its own `existingNames` and
+    /// the `run` that follows it.
+    func turn<Result: Sendable>(_ steps: @Sendable (Turn) -> Result) async -> Result {
+        lookedUp = nil
+        let result = await inTurn { flag in
+            await Self.taking(Turn(files: files, flag: flag, watching: watching), steps)
+        }
+        lookedUp = nil
+        return result
+    }
+
+    @concurrent private static func taking<Result: Sendable>(
+        _ turn: Turn, _ steps: @Sendable (Turn) -> Result
+    ) async -> Result {
+        steps(turn)
     }
 
     /// Stops the run in hand after the file it is on. What was done stays;

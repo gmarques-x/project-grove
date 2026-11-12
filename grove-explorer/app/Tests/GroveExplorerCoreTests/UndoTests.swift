@@ -432,11 +432,12 @@ private func refusal(_ body: () async throws -> String) async -> String? {
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: notes.md has changed")
+        #expect(said == "Can't undo: notes.md has changed. It can no longer be undone.")
         // Nothing is touched: not the copy that didn't change either.
         #expect(box.listing() == after)
         #expect(box.inTrash == [])
-        #expect(await stack.canUndo)
+        // Nobody can put that right: the entry is dropped.
+        #expect(await stack.canUndo == false)
         #expect(await stack.canRedo == false)
     }
 
@@ -452,22 +453,239 @@ private func refusal(_ body: () async throws -> String) async -> String? {
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: notes.md has changed")
+        #expect(said == "Can't undo: notes.md has changed. It can no longer be undone.")
         #expect(box.listing() == after)
         #expect(box.inTrash == [])
     }
 
-    @Test func aCopiedFolderThatGotAnItemIsNotUndone() async throws {
+    /// Only the folder itself is looked at, and a folder's date says nothing.
+    @Test func aCopiedFolderGoesToTheTrashWholeWhateverWasPutInItSince() async throws {
         try box.makeFile("src/Tree/one.txt", "one")
+        let before = box.listing()
         await perform(.copy(items: [box.path("src/Tree")], to: dest))
         try box.makeFile("dest/Tree/mine.txt", "written since")
-        let after = box.listing()
+
+        #expect(try await stack.undo() == "Undid: copied Tree to dest")
+
+        #expect(box.listing() == before)
+        // Not lost: in the Trash, with the folder.
+        #expect(box.text(box.inTrash[0].appendingPathComponent("mine.txt")) == "written since")
+    }
+
+    @Test func aCopiedFolderThatIsNowAFileIsNotUndone() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        await perform(.copy(items: [box.path("src/Tree")], to: dest))
+        try box.files.removeItem(at: box.path("dest/Tree"))
+        try box.makeFile("dest/Tree", "a file of that name")
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: Tree has changed")
-        #expect(box.listing() == after)
+        #expect(said == "Can't undo: Tree has changed. It can no longer be undone.")
+        #expect(box.text(box.path("dest/Tree")) == "a file of that name")
         #expect(box.inTrash == [])
+    }
+
+    // MARK: Operations that depend on each other
+
+    @Test func aNewFolderAndAMoveIntoItAreUndoneOneAfterTheOther() async throws {
+        let file = try box.makeFile("src/notes.md", "some notes")
+        let before = box.listing()
+        await perform(.newFolder(in: dest, name: "Plans"))
+        await perform(.move(items: [file], to: box.path("dest/Plans")))
+
+        #expect(try await stack.undo() == "Undid: moved notes.md to Plans")
+        // Empty again, with another date than when it was made.
+        #expect(try await stack.undo() == "Undid: made the folder Plans")
+
+        #expect(box.listing() == before)
+        #expect(try await stack.redo() == "Redid: made the folder Plans")
+        #expect(try await stack.redo() == "Redid: moved notes.md to Plans")
+        #expect(box.text(box.path("dest/Plans/notes.md")) == "some notes")
+    }
+
+    @Test func aCopiedFolderIsUndoneAfterALaterOperationInsideItWasUndone() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        let file = try box.makeFile("src/notes.md", "some notes")
+        let before = box.listing()
+        await perform(.copy(items: [box.path("src/Tree")], to: dest))
+        await perform(.copy(items: [file], to: box.path("dest/Tree")))
+        await perform(.rename(item: box.path("dest/Tree/one.txt"), to: "uno.txt"))
+
+        _ = try await stack.undo()
+        _ = try await stack.undo()
+        #expect(try await stack.undo() == "Undid: copied Tree to dest")
+
+        #expect(box.listing() == before)
+    }
+
+    @Test func anUndoThatCanNeverBeDoneIsDroppedAndTheNextReachesTheOperationBefore() async throws {
+        let file = try box.makeFile("src/notes.md", "some notes")
+        let other = try box.makeFile("src/other.md", "other")
+        let before = box.listing()
+        await perform(.move(items: [other], to: dest))
+        await perform(.copy(items: [file], to: dest))
+        try Data("some notes, and more".utf8).write(to: box.path("dest/notes.md"))
+
+        let said = await refusal { try await stack.undo() }
+        #expect(said == "Can't undo: notes.md has changed. It can no longer be undone.")
+        #expect(await stack.canUndo)
+
+        #expect(try await stack.undo() == "Undid: moved other.md to dest")
+        #expect(box.text(other) == "other")
+        #expect(box.names(in: dest) == ["notes.md"])
+        #expect(box.listing(src) == before.filter { $0.key.hasPrefix("src/") }.reduce(into: [:]) {
+            $0[String($1.key.dropFirst(4))] = $1.value
+        })
+        #expect(await stack.canUndo == false)
+    }
+
+    @Test func anUndoTheUserCanPutRightKeepsItsPlaceBeforeTheOlderOnes() async throws {
+        let file = try box.makeFile("src/notes.md", "some notes")
+        let other = try box.makeFile("src/other.md", "other")
+        await perform(.move(items: [other], to: dest))
+        await perform(.newFolder(in: dest, name: "Plans"))
+        try box.makeFile("dest/Plans/plan.md", "a plan")
+
+        // Again and again the same, and never the operation before.
+        for _ in 1...2 {
+            #expect(await refusal { try await stack.undo() } == "Can't undo: Plans is no longer empty")
+        }
+        #expect(box.names(in: dest) == ["Plans", "other.md"])
+        #expect(box.text(file) == "some notes")
+
+        try box.files.removeItem(at: box.path("dest/Plans/plan.md"))
+        #expect(try await stack.undo() == "Undid: made the folder Plans")
+        #expect(try await stack.undo() == "Undid: moved other.md to dest")
+    }
+
+    // MARK: Behind a run that takes its time
+
+    /// A runner whose run stops as it places `slow.txt`, until `gate` is
+    /// signalled; it tells `reached` when it is there, and writes the
+    /// names it places into `placed`.
+    private func slowRunner(
+        gate: DispatchSemaphore, reached: DispatchSemaphore, placed: Locked<[String]>
+    ) -> OperationRunner {
+        OperationRunner(fileManager: box.trash, watching: { stage in
+            guard case let .placing(url) = stage else { return }
+            if url.lastPathComponent == "slow.txt" {
+                reached.signal()
+                gate.wait()
+            } else {
+                placed.change { $0.append(url.lastPathComponent) }
+            }
+        })
+    }
+
+    private func wait(for semaphore: DispatchSemaphore) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                semaphore.wait()
+                continuation.resume()
+            }
+        }
+    }
+
+    @Test func anUndoBehindARunChecksWhenItsTurnComes() async throws {
+        let (gate, reached, placed) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), Locked<[String]>([]))
+        let runner = slowRunner(gate: gate, reached: reached, placed: placed)
+        let dest = dest
+        let stack = UndoStack(runner: runner)
+        let file = try box.makeFile("src/a.txt", "a")
+        let slow = try box.makeFile("src/slow.txt", "slow")
+        await GroveExplorerCoreTests.perform(.move(items: [file], to: dest), on: runner, into: stack)
+
+        async let running = runner.run(.copy(items: [slow], to: dest), resolve: { _ in .skip }, progress: { _ in })
+        await wait(for: reached)
+        let undoing = Task { await refusal { try await stack.undo() } }
+        try await Task.sleep(for: .milliseconds(200))
+        // While the undo waits for its turn, the moved file is written to.
+        try Data("a, and more".utf8).write(to: box.path("dest/a.txt"))
+        gate.signal()
+        _ = await running
+
+        #expect(await undoing.value == "Can't undo: a.txt has changed. It can no longer be undone.")
+        #expect(box.text(box.path("dest/a.txt")) == "a, and more")
+        #expect(box.names(in: src) == ["slow.txt"])
+    }
+
+    @Test func noOtherRunComesBetweenTheStepsOfAnUndo() async throws {
+        let (gate, reached, placed) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), Locked<[String]>([]))
+        let runner = slowRunner(gate: gate, reached: reached, placed: placed)
+        let dest = dest
+        let stack = UndoStack(runner: runner)
+        let files = try ["a.txt", "b.txt"].map { try box.makeFile("src/\($0)", $0) }
+        let slow = try box.makeFile("src/slow.txt", "slow")
+        let next = try box.makeFile("src/c.txt", "c")
+        await GroveExplorerCoreTests.perform(.move(items: files, to: dest), on: runner, into: stack)
+        placed.value = []
+
+        async let running = runner.run(.copy(items: [slow], to: dest), resolve: { _ in .skip }, progress: { _ in })
+        await wait(for: reached)
+        let undoing = Task { try await stack.undo() }
+        try await Task.sleep(for: .milliseconds(200))
+        let after = Task {
+            await runner.run(.copy(items: [next], to: dest), resolve: { _ in .skip }, progress: { _ in })
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        gate.signal()
+        _ = await running
+
+        #expect(try await undoing.value == "Undid: moved 2 items to dest")
+        #expect(await after.value.failures == [])
+        // The undo's two steps, then the copy that was asked for after it.
+        #expect(placed.value == ["b.txt", "a.txt", "c.txt"])
+        #expect(box.names(in: src) == ["a.txt", "b.txt", "c.txt", "slow.txt"])
+    }
+
+    @Test func anOperationRecordedWhileAnUndoWaitsLeavesNothingToRedo() async throws {
+        let (gate, reached, placed) = (DispatchSemaphore(value: 0), DispatchSemaphore(value: 0), Locked<[String]>([]))
+        let runner = slowRunner(gate: gate, reached: reached, placed: placed)
+        let dest = dest
+        let stack = UndoStack(runner: runner)
+        let file = try box.makeFile("src/a.txt", "a")
+        let slow = try box.makeFile("src/slow.txt", "slow")
+        await GroveExplorerCoreTests.perform(.move(items: [file], to: dest), on: runner, into: stack)
+
+        async let running = runner.run(.copy(items: [slow], to: dest), resolve: { _ in .skip }, progress: { _ in })
+        await wait(for: reached)
+        let undoing = Task { try await stack.undo() }
+        try await Task.sleep(for: .milliseconds(200))
+        gate.signal()
+        // The run in hand ends and is recorded before the undo is through.
+        let copied = await running
+        await stack.record(copied, words: copied.summary, operation: .copy(items: [slow], to: dest))
+
+        #expect(try await undoing.value == "Undid: moved a.txt to dest")
+        #expect(box.text(file) == "a")
+        #expect(await stack.canRedo == false)
+        // What is left to undo is the copy.
+        #expect(try await stack.undo() == "Undid: copied slow.txt to dest")
+    }
+
+    @Test func anUndoMakesTheRunnerForgetTheNamesItLookedUp() async throws {
+        let file = try box.makeFile("dest/notes.md", "there")
+        let coming = try box.makeFile("src/notes.md", "coming")
+        let away = try box.makeFolder("away")
+        await perform(.move(items: [file], to: away))
+        let copy = Operation.copy(items: [coming], to: dest)
+        #expect(await runner.existingNames(for: copy) == [])
+
+        // The undo puts an item at the very name that was looked up as free.
+        _ = try await stack.undo()
+        let asked = Locked<[String]>([])
+        let outcome = await runner.run(
+            copy,
+            resolve: { url in
+                asked.change { $0.append(url.lastPathComponent) }
+                return .skip
+            },
+            progress: { _ in })
+
+        // Looked up afresh: it is a name to ask about, not one that "appeared".
+        #expect(asked.value == ["notes.md"])
+        #expect(outcome.failures == [])
+        #expect(box.text(file) == "there")
     }
 
     @Test func aCopyThatIsGoneIsNotUndone() async throws {
@@ -479,7 +697,7 @@ private func refusal(_ body: () async throws -> String) async -> String? {
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: notes.md is no longer there")
+        #expect(said == "Can't undo: notes.md is no longer there. It can no longer be undone.")
         #expect(box.listing() == after)
         #expect(box.inTrash == [])
     }
@@ -506,7 +724,7 @@ private func refusal(_ body: () async throws -> String) async -> String? {
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: notes.md is no longer in the Trash")
+        #expect(said == "Can't undo: notes.md is no longer in the Trash. It can no longer be undone.")
         // The other one stays in the Trash too.
         #expect(box.listing() == after)
         #expect(box.text(box.inTrash[1]) == "other")
@@ -559,7 +777,7 @@ private func refusal(_ body: () async throws -> String) async -> String? {
 
         let said = await refusal { try await stack.undo() }
 
-        #expect(said == "Can't undo: notes.md is no longer in the Trash")
+        #expect(said == "Can't undo: notes.md is no longer in the Trash. It can no longer be undone.")
         // The newcomer stays where it is: it is not trashed for nothing.
         #expect(box.listing() == after)
         #expect(box.inTrash.count == 1)
@@ -695,7 +913,7 @@ private func refusal(_ body: () async throws -> String) async -> String? {
         let file = try box.makeFile("dest/notes 2.md", "some notes")
         let place = box.path("src/notes.md")
 
-        let outcome = await runner.put(file, at: place)
+        let outcome = await runner.turn { $0.put(file, at: place) }
 
         #expect(outcome.changes == [.moved(from: file, to: place)])
         #expect(outcome.failures == [])
@@ -710,8 +928,9 @@ private func refusal(_ body: () async throws -> String) async -> String? {
         try box.makeFile("src/Tree/mine.txt", "there already")
         let before = box.listing()
 
-        let outcome = await runner.put(file, at: place)
-        let folder = await runner.put(tree, at: box.path("src/Tree"))
+        let outcome = await runner.turn { $0.put(file, at: place) }
+        let to = box.path("src/Tree")
+        let folder = await runner.turn { $0.put(tree, at: to) }
 
         #expect(outcome.changes == [])
         #expect(outcome.failures == [ItemFailure(url: file, reason: "an item with that name appeared")])
@@ -723,7 +942,8 @@ private func refusal(_ body: () async throws -> String) async -> String? {
     @Test func putFailsWhenTheFolderIsNotThere() async throws {
         let file = try box.makeFile("dest/notes.md", "some notes")
 
-        let outcome = await runner.put(file, at: box.path("gone/notes.md"))
+        let place = box.path("gone/notes.md")
+        let outcome = await runner.turn { $0.put(file, at: place) }
 
         #expect(outcome.changes == [])
         #expect(outcome.failures == [ItemFailure(url: file, reason: "the folder “gone” is not there")])

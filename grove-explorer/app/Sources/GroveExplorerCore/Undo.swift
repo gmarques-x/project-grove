@@ -15,51 +15,71 @@ public struct UndoRefusal: Error, Equatable {
 ///
 /// **Undo** takes back exactly the changes an outcome lists, the last one
 /// first, and nothing it has to infer:
-/// - `.created`: the item goes to the Trash (by a `.trash` run of the runner).
+/// - `.created`: the item goes to the Trash (as a `.trash` of the runner).
 /// - `.moved`: the item goes back to the folder and the name it had.
 /// - `.trashed`, `.replaced`: the item comes out of the Trash, to the place
 ///   and the name it had; for a replace, after the newcomer has left it.
 ///
 /// Nothing is removed, and nothing is written over: an item only ever goes
-/// to the Trash or is moved, by the runner, to a name nothing has.
+/// to the Trash or is moved, by the runner's worker, to a name nothing has.
+///
+/// **An undo is one turn of the runner's queue** (`OperationRunner.turn`):
+/// it waits for the run in hand, then checks every change and takes them
+/// back with no other run in between. It is about the operation that was
+/// the latest when it was asked for.
 ///
 /// **Before anything is touched, every change is checked**, and one that
-/// can't be taken back refuses the whole undo ("Can't undo: …"). The entry
-/// stays, so the undo works again once the world is as it was. What is
+/// can't be taken back refuses the whole undo ("Can't undo: …"). What is
 /// checked, for the item each change left behind (the copy, the moved item
 /// where it now is, the item in the Trash):
 /// - its disk is still attached;
-/// - it is still there;
-/// - it is what the operation left: of the same kind (file, folder, link),
-///   and with the size and the modification date, to the nanosecond, that
-///   it had when the outcome was recorded. Of the item itself only: what
-///   is inside a folder is not looked at, but adding, removing or renaming
-///   an item directly in it changes the folder's date;
-/// - a folder that was made empty (a new folder) is still empty;
+/// - it is still there, and of the same kind (file, folder, link);
+/// - a file or a link has the size and the modification date, to the
+///   nanosecond, that it had when the outcome was recorded. A folder's are
+///   not compared: its date changes whenever anything is added to it or
+///   taken out, by this stack's own later operations too;
+/// - a folder that a new-folder operation made is empty;
 /// - where it goes back to: that disk is attached, the folder is there, and
 ///   nothing has the name (but the newcomer of a replace, which leaves first).
 ///
-/// Each change is checked once more just before it is taken back. **If a
-/// step fails all the same** (the file system refuses), the undo stops
-/// there: what was taken back stays so, the rest stays as it is, and the
-/// sentence thrown says which ("Undo stopped: …"). The entry is then
-/// dropped, with no redo: half of it is undone, and neither doing the rest
-/// later nor doing the whole again would be what was recorded.
+/// Only the item itself is looked at, never what is in it: a copied or
+/// moved folder whose contents were changed since goes to the Trash, or
+/// back, whole. From the Trash it can be had again.
 ///
-/// **Redo** runs the operation again, through the runner, with the answers
-/// it had. It is refused, before anything is written, unless the names
-/// that exist at the target now are exactly the ones that were answered
-/// about then: one more would be a question nobody can be asked from here,
-/// one fewer would let an item arrive that was skipped, or under another
-/// name. An operation that was cancelled or had failures is not offered for
-/// redo at all: run again, it would do more than it did.
+/// What a refusal leaves: when the user can put the world right (something
+/// is at the old place, the new folder is no longer empty, a disk or a
+/// folder is not there), the entry stays and the undo works once that is
+/// done. When nobody can (the item has changed, is gone, is no longer in
+/// the Trash), the entry is dropped, the sentence says so ("… It can no
+/// longer be undone."), and the next undo is about the operation before.
+///
+/// Each change is checked once more just before it is taken back. **If a
+/// step fails all the same** (the file system refuses, another program got
+/// in between), the undo stops there: what was taken back stays so, the
+/// rest stays as it is, and the sentence thrown says which ("Undo stopped:
+/// …"). The entry is then dropped, with no redo: half of it is undone, and
+/// neither doing the rest later nor doing the whole again would be what
+/// was recorded.
+///
+/// **Redo** runs the operation again, in one turn of the runner, with the
+/// answers it had. It is refused, before anything is written, unless the
+/// names that exist at the target now are exactly the ones that were
+/// answered about then: one more would be a question nobody can be asked
+/// from here, one fewer would let an item arrive that was skipped, or
+/// under another name. An operation that was cancelled or had failures is
+/// not offered for redo at all: run again, it would do more than it did.
+///
+/// The app must not offer undo or redo between its own `existingNames` and
+/// the `run` that follows: a turn makes the runner forget what was asked.
 public actor UndoStack {
     private let runner: OperationRunner
     private var undos: [Entry] = []
     private var redos: [Again] = []
-    /// An undo or a redo is in hand: its steps wait for the runner, and
-    /// another one must not start between them.
+    /// An undo or a redo is in hand, waiting for its turn or in it:
+    /// another one must not start meanwhile.
     private var working = false
+    /// How many outcomes were recorded, ever.
+    private var recorded = 0
 
     public init(runner: OperationRunner) {
         self.runner = runner
@@ -73,7 +93,7 @@ public actor UndoStack {
     /// Downloads"): undo answers "Undid: moved 3 items to Downloads".
     ///
     /// To be called as soon as the run ends: the items are looked at now,
-    /// and an undo is refused when they are no longer as they are now.
+    /// and an undo is refused when a file is no longer as it is now.
     ///
     /// With the `operation` that was run and the `answers` given about the
     /// names that existed (by the URL `existingNames` gave for each), the
@@ -89,6 +109,7 @@ public actor UndoStack {
         }
         undos.append(entry)
         redos.removeAll()
+        recorded += 1
     }
 
     /// Takes back the latest operation and says so: "Undid: moved 3 items
@@ -97,28 +118,27 @@ public actor UndoStack {
     public func undo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't undo: another undo or redo is still going on") }
         guard let entry = undos.last else { throw UndoRefusal(sentence: "There is nothing to undo") }
-
-        // All of it is checked before any of it is done.
-        for (index, step) in entry.steps.enumerated() {
-            let newcomer = Self.newcomerFollows(index, in: entry.steps)
-            if let problem = step.problem(expectingNewcomer: newcomer) {
-                throw UndoRefusal(sentence: "Can't undo: \(problem)")
-            }
-        }
-
-        undos.removeLast()
         working = true
         defer { working = false }
-        var undone: [String] = []
-        for step in entry.steps.reversed() {
-            // Once more, now: other work may have run since the checks.
-            var problem = step.problem(expectingNewcomer: false)
-            if problem == nil { problem = await takeBack(step) }
-            if let problem { throw UndoRefusal(sentence: Self.stopped(by: problem, after: undone)) }
-            undone.append(step.name)
+        let before = recorded
+        let steps = entry.steps
+
+        let result = await runner.turn { turn in Self.takeBack(steps, in: turn) }
+
+        switch result {
+        case .done:
+            undos.removeAll { $0.id == entry.id }
+            // An operation recorded meanwhile has cleared redo: it stays so.
+            if let again = entry.again, recorded == before { redos.append(again) }
+            return "Undid: \(Self.lowered(entry.words))"
+        case let .refused(problem):
+            guard !problem.heals else { throw UndoRefusal(sentence: "Can't undo: \(problem.words)") }
+            undos.removeAll { $0.id == entry.id }
+            throw UndoRefusal(sentence: "Can't undo: \(problem.words). It can no longer be undone.")
+        case let .stopped(sentence):
+            undos.removeAll { $0.id == entry.id }
+            throw UndoRefusal(sentence: sentence)
         }
-        if let again = entry.again { redos.append(again) }
-        return "Undid: \(Self.lowered(entry.words))"
     }
 
     /// Does the latest undone operation again and says so: "Redid: moved 3
@@ -128,32 +148,23 @@ public actor UndoStack {
     public func redo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't redo: another undo or redo is still going on") }
         guard let again = redos.last else { throw UndoRefusal(sentence: "There is nothing to redo") }
-        if let gone = Self.items(of: again.operation).first(where: { !OperationRunner.exists($0) }) {
-            throw UndoRefusal(sentence: "Can't redo: \(gone.lastPathComponent) is no longer there")
-        }
-
         working = true
         defer { working = false }
+        let operation = again.operation
         // By the key the runner compares targets by.
         let answers = Dictionary(
             again.answers.map { (OperationRunner.key($0.key), $0.value) }, uniquingKeysWith: { first, _ in first })
-        let existing = await runner.existingNames(for: again.operation)
-        if let unasked = existing.first(where: { answers[OperationRunner.key($0)] == nil }) {
-            throw UndoRefusal(sentence: "Can't redo: \(unasked.lastPathComponent) is now in the way")
-        }
-        let there = Set(existing.map(OperationRunner.key))
-        if let missing = answers.keys.sorted().first(where: { !there.contains($0) }) {
-            throw UndoRefusal(sentence: "Can't redo: \((missing as NSString).lastPathComponent) is no longer there")
-        }
 
-        // A name that appears from here on is not one the runner asks
-        // about: it fails its item. Were it asked all the same, the answer
-        // that loses nothing is given.
-        let outcome = await runner.run(
-            again.operation, resolve: { answers[OperationRunner.key($0)] ?? .skip }, progress: { _ in })
+        let result = await runner.turn { turn in Self.doAgain(operation, answers: answers, in: turn) }
+
+        let outcome: Outcome
+        switch result {
+        case let .refused(why): throw UndoRefusal(sentence: "Can't redo: \(why)")
+        case let .ran(ran): outcome = ran
+        }
         let complete = outcome.failures.isEmpty && !outcome.cancelled
         let words = complete ? again.words : outcome.summary
-        guard let entry = Self.entry(for: outcome, words: words, operation: again.operation, answers: again.answers)
+        guard let entry = Self.entry(for: outcome, words: words, operation: operation, answers: again.answers)
         else {
             let why = outcome.failures.first.map { "\($0.url.lastPathComponent): \($0.reason)" }
             throw UndoRefusal(sentence: "Can't redo: \(why ?? Self.lowered(outcome.summary))")
@@ -164,18 +175,50 @@ public actor UndoStack {
         return "Redid: \(Self.lowered(words))"
     }
 
-    // MARK: One change taken back
+    // MARK: Inside the runner's turn
 
-    /// Takes one change back through the runner. Nil when done, otherwise
-    /// what went wrong, as the words after "Undo stopped: ".
-    private func takeBack(_ step: Step) async -> String? {
+    private enum Undone: Sendable {
+        case done
+        /// Nothing was touched.
+        case refused(Problem)
+        /// Stopped in the middle, with the sentence that says where.
+        case stopped(String)
+    }
+
+    private enum Redone: Sendable {
+        /// Nothing was written; the words after "Can't redo: ".
+        case refused(String)
+        case ran(Outcome)
+    }
+
+    /// Checks all the changes, then takes them back, the last first.
+    private static func takeBack(_ steps: [Step], in turn: OperationRunner.Turn) -> Undone {
+        for (index, step) in steps.enumerated() {
+            if let problem = step.problem(expectingNewcomer: newcomerFollows(index, in: steps)) {
+                return .refused(problem)
+            }
+        }
+        var undone: [String] = []
+        for step in steps.reversed() {
+            // Once more, now: another program may have been at it since.
+            if let words = step.problem(expectingNewcomer: false)?.words ?? takeBack(step, in: turn) {
+                return .stopped(stopped(by: words, after: undone))
+            }
+            undone.append(step.name)
+        }
+        return .done
+    }
+
+    /// Takes one change back. Nil when done, otherwise what went wrong, as
+    /// the words after "Undo stopped: ".
+    private static func takeBack(_ step: Step, in turn: OperationRunner.Turn) -> String? {
         let outcome: Outcome
         let done: Bool
         let what: String
         switch step.change {
         case let .created(url):
             what = "moved to the Trash"
-            outcome = await runner.run(.trash(items: [url]), resolve: { _ in .skip }, progress: { _ in })
+            outcome = turn.run(.trash(items: [url]))
             if case .trashed? = outcome.changes.first { done = true } else { done = false }
         case .moved, .trashed, .replaced:
             guard let place = step.place else { return "\(step.name) has no place to go back to" }
@@ -184,22 +227,42 @@ public actor UndoStack {
             } else {
                 what = "put back"
             }
-            if case .moved = step.change, Self.isSameFolder(step.item, place) {
-                // A rename, which the runner knows how to do when the two
+            if case .moved = step.change, isSameFolder(step.item, place) {
+                // A rename, which the worker knows how to do when the two
                 // names are one to the volume ("Notes.md", "notes.md").
-                outcome = await runner.run(
-                    .rename(item: step.item, to: place.lastPathComponent), resolve: { _ in .skip },
-                    progress: { _ in })
+                outcome = turn.run(.rename(item: step.item, to: place.lastPathComponent))
             } else {
-                outcome = await runner.put(step.item, at: place)
+                outcome = turn.put(step.item, at: place)
             }
             // A `.created` instead: copied to the other disk, but still
             // where it was too.
             if outcome.changes.count == 1, case .moved? = outcome.changes.first { done = true } else { done = false }
         }
         if done { return nil }
-        let reason = outcome.failures.first?.reason ?? Self.lowered(outcome.summary)
+        let reason = outcome.failures.first?.reason ?? lowered(outcome.summary)
         return "\(step.name) could not be \(what) (\(reason))"
+    }
+
+    /// Runs the operation again, when the names at its target are the
+    /// ones in `answers` (by the runner's key) and its items are there.
+    private static func doAgain(
+        _ operation: Operation, answers: [String: Conflict.Choice], in turn: OperationRunner.Turn
+    ) -> Redone {
+        if let gone = items(of: operation).first(where: { !OperationRunner.exists($0) }) {
+            return .refused("\(gone.lastPathComponent) is no longer there")
+        }
+        let existing = turn.existing(for: operation)
+        if let unasked = existing.first(where: { answers[OperationRunner.key($0)] == nil }) {
+            return .refused("\(unasked.lastPathComponent) is now in the way")
+        }
+        let there = Set(existing.map(OperationRunner.key))
+        if let missing = answers.keys.sorted().first(where: { !there.contains($0) }) {
+            return .refused("\((missing as NSString).lastPathComponent) is no longer there")
+        }
+        // Only the names just seen are asked about; one that appears from
+        // here on fails its item. Were another asked about all the same,
+        // the answer that loses nothing is given.
+        return .ran(turn.run(operation, asked: existing) { answers[OperationRunner.key($0)] ?? .skip })
     }
 
     /// Whether the change at `index` is a replace whose newcomer, which
@@ -235,6 +298,7 @@ public actor UndoStack {
     // MARK: What is remembered
 
     private struct Entry {
+        let id = UUID()
         var steps: [Step]
         var words: String
         /// Nil when it can't be redone.
@@ -259,7 +323,10 @@ public actor UndoStack {
         if let operation, outcome.failures.isEmpty, !outcome.cancelled {
             again = Again(operation: operation, words: words, answers: answers)
         }
-        return Entry(steps: outcome.changes.map(Step.init), words: words, again: again)
+        var isNewFolder = false
+        if case .newFolder? = operation { isNewFolder = true }
+        let steps = outcome.changes.map { Step($0, ofNewFolder: isNewFolder, operationKnown: operation != nil) }
+        return Entry(steps: steps, words: words, again: again)
     }
 
     /// The items an operation names, which a redo needs.
@@ -272,11 +339,19 @@ public actor UndoStack {
     }
 }
 
+/// Why a change can't be taken back as things are.
+private struct Problem: Sendable {
+    /// The words after "Can't undo: ".
+    var words: String
+    /// Whether the user can put it right, so that the undo works later.
+    var heals: Bool
+}
+
 // MARK: - One change, and what it left
 
 /// One change of an outcome with what is needed to tell, later, whether it
 /// can still be taken back.
-private struct Step {
+private struct Step: Sendable {
     let change: Change
     /// Where the item the change left is: the copy, the moved item, the
     /// item in the Trash.
@@ -286,14 +361,14 @@ private struct Step {
     /// The item as it was when the outcome was recorded; nil when it was
     /// not there even then.
     let stamp: Stamp?
-    /// A folder that was made, and empty when recorded: taken back only
-    /// while it is.
-    let madeEmpty: Bool
+    /// A folder the operation made new: taken back only while it is empty.
+    /// (Recorded without its operation: a created folder that was empty.)
+    let mustBeEmpty: Bool
     let disk: Disk?
     /// The disk `place` is on.
     let home: Disk?
 
-    init(_ change: Change) {
+    init(_ change: Change, ofNewFolder: Bool, operationKnown: Bool) {
         self.change = change
         switch change {
         case let .created(url):
@@ -308,9 +383,9 @@ private struct Step {
         }
         stamp = Stamp.of(item)
         if case .created = change, stamp?.kind == S_IFDIR {
-            madeEmpty = TreeCopier.names(in: item.path) == []
+            mustBeEmpty = ofNewFolder || (!operationKnown && TreeCopier.names(in: item.path) == [])
         } else {
-            madeEmpty = false
+            mustBeEmpty = false
         }
         // By its folder: a link's own path would lead to the disk it points at.
         disk = Disk.holding(item.deletingLastPathComponent().path)
@@ -327,28 +402,29 @@ private struct Step {
         }
     }
 
-    /// Why the change can't be taken back as things are now, as the words
-    /// after "Can't undo: "; nil when it can. With `expectingNewcomer`,
+    /// Why the change can't be taken back as things are now; nil when it
+    /// can. With `expectingNewcomer`,
     /// the item at `place` is the one that replaced this one, which is
     /// taken back first.
-    func problem(expectingNewcomer: Bool) -> String? {
-        if let disk, !disk.isThere { return "the disk \(disk.name) is no longer there" }
+    func problem(expectingNewcomer: Bool) -> Problem? {
+        if let disk, !disk.isThere { return Problem(words: "the disk \(disk.name) is no longer there", heals: true) }
         guard let now = Stamp.of(item) else {
-            return isInTrash ? "\(name) is no longer in the Trash" : "\(name) is no longer there"
+            let gone = isInTrash ? "in the Trash" : "there"
+            return Problem(words: "\(name) is no longer \(gone)", heals: false)
         }
-        if madeEmpty, now.kind == S_IFDIR, TreeCopier.names(in: item.path) != [] {
-            return "\(name) is no longer empty"
+        guard let stamp, now.isSameItem(as: stamp) else { return Problem(words: "\(name) has changed", heals: false) }
+        if mustBeEmpty, TreeCopier.names(in: item.path) != [] {
+            return Problem(words: "\(name) is no longer empty", heals: true)
         }
-        guard now == stamp else { return "\(name) has changed" }
 
         guard let place else { return nil }
-        if let home, !home.isThere { return "the disk \(home.name) is no longer there" }
+        if let home, !home.isThere { return Problem(words: "the disk \(home.name) is no longer there", heals: true) }
         let folder = place.deletingLastPathComponent()
         guard let (_, kind) = FileIdentity.of(folder.path, followingLinks: true), kind == S_IFDIR else {
-            return "the folder \(folder.lastPathComponent) is no longer there"
+            return Problem(words: "the folder \(folder.lastPathComponent) is no longer there", heals: true)
         }
         if !expectingNewcomer, let there = FileIdentity.of(place.path)?.identity, !isItself(there, at: place) {
-            return "another item is now where \(name) was"
+            return Problem(words: "another item is now where \(name) was", heals: true)
         }
         return nil
     }
@@ -364,13 +440,20 @@ private struct Step {
     }
 }
 
-/// What tells that an item is still as an operation left it: its kind, its
-/// size and its modification date. Of the item itself: a link is not followed.
-private struct Stamp: Equatable {
+/// What tells that an item is still as an operation left it: its kind
+/// and, but for a folder, its size and its modification date. Of the item
+/// itself: a link is not followed.
+private struct Stamp: Equatable, Sendable {
     var kind: mode_t
     var size: Int64
     var seconds: Int
     var nanoseconds: Int
+
+    /// A folder is the same while it is a folder: its date changes with
+    /// everything put in it or taken out.
+    func isSameItem(as other: Stamp) -> Bool {
+        kind == S_IFDIR ? other.kind == S_IFDIR : self == other
+    }
 
     static func of(_ url: URL) -> Stamp? {
         var info = stat()
@@ -382,7 +465,7 @@ private struct Stamp: Equatable {
 }
 
 /// A disk as it was attached when an outcome was recorded.
-private struct Disk {
+private struct Disk: Sendable {
     /// The folder it is attached at.
     var root: String
     var device: dev_t
