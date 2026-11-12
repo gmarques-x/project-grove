@@ -272,7 +272,12 @@ private func until(_ condition: @Sendable () async -> Bool) async {
 }
 
 /// The calculator's own bookkeeping, with a stand-in for the walk.
-@Suite struct SizeCalculatorQueueTests {
+///
+/// One test at a time: each stand-in holds a thread of Swift's pool (one per
+/// core) while it waits, as a real walk holds one while it reads. Run all
+/// together, the tests here held more threads than a ten-core Mac has, and
+/// one or another then waited out its ten-second limit and failed.
+@Suite(.serialized) struct SizeCalculatorQueueTests {
     /// What the stand-in walks saw.
     private final class Walks: @unchecked Sendable {
         private let lock = NSLock()
@@ -441,5 +446,66 @@ private func until(_ condition: @Sendable () async -> Bool) async {
         for task in walking { #expect(await task.value == 7) }
         #expect(await patient.value == 7)
         #expect(walks.paths.sorted() == ["/a", "/b", "/d"])
+    }
+
+    /// One folder's walk given up (its rows are no longer shown): the other
+    /// walks go on, and no size already known is forgotten, its own
+    /// folders' included.
+    @Test func cancellingOneWalkLeavesTheOthersAndTheCache() async {
+        let walks = Walks()
+        let calculator = SizeCalculator { path in
+            walks.begin(path)
+            defer { walks.end() }
+            guard path.hasPrefix("/big") else { return 5 }
+            // As the real walk: goes on until it is cancelled (ten seconds at most).
+            let deadline = ContinuousClock.now + .seconds(10)
+            while !Task.isCancelled, ContinuousClock.now < deadline { Thread.sleep(forTimeInterval: 0.002) }
+            return Task.isCancelled ? nil : 9
+        }
+        // Known before: the folder the cancelled one is in.
+        #expect(await calculator.size(of: URL(fileURLWithPath: "/home")) == 5)
+        let left = Task { await calculator.size(of: URL(fileURLWithPath: "/big/left")) }
+        let kept = Task { await calculator.size(of: URL(fileURLWithPath: "/big/kept")) }
+        await until { walks.count == 3 }
+
+        await calculator.cancel(URL(fileURLWithPath: "/big/left"))
+        #expect(await left.value == nil)
+        #expect(await calculator.unanswered == 1)
+        // The other walk was not touched: it is still the one started first.
+        #expect(walks.paths.filter { $0 == "/big/kept" }.count == 1)
+        #expect(!kept.isCancelled)
+        // The turn is free, and what was known still is (no second walk of it).
+        #expect(await calculator.size(of: URL(fileURLWithPath: "/home")) == 5)
+        #expect(walks.paths.filter { $0 == "/home" }.count == 1)
+        // Nothing to cancel is nothing done.
+        await calculator.cancel(URL(fileURLWithPath: "/never-asked"))
+        await calculator.cancelAll()
+        #expect(await kept.value == nil)
+    }
+
+    /// A waiting walk cancelled leaves the queue; asked for again later, it is walked.
+    @Test func aCancelledFolderCanBeAskedForAgain() async {
+        let walks = Walks()
+        let proceed = DispatchSemaphore(value: 0)
+        let calculator = SizeCalculator { path in
+            walks.begin(path)
+            defer { walks.end() }
+            _ = proceed.wait(timeout: .now() + 10)
+            return 7
+        }
+        func ask(_ name: String) -> Task<Int64?, Never> {
+            Task { await calculator.size(of: URL(fileURLWithPath: "/\(name)")) }
+        }
+        let walking = [ask("a"), ask("b")]
+        await until { walks.count == 2 }
+        let waiting = ask("c")
+        await until { await calculator.unanswered == 3 }
+        await calculator.cancel(URL(fileURLWithPath: "/c"))
+        #expect(await waiting.value == nil)
+        let again = ask("c")
+        for _ in 0..<3 { proceed.signal() }
+        for task in walking { #expect(await task.value == 7) }
+        #expect(await again.value == 7)
+        #expect(walks.paths.sorted() == ["/a", "/b", "/c"])
     }
 }

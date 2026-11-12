@@ -64,6 +64,14 @@ public actor SizeCalculator {
         }
     }
 
+    /// The folder's size is no longer wanted (its row is not shown any
+    /// more): a walk of it on its way is cancelled and who asked gets nil.
+    /// Nothing is forgotten, and no other walk is touched; asked for again,
+    /// it is walked from the start.
+    public func cancel(_ folder: URL) {
+        if let walk = walks.removeValue(forKey: Self.key(folder)) { cancel(walk) }
+    }
+
     /// Every size being waited for is answered with nil. Sizes already
     /// known are kept.
     public func cancelAll() {
