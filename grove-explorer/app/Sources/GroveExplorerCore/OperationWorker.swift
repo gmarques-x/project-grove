@@ -5,8 +5,6 @@ private enum Placed {
     case at(URL)
     /// The name is taken.
     case taken
-    /// The volume has no rename that refuses to replace.
-    case unsafe
     /// The name is on another volume than the item.
     case otherVolume
     case failed(Int32)
@@ -15,7 +13,9 @@ private enum Placed {
 /// One run of one operation, on the thread it was started on.
 final class Worker {
     private let operation: Operation
-    private let known: Set<String>
+    /// The targets that were there when the names were looked up, less the
+    /// ones already asked about: an answer is for one item.
+    private var known: Set<String>
     private let files: FileManager
     private let flag: CancelFlag
     private let watching: (@Sendable (OperationRunner.Stage) -> Void)?
@@ -95,8 +95,9 @@ final class Worker {
     }
 
     private func transfer(_ item: URL, to folder: URL, on volume: dev_t, moving: Bool) {
-        guard let (source, kind) = FileIdentity.of(item.path) else {
-            fail(item, code: errno)
+        var code: Int32 = 0
+        guard let (source, kind) = FileIdentity.of(item.path, code: &code) else {
+            fail(item, code: code)
             return
         }
         var target = OperationRunner.target(for: item, in: folder)
@@ -106,7 +107,9 @@ final class Worker {
         if OperationRunner.exists(target) {
             // Not there when the names were looked up: nobody was asked
             // about it, so no answer is about it.
-            guard known.contains(OperationRunner.key(target)) else {
+            // And asked about once: a second item of the same name finds
+            // the first one's arrival there, which nobody was asked about.
+            guard known.remove(OperationRunner.key(target)) != nil else {
                 fail(item, Self.appeared)
                 return
             }
@@ -143,6 +146,13 @@ final class Worker {
         // On one volume a move is one rename.
         if moving, source.device == volume {
             if replacing {
+                // The old one goes to the Trash before the rename: first
+                // what would make the rename fail is looked for, so that it
+                // doesn't go for nothing.
+                if let reason = Self.whyNotMovable(item, to: folder) {
+                    fail(item, reason)
+                    return
+                }
                 guard let inTrash = moveToTrash(target, for: item) else { return }
                 replaced = inTrash
             }
@@ -155,16 +165,17 @@ final class Worker {
             case .otherVolume:
                 break  // Not one volume after all: copied, below.
             case let other:
-                if let replaced { changes.append(.trashed(original: target, inTrash: replaced)) }
-                fail(item, placed: other)
+                fail(item, placed: other, puttingBack: replaced, at: target)
                 return
             }
         }
 
         // Copied whole under a partial name; only then is the old one put
         // in the Trash, and the copy given its name.
-        guard let partial = copyToPartial(item, for: target, on: folder) else {
-            if let replaced { changes.append(.trashed(original: target, inTrash: replaced)) }
+        guard let partial = copyToPartial(item, for: target, on: folder, remembering: moving) else {
+            if let replaced, !putBack(replaced, at: target) {
+                changes.append(.trashed(original: target, inTrash: replaced))
+            }
             return
         }
         if replacing, replaced == nil {
@@ -183,10 +194,10 @@ final class Worker {
                 return
             }
             // The source goes only when the copy is all of it.
-            if !TreeCopier.isWhole(final.path, of: item.path) {
+            if !copier.isWhole(final.path, of: item.path) {
                 changes.append(.created(final))
                 fail(item, "it changed while it was copied: the copy is there, and it was left where it is")
-            } else if !TreeCopier.removeSource(item.path, copiedTo: final.path) {
+            } else if !copier.removeSource(item.path, copiedTo: final.path) {
                 changes.append(.created(final))
                 fail(item, "it was copied, but could not be removed from where it was")
             } else {
@@ -195,9 +206,30 @@ final class Worker {
             }
         case let other:
             TreeCopier.removeTemporary(partial.path)
-            if let replaced { changes.append(.trashed(original: target, inTrash: replaced)) }
-            fail(item, placed: other)
+            fail(item, placed: other, puttingBack: replaced, at: target)
         }
+    }
+
+    /// What would make moving `item` into `folder` fail, as far as it can
+    /// be told beforehand; nil when nothing is seen.
+    private static func whyNotMovable(_ item: URL, to folder: URL) -> String? {
+        var info = stat()
+        guard lstat(item.path, &info) == 0 else { return reason(errno) }
+        let locks = UInt32(UF_IMMUTABLE | UF_APPEND | SF_IMMUTABLE | SF_APPEND)
+        if info.st_flags & locks != 0 { return "it is locked" }
+        let from = item.deletingLastPathComponent().path
+        guard access(from, W_OK) == 0, access(folder.path, W_OK) == 0 else { return reason(EACCES) }
+        // A folder is written to when it moves: its ".." changes.
+        if info.st_mode & S_IFMT == S_IFDIR, access(item.path, W_OK) != 0 { return reason(EACCES) }
+        return nil
+    }
+
+    /// Gives the replaced item, in the Trash at `inTrash`, its name back,
+    /// when the item that was to replace it didn't come. Never in place of
+    /// another item: when the name is taken meanwhile, it stays in the Trash.
+    private func putBack(_ inTrash: URL, at target: URL) -> Bool {
+        if case .at = place(inTrash.path, at: target, orAt: nil) { return true }
+        return false
     }
 
     // MARK: Duplicate
@@ -219,8 +251,9 @@ final class Worker {
     }
 
     private func duplicate(_ item: URL) {
-        guard let (_, kind) = FileIdentity.of(item.path) else {
-            fail(item, code: errno)
+        var code: Int32 = 0
+        guard let (_, kind) = FileIdentity.of(item.path, code: &code) else {
+            fail(item, code: code)
             return
         }
         let next = { Self.freeName(beside: item, folder: kind == S_IFDIR, adding: " copy") }
@@ -244,8 +277,9 @@ final class Worker {
     private func rename(_ item: URL, to name: String) {
         reporter.begin(bytes: nil, items: 1)
         defer { reporter.itemFinished(bytes: 0) }
-        guard let (source, _) = FileIdentity.of(item.path) else {
-            fail(item, code: errno)
+        var code: Int32 = 0
+        guard let (source, _) = FileIdentity.of(item.path, code: &code) else {
+            fail(item, code: code)
             return
         }
         let target = OperationRunner.target(for: item, in: item.deletingLastPathComponent(), named: name)
@@ -268,15 +302,14 @@ final class Worker {
         defer { reporter.itemFinished(bytes: 0) }
         let target = folder.appendingPathComponent(name, isDirectory: true)
         // `mkdir` makes it or fails: it never touches what has the name.
-        if mkdir(target.path, 0o777) == 0 {
+        let code = mkdir(target.path, 0o777) == 0 ? 0 : errno
+        switch code {
+        case 0:
             changes.append(.created(target))
             done += 1
-        } else if errno == EEXIST {
-            fail(target, Self.alreadyThere(name))
-        } else if errno == ENOENT {
-            fail(target, "the folder “\(folder.lastPathComponent)” is not there")
-        } else {
-            fail(target, code: errno)
+        case EEXIST: fail(target, Self.alreadyThere(name))
+        case ENOENT: fail(target, "the folder “\(folder.lastPathComponent)” is not there")
+        default: fail(target, code: code)
         }
     }
 
@@ -300,10 +333,10 @@ final class Worker {
     /// Copies `item`, whole, to a partial name beside `target`. Nil when
     /// that stopped: the partial copy is removed, and why is recorded (a
     /// cancel, a full disk, or the item's failure).
-    private func copyToPartial(_ item: URL, for target: URL, on folder: URL) -> URL? {
+    private func copyToPartial(_ item: URL, for target: URL, on folder: URL, remembering: Bool = false) -> URL? {
         let partial = Self.partial(for: target)
         do throws(CopyStop) {
-            try copier.copy(item.path, to: partial.path)
+            try copier.copy(item.path, to: partial.path, remembering: remembering)
             return partial
         } catch {
             TreeCopier.removeTemporary(partial.path)
@@ -315,6 +348,8 @@ final class Worker {
                 if code == ENOSPC || code == EDQUOT { shortage = Self.shortage(on: folder, needing: reporter.bytesLeft) }
                 let reason = Self.reason(code)
                 fail(item, inner.map { "“\($0)” in it: \(reason)" } ?? reason)
+            case let .otherVolume(inner):
+                fail(item, "“\(inner)” in it is another disk, attached there")
             }
             return nil
         }
@@ -327,18 +362,72 @@ final class Worker {
         var target = target
         for _ in 0..<100 {
             watching?(.placing(target))
-            if renamex_np(path, target.path, UInt32(RENAME_EXCL)) == 0 { return .at(target) }
-            let code = errno
+            var code = renamex_np(path, target.path, UInt32(RENAME_EXCL)) == 0 ? 0 : errno
+            // ExFAT and FAT have no such rename.
+            if code == ENOTSUP { code = placeOverPlaceholder(path, at: target) }
             switch code {
+            case 0: return .at(target)
             case EEXIST, ENOTEMPTY:
                 guard let free = next?() else { return .taken }
                 target = free
-            case ENOTSUP: return .unsafe
             case EXDEV: return .otherVolume
             default: return .failed(code)
             }
         }
         return .taken
+    }
+
+    /// `place` on a volume whose rename can't refuse to replace: the name
+    /// is first taken by an empty item of the app's own, made by a call
+    /// that fails when the name exists (`open` with `O_EXCL`, `mkdir`);
+    /// then the item is renamed over that. An item that is there is so
+    /// never replaced. What is not excluded: another program writing into
+    /// the empty placeholder in the instant between the last look at it and
+    /// the rename; that write would be lost. Returns 0 or the error number.
+    private func placeOverPlaceholder(_ path: String, at target: URL) -> Int32 {
+        let name = target.path
+        var code: Int32 = 0
+        guard let (item, kind) = FileIdentity.of(path, code: &code) else { return code }
+        if let there = FileIdentity.of(name)?.identity {
+            // The item's own name in other capitals is one entry of the
+            // folder, the item's: nothing else can be under it.
+            guard there == item else { return EEXIST }
+            return Darwin.rename(path, name) == 0 ? 0 : errno
+        }
+
+        if kind == S_IFDIR {
+            guard mkdir(name, 0o700) == 0 else { return errno }
+        } else {
+            let file = open(name, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW, 0o600)
+            guard file >= 0 else { return errno }
+            close(file)
+        }
+        guard let placeholder = FileIdentity.of(name) else { return ENOENT }
+        watching?(.placeholder(target))
+
+        // Used by another program meanwhile: it is theirs now, and stays.
+        guard Self.isEmptyPlaceholder(name, placeholder) else { return EEXIST }
+        if Darwin.rename(path, name) == 0 { return 0 }
+        code = errno
+        // The one item at a final name the app removes: its own
+        // placeholder, when it is still that and still empty.
+        if Self.isEmptyPlaceholder(name, placeholder) {
+            if placeholder.kind == S_IFDIR { rmdir(name) } else { unlink(name) }
+        }
+        return code
+    }
+
+    /// Whether what is at `path` is still the placeholder made there (the
+    /// same item on the volume, of the same kind) with nothing in it.
+    private static func isEmptyPlaceholder(
+        _ path: String, _ placeholder: (identity: FileIdentity, kind: mode_t)
+    ) -> Bool {
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == placeholder.kind,
+            FileIdentity(device: info.st_dev, number: info.st_ino) == placeholder.identity
+        else { return false }
+        if placeholder.kind == S_IFDIR { return TreeCopier.names(in: path) == [] }
+        return info.st_size == 0
     }
 
     /// Puts `url` in the Trash and tells where it is there. Nil when it
@@ -380,14 +469,24 @@ final class Worker {
         fail(item, Self.reason(code))
     }
 
-    private func fail(_ item: URL, placed: Placed) {
+    /// The item could not be given its name. When an item was put in the
+    /// Trash for it (`replaced`, once at `target`), that one gets its name
+    /// back; if it can't, it stays in the Trash, which is told as a change
+    /// (so it can be undone) and in the reason.
+    private func fail(_ item: URL, placed: Placed, puttingBack replaced: URL? = nil, at target: URL? = nil) {
+        let reason: String
         switch placed {
-        case .at: break
-        case .taken: fail(item, Self.appeared)
-        case .unsafe: fail(item, "this disk's format can't add an item without the risk of replacing another")
-        case .otherVolume: fail(item, code: EXDEV)
-        case let .failed(code): fail(item, code: code)
+        case .at: return
+        case .taken: reason = Self.appeared
+        case .otherVolume: reason = Self.reason(EXDEV)
+        case let .failed(code): reason = Self.reason(code)
         }
+        guard let replaced, let target, !putBack(replaced, at: target) else {
+            fail(item, reason)
+            return
+        }
+        changes.append(.trashed(original: target, inTrash: replaced))
+        fail(item, "\(reason); “\(target.lastPathComponent)”, which it was to replace, is in the Trash")
     }
 
     private static let appeared = "an item with that name appeared"

@@ -4,24 +4,34 @@ import Foundation
 ///
 /// What it never does:
 /// - remove a user's item. An item goes to the Trash (`FileManager.trashItem`)
-///   or stays. The two direct removals are of the app's own half-written
-///   copies, and of the source of a move to another volume once its copy is
-///   whole (`TreeCopier.isWhole`, `TreeCopier.removeSource`).
+///   or stays. The direct removals are of the app's own: its half-written
+///   copies, its empty placeholders (below), and the source of a move to
+///   another volume once its copy is whole (`TreeCopier.isWhole`,
+///   `TreeCopier.removeSource`).
 /// - write over an item. Every item gets its final name by a rename that
 ///   fails when the name is taken (`renamex_np` with `RENAME_EXCL`), a new
 ///   folder by `mkdir`, which fails the same way. An item that is to be
-///   replaced is put in the Trash first; a name taken by something nobody
-///   was asked about is a failed item, never an overwrite.
+///   replaced is put in the Trash first (and gets its name back when the
+///   newcomer doesn't come); a name taken by something nobody was asked
+///   about is a failed item, never an overwrite.
+///   ExFAT and FAT have no such rename. There the name is first taken by an
+///   empty placeholder, made by a call that fails when the name exists, and
+///   the item is renamed over that: see `Worker.placeOverPlaceholder` for
+///   what this keeps and the one thing it doesn't.
 /// - leave half an item under its final name. A copy is written beside its
 ///   target as `.<name>.grove-partial-<uuid>` and renamed when complete.
 public actor OperationRunner {
     /// Where the work is, for tests: a file or link written into a partial
     /// copy; how many bytes of the file in hand are written; an item about
-    /// to be given its final name.
+    /// to be given its final name (the replaced one too, when it gets its
+    /// name back); the placeholder for that name made.
     enum Stage: Sendable {
         case fileCopied(String)
         case copying(Int64)
         case placing(URL)
+        /// On a volume without a rename that refuses to replace: the empty
+        /// item that holds the name is made, the rename over it is next.
+        case placeholder(URL)
     }
 
     /// `FileManager` is safe to use from any thread; the type doesn't say so.
