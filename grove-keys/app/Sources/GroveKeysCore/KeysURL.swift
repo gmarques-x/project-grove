@@ -1,20 +1,20 @@
 import Foundation
 
-/// The `grovekeys://` links Grove Keys answers. The Grove bar opens two:
-/// `grove-menu` (the pine: the Grove menu) and `app-menu` (the app name: the
-/// front app's menus). AeroSpace opens `cheatsheet` for its hotkey; `launcher` is the Grove
+/// The `grovekeys://` links Grove Keys answers. The Grove bar opens
+/// `grove-menu` (the pine: the Grove menu, which is the panel `panel/grove`)
+/// and `app-menu` (the app name: the front app's menus). AeroSpace opens `cheatsheet` for its hotkey; `launcher` is the Grove
 /// Launcher (its key, ⌘Space, comes through the key tap, not a link; `palette`
 /// is its old name and still answered). `menu` alone is no longer opened by the bar (its ⌘ glyph is gone)
 /// but still answered, e.g. from a terminal. The bar's other pills open
-/// `panel/<name>` (clock, system, battery, wifi, sound; later grove): that
+/// `panel/<name>` (clock, system, battery, wifi, sound, grove): that
 /// dropdown, shown or put away. Anything else is ignored.
 public enum KeysURL: Equatable, Sendable {
     /// Grove Keys' own menu at the pointer (the pine's Grove Keys ▸ submenu).
     case menu
-    /// `menu/<id>`: one row of the Grove menu, run if it is a leaf, popped up
-    /// at the pointer if it is a submenu.
+    /// `menu/<id>`: one row of the Grove menu, run if it is a leaf; a
+    /// submenu opens the Grove menu's panel with that submenu open.
     case row(id: String)
-    /// The pine's dropdown: the Grove menu.
+    /// The pine's dropdown, the Grove menu: the same as `panel(name: "grove")`.
     case groveMenu
     /// The front app's menus, directly.
     case appMenu

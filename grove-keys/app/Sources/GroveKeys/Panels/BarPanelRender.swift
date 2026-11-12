@@ -16,6 +16,10 @@ import SwiftUI
 ///   (`grove-dotfiles/theme/everforest-light-medium`).
 /// - `left` / `right`: draw that top corner as it follows a window border's
 ///   (the clock at the bar's right end, the Grove menu at its left).
+///
+/// A panel with side panels in its sample (the Grove menu with
+/// `GROVE_MENU_OPEN=appearance`) is drawn with them beside it, where the
+/// host would put them on a screen with room.
 @MainActor
 enum BarPanelRender {
     static let margin = GroveSpace.s12
@@ -38,10 +42,11 @@ enum BarPanelRender {
 
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
-        let view = registration.sample()
+        let sample = registration.sampleEntry()
+        let view = composite(sample.view.environment(\.barPanelShape, shape), width: registration.width,
+                             sides: (sample.model as? any BarPanelWithSides)?.sides ?? [])
             .environment(\.theme, colors)
             .environment(\.panelStandIns, true)
-            .environment(\.barPanelShape, shape)
             .padding(margin)
             .background(Color(colors.bg0))
         let hosting = NSHostingView(rootView: view)
@@ -73,6 +78,31 @@ enum BarPanelRender {
         }
         print("\(arguments[1]) \(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
         exit(0)
+    }
+
+    /// The panel with its side panels placed as the host places them
+    /// (`MenuListPlacement.submenu`), on a screen without limits; the panel
+    /// alone when it has none.
+    private static func composite(_ panel: some View, width: CGFloat, sides: [BarPanelSide]) -> AnyView {
+        guard !sides.isEmpty else { return AnyView(panel) }
+        let everywhere = CGRect(x: -10000, y: 0, width: 20000, height: 20000)
+        // Only the main panel's place and width matter to its side panels.
+        var parent = CGRect(x: 0, y: 0, width: width, height: 0)
+        var frames: [CGRect] = []
+        for side in sides {
+            parent = MenuListPlacement.submenu(parent: parent, row: side.row, size: side.size,
+                                               firstRow: side.firstRow, bounds: everywhere)
+            frames.append(parent)
+        }
+        let size = CGSize(width: frames.map(\.maxX).max() ?? width, height: frames.map(\.maxY).max() ?? 0)
+        return AnyView(
+            ZStack(alignment: .topLeading) {
+                panel
+                ForEach(Array(sides.enumerated()), id: \.offset) { index, side in
+                    side.view.offset(x: frames[index].minX, y: frames[index].minY)
+                }
+            }
+            .frame(minWidth: size.width, minHeight: size.height, alignment: .topLeading))
     }
 
     /// A scheme's colours: from a theme file when `scheme` is a path, else

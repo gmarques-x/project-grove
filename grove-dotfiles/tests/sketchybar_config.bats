@@ -774,8 +774,9 @@ wifi_icon() {
 @test "panels: a click on a pill sends Grove Keys the link of its panel, without bringing it forward" {
   rc
   local pair item name
-  # CPU and memory share one panel; the volume's is the sound panel.
-  for pair in clock:clock volume:sound wifi:wifi battery:battery cpu:system mem:system; do
+  # CPU and memory share one panel; the volume's is the sound panel; the
+  # pine's is the Grove menu.
+  for pair in grove:grove clock:clock volume:sound wifi:wifi battery:battery cpu:system mem:system; do
     item="${pair%%:*}"; name="${pair#*:}"
     calls | grep -qE -- "--set $item .*click_script=open -g grovekeys://panel/$name( |\$)" || { echo "$item"; false; }
     : > "$OPENS"
@@ -838,9 +839,8 @@ wifi_icon() {
   [ "$(awk -v g="$gap" -v w="$width" 'BEGIN { printf "%d", g - w / 2 + 0.5 }')" = 6 ] || { echo "$gap $width"; false; }
 }
 
-@test "sketchybar: the pine opens the grove menu, the app name the app's menus" {
+@test "sketchybar: the app name opens the app's menus" {
   rc
-  calls | grep -qE -- '--set grove .*click_script=open grovekeys://grove-menu'
   calls | grep -qE -- '--set front_app .*click_script=open grovekeys://app-menu'
   calls | grep -qE -- '--subscribe front_app front_app_switched mouse.entered mouse.exited'
 }

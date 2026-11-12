@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // No Dock icon, as LSUIElement in the bundle (also when run bare from .build).
         NSApp.setActivationPolicy(.accessory)
         AppModel.shared.start()
+        // Nothing is kept awake yet, whatever a killed run left in its file.
+        KeepAwake.resetAtLaunch()
         MainActor.assumeIsolated {
             PointerMenu.shared.start()
             // No bar panel is open yet, whatever a crash left in the bar's file.
@@ -55,8 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// What each `grovekeys://` link does. The Grove bar's pine and app name
-/// send `grove-menu` and `app-menu`, its other pills `panel/<name>` (the bar's panels: `BarPanelHost`), AeroSpace's hotkey `cheatsheet`; `launcher` is for a
+/// What each `grovekeys://` link does. The Grove bar's pills send
+/// `panel/<name>` (the bar's panels: `BarPanelHost`); the pine's is the Grove
+/// menu, `panel/grove`, which `grove-menu` (its link while it was a native
+/// menu) still names. The app name sends `app-menu`, AeroSpace's hotkey `cheatsheet`; `launcher` is for a
 /// terminal or a binding of one's own (its key, ⌘Space, comes through the key tap); an `open` row of the Grove menu naming one of these links is
 /// answered here too, without going round through macOS.
 @MainActor
@@ -65,7 +69,7 @@ enum Links {
         switch link {
         case .menu: PointerMenu.shared.show()
         case .row(let id): PointerMenu.shared.showRow(id: id)
-        case .groveMenu: PointerMenu.shared.showGroveMenu()
+        case .groveMenu: BarPanelHost.shared.toggle(GroveMenuPanel.registration.name)
         case .appMenu: PointerMenu.shared.showAppMenu()
         case .launcher: LauncherPanel.shared.toggle()
         case .cheatSheet: CheatSearchPanel.shared.toggle()

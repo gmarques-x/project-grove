@@ -7,7 +7,9 @@ import SwiftUI
 /// Shows the bar's panels (`grovekeys://panel/<name>`): one at a time, each
 /// a borderless, non-activating window hung from its pill, its outline on
 /// the tiled windows' border lines (`BarPanelPlacement`). The window takes
-/// the keyboard without Grove Keys coming forward.
+/// the keyboard without Grove Keys coming forward. A panel whose model is a
+/// `BarPanelWithSides` (a menu) has its side panels shown beside it, as
+/// child windows that never take the keyboard.
 ///
 /// A panel closes on Escape, a click anywhere outside it, another app coming
 /// forward, a Space change, a change of the screens, `panel/close` (the bar
@@ -32,16 +34,43 @@ final class BarPanelHost {
         let window: BarPanelWindow
         let layout = BarPanelLayout()
         let geometry: Geometry
+        let actions: BarPanelActions
+        /// The panel's outline on screen (the window list's coordinates).
+        var frame = CGRect.zero
+        /// The side panels' windows, in the chain's order.
+        var sides: [Side] = []
         var handBackTo: pid_t?
         var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
         var monitors: [Any] = []
 
         init(registration: BarPanelRegistration, model: any BarPanelModel, window: BarPanelWindow,
-             geometry: Geometry) {
+             geometry: Geometry, actions: BarPanelActions) {
             self.registration = registration
             self.model = model
             self.window = window
             self.geometry = geometry
+            self.actions = actions
+        }
+
+        /// The click was in the panel or one of its side panels.
+        func owns(_ window: NSWindow?) -> Bool {
+            window === self.window || sides.contains { $0.window === window }
+        }
+    }
+
+    /// One side panel's window.
+    @MainActor
+    private final class Side {
+        let window: NSPanel
+        let hosting: NSHostingView<BarPanelRoot>
+        let layout: BarPanelLayout
+        var id: AnyHashable
+
+        init(window: NSPanel, hosting: NSHostingView<BarPanelRoot>, layout: BarPanelLayout, id: AnyHashable) {
+            self.window = window
+            self.hosting = hosting
+            self.layout = layout
+            self.id = id
         }
     }
 
@@ -79,6 +108,20 @@ final class BarPanelHost {
         }
     }
 
+    /// `name`'s panel shown, whether or not it was open (`grovekeys://menu/<id>`
+    /// for a submenu: the Grove menu, opened again at that submenu).
+    func show(_ name: String) {
+        guard let registration = BarPanels.named(name) else {
+            PointerMenu.shared.handBackAfterLink()
+            return
+        }
+        let handBackTo = current?.handBackTo
+        tearDown(handBack: false)
+        toggle.closed()
+        _ = toggle.toggle(name, now: Date())
+        if !open(registration, handBackTo: handBackTo) { toggle.closed() }
+    }
+
     /// Puts the open panel away (Escape, `panel/close`, a row chosen).
     /// `handBack: false` when something else was just brought forward.
     func close(handBack: Bool = true) {
@@ -109,33 +152,37 @@ final class BarPanelHost {
             ?? NSScreen.screens.first else { return false }
         let colors = AppModel.shared.colors
         let entry = registration.opened()
-        entry.model.start()
-
-        let window = BarPanelWindow(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
-                                    backing: .buffered, defer: false)
-        // Above the windows and their borders; the panel starts below the
-        // bar's strip, so the bar needs no room made.
-        window.level = .statusBar
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.hasShadow = false
-        window.hidesOnDeactivate = false
-        window.isReleasedWhenClosed = false
-        window.becomesKeyOnlyIfNeeded = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
-        window.appearance = NSAppearance(named: colors.isDark ? .darkAqua : .aqua)
-
-        let open = Open(registration: registration, model: entry.model, window: window,
-                        geometry: Self.geometry(pill: registration.pill, on: screen))
-        // Grove Keys' own window in front: nothing to give back.
-        open.handBackTo = inherited ?? (NSApp.isActive && NSApp.mainWindow != nil ? nil : PointerMenu.shared.previousApp)
-
         var actions = BarPanelActions()
         actions.close = { [weak self] in self?.close() }
         actions.leave = { [weak self] action in
             self?.close(handBack: false)
             action()
         }
+        if let source = entry.model as? any BarPanelWithSides {
+            var link = BarPanelLink()
+            link.actions = actions
+            link.sidesChanged = { [weak self, weak source] in
+                guard let self, let open = self.current, open.model === source else { return }
+                self.placeSides(open)
+            }
+            link.frame = { [weak self, weak source] in
+                guard let open = self?.current, open.model === source else { return nil }
+                return Self.appKit(open.frame)
+            }
+            source.link = link
+        }
+        entry.model.start()
+
+        let window = BarPanelWindow(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+                                    backing: .buffered, defer: false)
+        Self.configure(window, dark: colors.isDark)
+        window.becomesKeyOnlyIfNeeded = false
+
+        let open = Open(registration: registration, model: entry.model, window: window,
+                        geometry: Self.geometry(pill: registration.pill, on: screen), actions: actions)
+        // Grove Keys' own window in front: nothing to give back.
+        open.handBackTo = inherited ?? (NSApp.isActive && NSApp.mainWindow != nil ? nil : PointerMenu.shared.previousApp)
+
         let hosting = NSHostingView(rootView: BarPanelRoot(content: entry.view, layout: open.layout,
                                                            app: AppModel.shared, actions: actions))
         // The host sizes the window; the hosting view must not.
@@ -155,6 +202,12 @@ final class BarPanelHost {
 
         window.orderFrontRegardless()
         window.makeKey()
+        // AppKit gives the first switch or slider the focus, and those draw
+        // their own ring whatever SwiftUI's focus effect says: open with
+        // nothing focused; Tab starts from the top.
+        window.makeFirstResponder(nil)
+        DispatchQueue.main.async { [weak window] in window?.makeFirstResponder(nil) }
+        placeSides(open)
         watch(open)
         bar.mark(open: registration.pill, fill: colors.hover)
         return true
@@ -171,8 +224,76 @@ final class BarPanelHost {
         open.layout.shape = BarPanelShape(
             topLeading: placement.followsLeft ? geometry.cornerRadius : GroveRadius.card,
             topTrailing: placement.followsRight ? geometry.cornerRadius : GroveRadius.card)
+        open.frame = placement.frame
         let target = Self.appKit(frame)
         if open.window.frame != target { open.window.setFrame(target, display: true) }
+        if !open.sides.isEmpty { placeSides(open) }
+    }
+
+    /// How every panel's window is: above the windows and their borders
+    /// (the panel starts below the bar's strip, so the bar needs no room
+    /// made), clear but for the panel drawn in it, on every Space.
+    private static func configure(_ window: NSPanel, dark: Bool) {
+        window.level = .statusBar
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.hidesOnDeactivate = false
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    }
+
+    // MARK: Side panels
+
+    /// Shows, moves and removes the side panels' windows so they are what
+    /// the model's `sides` says: each beside the one before, sharing its
+    /// outline, inside the lines.
+    private func placeSides(_ open: Open) {
+        let wanted = (open.model as? any BarPanelWithSides)?.sides ?? []
+        let geometry = open.geometry
+        let bounds = CGRect(x: geometry.lines.left, y: geometry.lines.top,
+                            width: geometry.lines.right - geometry.lines.left,
+                            height: geometry.bottom - geometry.lines.top)
+        var parent = open.frame
+        for (index, side) in wanted.enumerated() {
+            let frame = MenuListPlacement.submenu(parent: parent, row: side.row, size: side.size,
+                                                  firstRow: side.firstRow, bounds: bounds)
+            let (whole, inset) = MenuListPlacement.window(for: frame)
+            let shown: Side
+            if index < open.sides.count {
+                shown = open.sides[index]
+                if shown.id != side.id {
+                    shown.id = side.id
+                    shown.hosting.rootView = BarPanelRoot(content: side.view, layout: shown.layout,
+                                                          app: AppModel.shared, actions: open.actions)
+                }
+            } else {
+                let window = BarPanelSideWindow(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+                                                backing: .buffered, defer: false)
+                Self.configure(window, dark: AppModel.shared.colors.isDark)
+                let layout = BarPanelLayout()
+                let hosting = NSHostingView(rootView: BarPanelRoot(content: side.view, layout: layout,
+                                                                   app: AppModel.shared, actions: open.actions))
+                hosting.sizingOptions = []
+                window.contentView = hosting
+                shown = Side(window: window, hosting: hosting, layout: layout, id: side.id)
+                open.sides.append(shown)
+            }
+            shown.layout.inset = inset
+            let target = Self.appKit(whole)
+            if shown.window.frame != target { shown.window.setFrame(target, display: true) }
+            // A child window moves and goes with its parent, above it.
+            if shown.window.parent == nil { open.window.addChildWindow(shown.window, ordered: .above) }
+            side.placed?(frame.minX < parent.minX)
+            parent = frame
+        }
+        while open.sides.count > wanted.count { remove(open.sides.removeLast(), from: open) }
+    }
+
+    private func remove(_ side: Side, from open: Open) {
+        open.window.removeChildWindow(side.window)
+        side.window.orderOut(nil)
     }
 
     // MARK: Closing
@@ -225,12 +346,12 @@ final class BarPanelHost {
     private func used(_ event: NSEvent) -> Bool {
         guard let open = current else { return false }
         if event.type != .keyDown {
-            if event.window !== open.window { dismissFromOutside() }
+            if !open.owns(event.window) { dismissFromOutside() }
             return false
         }
         guard event.window === open.window else { return false }
         if event.keyCode == 53 {  // Escape
-            close()
+            if !open.model.escape() { close() }
             return true
         }
         if let key = BarPanelKey(event) { return open.model.key(key) }
@@ -244,6 +365,7 @@ final class BarPanelHost {
         for observer in open.observers { observer.center.removeObserver(observer.token) }
         open.layout.onSize = nil
         open.model.stop()
+        while let side = open.sides.popLast() { remove(side, from: open) }
         open.window.orderOut(nil)
         // The pointer still on the pill (the click that closed it): the
         // bar's hover keeps the fill until it leaves.
@@ -308,6 +430,13 @@ final class BarPanelHost {
 /// A borderless panel can't take the keyboard unless it says so.
 private final class BarPanelWindow: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+/// A side panel's window: the keyboard stays with the main panel, whose
+/// model the keys go to; clicks and the pointer work in it all the same.
+private final class BarPanelSideWindow: NSPanel {
+    override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 

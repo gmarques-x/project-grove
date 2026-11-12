@@ -21,7 +21,7 @@ Until now the Grove menu was a native menu at the pointer and the others were Sk
 
 Every dropdown is a panel drawn by **Grove Keys**: it is always running, signed, and already answers `grovekeys://` links from the bar. The bar (SketchyBar) draws the pills and sends a link on click; it has no popups.
 
-- `grovekeys://panel/<name>` toggles the panel `<name>`: `clock`, `system`, `battery`, `wifi`, `sound`, `grove`. Opening one closes any other; a second link for the open one closes it. `grovekeys://panel/close` closes whichever is open. A name nobody registered is ignored. (`grove` is registered in a later stage; until then the pine keeps `grovekeys://grove-menu`, the native menu.)
+- `grovekeys://panel/<name>` toggles the panel `<name>`: `clock`, `system`, `battery`, `wifi`, `sound`, `grove`. Opening one closes any other; a second link for the open one closes it. `grovekeys://panel/close` closes whichever is open. A name nobody registered is ignored. `grovekeys://grove-menu`, the pine's link while its menu was native, is the same as `panel/grove`.
 - The bar sends them with `open -g`, so macOS doesn't bring Grove Keys forward for a link.
 - A panel is a borderless, non-activating window above the normal windows that can take the keyboard without Grove Keys becoming the front app.
 - The shared drawing (frame, rows, charts, meters) is in `GroveUI`; the host, the registry and each panel are in Grove Keys (`Sources/GroveKeys/Panels/`); what a panel computes (a month's grid, the placement) is pure code in `GroveKeysCore`, tested.
@@ -91,7 +91,15 @@ Open detail for stage 2: both Keep Awake and Ignore Lid must show on the bar whi
 
 **Clock** (`clock`, variant A, 248 pt). The month and year as the title, with chevrons to the previous and next month. A grid, Monday first: a quiet "wk" column with ISO week numbers; the neighbouring months' days shown fainter instead of blanks; today a green disc with the on-accent ink. A line, then the footer: today spelt out ("Thursday 12 November") and "week 46". ←/→ change the month; a click on the footer (or Home, or T) comes back to today. It opens on the current month every time. Month and day names follow the user's language; the layout (Monday first, ISO weeks, day before month) doesn't follow the region.
 
-**Grove menu** (`grove`, variant B, a later stage). The rows of `menu.toml` with an icon each (Appearance, Grove Keys, Update, Learn, About, System, Global Menu); a submenu opens as a second panel beside the first, same frame, the current scheme ticked; "Global Menu" opens the front app's native menus. Left edge on the pine pill.
+**Grove menu** (`grove`, variant B, 200 pt; built 2026-11-12). The rows of `menu.toml` and `menu.local.toml` (the same merged tree the launcher lists: file order, separators, hidden rows, a broken file as a quiet first row, Grove Keys' own items in place of the `keys` builtin). No header: a menu's rows are its content. Left edge on the pine pill's left outline, which is the window border's line, so the top-left corner follows the border's.
+
+- **Rows.** Label size, 24 pt each, the hover fill reaching 4 pt from the outline; a separator is a 1 pt line with 4 pt above and below; a row that can't be chosen is quiet and wraps. At the right: a green tick on a row whose `checked` test succeeded, a quiet chevron on a row that opens something.
+- **Icons.** Before each top-level row, quiet, in a 16 pt column: the row's `icon` in the menu file (an SF Symbol's name that is one of `GroveIcon.Name`'s; the seven shipped rows have one). A top-level row without one keeps the indent. Submenus have no icon column.
+- **Submenus.** A second panel (and a third: the tree can be deeper), same frame, as wide as its titles need between 190 and 408 pt. Its left outline is the parent's right outline (the two 1 pt lines are one) and its first row is level with the row that opened it; near the screen's right or bottom it goes to the parent's left or moves up, inside the lines of §5. It opens when the pointer has rested about 150 ms on its row, at once on a click, → or Return, and stays while the pointer moves toward it across other rows (300 ms of grace).
+- **Keys.** ↑/↓ move, skipping lines and rows that can't be chosen, wrapping; Home and End go to the ends; Return or Space runs the row; → opens a submenu and goes into it; ← or Escape closes the submenu the keys are in (Escape at the top level closes the menu); a letter jumps to the next row starting with it. One highlighted row per level, the pointer's and the keys' alike.
+- **Global Menu.** The front app's own menus can't be restyled: the row has a submenu's chevron, and choosing it puts the panel away and pops the native Global Menu with its top-left corner where the panel's was.
+- **Running a row.** What `MenuRunner` does for the launcher (`run`, `present`, `open`, a builtin), after putting the panel away: through `leave` when the row brings something forward, `close` otherwise, so the previous app keeps the keyboard as it did with the native menu.
+- `checked` tests run when their level is shown, 0.5 s each at most, all at once; nothing runs while the menu is closed.
 
 ## 7. The host (Grove Keys)
 
@@ -101,11 +109,13 @@ Open detail for stage 2: both Keep Awake and Ignore Lid must show on the bar whi
 - **Focus.** The app in front is never deactivated by opening a panel; if macOS did bring Grove Keys forward, the app that was in front gets the keyboard back on closing. Not when the panel closed because of what was chosen (a footer that opens Settings, Activity Monitor) or because another app came forward.
 - **Cost.** A panel's model is made the first time it opens and kept; `start()` runs at each opening and `stop()` at each closing. Closed, a panel runs nothing: no timer, no process.
 - **The open pill.** On opening, Grove Keys writes the pill's name to `$GROVE_STATE/bar-panel` and fills the pill (`sketchybar --set pill.<x> background.color=<hover fill>`); on closing it removes the file and clears the fill (unless the pointer is still over the pill, whose hover keeps it). The bar's hover helper (`sb_hover`) leaves the open pill filled when the pointer leaves; a reload of the bar fills it again.
-- **One-shot.** `GroveKeys --render-panel <name> <out.png> [scheme] [left|right]` draws a panel with its sample data to a PNG at 2x and exits, without starting the app or showing a window (as `--check-menu`).
+- **Side panels.** A panel whose model has them (the Grove menu's submenus) gets each as a child window of the panel's own: same level, never key (the keys stay the main panel's model's), so a click in one is not a click outside and closing the panel closes them. The host places them (`MenuListPlacement.submenu`) and follows the model as they open and close.
+- **Escape** is offered to the model first (`escape()`): a menu closes its submenu; any other panel is put away.
+- **One-shot.** `GroveKeys --render-panel <name> <out.png> [scheme] [left|right]` draws a panel with its sample data to a PNG at 2x and exits, without starting the app or showing a window (as `--check-menu`). A sample with side panels is drawn with them beside it.
 
 ## 8. The bar
 
-- Every pill's click sends its link: clock → `panel/clock`; cpu and mem → `panel/system`; battery → `panel/battery`; wifi → `panel/wifi`; volume → `panel/sound`. The pine keeps `grovekeys://grove-menu` until its panel exists.
+- Every pill's click sends its link: clock → `panel/clock`; cpu and mem → `panel/system`; battery → `panel/battery`; wifi → `panel/wifi`; volume → `panel/sound`. The pine sends `grovekeys://grove-menu`, which the app with the Grove menu's panel answers as `panel/grove` and the app before it as the native menu, so the bar works with either. It is still sent without `-g`: the native menu of an app not yet updated needs Grove Keys brought forward. Once the new app is installed the pine's click becomes `open -g grovekeys://panel/grove`, like the other pills (one line of `sketchybarrc` and one of `tests/sketchybar_config.bats`).
 - Gone: the popups and what only they used (`plugins/popup.sh`, `clock_popup.sh`, `network_popup.sh`, `system_popup.sh`, `battery_popup.sh`, `net_sample.sh` and its hidden item, the popup and chart items, the popup helpers and the parsers only they called). The bar's own labels and icons are as they were.
 - The end gaps of §5.
 
@@ -126,7 +136,8 @@ static let registration = BarPanelRegistration("battery", pill: "pill.battery", 
 
 - `.live`: made once, the first time the panel opens, and kept (so a speed test's last result survives a closing). `start()` runs at every opening, before the panel is drawn: read what it shows, start what keeps it current. `stop()` runs at every closing: every timer, process and observer ends there. Closed, a panel must cost nothing.
 - `.sample`: fixed data for the render (below); `start()` is never called on it, and it must read nothing from the Mac.
-- `key(_:) -> Bool` (optional): a key pressed while the panel has the keyboard, offered to the model before any control (`.left`, `.right`, `.up`, `.down`, `.home`, `.end`, `.pageUp`, `.pageDown`, `.enter`, `.space`, `.character("t")`). Return true when used. Escape never arrives: it closes the panel.
+- `key(_:) -> Bool` (optional): a key pressed while the panel has the keyboard, offered to the model before any control (`.left`, `.right`, `.up`, `.down`, `.home`, `.end`, `.pageUp`, `.pageDown`, `.enter`, `.space`, `.character("t")`). Return true when used. Escape never arrives there.
+- `escape() -> Bool` (optional): Escape was pressed. False, the default, closes the panel; true when the model used it (a menu closing its submenu).
 - State in views: the Command Line Tools have no `@State` macro; use the model's `@Published` properties, or `State(initialValue:)` with a comment.
 
 **The view.** A `BarPanel(width:)` from `GroveUI` holding sections separated by `PanelRule()`. The parts (all in `GroveUI`, `PanelKit.swift` and `PanelCharts.swift`): `PanelHeader(icon, accent:, title:) { trailing }`, `PanelValue`, `PanelCaption`, `PanelDetail(label, value)`, `PanelStatus(text, accent:)` (a dot and a word: how a panel says "warning"), `PanelRows { PanelRow(action:) { … } }` (rows with the hover fill), `PanelFooter(title, note:, action:)`, `PanelPairs` (name and value lines), `PanelButton`, `PanelSwitch(label, isOn:)`, `PanelSlider(label, value:)`, `Sparkline` (one or two series, values 0...1; `SparklineGeometry.normalized` for rates), `PanelMeter` and `PanelLegend` (`MeterPart`s), `CoreBars`. Icons are `GroveIcon.Name` cases; the ones the six panels need are there. Colours from `@Environment(\.theme)`, roles only; nothing orange inside.
@@ -151,15 +162,19 @@ swift build
 
 Draws the panel's `.sample` model at 2x on a bg0 ground and exits; no window is shown and the app is not started, so it is safe beside the installed Grove Keys (never run the binary without a one-shot flag). The scheme is a name (through the installed `grove-themes`) or a theme file's path; `left` or `right` draws that top corner as it follows a window border. Switches and sliders are drawn as stand-ins there (`\.panelStandIns`), since AppKit leaves their tint out off screen. To feed it data, make `.sample` build the model's published state from fixed values (the mock-ups' numbers are a good set); to see a second state (a running speed test), switch on an environment variable inside `.sample`.
 
+**Side panels and menus.** A model that conforms to `BarPanelWithSides` gets a `link` from the host at each opening, before `start()` (`link.actions`: the same `close`/`leave`/`open` for a row run from the keyboard; `link.frame()`: the panel's outline on screen; `link.sidesChanged()`: call it when `sides` changes), and lists its side panels in `sides`: each a `BarPanelSide` (a view, its size, the row of the panel before it that it opens from, and where its own first row starts). The host shows each as a child window with its outline on its parent's.
+
+A menu doesn't build that by hand: `MenuListModel` (`Panels/MenuList.swift`) holds the levels (the menu and each open submenu), one highlighted row per level, the keys (`key(_:)`, `escape()`) and the pointer (followed by AppKit over the whole panel, since a side panel never has the keyboard); `MenuListPanel(model:level:)` draws one level in a `BarPanel`. Give the model `MenuListRow`s (title, icon, separator; an action, a submenu's rows, a link drawn with a chevron, or a note), set `onChoose`, `onShow` (a level was shown) and `onLevels` (pass it to `link.sidesChanged`), return `list.sides { … }` as `sides`, and pass the keys on. `GroveMenuPanel.swift` is the worked example. The pure parts are `GroveKeysCore/MenuList.swift`: `MenuListMove` (the keys' moves, type-to-jump), `MenuHoverIntent` (when a submenu opens and closes under the pointer), `MenuListLayout` (the rows' rectangles, from fixed row heights) and `MenuListPlacement` (a submenu's frame).
+
 **Pure logic** (parsing a tool's output, a grid, a rate) goes in `GroveKeysCore` with tests, as `MonthGrid` does; the model in the app target only reads the Mac and publishes.
 
 ## Out of scope (stage 1)
 
-The content of the system, battery, Wi-Fi and sound panels (each is a placeholder in the frame, registered), the Grove menu as a panel, the bar's Keep Awake mark.
+The content of the system, battery, Wi-Fi and sound panels (each is a placeholder in the frame, registered), the Grove menu as a panel (built in stage 2, see §6), the bar's Keep Awake mark.
 
 ## Testing
 
 - GroveUI: the chart's point mapping, the meter's fractions, the icon list.
-- GroveKeysCore: the links; the toggle's "own click" rule; the placement, as a table with the measured numbers; the lines from `borders` windows and the fallback, held to the config files; the month grid (Monday first, ISO weeks, neighbouring days, today, previous and next).
+- GroveKeysCore: the menu list (the keys' moves, type-to-jump, the hover timing, the rows' rectangles, a submenu's frame); the links; the toggle's "own click" rule; the placement, as a table with the measured numbers; the lines from `borders` windows and the fallback, held to the config files; the month grid (Monday first, ISO weeks, neighbouring days, today, previous and next).
 - bats: the click links, the open pill and hover, the end gaps, the workspace change's close; nothing left of the popups.
 - By eye: `--render-panel` in dark-medium and light-medium against the approved mock-ups. The live panel (placement on screen, focus, closing) is checked by the owner after installing.

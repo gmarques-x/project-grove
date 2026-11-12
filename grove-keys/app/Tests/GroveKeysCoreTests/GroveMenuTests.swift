@@ -39,6 +39,61 @@ import Testing
         #expect(global.action == .builtin(.globalMenu) && global.separator)
     }
 
+    @Test func theShippedTopLevelRowsEachHaveAnIcon() throws {
+        let menu = try GroveMenu.strict(main: try fixture("menu.toml"))
+        #expect(menu.rows.map(\.icon) == ["paintpalette", "keyboard", "arrow.triangle.2.circlepath", "book",
+                                          "info.circle", "power", "menubar.rectangle"])
+        // Only the top level: the names are held to Grove's icons by `--check-menu`.
+        #expect(menu.icons.map(\.id) == menu.rows.map(\.id))
+        #expect(menu.icons.map(\.icon) == menu.rows.compactMap(\.icon))
+        // The Grove Keys row keeps its icon when its items take the builtin's place.
+        let keys = KeysMenuItem.items(accessibility: true, inputMonitoring: true, redLine: nil, offersRestart: false,
+                                      paused: false)
+        #expect(menu.expandingKeys(keys).row(id: "keys")?.icon == "keyboard")
+        #expect(menu.expandingKeys(keys).row(id: "keys.pause")?.icon == nil)
+    }
+
+    @Test func anIconIsARowsKeyAndTheLocalFileSetsChangesOrRemovesIt() throws {
+        let main = """
+            [a]
+            title = "A"
+            icon = "book"
+            [a.one]
+            run = "x"
+            icon = "wifi"
+            [b]
+            run = "b"
+            icon = "power"
+            [c]
+            run = "c"
+            """
+        let menu = try GroveMenu.strict(main: main)
+        #expect(menu.rows.map(\.icon) == ["book", "power", nil])
+        // A submenu's row keeps an icon the file gives it (the pine's menu draws the top level's only).
+        #expect(menu.row(id: "a.one")?.icon == "wifi")
+        #expect(menu.icons.map(\.id) == ["a", "a.one", "b"])
+
+        let local = "[a]\nicon = \"keyboard\"\n[b]\nicon = \"\"\n[c]\nicon = \"calendar\"\n[d]\nrun = \"d\"\nicon = \"not.a.symbol\"\n"
+        let merged = try GroveMenu.strict(main: main, local: local)
+        // The name is kept as written: whether Grove has that icon is the app's to say.
+        #expect(merged.rows.map(\.icon) == ["keyboard", nil, "calendar", "not.a.symbol"])
+        #expect(merged.row(id: "a")?.title == "A")
+    }
+
+    @Test func anIconMustBeAString() {
+        #expect(throws: MenuFileError(file: "menu.toml", line: 3, message: #""icon" must be a string"#)) {
+            try GroveMenu.strict(main: "[a]\nrun = \"x\"\nicon = true\n")
+        }
+    }
+
+    @Test func thePathToARowIsItsParentsThenItself() throws {
+        let menu = try GroveMenu.strict(main: "[a]\ntitle = \"A\"\n[a.b]\ntitle = \"B\"\n[a.b.c]\nrun = \"c\"\n[d]\nrun = \"d\"\n")
+        #expect(menu.path(to: "a.b.c") == ["a", "a.b", "a.b.c"])
+        #expect(menu.path(to: "a.b") == ["a", "a.b"])
+        #expect(menu.path(to: "d") == ["d"])
+        #expect(menu.path(to: "nope").isEmpty && menu.path(to: "").isEmpty)
+    }
+
     @Test func aRowWithRowsUnderItIsASubmenuAndOneWithNothingIsLeftOut() throws {
         let menu = try GroveMenu.strict(main: """
         [tools]

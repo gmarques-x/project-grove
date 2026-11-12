@@ -1,5 +1,6 @@
 import Foundation
 import GroveKeysCore
+import GroveUI
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data((message + "\n").utf8))
@@ -37,7 +38,9 @@ func renderAeroSpace() -> Never {
 
 /// `--check-menu <file> [<local file>]`: reads the Grove menu's file (and the
 /// local one over it) as the app would, for grove's tests. Prints the number
-/// of rows; an error goes to stderr as "<file> line N: message".
+/// of rows; an error goes to stderr as "<file> line N: message". An `icon`
+/// that isn't one of Grove's icons is an error too (the menu itself would
+/// draw that row without one).
 func checkMenu(_ files: [String]) -> Never {
     guard let main = files.first, files.count <= 2 else {
         fail("usage: GroveKeys --check-menu <file> [<local file>]")
@@ -53,6 +56,11 @@ func checkMenu(_ files: [String]) -> Never {
     do {
         let menu = try GroveMenu.strict(main: tracked.text, mainName: tracked.name,
                                         local: local?.text, localName: local?.name ?? "")
+        let unknown = menu.icons.filter { GroveIcon.Name(rawValue: $0.icon) == nil }
+        if !unknown.isEmpty {
+            fail(unknown.map { "[\($0.id)]: unknown icon \"\($0.icon)\"" }.joined(separator: "\n")
+                + "\nThe icons: " + GroveIcon.Name.allCases.map(\.rawValue).sorted().joined(separator: ", "))
+        }
         print("\(menu.count) rows")
     } catch {
         fail(error.description)

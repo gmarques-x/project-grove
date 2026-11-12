@@ -13,9 +13,15 @@
 #   checked    a shell test; the row gets a ✓ when it succeeds
 #   separator  true: a line above this row
 #   hidden     true: the row is left out
+#   icon       an SF Symbol's name, drawn before a top-level row in the pine's
+#              menu (rows inside a submenu have none). It must be one of
+#              Grove's icons: `GroveKeys --check-menu <this file>` lists them
+#              when a name isn't. A top-level row without one keeps the same
+#              indent; `icon = ""` in menu.local.toml takes one away.
 
 [appearance]
 title = "Appearance"
+icon = "paintpalette"
 
 [appearance.gallery]
 title = "Grove Themes…"
@@ -54,10 +60,12 @@ checked = "test \"$(grove-themes current)\" = light-soft"
 
 [keys]
 title = "Grove Keys"
+icon = "keyboard"
 builtin = "keys"
 
 [update]
 title = "Update"
+icon = "arrow.triangle.2.circlepath"
 
 [update.check]
 title = "Check"
@@ -73,6 +81,7 @@ present = "grove install"
 
 [learn]
 title = "Learn"
+icon = "book"
 
 [learn.keys]
 title = "Keybindings"
@@ -98,10 +107,12 @@ open = "https://yazi-rs.github.io/docs/quick-start"
 
 [about]
 title = "About"
+icon = "info.circle"
 present = "grove about"
 
 [system]
 title = "System"
+icon = "power"
 
 [system.settings]
 title = "System Settings…"
@@ -135,5 +146,6 @@ run = "osascript -e 'tell application \"loginwindow\" to «event aevtrsdn»'"
 
 [global-menu]
 title = "Global Menu"
+icon = "menubar.rectangle"
 separator = true
 builtin = "global-menu"

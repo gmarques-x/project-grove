@@ -55,6 +55,7 @@ In either file, each `[name]` block is a row. A dot in the name places the row i
 | `checked` | A shell test; the row gets a ✓ when it succeeds |
 | `separator = true` | Draw a line above this row |
 | `hidden = true` | Leave this row (and anything inside it) out |
+| `icon` | A symbol before the row, for a row at the top of the pine's menu: an SF Symbol's name from Grove's set, such as `book`, `keyboard`, `wifi`, `calendar` or `display` (`GroveKeys --check-menu` lists them all). A top row without one keeps the same indent |
 
 A row takes one of `run`, `present` or `open`. A row with rows inside it is a submenu.
 

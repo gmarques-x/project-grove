@@ -32,10 +32,63 @@ protocol BarPanelModel: AnyObject {
     /// it sees it. True: the panel used it. Escape never arrives (it closes
     /// the panel), nor does a key pressed with ⌘, ⌃ or ⌥.
     func key(_ key: BarPanelKey) -> Bool
+    /// Escape was pressed. True: the panel used it (a menu closing its
+    /// submenu) and stays open; false, the default: the panel is put away.
+    func escape() -> Bool
 }
 
 extension BarPanelModel {
     func key(_ key: BarPanelKey) -> Bool { false }
+    func escape() -> Bool { false }
+}
+
+/// A panel beside an open panel: a menu's submenu. Same frame, its left
+/// outline on the right outline of the panel before it (one shared line),
+/// its first row level with the row it opens from, kept on the screen
+/// (`MenuListPlacement.submenu`). It is a child window of the main panel:
+/// a click in it is not a click outside, it never takes the keyboard (the
+/// keys stay the main panel's model's), and it goes when the panel does.
+@MainActor
+struct BarPanelSide {
+    /// What tells one side panel's content from another's at the same
+    /// depth; the host keeps the view while it stays the same.
+    let id: AnyHashable
+    /// A `BarPanel` of `size`.
+    let view: AnyView
+    let size: CGSize
+    /// The row it opens from, in the coordinates of the panel before it
+    /// (the main panel for the first side panel): points from that panel's
+    /// top-left corner, y down.
+    let row: CGRect
+    /// From this panel's top to its first row.
+    let firstRow: CGFloat
+    /// Told where the host put it: true when there was no room at the right
+    /// and it went to the left of the panel before it.
+    var placed: (@MainActor (_ onLeft: Bool) -> Void)?
+}
+
+/// What the host gives a model that needs more of it than a view can ask
+/// through `@Environment(\.barPanel)` (`BarPanelWithSides`).
+@MainActor
+struct BarPanelLink {
+    /// The same actions the views get: for a row run from the keyboard.
+    var actions = BarPanelActions()
+    /// The model's `sides` changed: the host shows, moves and removes the
+    /// side panels to match.
+    var sidesChanged: @MainActor () -> Void = {}
+    /// The main panel's outline on screen, in AppKit's coordinates; nil
+    /// while it isn't shown.
+    var frame: @MainActor () -> NSRect? = { nil }
+}
+
+/// A panel's model that shows side panels (a menu with submenus). The host
+/// sets `link` at each opening, before `start()`, and reads `sides` after
+/// showing the panel and whenever `link.sidesChanged()` is called. The
+/// chain is in order: each side panel opens from a row of the one before.
+@MainActor
+protocol BarPanelWithSides: BarPanelModel {
+    var link: BarPanelLink { get set }
+    var sides: [BarPanelSide] { get }
 }
 
 /// A key as a panel's model is told it.
@@ -152,6 +205,9 @@ final class BarPanelRegistration {
 
     /// The panel on its sample data, for a render.
     func sample() -> AnyView { make(.sample).view }
+
+    /// The same with its model, for a render that draws its side panels too.
+    func sampleEntry() -> (model: any BarPanelModel, view: AnyView) { make(.sample) }
 }
 
 /// Every bar panel. A new panel is a file in this folder and a line here;
@@ -164,6 +220,7 @@ enum BarPanels {
         BatteryPanel.registration,
         WifiPanel.registration,
         SoundPanel.registration,
+        GroveMenuPanel.registration,
     ]
 
     static func named(_ name: String) -> BarPanelRegistration? {

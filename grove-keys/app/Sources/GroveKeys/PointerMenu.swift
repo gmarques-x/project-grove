@@ -1,11 +1,14 @@
 import AppKit
 import GroveKeysCore
 
-/// Grove Keys' menus popped up at the pointer, for the `grovekeys://` links
-/// (the native menu bar is hidden behind the Grove bar): the bar's pine opens
-/// `grove-menu` (the Grove menu, from `menu.toml`) and its app name
-/// `app-menu`. Nothing in the bar opens `menu` any more; it still works, e.g.
-/// `open grovekeys://menu` from a terminal.
+/// Grove Keys' native menus popped up at the pointer, for the `grovekeys://`
+/// links (the native menu bar is hidden behind the Grove bar): the bar's app
+/// name opens `app-menu` (the front app's menus, which only macOS can draw).
+/// Nothing in the bar opens `menu` any more; it still works, e.g.
+/// `open grovekeys://menu` from a terminal. The pine's Grove menu is no
+/// longer one of these: it is a bar panel (`GroveMenuPanel`), which reads
+/// the menu here (`groveMenu()`) and pops the Global Menu from its row
+/// (`showAppMenu(at:)`).
 @MainActor
 final class PointerMenu: NSObject {
     static let shared = PointerMenu()
@@ -40,13 +43,8 @@ final class PointerMenu: NSObject {
     /// The app to give the keyboard back to: the last one in front.
     var previousApp: pid_t? { front.current?.pid }
 
-    /// The pine's dropdown: the Grove menu.
-    func showGroveMenu() {
-        popUpAtPointer(menu(of: groveMenu().rows))
-    }
-
-    /// `grovekeys://menu/<id>`: a row with an action is run, a submenu is
-    /// popped up at the pointer.
+    /// `grovekeys://menu/<id>`: a row with an action is run; a submenu opens
+    /// the Grove menu's panel under the pine with that submenu open.
     func showRow(id: String) {
         guard let row = groveMenu().row(id: id) else {
             FailureNotice.show(.unknownRow(id: id))
@@ -56,7 +54,8 @@ final class PointerMenu: NSObject {
             if !action.takesFocus { handBackAfterLink() }
             MenuRunner.run(action, title: row.title)
         } else {
-            popUpAtPointer(menu(of: row.children))
+            GroveMenuModel.openAt = id
+            BarPanelHost.shared.show(GroveMenuPanel.registration.name)
         }
     }
 
@@ -118,9 +117,11 @@ final class PointerMenu: NSObject {
         return menu
     }
 
-    /// The front app's menus directly (the bar's app name).
-    func showAppMenu() {
-        popUpAtPointer(appMenu())
+    /// The front app's menus directly (the bar's app name), at the pointer;
+    /// or with their top-left corner at `point` (the screen's coordinates):
+    /// the Grove menu's Global Menu row, where its panel was.
+    func showAppMenu(at point: NSPoint? = nil) {
+        popUpAtPointer(appMenu(), at: point)
     }
 
     private func appMenu() -> NSMenu {
@@ -142,13 +143,13 @@ final class PointerMenu: NSObject {
         popUpAtPointer(menu(of: KeysMenuItem.rows(model.keysMenuItems, under: "keys")))
     }
 
-    /// Pops `menu` up where the pointer was at the click. With another app in
+    /// Pops `menu` up where the pointer was at the click (or at `place`). With another app in
     /// front, Grove Keys comes forward first: a menu shown while that switch is
     /// still under way closes again at once (the "second click" bug). When the
     /// menu closes, the app that was in front gets the keyboard back, unless
     /// the chosen item brought something forward itself.
-    private func popUpAtPointer(_ menu: NSMenu) {
-        let point = NSEvent.mouseLocation
+    private func popUpAtPointer(_ menu: NSMenu, at place: NSPoint? = nil) {
+        let point = place ?? NSEvent.mouseLocation
         if NSApp.isActive {
             // Grove Keys' own window is in front: nothing to hand back.
             DispatchQueue.main.async { menu.popUp(positioning: nil, at: point, in: nil) }

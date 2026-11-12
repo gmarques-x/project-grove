@@ -68,7 +68,7 @@ gap gap.l0 left "$EDGE"
 sketchybar --add item grove left \
   --set grove icon.background.image="$PINE_ICON" icon.background.image.scale=0.5 icon.background.drawing=on \
     icon.width=18 icon.padding_left=0 icon.padding_right=0 width=44 align=center padding_left=0 padding_right=0 label.drawing=off \
-    script="$P/hover.sh" click_script="open grovekeys://grove-menu" \
+    script="$P/hover.sh" click_script="$(panel grove)" \
   --subscribe grove mouse.entered mouse.exited
 gap gap.l1 left 8
 

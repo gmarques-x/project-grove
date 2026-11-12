@@ -37,15 +37,20 @@ public struct GroveMenuRow: Equatable, Sendable {
     /// A line above the row.
     public var separator: Bool
     public var children: [GroveMenuRow]
+    /// The row's icon in the pine's panel: an SF Symbol's name as the file
+    /// has it (`icon = "book"`). Drawn for top-level rows, and only when it
+    /// is one of Grove's icons (the app's `GroveIcon.Name`); nil for none.
+    public var icon: String?
 
     public init(id: String, title: String, action: GroveMenuAction? = nil, checked: String? = nil,
-                separator: Bool = false, children: [GroveMenuRow] = []) {
+                separator: Bool = false, children: [GroveMenuRow] = [], icon: String? = nil) {
         self.id = id
         self.title = title
         self.action = action
         self.checked = checked
         self.separator = separator
         self.children = children
+        self.icon = icon
     }
 
     /// A line of text that can't be chosen (an error, the Grove Keys red line).
@@ -158,6 +163,29 @@ public struct GroveMenu: Equatable, Sendable {
         return id.isEmpty ? nil : find(rows)
     }
 
+    /// Every `icon` the files name, with its row's id, in menu order
+    /// (`--check-menu` holds them to the icons Grove has).
+    public var icons: [(id: String, icon: String)] {
+        func icons(_ rows: [GroveMenuRow]) -> [(id: String, icon: String)] {
+            rows.flatMap { row in (row.icon.map { [(row.id, $0)] } ?? []) + icons(row.children) }
+        }
+        return icons(rows)
+    }
+
+    /// The ids from the top of the menu down to the row `id`, itself
+    /// included (`["learn", "learn.more", "learn.more.yazi"]`); empty when
+    /// no row has that id.
+    public func path(to id: String) -> [String] {
+        func find(_ rows: [GroveMenuRow]) -> [String]? {
+            for row in rows where !row.isNote {
+                if row.id == id { return [row.id] }
+                if let below = find(row.children) { return [row.id] + below }
+            }
+            return nil
+        }
+        return id.isEmpty ? [] : find(rows) ?? []
+    }
+
     /// The menu with each `keys` builtin row turned into an ordinary submenu
     /// of `items`, so the launcher and `menu/<id>` reach them (`keys.pause`).
     public func expandingKeys(_ items: [KeysMenuItem]) -> GroveMenu {
@@ -186,6 +214,8 @@ private struct Draft {
         var checked: String?
         var separator: Bool?
         var hidden: Bool?
+        /// "" takes an icon away (the local file over the tracked one).
+        var icon: String?
         var children: [Node] = []
     }
 
@@ -218,6 +248,8 @@ private struct Draft {
                     fields.separator = on
                 case ("hidden", .bool(let on)):
                     fields.hidden = on
+                case ("icon", .string(let text)):
+                    fields.icon = text
                 case (let key, .string(let text)) where Self.actionKeys.contains(key):
                     if let actionKey { throw fail(entry, "a row has one action: \"\(actionKey)\" is already set") }
                     actionKey = key
@@ -235,7 +267,7 @@ private struct Draft {
                     throw fail(entry, "\"title\" must be a string with text in it")
                 case ("separator", _), ("hidden", _):
                     throw fail(entry, "\"\(entry.key)\" must be true or false")
-                case ("checked", _), ("run", _), ("present", _), ("open", _), ("builtin", _):
+                case ("checked", _), ("icon", _), ("run", _), ("present", _), ("open", _), ("builtin", _):
                     throw fail(entry, "\"\(entry.key)\" must be a string")
                 default:
                     throw fail(entry, "unknown key \"\(entry.key)\"")
@@ -265,6 +297,7 @@ private struct Draft {
         if let checked = fields.checked { nodes[index].checked = checked }
         if let separator = fields.separator { nodes[index].separator = separator }
         if let hidden = fields.hidden { nodes[index].hidden = hidden }
+        if let icon = fields.icon { nodes[index].icon = icon }
     }
 
     /// The rows to show: hidden ones gone, a row with rows under it a submenu
@@ -278,11 +311,13 @@ private struct Draft {
                 let children = rows(node.children, under: id)
                 let title = node.title ?? node.name
                 let separator = node.separator ?? false
+                let icon = node.icon.flatMap { $0.isEmpty ? nil : $0 }
                 if !children.isEmpty {
-                    return GroveMenuRow(id: id, title: title, separator: separator, children: children)
+                    return GroveMenuRow(id: id, title: title, separator: separator, children: children, icon: icon)
                 }
                 guard let action = node.action else { return nil }
-                return GroveMenuRow(id: id, title: title, action: action, checked: node.checked, separator: separator)
+                return GroveMenuRow(id: id, title: title, action: action, checked: node.checked, separator: separator,
+                                    icon: icon)
             }
         }
         return rows(roots, under: "")

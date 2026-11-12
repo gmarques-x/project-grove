@@ -13,7 +13,7 @@ The idea is Omarchy's (its menu is one data file with a user extension file; eve
 `~/.config/grove/menu.toml` (tracked: `grove-dotfiles/config/grove/menu.toml`), then `~/.config/grove/menu.local.toml` (the owner's, git-ignored). The format is the TOML subset Grove Keys already parses (tables, strings, booleans, comments).
 
 - A table is a row. Its dotted name is its id and its place in the tree: `[update.check]` is a child of `[update]`. Rows keep file order.
-- Keys: `title`; one action of `run` (shell, quiet), `present` (shell, in the Grove window, §3), `open` (link or path), `builtin` (rows Grove Keys draws: `keys`, `global-menu`, `lock`); `checked` (a shell test: ✓ when it exits 0); `separator = true` (a line above the row); `hidden = true`.
+- Keys: `title`; one action of `run` (shell, quiet), `present` (shell, in the Grove window, §3), `open` (link or path), `builtin` (rows Grove Keys draws: `keys`, `global-menu`, `lock`); `checked` (a shell test: ✓ when it exits 0); `separator = true` (a line above the row); `hidden = true`; `icon` (an SF Symbol's name, drawn before a top-level row of the pine's menu; see the 2026-11-12 note in §2).
 - A row with children is a submenu; its own action, if any, is ignored. A row with neither action nor children is left out.
 - The local file: a table with a known id overrides that row key by key; a new id is appended to its parent (a missing parent is created with the id's last part as its title); `hidden = true` removes a row and its children.
 - A file that can't be read or parsed: the tracked file falling back to a built-in minimal menu (Grove Themes, Grove Keys ▸, Global Menu ▸) and the error shown as a disabled first row; a broken local file is ignored with the same kind of row. The menu never fails to open.
@@ -30,6 +30,15 @@ Initial tree: Appearance (Grove Themes…, the six schemes with ✓) · Grove Ke
 - The tree, the merge, the filter and the id lookup are pure code in GroveKeysCore with tests. Running rows and drawing are in the app target.
 
 > **2026-11-11, later:** the palette was renamed the **Grove Launcher** (`grovekeys://launcher`; `grovekeys://palette` still answers). It moved from Hyper + Space to ⌘Space, taken in Grove Keys' key tap before Spotlight (`launcher = "cmd-space"` under `[hyper]` in `keys.toml`; the `hyper-space` binding is gone), and it gained the installed apps, ranked with the menu's rows once something is typed. The System submenu gained a first row, System Settings….
+
+> **2026-11-12:** the pine's menu is no longer a native menu at the pointer. It is one of the bar's panels (`2026-11-12-bar-panels-design.md`, "Grove menu"): Grove's frame with the orange outline and JetBrains Mono, hung under the pine pill with its left edge on the pill's left outline, a submenu as a second panel beside the first. What changed here:
+>
+> - **Links.** `grovekeys://grove-menu` and `grovekeys://panel/grove` both show the panel or put it away. `grovekeys://menu/<id>` still runs a leaf; for a submenu it opens the panel under the pine with that submenu open (it was a native menu at the pointer). `grovekeys://menu` (Grove Keys' own items) and `grovekeys://app-menu` stay native menus at the pointer.
+> - **Icons.** A row may have `icon = "<SF Symbol name>"`. The pine's menu draws it before a **top-level** row, quiet; rows inside a submenu have none, and neither has the launcher. The name must be one of Grove's icons (`GroveIcon.Name` in `GroveUI`: the seven the shipped rows use, `paintpalette`, `keyboard`, `arrow.triangle.2.circlepath`, `book`, `info.circle`, `power`, `menubar.rectangle`, and the bar panels' own, e.g. `wifi`, `calendar`, `display`); any other name draws no icon, and `GroveKeys --check-menu` fails on it and lists the names. A top-level row without an icon keeps the same indent, so the owner's own rows line up; `icon = ""` in `menu.local.toml` takes a shipped one away.
+> - **Rows.** As before: file order, separators, hidden rows, an error in a file as a quiet first row (wrapped, it can't be chosen), the `keys` builtin as a submenu of Grove Keys' own items. `checked` tests now run when their level is shown (the top level at opening, a submenu's when it opens), each with the 0.5 s limit, all at once; the tick is green, at the row's right.
+> - **Global Menu.** Still the front app's own menus, which only macOS can draw: its row shows a submenu's chevron, and choosing it (a click, → or Return) puts the panel away and pops the native Global Menu with its top-left corner where the panel's was.
+> - **Pointer and keys.** A submenu opens after the pointer rests about 150 ms on its row, at once on a click, → or Return; it stays while the pointer moves toward it over other rows (300 ms of grace). ↑/↓ move (skipping lines and rows that can't be chosen, wrapping), Home/End go to the ends, Return or Space runs, a letter jumps to the next row starting with it, ← or Escape closes the submenu (Escape at the top level closes the menu). One highlighted row per level, shared by the pointer and the keys.
+> - **Focus.** As before: the previous app keeps the keyboard unless the row brought something forward (`open` and `present` rows, Open Grove Keys, the cheat sheet). The panel never brings Grove Keys forward.
 
 ## 3. The Grove window: `grove present`
 
@@ -57,6 +66,6 @@ Toggles and their bar indicators, Capture, Share, an Apps row, launch-or-focus f
 
 ## Testing
 
-- Core: menu parsing, merge with the local file, hidden rows, file order, error fallbacks, palette filter ranking, id lookup; cheat-sheet row building and filtering.
+- Core: menu parsing, merge with the local file, hidden rows, file order, error fallbacks, palette filter ranking, id lookup; cheat-sheet row building and filtering. Since 2026-11-12 also the `icon` key, the path to a row, and the menu list's pure parts (the keys' moves, type-to-jump, the hover timing, the rows' rectangles, a submenu's frame).
 - Installer (bats): `grove present` builds the right Ghostty invocation (faked `open`), `grove --version`, `grove about`'s extra lines, the AeroSpace float rule, the shipped `menu.toml` parses (through the app's own parser: a `GroveKeys --check-menu <file>` one-shot, as `--render-aerospace` is), the two new key bindings.
 - By hand: the pine menu, the palette, each System row up to macOS's confirmation, the Grove window floating and closing, the cheat sheet.
