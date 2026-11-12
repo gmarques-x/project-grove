@@ -10,6 +10,8 @@ import SwiftUI
 /// by `PaneView` above it, and the rows and cells here draw with the tokens.
 struct FileList: NSViewRepresentable {
     @ObservedObject var model: AppModel
+    /// The file operations: the rename field of a row follows them.
+    @ObservedObject var work: FileWork
     let side: Side
     let columns: ListColumns
 
@@ -45,6 +47,8 @@ struct FileList: NSViewRepresentable {
         // Typing a name is the model's (a second's pause, accents ignored), not the table's.
         table.allowsTypeSelect = false
         table.onKey = { [weak coordinator] in coordinator?.key($0) ?? false }
+        table.onEdit = { [weak coordinator] in coordinator?.edit($0) }
+        table.canEdit = { [weak coordinator] in coordinator?.canEdit($0) ?? false }
         table.onActivate = { [weak coordinator] in coordinator?.activate() }
         table.onClick = { [weak coordinator] in coordinator?.clicked() }
         table.onPointerRow = { [weak coordinator] in coordinator?.pointerMoved(to: $0) }
@@ -100,10 +104,12 @@ struct FileList: NSViewRepresentable {
         private var settingSelection = false
         /// The model's last call for the keyboard that this list answered.
         private var listFocus = 0
+        private let rename: RenameEditor
 
         init(model: AppModel, side: Side) {
             self.model = model
             self.side = side
+            rename = RenameEditor(model: model)
         }
 
         // MARK: Following the model
@@ -183,6 +189,8 @@ struct FileList: NSViewRepresentable {
             if let url = model.takeReveal(for: side), let row = listing?.rows[url], row < table.numberOfRows {
                 table.scrollRowToVisible(row)
             }
+            let renaming = model.work.rename.flatMap { $0.side == side ? $0 : nil }
+            rename.update(renaming, row: renaming.flatMap { listing?.rows[$0.url] }, in: table, theme: model.colors)
             takeKeyboardIfAsked(table, active: active)
         }
 
@@ -328,6 +336,18 @@ struct FileList: NSViewRepresentable {
             CommandTable.handle(event, in: model, side: side)
         }
 
+        /// Copy, Paste, Undo and Redo of the system's Edit menu, which come
+        /// to the list by the responder chain: the commands of those names.
+        func edit(_ id: String) {
+            guard let command = CommandTable.command(id), command.isEnabled(model) else { return }
+            model.activate(side)
+            command.run(model)
+        }
+
+        func canEdit(_ id: String) -> Bool {
+            CommandTable.command(id)?.isEnabled(model) ?? false
+        }
+
         func activate() { model.activate(side) }
 
         func clicked() { model.clicked(side) }
@@ -350,59 +370,5 @@ struct FileList: NSViewRepresentable {
             let visible = entries[first..<min(entries.count, first + rows.length)]
             model.wantSizesFirst(for: visible.filter(\.isMeasured).map(\.url))
         }
-    }
-}
-
-/// The table itself: it tells which row the pointer is over and when the
-/// pane is clicked (so it becomes the active one).
-final class FileTableView: NSTableView {
-    /// The list was handed the keyboard.
-    var onActivate: (() -> Void)?
-    /// The list was clicked.
-    var onClick: (() -> Void)?
-    /// A key was pressed: true when it was dealt with.
-    var onKey: ((NSEvent) -> Bool)?
-    var onPointerRow: ((Int) -> Void)?
-    /// The row under the pointer; -1 for none.
-    var pointerRow = -1 {
-        didSet { if pointerRow != oldValue { onPointerRow?(pointerRow) } }
-    }
-    private var tracking: NSTrackingArea?
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(
-            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
-            owner: self)
-        addTrackingArea(area)
-        tracking = area
-    }
-
-    override func mouseMoved(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
-    override func mouseEntered(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
-    override func mouseExited(with event: NSEvent) { pointerRow = -1 }
-
-    /// After a scroll the pointer is over another row without having moved.
-    func pointerMovedToCurrentPlace() {
-        guard let window, window.isKeyWindow else { return }
-        let place = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        pointerRow = visibleRect.contains(place) ? row(at: place) : -1
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if onKey?(event) != true { super.keyDown(with: event) }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onClick?()
-        super.mouseDown(with: event)
-    }
-
-    /// The keys came here (Tab, a click elsewhere in the pane): after the
-    /// turn, since this can come while SwiftUI is updating its views.
-    override func becomeFirstResponder() -> Bool {
-        DispatchQueue.main.async { [weak self] in self?.onActivate?() }
-        return super.becomeFirstResponder()
     }
 }

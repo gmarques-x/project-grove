@@ -1,0 +1,266 @@
+import AppKit
+import GroveExplorerCore
+
+/// How a file command is done, from the key to the undo stack. Each command
+/// is one job of `FileWork.pending`, done whole before the next begins:
+///
+///     validate → existingNames → the prompt, when any → run → record
+///
+/// with the same operation value from the first step to the last, and
+/// nothing of another command, nor an undo or a redo (jobs of the same
+/// queue), in between.
+extension AppModel {
+    /// Issues `operation`; `side` is the pane whose status bar tells of it.
+    func perform(
+        _ operation: GroveExplorerCore.Operation, in side: Side, fromField: Bool = false, thenRename: Bool = false
+    ) {
+        enqueue(.operation(operation, side: side, fromField: fromField, thenRename: thenRename))
+    }
+
+    /// Takes `job` in: started now when nothing is in hand, else it waits
+    /// for the ones before it. Nothing is ever done in a render.
+    func enqueue(_ job: FileJob) {
+        guard live, let first = work.pending.add(job) else { return }
+        work.busy = true
+        Task { await drain(from: first) }
+    }
+
+    /// Does the jobs one after the other until none waits.
+    private func drain(from first: FileJob) async {
+        var job: FileJob? = first
+        while let next = job {
+            switch next {
+            case let .operation(operation, side, fromField, thenRename):
+                await run(operation, in: side, fromField: fromField, thenRename: thenRename)
+            case let .undo(side):
+                await takeBack(redo: false, in: side)
+            case let .redo(side):
+                await takeBack(redo: true, in: side)
+            }
+            work.canUndo = await work.undo.canUndo
+            work.canRedo = await work.undo.canRedo
+            job = work.pending.finished()
+        }
+        // No suspension since `finished` said none waits: a command issued
+        // from here on starts a drain of its own.
+        work.busy = false
+    }
+
+    // MARK: One operation
+
+    private func run(
+        _ operation: GroveExplorerCore.Operation, in side: Side, fromField: Bool, thenRename: Bool
+    ) async {
+        let runner = work.runner
+        /// The rename field still waits for this one (Escape may have closed it).
+        var field: Bool { fromField && work.rename?.committing == true }
+
+        // 1. Does it make sense at all.
+        do {
+            try await runner.validate(operation)
+        } catch {
+            if field { renameRefused(error.sentence) } else { say(error.sentence, in: side) }
+            return
+        }
+
+        // 2. The names that exist where it goes; 3. what to do about them.
+        let existing = await runner.existingNames(for: operation)
+        var asking = ConflictAsking(existing: [])
+        if !existing.isEmpty {
+            if FileCommands.asksAboutNames(operation) {
+                // Cancel gives up the whole operation: nothing runs.
+                guard let asked = await ask(about: existing, for: operation) else { return }
+                asking = asked
+            } else if field, case let .rename(_, name) = operation {
+                renameRefused(OperationStatus.nameTaken(name))
+                return
+            }
+            // Otherwise a rename or a new folder: the runner fails it on
+            // the name in use, and the failure is told below.
+        }
+        let plan = asking.plan, answers = asking.answers
+
+        // 4. The run, of the very operation the names were looked up for.
+        work.run += 1
+        let number = work.run, started = Date()
+        work.runInHand = number
+        let outcome = await runner.run(
+            operation, resolve: { plan.choice(for: $0) ?? .skip },
+            progress: { [weak self] progress in
+                // Told on the thread doing the work: over to the main actor.
+                Task { @MainActor in self?.progressed(progress, of: operation, in: side, run: number, since: started) }
+            })
+        // 5. Recorded at once: the undo stack reads the items as they are now.
+        await work.undo.record(outcome, words: outcome.summary, operation: operation, answers: answers)
+        work.runInHand = nil
+
+        finished(operation, outcome, in: side, field: field, thenRename: thenRename)
+    }
+
+    /// Progress of the run numbered `run`. Shown once the run has taken a
+    /// moment: a rename or a move within a disk is over before anyone
+    /// could read a meter.
+    private func progressed(
+        _ progress: GroveExplorerCore.Progress, of operation: GroveExplorerCore.Operation, in side: Side, run: Int,
+        since started: Date
+    ) {
+        guard work.runInHand == run, Date().timeIntervalSince(started) >= 0.2 else { return }
+        show(
+            .running(
+                words: OperationStatus.running(operation, progress), fraction: OperationStatus.fraction(progress),
+                percent: OperationStatus.percent(progress)),
+            in: side, for: nil)
+    }
+
+    /// The cancel button of a status bar: the run in hand stops after the
+    /// file it is on.
+    func cancelRun() {
+        Task { await work.runner.cancel() }
+    }
+
+    private func finished(
+        _ operation: GroveExplorerCore.Operation, _ outcome: Outcome, in side: Side, field: Bool, thenRename: Bool
+    ) {
+        let touched = AfterOperation.touchedFolders(by: operation, outcome: outcome)
+        for folder in touched { work.touched[folder.standardizedFileURL.path] = folder }
+        filesChanged(in: touched)
+
+        // What it left is selected once the panes list it (the watcher has
+        // them read their folders); what is listed already, now.
+        let new = AfterOperation.newItems(of: outcome)
+        work.arrivals = new.isEmpty
+            ? nil
+            : Arrivals(items: new, renameIn: thenRename && new.count == 1 ? side : nil, until: Date().addingTimeInterval(3))
+        for side in sides { arrived(in: side) }
+
+        let changed = !outcome.changes.isEmpty
+        if field {
+            if let failure = outcome.failures.first {
+                // Said under the field, not here: a meter shown meanwhile goes.
+                if case .running = work.statuses[side] { work.statuses[side] = nil }
+                renameRefused(OperationStatus.renameReason(for: failure))
+                return
+            }
+            endRename()
+        }
+        if outcome.failures.isEmpty {
+            show(.done(outcome.summary, changed: changed, hint: changed), in: side, for: 5)
+        } else {
+            // It stays until the next thing the pane has to say.
+            show(
+                .failed(
+                    line: OperationStatus.couldNot(operation, failed: outcome.failures.count), summary: outcome.summary,
+                    items: outcome.failures.map(OperationStatus.line(for:)), changed: changed),
+                in: side, for: nil)
+        }
+    }
+
+    // MARK: Undo and redo
+
+    private func takeBack(redo: Bool, in side: Side) async {
+        do {
+            let sentence: String
+            if redo { sentence = try await work.undo.redo() } else { sentence = try await work.undo.undo() }
+            show(.done(sentence, changed: true, hint: redo), in: side, for: 5)
+        } catch {
+            // Refused: the sentence says why, and whether the entry is gone.
+            say(error.sentence, in: side)
+        }
+        // The stack doesn't tell which folders it changed: any a run of
+        // this window touched may be among them.
+        filesChanged(in: Array(work.touched.values))
+    }
+
+    // MARK: The prompt
+
+    /// Asks about each of `existing` in turn, unless an answer is for all
+    /// the rest. Nil when the answer was Cancel.
+    private func ask(about existing: [URL], for operation: GroveExplorerCore.Operation) async -> ConflictAsking? {
+        var asking = ConflictAsking(existing: existing)
+        watchPromptKeys()
+        defer {
+            stopWatchingPromptKeys()
+            work.prompt = nil
+        }
+        while let current = asking.current {
+            let incoming = FileCommands.incoming(for: current, in: operation) ?? current
+            let remaining = asking.remaining
+            // Two looks at the disk, off the main thread.
+            let question = await Task.detached {
+                Conflict.Question(incoming: incoming, existing: current, remaining: remaining)
+            }.value
+            let reply = await withCheckedContinuation { continuation in
+                work.reply = continuation
+                work.prompt = ConflictPromptState(
+                    question: question, comingLabel: ConflictWords.comingLabel(for: operation))
+            }
+            guard let choice = reply.button.choice else { return nil }
+            asking.answer(choice, applyToAll: reply.applyToAll)
+        }
+        return asking
+    }
+
+    /// A button of the prompt. Nothing when no answer is awaited (the next
+    /// question is being read).
+    func answerPrompt(_ button: ConflictButton) {
+        guard let reply = work.reply, let prompt = work.prompt else { return }
+        work.reply = nil
+        reply.resume(returning: (button, prompt.applyToAll && prompt.question.remaining > 0))
+    }
+
+    // MARK: After a run
+
+    /// The status bar of `side` says `status`, for `seconds` or until the
+    /// next thing it has to say.
+    func show(_ status: PaneStatus, in side: Side, for seconds: Int?) {
+        work.statusTimers[side]?.cancel()
+        work.statusTimers[side] = nil
+        work.statuses[side] = status
+        if case .failed = status {} else if work.failuresShown == side { work.failuresShown = nil }
+        // What the pane said before about its folder is over.
+        if notices[side] != nil { notices[side] = nil }
+        guard let seconds else { return }
+        work.statusTimers[side] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.work.statuses[side] = nil
+        }
+    }
+
+    /// The contents of `folders` changed: the totals of each and of the
+    /// folders it is in are worked out again. (The lists themselves follow
+    /// their watchers.)
+    private func filesChanged(in folders: [URL]) {
+        guard live, !folders.isEmpty else { return }
+        for folder in folders { sizeQueue.changed(folder) }
+        let stale = AfterOperation.staleTotals(among: Array(sizes.keys), touched: folders)
+        if !stale.isEmpty {
+            var kept = sizes
+            for url in stale { kept[url] = nil }
+            sizes = kept
+        }
+        wantSizes()
+    }
+
+    /// The pane has read its folder (or a run just ended): the items the
+    /// last run left there are selected, and a new folder is renamed in place.
+    func arrived(in side: Side) {
+        guard let arrivals = work.arrivals, !arrivals.done.contains(side) else { return }
+        guard arrivals.until > Date() else {
+            work.arrivals = nil
+            return
+        }
+        guard let tab = browser.tab(side), let listing = listing(for: side),
+            listing.folder.standardizedFileURL.path == tab.folder.standardizedFileURL.path
+        else { return }
+        let here = AfterOperation.arrivals(arrivals.items, in: tab.folder, listed: listing.all.map(\.url))
+        guard !here.found.isEmpty else { return }
+        select(Set(here.found), in: side)
+        reveal(here.found[0], in: side)
+        // A listing read while the run was going has only some: the next has all.
+        guard here.complete else { return }
+        // Done for this pane: a later read leaves the selection to the user.
+        work.arrivals?.done.insert(side)
+        if arrivals.renameIn == side, let made = here.found.first { beginRename(of: made, in: side) }
+    }
+}

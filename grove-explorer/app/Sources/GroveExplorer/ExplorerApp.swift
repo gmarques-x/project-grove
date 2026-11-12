@@ -45,8 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func keepCommandWForTabs() {
         commandW = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             // Only in the Explorer window itself: in the About panel, a
-            // sheet, an alert or the Quick Look panel the key is theirs.
+            // sheet (whose keys come with the sheet's own window), an alert
+            // or the Quick Look panel the key is theirs. Under the conflict
+            // prompt, a card in the window, the command is not enabled.
             guard let window = event.window, window.canBecomeMain, window.attachedSheet == nil,
+                window.sheetParent == nil,
                 let stroke = CommandTable.stroke(of: event), stroke.key == "W", stroke.modifiers == [.command],
                 let self, let command = CommandTable.command("closeTab")
             else { return event }

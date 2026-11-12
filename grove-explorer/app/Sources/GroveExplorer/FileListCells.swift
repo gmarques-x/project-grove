@@ -144,3 +144,83 @@ final class NameCellView: TextCellView {
         draw(Formatting.middleTruncated(text, to: fits), in: NSRect(x: start, y: 0, width: room, height: bounds.height))
     }
 }
+
+/// The table itself: it tells which row the pointer is over and when the
+/// pane is clicked (so it becomes the active one).
+final class FileTableView: NSTableView {
+    /// The list was handed the keyboard.
+    var onActivate: (() -> Void)?
+    /// The list was clicked.
+    var onClick: (() -> Void)?
+    /// A key was pressed: true when it was dealt with.
+    var onKey: ((NSEvent) -> Bool)?
+    var onPointerRow: ((Int) -> Void)?
+    /// An item of the system's Edit menu was chosen, or its key pressed:
+    /// "copy", "paste", "undo" or "redo", as `CommandList` names them.
+    var onEdit: ((String) -> Void)?
+    /// Whether that item is offered now.
+    var canEdit: ((String) -> Bool)?
+    /// The row under the pointer; -1 for none.
+    var pointerRow = -1 {
+        didSet { if pointerRow != oldValue { onPointerRow?(pointerRow) } }
+    }
+    private var tracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseEntered(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseExited(with event: NSEvent) { pointerRow = -1 }
+
+    /// After a scroll the pointer is over another row without having moved.
+    func pointerMovedToCurrentPlace() {
+        guard let window, window.isKeyWindow else { return }
+        let place = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        pointerRow = visibleRect.contains(place) ? row(at: place) : -1
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if onKey?(event) != true { super.keyDown(with: event) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        onClick?()
+        super.mouseDown(with: event)
+    }
+
+    /// The keys came here (Tab, a click elsewhere in the pane): after the
+    /// turn, since this can come while SwiftUI is updating its views.
+    override func becomeFirstResponder() -> Bool {
+        DispatchQueue.main.async { [weak self] in self?.onActivate?() }
+        return super.becomeFirstResponder()
+    }
+
+    // MARK: The system's Edit menu
+
+    // Undo, Redo, Copy and Paste stay the system's menu items (they act on
+    // a text field when one has the keyboard); with the list as the first
+    // responder they are sent here. Select All is the table's own.
+
+    @objc func copy(_ sender: Any?) { onEdit?("copy") }
+    @objc func paste(_ sender: Any?) { onEdit?("paste") }
+    @objc func undo(_ sender: Any?) { onEdit?("undo") }
+    @objc func redo(_ sender: Any?) { onEdit?("redo") }
+
+    private static let edits: [Selector: String] = [
+        #selector(copy(_:)): "copy", #selector(paste(_:)): "paste",
+        #selector(undo(_:)): "undo", #selector(redo(_:)): "redo",
+    ]
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if let action = item.action, let id = Self.edits[action] { return canEdit?(id) ?? false }
+        return super.validateUserInterfaceItem(item)
+    }
+}

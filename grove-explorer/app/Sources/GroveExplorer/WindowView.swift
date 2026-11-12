@@ -10,6 +10,13 @@ import SwiftUI
 /// `GroveWindow.margin`.
 struct WindowView: View {
     @ObservedObject var model: AppModel
+    /// The file operations: the conflict prompt follows them.
+    @ObservedObject var work: FileWork
+
+    init(model: AppModel) {
+        self.model = model
+        work = model.work
+    }
 
     /// The smallest window: the rail and a pane narrow enough to have only Name and Size.
     static let minimum = CGSize(width: 368, height: 280)
@@ -35,6 +42,13 @@ struct WindowView: View {
                 parts(width: geometry.size.width)
             }
         }
+        // A name is taken where an operation goes: the prompt, over the scrim.
+        .overlay {
+            if let prompt = work.prompt {
+                PromptScrim()
+                ConflictPrompt(model: model, state: prompt)
+            }
+        }
         .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
         .background(Color(theme.bg0).ignoresSafeArea())
@@ -53,12 +67,12 @@ struct WindowView: View {
             }
             HStack(spacing: 0) {
                 if model.sides.count == 2 {
-                    PaneView(model: model, side: .left)
+                    PaneView(model: model, work: work, side: .left)
                         .frame(width: SidebarLayout.leftPaneWidth(panesWidth: panes, split: model.split))
                     PaneDivider(model: model, panesWidth: panes)
-                    PaneView(model: model, side: .right)
+                    PaneView(model: model, work: work, side: .right)
                 } else {
-                    PaneView(model: model, side: .left)
+                    PaneView(model: model, work: work, side: .left)
                 }
             }
             .coordinateSpace(name: PaneDivider.space)

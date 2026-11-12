@@ -19,6 +19,8 @@ struct Line: View {
 /// status bar. Its columns follow its own width.
 struct PaneView: View {
     @ObservedObject var model: AppModel
+    /// The file operations: the status bar and the rename field follow them.
+    @ObservedObject var work: FileWork
     let side: Side
     @Environment(\.theme) private var theme
 
@@ -47,15 +49,26 @@ struct PaneView: View {
                 }
                 // The list is always there, even with no rows: it is what
                 // holds the keyboard for the pane.
-                FileList(model: model, side: side, columns: columns)
+                FileList(model: model, work: work, side: side, columns: columns)
                     .overlay { if let listing, bare { note(listing) } }
+                    .overlay(alignment: .bottomLeading) { failures }
                 Line()
                 StatusBar(
-                    text: model.status(for: side), notice: model.notices[side], free: listing?.free,
-                    showsFree: columns.showsKind)
+                    text: model.status(for: side), notice: model.notices[side], status: work.statuses[side],
+                    free: listing?.free, showsFree: columns.showsKind, failuresShown: work.failuresShown == side,
+                    onCancel: { model.cancelRun() },
+                    onFailures: { work.failuresShown = work.failuresShown == side ? nil : side })
             }
         }
         .background(Color(theme.bg0))
+    }
+
+    /// The items the pane's last operation could not do, over the foot of
+    /// the list while the status bar's line was clicked.
+    @ViewBuilder private var failures: some View {
+        if work.failuresShown == side, case let .failed(_, summary, items, _)? = work.statuses[side] {
+            FailureList(summary: summary, items: items) { work.failuresShown = nil }
+        }
     }
 
     /// In the list's place: "This folder is empty", or why the folder

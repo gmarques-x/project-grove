@@ -90,6 +90,8 @@ final class AppModel: ObservableObject {
     private var sorts: [Side: Int] = [:]
     var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
     let sizeQueue = SizeQueue()
+    /// The file operations: the runner, the undo stack, what the views show of them.
+    let work = FileWork()
     /// A sort by size waiting for more totals to arrive, per pane.
     var sizeSorts: [Side: Task<Void, Never>] = [:]
     /// The status bar's words, kept while nothing they are made of changed.
@@ -382,6 +384,8 @@ final class AppModel: ObservableObject {
                 selections[tab.id] = [entry.url]
                 reveal(entry.url, in: side)
             }
+            // What the last operation left here is selected.
+            arrived(in: side)
             // The header was clicked, hidden items were switched or a total
             // arrived while this read was on its way: what it sorted by is
             // no longer what the pane asks for.

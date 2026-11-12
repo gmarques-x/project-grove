@@ -22,29 +22,38 @@ enum CommandTable {
     /// of spec §7 has its row, and doing nothing yet.
     private static let later: Action = ({ _ in }, { _ in false })
 
+    /// A command on the files: not while a text field has the keyboard
+    /// (⌘⌫ there deletes text, ⌘V pastes text), and only `when` it has
+    /// something to work on.
+    private static func files(
+        _ run: @escaping @MainActor (AppModel) -> Void, when: @escaping @MainActor (AppModel) -> Bool = { _ in true }
+    ) -> Action {
+        (run, { !$0.isEditingText && when($0) })
+    }
+
     private static let actions: [String: Action] = {
         var actions: [String: Action] = [
             // File
             "newTab": always { $0.newTab() },
-            "newFolder": later,  // Task 13
+            "newFolder": files { $0.newFolder() },
             "open": ({ $0.openSelection() }, { !$0.selection(for: $0.browser.active).isEmpty }),
             "openWithArrow": ({ $0.openSelection() }, { !$0.selection(for: $0.browser.active).isEmpty }),
-            "openInGhostty": later,  // Task 13
+            "openInGhostty": files { $0.openInGhostty() },
             "closeTab": ({ $0.closeTab() }, { $0.browser.panes[$0.browser.active.rawValue].tabs.count > 1 }),
-            "getInfo": later,  // Task 13
-            "rename": later,  // Task 13
-            "duplicate": later,  // Task 13
+            "getInfo": files { $0.getInfo() },
+            "rename": files({ $0.beginRename() }, when: { $0.selection(for: $0.browser.active).count == 1 }),
+            "duplicate": files({ $0.duplicateSelection() }, when: { $0.hasSelection }),
             "quickLook": later,  // Task 14
-            "copyToOtherPane": later,  // Task 13
-            "moveToOtherPane": later,  // Task 13
-            "moveToTrash": later,  // Task 13
+            "copyToOtherPane": files({ $0.toOtherPane(moving: false) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
+            "moveToOtherPane": files({ $0.toOtherPane(moving: true) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
+            "moveToTrash": files({ $0.trashSelection() }, when: { $0.hasSelection }),
             // Edit
-            "undo": later,  // Task 13
-            "redo": later,  // Task 13
-            "copy": later,  // Task 13
-            "copyPaths": later,  // Task 13
-            "paste": later,  // Task 13
-            "pasteMove": later,  // Task 13
+            "undo": files({ $0.undoLast() }, when: { $0.canUndo }),
+            "redo": files({ $0.redoLast() }, when: { $0.canRedo }),
+            "copy": files({ $0.copySelection() }, when: { $0.hasSelection }),
+            "copyPaths": files({ $0.copyPaths() }, when: { $0.hasSelection }),
+            "paste": files({ $0.paste(moving: false) }, when: { $0.canPaste }),
+            "pasteMove": files({ $0.paste(moving: true) }, when: { $0.canPaste }),
             "selectAll": always { $0.selectAll() },
             // View
             "togglePanes": always { $0.togglePanes() },
@@ -80,7 +89,11 @@ enum CommandTable {
     /// render too), not on the day its key is pressed.
     static let all: [Command] = CommandList.all.map { info in
         guard let action = actions[info.id] else { fatalError("no action for the command \(info.id)") }
-        return Command(info: info, run: action.run, isEnabled: action.isEnabled)
+        // Under the conflict prompt the window does nothing but answer it;
+        // while a name is being typed in a row, every key is the field's.
+        return Command(
+            info: info, run: action.run,
+            isEnabled: { $0.work.prompt == nil && $0.work.rename == nil && action.isEnabled($0) })
     }
 
     private static let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.info.id, $0) })
@@ -123,6 +136,11 @@ enum CommandTable {
     /// arrows, Home, End, Page Up and Down).
     static func handle(_ event: NSEvent, in model: AppModel, side: Side) -> Bool {
         guard let stroke = stroke(of: event) else { return false }
+        // Escape closes the list of what could not be done.
+        if model.work.failuresShown != nil, stroke.key == "Escape", stroke.modifiers.isEmpty {
+            model.work.failuresShown = nil
+            return true
+        }
         if model.sidebarCursor != nil {
             // The keyboard is in the sidebar; a command's key (with ⌘, ⌃ or
             // a function key) still does its command.
@@ -160,6 +178,13 @@ enum CommandTable {
 /// same table as the keys.
 struct MenuBar: SwiftUI.Commands {
     @ObservedObject var model: AppModel
+    /// The file operations: what is enabled follows them too.
+    @ObservedObject var work: FileWork
+
+    init(model: AppModel) {
+        self.model = model
+        work = model.work
+    }
 
     var body: some SwiftUI.Commands {
         // One window: no "New Window".
