@@ -108,6 +108,11 @@ public struct GroveIcon: View {
         /// The Grove menu's Global Menu row: the front app's menus.
         case globalMenu = "menubar.rectangle"
 
+        // Grove Explorer (spec 2026-11-12-grove-explorer-design).
+        /// The column a list is sorted by, ascending; turned upside down
+        /// (by the header that draws it) for descending.
+        case sorted = "chevron.up"
+
         /// The SF Symbol's name.
         public var symbol: String { rawValue }
     }

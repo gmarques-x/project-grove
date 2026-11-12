@@ -82,7 +82,9 @@ import Testing
                 "arrow.down", "arrow.up", "chevron.right", "chevron.left", "doc.on.doc", "arrow.clockwise",
                 "laptopcomputer", "airpodspro", "display", "headphones", "airplayaudio",
              "cable.connector.horizontal", "hifispeaker", "mic", "paintpalette", "keyboard",
-                "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle"])
+                "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle",
+                // Grove Explorer.
+                "chevron.up"])
     }
 
     /// The bar panels' outline is the palette's orange, in every scheme.
