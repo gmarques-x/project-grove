@@ -25,4 +25,26 @@ public enum Filter {
         let options = loose.union(.anchored)
         return entries.firstIndex { $0.name.range(of: typed, options: options) != nil }
     }
+
+    /// What is left of `selection` under a filter: the items among `shown`.
+    /// A row the filter hides is never selected, so no command acts on
+    /// what the user can't see.
+    public static func visibleSelection(_ selection: Set<URL>, among shown: [Entry]) -> Set<URL> {
+        guard !selection.isEmpty else { return [] }
+        return selection.intersection(shown.map(\.url))
+    }
+
+    /// ↑ (`step` −1) and ↓ (1) pressed in the filter field: the one row of
+    /// `shown` to select next. From no selection ↓ takes the first row and
+    /// ↑ the last; from several, the move starts at the end it goes
+    /// towards; at the list's ends it stays. Nil when there are no rows.
+    public static func moved(from selection: Set<URL>, by step: Int, in shown: [Entry]) -> URL? {
+        guard !shown.isEmpty else { return nil }
+        let rows = shown.indices.filter { selection.contains(shown[$0].url) }
+        guard let first = rows.first, let last = rows.last else {
+            return step > 0 ? shown[0].url : shown[shown.count - 1].url
+        }
+        let next = (step > 0 ? last : first) + step
+        return shown[min(max(next, 0), shown.count - 1)].url
+    }
 }

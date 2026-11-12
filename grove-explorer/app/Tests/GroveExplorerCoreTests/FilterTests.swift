@@ -88,4 +88,53 @@ import Testing
         #expect(Filter.jumpIndex(in: list, typed: "ec") == 1)
         #expect(Filter.jumpIndex(in: list, typed: "éc") == 1)
     }
+
+    // MARK: The filter and the selection
+
+    @Test func aSelectionKeepsOnlyTheRowsTheFilterShows() {
+        let all = entries("notes.md", "shot-1.png", "shot-2.png")
+        let shown = Filter.matches(all, words: "shot")
+        let selection = Set([all[0].url, all[1].url])
+        #expect(Filter.visibleSelection(selection, among: shown) == [all[1].url])
+    }
+
+    @Test func aSelectionWhollyShownIsKeptWhole() {
+        let all = entries("a", "b")
+        #expect(Filter.visibleSelection(Set(all.map(\.url)), among: all) == Set(all.map(\.url)))
+        #expect(Filter.visibleSelection([], among: all).isEmpty)
+        #expect(Filter.visibleSelection([all[0].url], among: []).isEmpty)
+    }
+
+    // MARK: ↑ and ↓ from the filter field
+
+    @Test func withNothingSelectedDownTakesTheFirstRowAndUpTheLast() {
+        let shown = entries("a", "b", "c")
+        #expect(Filter.moved(from: [], by: 1, in: shown) == shown[0].url)
+        #expect(Filter.moved(from: [], by: -1, in: shown) == shown[2].url)
+    }
+
+    @Test func theSelectionMovesOneRowAndStopsAtTheEnds() {
+        let shown = entries("a", "b", "c")
+        #expect(Filter.moved(from: [shown[1].url], by: 1, in: shown) == shown[2].url)
+        #expect(Filter.moved(from: [shown[1].url], by: -1, in: shown) == shown[0].url)
+        #expect(Filter.moved(from: [shown[2].url], by: 1, in: shown) == shown[2].url)
+        #expect(Filter.moved(from: [shown[0].url], by: -1, in: shown) == shown[0].url)
+    }
+
+    @Test func fromSeveralRowsItMovesFromTheEndItGoesTowards() {
+        let shown = entries("a", "b", "c", "d")
+        let chosen = Set([shown[1].url, shown[2].url])
+        #expect(Filter.moved(from: chosen, by: 1, in: shown) == shown[3].url)
+        #expect(Filter.moved(from: chosen, by: -1, in: shown) == shown[0].url)
+    }
+
+    @Test func aSelectionThatIsNotShownCountsAsNone() {
+        let shown = entries("a", "b")
+        let gone = URL(fileURLWithPath: "/tmp/grove/zzz")
+        #expect(Filter.moved(from: [gone], by: 1, in: shown) == shown[0].url)
+    }
+
+    @Test func noRowsNoMove() {
+        #expect(Filter.moved(from: [], by: 1, in: []) == nil)
+    }
 }
