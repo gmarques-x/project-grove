@@ -152,6 +152,11 @@ extension AppModel {
             kept = kept.filter { id, _ in tabs.contains { $0.id == id } }
             if kept != filter.texts { filter.texts = kept }
         }
+        // A field asked to take the keyboard that never appeared: the ask
+        // doesn't outlive its tab showing, nor its pane having the keys.
+        if let asked = filter.asked, was.tab(asked)?.id != now.tab(asked)?.id || now.active != asked {
+            filter.asked = nil
+        }
         // A pane that shows no field now (its filter went, or its other
         // tab has none): the field has the keyboard no more, and the list
         // of the pane that has the keys takes it.
