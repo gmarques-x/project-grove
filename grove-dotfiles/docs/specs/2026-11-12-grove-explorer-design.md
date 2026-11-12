@@ -154,7 +154,7 @@ Finder's, unchanged:
 | ⌘A | Select all |
 | ⌘⇧G, ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
-| ⌘I | Finder's Get Info for the selection |
+| ⌘I | Finder's Get Info for the selection (macOS asks once to let Grove Explorer control Finder) |
 | Letters | Jump to a name |
 
 Grove's:
@@ -169,6 +169,7 @@ Grove's:
 | F6 | Move it there |
 | ⌘F | Filter this folder |
 | ⌘⌥S | Show or hide the sidebar |
+| ⌥⌘← | The keyboard to the sidebar: ↑ ↓ move, Return opens the place, → or Esc returns to the list |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 
@@ -196,24 +197,26 @@ start = "~"                 # where a new window opens
 show_hidden = false
 two_panes = false
 
-[[favourites]]
+[favourites.applications]
 path = "/Applications"
 
-[[favourites]]
+[favourites.home]
 path = "~"
 title = "Home"
 
-[[favourites]]
+[favourites.developer]
 path = "~/Developer"
 
-[[favourites]]
+[favourites.documents]
 path = "~/Documents"
 
-[[favourites]]
+[favourites.downloads]
 path = "~/Downloads"
 ```
 
-A favourite whose folder doesn't exist is left out. The local file's `favourites`, when present, replace the tracked list.
+Favourites are tables in file order, as the Grove menu's rows are (Grove's TOML reader has no arrays of tables).
+
+A favourite whose folder doesn't exist is left out. Any `[favourites.*]` table in the local file replaces the tracked list.
 
 The session (panes, tabs, each tab's folder and sort, the sidebar's and divider's widths) is saved to `$GROVE_STATE/explorer-session.json` when it changes and at quit, and read at launch. A folder that no longer exists falls back to its nearest existing parent.
 
