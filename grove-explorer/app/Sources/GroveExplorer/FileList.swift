@@ -86,8 +86,9 @@ struct FileList: NSViewRepresentable {
         private var paneIsActive = true
         /// The folder the rows are of, by its standardized path.
         private var folder: String?
-        /// The model's selection as last put on the table.
+        /// The model's selection as last put on the table, and the tab it was of.
         private var selectionVersion = -1
+        private var tab: UUID?
         /// Each row's date as written, kept until the rows change or the
         /// dates turn short or long.
         private var dates: [URL: String] = [:]
@@ -163,8 +164,11 @@ struct FileList: NSViewRepresentable {
                     view.paneIsActive = active
                 }
             }
-            if newRows || model.selectionVersion != selectionVersion {
+            // Another tab of the pane has a selection of its own.
+            let tab = model.browser.tab(side)?.id
+            if newRows || model.selectionVersion != selectionVersion || tab != self.tab {
                 selectionVersion = model.selectionVersion
+                self.tab = tab
                 putSelection(on: table, rows: listing?.rows ?? [:])
             }
             if let stand = model.pointerStandIn[side] {

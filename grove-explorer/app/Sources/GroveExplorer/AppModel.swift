@@ -41,7 +41,7 @@ final class AppModel: ObservableObject {
     /// A sort by size waiting for more totals to arrive, per pane.
     private var sizeSorts: [Side: Task<Void, Never>] = [:]
     /// The status bar's words, kept while nothing they are made of changed.
-    private var statuses: [Side: (revision: Int, selection: Int, sizes: Int, text: String)] = [:]
+    private var statuses: [Side: (tab: UUID?, revision: Int, selection: Int, sizes: Int, text: String)] = [:]
 
     private var themeWatcher: FolderWatcher?
     private var themeState: Data?
@@ -114,8 +114,10 @@ final class AppModel: ObservableObject {
     /// only when the rows, the selection or the sizes changed.
     func status(for side: Side) -> String {
         guard let listing = listings[side] else { return "" }
-        if let kept = statuses[side], kept.revision == listing.revision, kept.selection == selectionVersion,
-            kept.sizes == sizesVersion
+        // The tab too: another tab of the pane has another selection.
+        let tab = browser.tab(side)?.id
+        if let kept = statuses[side], kept.tab == tab, kept.revision == listing.revision,
+            kept.selection == selectionVersion, kept.sizes == sizesVersion
         {
             return kept.text
         }
@@ -129,7 +131,7 @@ final class AppModel: ObservableObject {
         }
         let text = GroveExplorerCore.StatusText.items(
             total: listing.shown.count, selected: count, selectedBytes: bytes, filteredFrom: nil)
-        statuses[side] = (listing.revision, selectionVersion, sizesVersion, text)
+        statuses[side] = (tab, listing.revision, selectionVersion, sizesVersion, text)
         return text
     }
 
@@ -194,8 +196,9 @@ final class AppModel: ObservableObject {
 
     private func folderChanged(_ side: Side) {
         guard live else { return }
-        // The walks on their way are for the folder just left.
-        sizeQueue.left()
+        // The walks on their way for the folder just left give their slots
+        // back; those for what the other pane shows go on.
+        sizeQueue.keep(Set(wantedSizes()))
         load(side)
     }
 
@@ -298,10 +301,22 @@ final class AppModel: ObservableObject {
     /// and forgets the totals of what is no longer shown.
     private func wantSizes() {
         guard live else { return }
-        let measured = sides.flatMap { entries(for: $0) }.filter(\.isMeasured).map(\.url)
-        let shown = Set(measured)
+        // Totals are kept for every row on screen, the rows of a folder a
+        // pane is just leaving included (they show until the new read lands).
+        let shown = Set(sides.flatMap { entries(for: $0) }.map(\.url))
         if sizes.keys.contains(where: { !shown.contains($0) }) { sizes = sizes.filter { shown.contains($0.key) } }
-        sizeQueue.want(measured.filter { sizes[$0] == nil })
+        sizeQueue.want(wantedSizes().filter { sizes[$0] == nil })
+    }
+
+    /// The folders and packages whose totals are wanted: the rows of each
+    /// pane that shows the folder its tab is on. A pane between two folders
+    /// (navigated, the new one not yet read) wants none of its old rows.
+    private func wantedSizes() -> [URL] {
+        SizeWanted.urls(in: sides.compactMap { side in
+            browser.tab(side).map {
+                SizeWanted.Pane(tabFolder: $0.folder, listedFolder: listings[side]?.folder, shown: entries(for: side))
+            }
+        })
     }
 
     /// The rows in view: their totals come before the others'.
@@ -358,10 +373,5 @@ final class AppModel: ObservableObject {
 extension Entry {
     /// Whether its size is a total the calculator works out (a package's
     /// comes from it like a folder's).
-    var isMeasured: Bool {
-        switch kind {
-        case .folder, .package: true
-        case .file, .symlink, .alias, .volume: false
-        }
-    }
+    var isMeasured: Bool { SizeWanted.isMeasured(self) }
 }

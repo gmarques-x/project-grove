@@ -8,9 +8,9 @@ import GroveExplorerCore
 final class SizeQueue {
     /// A total arrived.
     var onSize: (URL, Int64) -> Void = { _, _ in }
-    /// Totals that were on their way are gone (their walks were cancelled, or
-    /// it is time to try the unanswered again): the owner calls `want` with
-    /// what it still shows.
+    /// A total given up by `keep` may be wanted after all (the pane came
+    /// back before the cancelled walk had answered), or it is time to try
+    /// the unanswered again: the owner calls `want` with what it shows now.
     var onAskAgain: () -> Void = {}
 
     private let calculator = SizeCalculator()
@@ -21,10 +21,9 @@ final class SizeQueue {
     /// was cancelled under it by a change): asked again after the next change.
     private var unanswered: Set<URL> = []
     private var retry: Task<Void, Never>?
-    /// Tells an answer to a walk this queue cancelled itself from a real
-    /// "nothing": the number changes around every `cancelAll`.
-    private var epoch = 0
-    private var cancelling = 0
+    /// On their way and given up by `keep`: their answer, a nil from the
+    /// cancelled walk, is not a refusal.
+    private var givenUp: Set<URL> = []
     /// The calculator walks two at once; two more wait there in order.
     private static let atOnce = 4
 
@@ -44,17 +43,15 @@ final class SizeQueue {
         pump()
     }
 
-    /// A pane left its folder: the walks on their way are for rows no longer
-    /// shown, so they give their slots back. What another pane still shows
-    /// is asked for again through `onAskAgain`.
-    func left() {
-        queue = []
-        epoch += 1
-        cancelling += 1
-        Task {
-            await calculator.cancelAll()
-            cancelling -= 1
-            epoch += 1
+    /// A pane left its folder: only `wanted` (what the panes still show) is
+    /// kept. Walks on their way for anything else are cancelled, one by one,
+    /// and give their slots back; a walk for a row still shown, the other
+    /// pane's large folder say, goes on undisturbed.
+    func keep(_ wanted: Set<URL>) {
+        queue.removeAll { !wanted.contains($0) }
+        unanswered.formIntersection(wanted)
+        for url in inFlight where !wanted.contains(url) && givenUp.insert(url).inserted {
+            Task { await calculator.cancel(url) }
         }
     }
 
@@ -77,15 +74,15 @@ final class SizeQueue {
         while inFlight.count < Self.atOnce, !queue.isEmpty {
             let url = queue.removeFirst()
             inFlight.insert(url)
-            let asked = epoch
             Task {
                 let size = await calculator.size(of: url)
                 inFlight.remove(url)
-                if let size {
-                    onSize(url, size)
-                } else if asked != epoch || cancelling > 0 {
-                    // Cancelled by `left`, not refused: wanted again if still shown.
+                if givenUp.remove(url) != nil {
+                    // Its row went while it was walked. Should the pane have
+                    // come back to it meanwhile, it is asked for afresh.
                     onAskAgain()
+                } else if let size {
+                    onSize(url, size)
                 } else {
                     unanswered.insert(url)
                 }
