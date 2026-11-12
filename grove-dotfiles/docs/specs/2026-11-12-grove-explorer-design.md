@@ -1,0 +1,261 @@
+# Grove Explorer · a file browser with two panes and tabs, in the Grove look
+
+**Status:** design for review, 2026-11-12
+**Builds on:** [2026-11-10-grove-themes-gui-design.md](2026-11-10-grove-themes-gui-design.md) (the app pattern), the shared `GroveUI` library, [2026-11-11-grove-menu-design.md](2026-11-11-grove-menu-design.md) (its row in the Grove menu)
+**Comes before:** stages 3 to 5 of Grove Explorer (§3), each with its own spec
+**Mock-ups:** `artifacts/grove-explorer/mockups/` (private), dark-medium and light-medium
+
+## 1. Goal
+
+Grove Explorer is the app for looking after files in Project Grove: what Finder's windows do, with two panes side by side, tabs in each, the keyboard first, and the Grove look in all six schemes. Finder stays installed and keeps the desktop and the Trash.
+
+This spec is the first build: the browser, the two panes and the tabs. It is usable every day on its own.
+
+**Success looks like this:**
+- After `grove install`, Grove Explorer is in `~/Applications`, in the Grove Launcher and in the Grove menu, and opens on the Home folder in a tiled window.
+- Everything in §7's key table works without the mouse, and a person who knows Finder's keys needs to learn only the ones for panes and tabs.
+- Copying a folder of several GB from one pane to the other shows progress, can be cancelled, asks once about a name that already exists, and ⌘Z puts everything back.
+- A folder with 50,000 items opens, scrolls and sorts without a visible pause.
+- A file created, renamed or removed by another program appears, changes or goes within a second.
+- Quitting and reopening brings back the same panes, tabs and folders.
+- It looks right in a dark and a light scheme, and follows a scheme switch while open.
+- `grove check` reports `94-explorer-app` ok.
+
+## 2. Decisions
+
+All chosen by the owner on 2026-11-12, from options put to him.
+
+| Topic | Decision | Why |
+| --- | --- | --- |
+| First build | The browser plus two panes and tabs | Panes and tabs shape the window; designing it without them means redoing it. |
+| Panes and tabs | One or two panes; each pane has its own tabs | One side can stay put while the other moves through its tabs; copy and move go from the active pane to the other. |
+| Keyboard | Finder's keys, plus Grove's for panes and tabs. No modes | Nothing to unlearn; typing a letter still jumps to a file. |
+| Views | List view only: Name, Size, Date Modified, Kind | The owner's Finder is set to list view everywhere. One view done well. |
+| File operations | Background queue with progress and cancel; a prompt for name conflicts with "apply to all"; undo; drag and drop between panes and with other apps | Chosen as "full and safe". |
+| Deleting | Always the system Trash, never a direct delete | Anything removed can be put back from Finder. |
+| Icons | Grove Icons where the set has one; one Grove-drawn folder; the real macOS icon for apps, disks and unknown types | An app should still look like itself. |
+| Window | Tiled like any other app; no AeroSpace float rule | Two panes want the width. |
+| Kind of app | An ordinary app that is opened and quit, in ⌘Tab like any other; no menu-bar item, no login agent | It has nothing to do while closed. |
+
+Taken from the owner's recorded Finder setup (`artifacts/finder-changes.md`) as the defaults: new windows on Home; folders on top; all extensions shown; folder sizes calculated; path bar and status bar always there; the filter looks in the current folder; sidebar favourites Applications, Home, Developer, Documents, Downloads; iCloud Drive; disks.
+
+## 3. Out of scope
+
+Later stages, each its own spec:
+
+- **Stage 3:** search beyond the current folder, a preview pane, an icon grid, tags, batch rename, compress and expand.
+- **Stage 4:** SSH, a remote machine browsed like a folder.
+- **Stage 5:** becoming the default file viewer (so "Show in Finder" in other apps opens Grove Explorer), "Open With" defaults.
+
+Not planned: browsing the Trash (the sidebar's Trash row opens Finder's), the desktop's icons, AirDrop, a Yazi-style key map, a floating quick window, several windows (one window in this build; ⌘N is not bound).
+
+## 4. Pieces
+
+```
+grove-explorer/
+  deps/grove-themes -> ../../grove-themes/app      (symlink, as grove-keys has)
+  app/
+    Package.swift
+    Sources/
+      GroveExplorerCore/     pure logic, no AppKit
+      GroveExplorer/         the app: window, panes, list, operations' UI
+    Tests/GroveExplorerCoreTests/
+grove-dotfiles/
+  modules/94-explorer-app/module.sh
+  config/grove-explorer/explorer.toml               (tracked defaults)
+  tests/modules_explorer_app.bats
+```
+
+`GroveExplorerCore` holds everything that can be tested without a window:
+
+| Unit | Does | Depends on |
+| --- | --- | --- |
+| `Entry` | One item of a folder: name, kind, size, dates, flags (folder, package, hidden, alias) | – |
+| `FolderReader` | Lists a folder into entries, in batches, off the main thread | Foundation |
+| `FolderWatcher` | Tells when a folder's contents changed (FSEvents), coalesced | CoreServices |
+| `Sorting` | Orders entries by a column and direction, folders on top, names compared as Finder does (numbers by value, case and accents ignored) | – |
+| `Filter` | The ⌘F filter and type-to-jump matching | – |
+| `SizeCalculator` | A folder's total size, cancellable, cached per folder until it changes | Foundation |
+| `PathBar` | A path as clickable parts; a typed path with `~` and relative parts resolved | – |
+| `Tabs`, `Panes` | The window's state: panes, their tabs, each tab's folder, history, selection, sort; which is active | – |
+| `Session` | That state to and from a file | – |
+| `Operation`, `OperationQueue` | Copy, move, duplicate, rename, new folder, trash as values; run one after the other with progress; cancellable | Foundation |
+| `Conflict` | What to do when the name exists: replace, keep both (the next free "name 2.ext"), skip; "apply to all" | – |
+| `Undo` | The inverse of each finished operation, and whether it can still be undone | – |
+| `Favourites`, `ExplorerConfig` | `explorer.toml` and the user's `explorer.local.toml` | the TOML reader in `GroveThemesCore`/`GroveKeysCore` (moved to a shared target if needed) |
+| `IconKind` | Which icon an entry gets: a Grove Icons glyph and colour, the Grove folder (and which variant), or "ask macOS" | the Grove Icons map |
+
+The app target draws and wires: the window (`GroveWindowHeader`), the sidebar, the panes, the list, the status bar, the prompts, Quick Look, drag and drop, the menus.
+
+## 5. The window
+
+One window, tiled by AeroSpace. From left to right: the sidebar, then one pane or two.
+
+**Header** (`GroveWindowHeader`): the name on the window buttons' line; in the middle back and forward for the active pane; trailing, the one-pane/two-pane toggle.
+
+**Sidebar** (fixed width; hidden when the window is narrower than a pane and a half needs, and by ⌘⌥S):
+- *Favourites:* from the config (§9). Drag a folder onto the sidebar to add one; drag a row out to remove it. Both write `explorer.local.toml`.
+- *iCloud:* iCloud Drive when it exists.
+- *Locations:* mounted volumes, each with an eject button where it can be ejected; they come and go live.
+- *Trash* at the bottom: opens Finder's Trash.
+- A click opens the place in the active pane's current tab; ⌘-click in a new tab; a drop on a row copies or moves there.
+
+**A pane**, top to bottom:
+1. *Tab strip.* The tab's title is the folder's name. "+" adds a tab on the same folder. A tab closes with its hover button or ⌘W; the last tab of a pane doesn't close. The active pane's strip carries a 1 pt green line; the other pane's does not, and its selection is drawn in the hover fill rather than the selected fill.
+2. *Path bar.* The folders from the volume (or Home, shown as "Home") down to the current one, each a click. ⌘L turns it into a text field with the full path selected; Return goes, Escape cancels, a path that doesn't exist marks the field red and stays.
+3. *The list* (§6).
+4. *Status bar.* "212 items" or "3 of 212 selected · 48.2 MB"; the volume's free space at the right. While operations run: the current one's words ("Copying 1,204 items to Downloads"), a meter, and a cancel button. After one finishes: what it did and "⌘Z to undo", for a few seconds.
+
+With two panes the split is even; the divider can be dragged, and a double-click evens it.
+
+## 6. The list
+
+An AppKit table (`NSTableView` through `NSViewRepresentable`) under the Grove skin: the `Table` of SwiftUI is not used because of very large folders, type-to-jump, inline rename and drag and drop of files. Its header, rows, selection and focus are drawn with the tokens; the table gives scrolling, selection maths, column resizing and reuse of rows.
+
+- **Columns:** Name (icon and name; fills the width), Size, Date Modified, Kind. Size and dates are right-aligned in tabular figures. A narrow pane drops Kind, then Date Modified.
+- **Sorting:** a click on a header sorts by it, a second click reverses; folders stay on top in either direction (Finder's "keep folders on top"). Each tab remembers its sort.
+- **Sizes:** files show their size; folders show "–" until `SizeCalculator` has the total, then the total. Totals are calculated for the folders in view first, a few at a time, and kept until the folder changes. Packages (apps, bundles) count as files.
+- **Dates:** as Finder writes them: "Today at 09:41", "Yesterday at 18:02", then the date and time, in the user's locale.
+- **Names:** extensions always shown. Hidden items are left out until ⌘⇧. shows them, drawn in the quiet colour. The setting is per window and remembered.
+- **Selection:** click, ⇧-click, ⌘-click, ⇧-arrows, ⌘A. Typing letters selects the first name that starts with them (a second's pause starts again).
+- **Opening:** Return renames (Finder's rule); ⌘↓ or ⌘O or a double-click opens: a folder in this tab, a file in its default app, a package as its app. ⌘-double-click a folder: a new tab.
+- **Rename:** in place, the name without its extension selected. Return commits, Escape cancels; an empty name, a "/" or a name that exists marks the field red with one line of reason beneath.
+- **Filter (⌘F):** a `FilterField` above the list; the list shows the names containing every typed word; the status bar says "4 of 212". Escape clears it and gives the focus back to the list.
+- **Live:** `FolderWatcher` keeps the list current. The selection and scroll position survive a refresh.
+- **Empty and unreadable:** an empty folder says so. A folder macOS won't let the app read says which permission is missing and has a button for Privacy Settings.
+
+## 7. Keys
+
+Finder's, unchanged:
+
+| Key | Does |
+| --- | --- |
+| ↑ ↓, ⇧↑ ⇧↓, Home, End, Page Up/Down | Move and extend the selection |
+| ⌘↓, ⌘O | Open |
+| ⌘↑ | The enclosing folder |
+| ⌘[ , ⌘] | Back, forward (per tab) |
+| Return | Rename |
+| Space | Quick Look (arrows move through the selection while it is up) |
+| ⌘C, ⌘V | Copy the selection; paste copies here |
+| ⌥⌘V | Paste moves here |
+| ⌘D | Duplicate |
+| ⌘⌫ | Move to Trash |
+| ⌘⇧N | New folder, named in place |
+| ⌘⇧. | Show or hide hidden items |
+| ⌘Z, ⌘⇧Z | Undo, redo |
+| ⌘A | Select all |
+| ⌘⇧G, ⌘L | Go to a path |
+| ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
+| ⌘I | Finder's Get Info for the selection |
+| Letters | Jump to a name |
+
+Grove's:
+
+| Key | Does |
+| --- | --- |
+| Tab | The other pane (opens it if there is one pane) |
+| ⌘\ | One pane / two panes |
+| ⌘T, ⌘W | New tab, close tab |
+| ⌃Tab, ⌃⇧Tab, ⌘1…⌘9 | Next, previous, the nth tab of the active pane |
+| F5 | Copy the selection to the other pane's folder |
+| F6 | Move it there |
+| ⌘F | Filter this folder |
+| ⌘⌥S | Show or hide the sidebar |
+| ⌘⌥T | Open this folder in Ghostty |
+| ⌘⌥C | Copy the selection's paths |
+
+The right-click menu (the system's `.contextMenu`): Open, Open With ▸, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder, Open in Ghostty; on empty space: New Folder, Paste, Show Hidden Items. The app's menu bar menus (reached through Grove's Global Menu) carry the same commands with their keys.
+
+## 8. File operations
+
+- **A value, then a run.** Each command makes an `Operation` (what, which items, where to). `OperationQueue` runs them one after the other on its own queue, with progress by bytes for copies and by items otherwise.
+- **Copy and move.** A move on the same volume is a rename (instant); across volumes it is a copy then a removal of the source once the copy is whole. A copy is written to a temporary name beside the target and renamed when complete, so a cancelled or failed copy leaves nothing half-written. Copies keep dates, permissions, extended attributes and tags (`FileManager`/`copyfile`).
+- **Conflicts.** Before anything is written, the names that already exist at the target are found. If there are any, one prompt: the first name, **Replace**, **Keep Both**, **Skip**, a box "Apply to all (N more)", and Cancel (the whole operation). Replacing a folder replaces it whole, as Finder does; it does not merge. A replaced item goes to the Trash, so the replace can be undone.
+- **Cancel.** Stops after the current file; what was already copied stays and the status bar says how much.
+- **Errors.** One failed item doesn't stop the rest. At the end the status bar says "3 items could not be copied" in the marked style, with a click showing which and why.
+- **Trash.** `FileManager.trashItem`; the status bar says what went. No confirmation, as in Finder.
+- **Undo.** Every finished operation records its inverse: copies → the copies go to the Trash; moves → moved back; rename → the old name; new folder → to the Trash if still empty; trash → put back from the Trash to where it was; a replace → the replaced item returns. ⌘Z undoes the latest, ⌘⇧Z redoes. An undo that can no longer be done (the item changed or went since) says so and does nothing. The stack is per window and is not kept across launches.
+- **Drag and drop.** Within and between panes: a drop on a folder row or on a pane's empty space moves on the same volume and copies across volumes; ⌥ forces copy, ⌘ forces move (Finder's rules). To and from other apps through the file pasteboard types. A drag shows the system's drag image with a count. Drops go through the same queue, prompt and undo.
+- **The clipboard.** ⌘C puts file URLs on the general pasteboard, so paste works to and from Finder and other apps.
+
+## 9. Config and state
+
+`~/.config/grove-explorer/explorer.toml` (tracked defaults, linked like the other configs), then `explorer.local.toml` beside it (the user's, not tracked; the app writes only this one):
+
+```toml
+[general]
+start = "~"                 # where a new window opens
+show_hidden = false
+two_panes = false
+
+[[favourites]]
+path = "/Applications"
+
+[[favourites]]
+path = "~"
+title = "Home"
+
+[[favourites]]
+path = "~/Developer"
+
+[[favourites]]
+path = "~/Documents"
+
+[[favourites]]
+path = "~/Downloads"
+```
+
+A favourite whose folder doesn't exist is left out. The local file's `favourites`, when present, replace the tracked list.
+
+The session (panes, tabs, each tab's folder and sort, the sidebar's and divider's widths) is saved to `$GROVE_STATE/explorer-session.json` when it changes and at quit, and read at launch. A folder that no longer exists falls back to its nearest existing parent.
+
+Links: `groveexplorer://open?path=<percent-encoded path>` opens that folder in a new tab of the active pane (and selects the item when the path is a file) and brings the window forward. The Grove menu gains a row "Files" that opens the app.
+
+## 10. Icons
+
+`IconKind` decides, in this order:
+1. A folder: the Grove folder, drawn as a shape in palette colours (a `Shape`, as `PineShape` is), with a small mark for the known ones (Home, Developer, Documents, Downloads, Applications, Desktop, iCloud Drive). A package is not a folder.
+2. An app, a volume, an alias to one, or a file with its own custom icon: the macOS icon (`NSWorkspace.icon(forFile:)`), cached per path.
+3. A name or extension Grove Icons knows: its glyph in its colour, dark or light set by the scheme. The map and the font are the ones the VS Code theme uses (`grove-dotfiles/config/vscode/grove-icons/`); the module copies them into the app's resources, and the font is registered for the process only.
+4. Anything else: the macOS icon for its type, cached per extension.
+
+Icons are 16 pt in the list and the sidebar.
+
+## 11. Permissions
+
+Not sandboxed. macOS asks once each for Desktop, Documents, Downloads, iCloud Drive, removable and network volumes the first time a folder there is read; the usage strings in `Info.plist` say why in a sentence. Refused, that folder shows the "needs permission" state (§6). Full Disk Access is not asked for; with it, protected folders (Mail, Safari, the Trash) can be read like any other.
+
+The bundle is signed with the "Grove Code Signing" certificate, as the other apps are, so the permissions survive rebuilds.
+
+## 12. grove module `94-explorer-app`
+
+As `96-keys-app` and `97-themes-app`, without the login agent:
+- **check:** the app is in `~/Applications/Grove Explorer.app`, built from the current sources (a stamp of the source tree's hash in the bundle), signed, its config linked.
+- **apply:** `swift build -c release`, assemble the bundle (Info.plist with the bundle id `com.projectgrove.explorer`, the URL scheme, the usage strings; no `LSUIElement`, so it is in ⌘Tab), copy the Grove Icons font and map, sign, install; if the app is running, tell the user to reopen it rather than killing it.
+- **remove** (`grove uninstall`): removes the app; leaves the config and session.
+
+## 13. Errors
+
+| Situation | What happens |
+| --- | --- |
+| A folder can't be read (permission) | The "needs permission" state with the Privacy Settings button |
+| A folder went away while shown | The tab moves to the nearest existing parent; the status bar says so |
+| A volume is ejected | Its tabs move to Home; an eject that fails (files in use) says which app holds it when macOS tells |
+| The target disk is full | The operation stops; what was copied stays; the status bar says how much room was missing |
+| A name can't be used | The rename field turns red with the reason; nothing is changed |
+| `explorer.toml` can't be parsed | The built-in defaults are used and a tinted banner at the top of the window names the line |
+| The session file is damaged | Ignored; the window opens on Home |
+| An undo is no longer possible | "Can't undo: <name> has changed", nothing is touched |
+
+## 14. Testing
+
+- **Core, unit tests** (Swift Testing): sorting against Finder's order for a fixture of awkward names; filter and type-to-jump; path parsing; tabs and panes state changes; session round-trip; conflict naming ("name 2.ext", "name 3.ext"); undo's inverses; config merge; `IconKind` for a table of names.
+- **Core, against real temporary folders:** reading (10 and 50,000 items, hidden files, packages, aliases, unreadable folders); the watcher (create, rename, delete seen within a second); every operation, its cancel, its failure in the middle, its conflict choices and its undo and redo; copy across two disk images for the cross-volume paths; attributes and tags preserved.
+- **Performance, as tests with a limit:** list and sort 50,000 entries; size of a tree of 20,000 files.
+- **Views:** a `--render <state> <out.png> [scheme]` one-shot, as Grove Keys has for its panels, drawing the window from sample data in dark-medium and light-medium; compared with the mock-ups by eye.
+- **Installer:** bats for the module's check, apply (with fakes) and remove.
+- **By hand, listed in the plan:** the keys, drag and drop with Finder and other apps, Quick Look, the permission prompts, ejecting, a scheme switch while open, tiling beside another window.
+
+## 15. Build order
+
+For the plan: (1) Core reading, sorting and the list in one pane, read-only; (2) navigation, path bar, sidebar, tabs, the second pane, the session; (3) operations, conflicts, undo, the clipboard; (4) drag and drop, Quick Look, the context menu; (5) icons; (6) the module, the Grove menu row, the manual chapter. Each step ends installable.
