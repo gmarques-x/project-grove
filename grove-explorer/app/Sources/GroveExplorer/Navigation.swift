@@ -131,7 +131,10 @@ extension AppModel {
 
     /// ⌘\ and the header's switch.
     func togglePanes() {
+        // Two panes to one: the active pane stays, as the left.
+        let kept = browser.active, closes = sides.count == 2
         change { $0.togglePanes() }
+        if closes { statusFollows(closed: kept.other, kept: kept) }
         closePathField()
         focusList()
     }
@@ -286,8 +289,14 @@ extension AppModel {
         }
     }
 
+    /// The pane whose status bar says what was meant for `side`'s: its
+    /// own, or the left's when that pane has closed since (⌘\ during a
+    /// copy to it): what an operation has to say is always said somewhere.
+    func teller(for side: Side) -> Side { sides.contains(side) ? side : .left }
+
     /// A sentence in the pane's status bar, for a few seconds.
     func say(_ sentence: String, in side: Side) {
+        let side = teller(for: side)
         notices[side] = sentence
         noticeTimers[side]?.cancel()
         noticeTimers[side] = Task { [weak self] in

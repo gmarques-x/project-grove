@@ -156,7 +156,7 @@ extension AppModel {
         if field {
             if let failure = outcome.failures.first {
                 // Said under the field, not here: a meter shown meanwhile goes.
-                if case .running = work.statuses[side] { work.statuses[side] = nil }
+                meterGoes(except: nil)
                 renameRefused(OperationStatus.renameReason(for: failure))
                 return
             }
@@ -239,6 +239,8 @@ extension AppModel {
     /// The status bar of `side` says `status`, for `seconds` or until the
     /// next thing it has to say.
     func show(_ status: PaneStatus, in side: Side, for seconds: Int?) {
+        let side = teller(for: side)
+        meterGoes(except: side)
         work.statusTimers[side]?.cancel()
         work.statusTimers[side] = nil
         work.statuses[side] = status
@@ -252,6 +254,58 @@ extension AppModel {
             guard !Task.isCancelled else { return }
             self?.work.statuses[side] = nil
         }
+    }
+
+    /// There is one run, so one meter: a pane other than `side` that
+    /// still shows one (it told for a pane that was closed then and is
+    /// open again) shows it no more.
+    private func meterGoes(except side: Side?) {
+        for other in [Side.left, .right] where other != side {
+            if case .running = work.statuses[other] { work.statuses[other] = nil }
+        }
+    }
+
+    /// ⌘\ closed the pane `closed`; `kept` is the one pane now, at the left.
+    /// What the status bars said goes where it can still be read: the kept
+    /// pane's own status and notice go with it, and a meter or a failure
+    /// (with its list) of the pane that closed is said at the left
+    /// instead. A meter comes before anything else: there is one run.
+    func statusFollows(closed: Side, kept: Side) {
+        let own = work.statuses[kept], theirs = work.statuses[closed], notice = notices[kept]
+        var from = kept
+        switch (own, theirs) {
+        case (.running?, _): break
+        case (_, .running?), (_, .failed?): from = closed
+        default: break
+        }
+        // Nothing moves: the left pane stays and the right had nothing to keep.
+        if kept == .left, from == .left {
+            if work.failuresShown == .right { work.failuresShown = nil }
+            work.statusTimers[.right]?.cancel()
+            work.statusTimers[.right] = nil
+            work.statuses[.right] = nil
+            noticeTimers[.right]?.cancel()
+            noticeTimers[.right] = nil
+            notices[.right] = nil
+            return
+        }
+        let status = from == kept ? own : theirs
+        let listShown = work.failuresShown == from
+        work.failuresShown = nil
+        for side in [Side.left, .right] {
+            work.statusTimers[side]?.cancel()
+            work.statusTimers[side] = nil
+            work.statuses[side] = nil
+            noticeTimers[side]?.cancel()
+            noticeTimers[side] = nil
+            notices[side] = nil
+        }
+        if let status {
+            // A summary goes after its few seconds, counted again from here.
+            if case .done = status { show(status, in: .left, for: 5) } else { show(status, in: .left, for: nil) }
+            if listShown, case .failed = status { work.failuresShown = .left }
+        }
+        if let notice { say(notice, in: .left) }
     }
 
     /// The contents of `folders` changed: the totals of each and of the
