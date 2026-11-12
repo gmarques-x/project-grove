@@ -30,6 +30,11 @@ final class KeyboardReach {
     var listMenus: [Side: @MainActor () -> Void] = [:]
     /// The sidebar row the keyboard is on, as a view a menu can open at.
     weak var sidebarAnchor: NSView?
+    /// The sidebar is the rail of icons: nothing can be said under a row.
+    var sidebarIsRail = false
+    /// The disks whose row says why an eject was refused (in use by a
+    /// file command): said until the commands are done.
+    var refusedEjects: Set<String> = []
     /// A menu opened from a key is up: a second way the same key arrived
     /// by (the menu bar's row and the system's own key) opens no second one.
     var menuIsUp = false
@@ -140,6 +145,21 @@ extension AppModel {
         if let volume = ejectTarget { eject(volume) }
     }
 
+    /// An eject of `volume` was refused because a file command uses it:
+    /// said under its row; in the rail, where a row has no room for a
+    /// line, in the active pane's status bar.
+    func ejectRefused(_ volume: Volume, because reason: String) {
+        ejectFailures[volume.id] = reason
+        reach.refusedEjects.insert(volume.id)
+        if reach.sidebarIsRail { say(reason, in: browser.active) }
+    }
+
+    /// The file commands are all done: "in use by a copy" is no longer so.
+    func ejectRefusalsAreOver() {
+        for id in reach.refusedEjects { ejectFailures[id] = nil }
+        reach.refusedEjects = []
+    }
+
     // MARK: The operation that runs, and what one could not do
 
     /// With the keyboard in a list or the sidebar. While the path or the
@@ -189,10 +209,12 @@ extension AppModel {
             return true
         }
         guard side == browser.active, items.count > FailureList.rows, key == "↓" || key == "↑" else { return false }
-        // From the item at the card's top now (the scroll view keeps it,
-        // a wheel's scroll included) to the next one, down to the last.
-        let top = work.failuresTop ?? 0
-        work.failuresTop = key == "↓" ? min(top + 1, items.count - 1) : max(top - 1, 0)
+        // One more item into view, from what the card shows now (a
+        // wheel's scroll included); at an end nothing is asked, so the
+        // next press the other way answers at once.
+        if let step = CardScroll.step(down: key == "↓", visible: work.failuresVisible, count: items.count) {
+            work.failuresScroll = FailureScroll(step: step, number: (work.failuresScroll?.number ?? 0) + 1)
+        }
         return true
     }
 
@@ -239,12 +261,42 @@ extension FileList.Coordinator {
     func offerMenuByKey() {
         model.reach.listMenus[side] = { [weak self] in self?.showMenuByKey() }
         table?.onRowLabel = { [weak self] in self?.spoken($0) }
-        // The system's own key for it comes to the table: the sidebar's
-        // row when the keyboard is there, as with ⌃Return.
+        table?.onRowURL = { [weak self] in self?.item(onRow: $0) }
+        table?.onRowOf = { [weak self] in self?.row(of: $0) }
+        table?.onRowMenu = { [weak self] in self?.showMenu(atRow: $0) ?? false }
+        // The system's own key for it (or VoiceOver's "show menu" on the
+        // list) comes to this table: the sidebar's row when the keyboard
+        // is there and this is the pane it came from, as with ⌃Return;
+        // otherwise this list's own menu, whichever pane has the keys.
         table?.onMenuKey = { [weak self] in
             guard let self, let command = CommandTable.command("contextMenu"), command.isEnabled(self.model) else { return }
-            command.run(self.model)
+            if self.model.sidebarCursor != nil, self.model.browser.active == self.side {
+                command.run(self.model)
+            } else {
+                self.showMenuByKey()
+            }
         }
+    }
+
+    /// This list's right-click menu for `row`, as a right-click on it
+    /// gives (`menu(forRow:)`: its pane gets the keys, the keyboard leaves
+    /// the sidebar, a row not among the selected becomes the selection),
+    /// opened under the row. False when there is none to show (the
+    /// conflict prompt is up, a name is being typed).
+    @discardableResult
+    func showMenu(atRow row: Int) -> Bool {
+        guard let table, table.window != nil else { return false }
+        if row >= 0 { table.scrollRowToVisible(row) }
+        guard let menu = menu(forRow: row) else { return false }
+        let rect = row >= 0 ? table.rect(ofRow: row) : NSRect(origin: table.visibleRect.origin, size: .zero)
+        // Under the row, where its name starts.
+        let start = ListColumns.edge + IconMetrics.cell + ListMetrics.iconGap
+        // After the turn: a menu holds the run loop while it is up.
+        DispatchQueue.main.async { [weak self, weak table] in
+            guard let table, table.window != nil else { return }
+            self?.model.reach.popUp(menu, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table)
+        }
+        return true
     }
 
     /// The right-click menu, opened from the keyboard: for the selection,
@@ -254,16 +306,6 @@ extension FileList.Coordinator {
         guard let table, table.window != nil else { return }
         let visible = table.rows(in: table.visibleRect)
         let chosen = table.selectedRowIndexes
-        let row = chosen.first { visible.contains($0) } ?? chosen.first ?? -1
-        if row >= 0 { table.scrollRowToVisible(row) }
-        guard let menu = menu(forRow: row) else { return }
-        let rect = row >= 0 ? table.rect(ofRow: row) : NSRect(origin: table.visibleRect.origin, size: .zero)
-        // Under the row, where its name starts.
-        let start = ListColumns.edge + IconMetrics.cell + ListMetrics.iconGap
-        // After the turn: a menu holds the run loop while it is up.
-        DispatchQueue.main.async { [weak self, weak table] in
-            guard let table, table.window != nil else { return }
-            self?.model.reach.popUp(menu, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table)
-        }
+        showMenu(atRow: chosen.first { visible.contains($0) } ?? chosen.first ?? -1)
     }
 }

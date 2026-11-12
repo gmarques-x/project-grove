@@ -84,8 +84,8 @@ struct PaneView: View {
     @ViewBuilder private var failures: some View {
         if work.failuresShown == side, case let .failed(_, summary, items, _)? = work.statuses[side] {
             FailureList(
-                summary: summary, items: items,
-                top: Binding(get: { work.failuresTop }, set: { if work.failuresTop != $0 { work.failuresTop = $0 } })
+                summary: summary, items: items, scroll: work.failuresScroll,
+                onVisible: { work.failuresVisible = $0 }
             ) { work.failuresShown = nil }
         }
     }

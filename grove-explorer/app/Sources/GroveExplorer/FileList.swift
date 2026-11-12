@@ -342,6 +342,15 @@ struct FileList: NSViewRepresentable {
             return cell
         }
 
+        /// The item on a row, and the row an item is on: through the
+        /// listing's index while the table shows that listing's rows.
+        func item(onRow row: Int) -> URL? { entries.indices.contains(row) ? entries[row].url : nil }
+
+        func row(of item: URL) -> Int? {
+            if let listing = model.listing(for: side), listing.revision == revision { return listing.rows[item] }
+            return entries.firstIndex { $0.url == item }
+        }
+
         /// The row as VoiceOver says it; nil for a row that is not there.
         func spoken(_ row: Int) -> String? {
             guard entries.indices.contains(row) else { return nil }

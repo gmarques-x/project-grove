@@ -214,9 +214,10 @@ extension AppModel {
         // Not from under a copy: said under the row, by whichever way it
         // was asked (the button, the row's menu, ⌘E), and nothing is let go of.
         if let refusal = ejectRefusal(for: volume) {
-            ejectFailures[volume.id] = refusal
+            ejectRefused(volume, because: refusal)
             return
         }
+        reach.refusedEjects.remove(volume.id)
         ejecting.insert(volume.id)
         ejectFailures[volume.id] = nil
         // `wantedSizes` leaves out what is on a disk being ejected.

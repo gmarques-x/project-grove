@@ -48,6 +48,8 @@ extension AppModel {
         // No suspension since `finished` said none waits: a command issued
         // from here on starts a drain of its own.
         work.busy = false
+        // A disk that was "in use by a copy" no longer is.
+        ejectRefusalsAreOver()
         quitIfAsked()
     }
 

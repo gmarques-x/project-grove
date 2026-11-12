@@ -23,6 +23,8 @@ struct Sidebar: View {
     var body: some View {
         let places = model.places
         let lit = model.litPlace(among: places)
+        // Not drawn from: where a refused eject's reason goes (`ejectRefused`).
+        let _ = (model.reach.sidebarIsRail = rail)
         VStack(alignment: .leading, spacing: 0) {
             Line()
             VStack(alignment: .leading, spacing: 0) {

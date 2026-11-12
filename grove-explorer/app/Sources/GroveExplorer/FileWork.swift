@@ -42,6 +42,13 @@ enum PaneStatus: Equatable {
     case failed(line: String, summary: String, items: [String], changed: Bool)
 }
 
+/// A step of the failure card's list, numbered so the same step asked
+/// twice is two.
+struct FailureScroll: Equatable {
+    let step: CardScroll.Step
+    let number: Int
+}
+
 /// The conflict prompt as shown: the name asked about and the keyboard's place.
 struct ConflictPromptState: Equatable {
     let question: Conflict.Question
@@ -98,11 +105,17 @@ final class FileWork: ObservableObject {
     @Published var rename: RenameState?
     /// The pane whose list of failed items is open.
     @Published var failuresShown: Side? {
-        didSet { if failuresShown != oldValue, failuresTop != nil { failuresTop = nil } }
+        didSet {
+            guard failuresShown != oldValue else { return }
+            failuresVisible = nil
+            if failuresScroll != nil { failuresScroll = nil }
+        }
     }
-    /// The item at the top of a list longer than its card: the scroll
-    /// view says which as it scrolls, and ↑ ↓ set it. Nil: not scrolled yet.
-    @Published var failuresTop: Int?
+    /// The items wholly in view of a list longer than its card, as the
+    /// card says while it scrolls (by ↑ ↓ or by the wheel).
+    var failuresVisible: ClosedRange<Int>?
+    /// The latest ↑ or ↓ in that list: the item the card is to bring into view.
+    @Published var failuresScroll: FailureScroll?
 
     /// What the prompt's answer goes to; nil when none is awaited.
     var reply: CheckedContinuation<(button: ConflictButton, applyToAll: Bool), Never>?

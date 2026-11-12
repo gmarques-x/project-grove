@@ -91,6 +91,15 @@ struct StatusBar: View {
     }
 }
 
+/// The items of the failure card's list that are wholly in view.
+private struct ItemsInView: PreferenceKey {
+    static let defaultValue: [Int] = []
+
+    static func reduce(value: inout [Int], nextValue: () -> [Int]) {
+        value += nextValue()
+    }
+}
+
 /// The items an operation could not do, each with its reason, under what
 /// it did all the same: a card over the foot of the pane's list, opened by
 /// a click on the status bar's line and closed by another, by its button
@@ -98,14 +107,18 @@ struct StatusBar: View {
 struct FailureList: View {
     let summary: String
     let items: [String]
-    /// The item at the top of a list longer than the card: the scroll
-    /// view writes it as it scrolls, and ↑ ↓ set it (`AppModel.failuresKey`).
-    var top: Binding<Int?> = .constant(nil)
+    /// The latest ↑ or ↓ (`AppModel.failuresKey`): the item to bring into
+    /// view of a list longer than the card.
+    var scroll: FailureScroll?
+    /// The items wholly in view of such a list, said as it scrolls.
+    var onVisible: @MainActor (ClosedRange<Int>?) -> Void = { _ in }
     let onClose: () -> Void
     @Environment(\.theme) private var theme
 
     /// No taller than this many rows: the rest scrolls.
     static let rows = 8
+    private static let height = CGFloat(rows) * ListMetrics.row
+    private static let space = "failures"
 
     var body: some View {
         VStack(alignment: .leading, spacing: GroveSpace.s8) {
@@ -125,15 +138,32 @@ struct FailureList: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                         .id(item.offset)
+                        .background(GeometryReader { geometry in
+                            let frame = geometry.frame(in: .named(Self.space))
+                            // Wholly in view, give or take a rounding.
+                            let inView = frame.minY >= -0.5 && frame.maxY <= Self.height + 0.5
+                            Color.clear.preference(key: ItemsInView.self, value: inView ? [item.offset] : [])
+                        })
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if items.count > Self.rows {
-                // By item, not by a count of lines: an item may wrap, and
-                // the last one is reached whatever the others' heights.
-                ScrollView { list.scrollTargetLayout() }
-                    .scrollPosition(id: top, anchor: .top)
-                    .frame(height: CGFloat(Self.rows) * ListMetrics.row)
+                // By item, not by a count of lines (an item may wrap): the
+                // list says which items are wholly in view, and a key
+                // brings the next one above or below them into view.
+                ScrollViewReader { reader in
+                    ScrollView { list }
+                        .coordinateSpace(name: Self.space)
+                        .frame(height: Self.height)
+                        .onPreferenceChange(ItemsInView.self) { items in
+                            let range = items.min().flatMap { first in items.max().map { first...$0 } }
+                            Task { @MainActor in onVisible(range) }
+                        }
+                        .onChange(of: scroll) { _, scroll in
+                            guard let step = scroll?.step else { return }
+                            reader.scrollTo(step.item, anchor: step.toTop ? .top : .bottom)
+                        }
+                }
             } else {
                 list
             }
