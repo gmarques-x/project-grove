@@ -61,4 +61,58 @@ import Testing
         _ = pending.finished()
         #expect(pending.allowsUndo)
     }
+
+    // MARK: Dropping
+
+    @Test func theSiblingsOfAGivenUpCommandAreDroppedAndTheRestKeepTheirOrder() {
+        var pending = PendingCommands<String>()
+        _ = pending.add("paste-copy")
+        _ = pending.add("paste-duplicate")
+        _ = pending.add("trash")
+        _ = pending.add("paste-more")
+        #expect(pending.dropWaiting { $0.hasPrefix("paste") } == 2)
+        // The one in hand is not the queue's to drop.
+        #expect(pending.inHand == "paste-copy")
+        #expect(pending.waiting == ["trash"])
+        #expect(pending.dropWaiting { $0 == "nothing" } == 0)
+    }
+
+    // MARK: Quitting
+
+    @Test func quittingWithNothingGoingQuitsAtOnce() {
+        var pending = PendingCommands<String>()
+        #expect(pending.quit(promptIsUp: false, runIsGoing: false) == QuitPlan(waits: false, cancelsRun: false, answersPrompt: false, dropped: 0))
+    }
+
+    @Test func quittingDuringARunCancelsItDropsTheQueuedAndWaits() {
+        var pending = PendingCommands<String>()
+        _ = pending.add("copy")
+        _ = pending.add("move")
+        _ = pending.add("trash")
+        #expect(pending.quit(promptIsUp: false, runIsGoing: true) == QuitPlan(waits: true, cancelsRun: true, answersPrompt: false, dropped: 2))
+        #expect(pending.inHand == "copy")
+        #expect(pending.waiting.isEmpty)
+        // The one in hand ends, and nothing follows it.
+        #expect(pending.finished() == nil)
+        #expect(pending.isIdle)
+    }
+
+    @Test func quittingWithThePromptUpAnswersItWithCancel() {
+        var pending = PendingCommands<String>()
+        _ = pending.add("copy")
+        _ = pending.add("move")
+        #expect(pending.quit(promptIsUp: true, runIsGoing: false) == QuitPlan(waits: true, cancelsRun: false, answersPrompt: true, dropped: 1))
+    }
+
+    @Test func aCommandInHandThatNeitherRunsNorAsksIsStillWaitedFor() {
+        // Between its validate and its run, or an undo: it ends by itself.
+        var pending = PendingCommands<String>()
+        _ = pending.add("undo")
+        #expect(pending.quit(promptIsUp: false, runIsGoing: false) == QuitPlan(waits: true, cancelsRun: false, answersPrompt: false, dropped: 0))
+    }
+
+    @Test func aPromptOrARunWithNothingInHandIsNothingToWaitFor() {
+        var pending = PendingCommands<String>()
+        #expect(!pending.quit(promptIsUp: true, runIsGoing: true).waits)
+    }
 }

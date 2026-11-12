@@ -71,13 +71,30 @@ public enum FileCommands {
         items.map(\.path).joined(separator: "\n")
     }
 
+    /// ⌘I opens no more information windows than this at a time.
+    public static let getInfoLimit = 10
+    /// What the status bar says of a larger selection.
+    public static let getInfoTooMany = "Get Info opens up to \(getInfoLimit) items at a time"
+
     /// The AppleScript that has Finder open `item`'s information window. The
     /// path is written as a string of the script: a quote or a backslash in
     /// a name can't end it.
     public static func getInfoScript(for item: URL) -> String {
+        "tell application \"Finder\" to \(openInfo(item))"
+    }
+
+    /// One script for the information windows of all of `items`: Finder is
+    /// asked once. Empty for no items.
+    public static func getInfoScript(for items: [URL]) -> String {
+        guard items.count != 1 else { return getInfoScript(for: items[0]) }
+        guard !items.isEmpty else { return "" }
+        return (["tell application \"Finder\""] + items.map(openInfo) + ["end tell"]).joined(separator: "\n")
+    }
+
+    private static func openInfo(_ item: URL) -> String {
         let path = item.path
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        return "tell application \"Finder\" to open information window of (POSIX file \"\(path)\" as alias)"
+        return "open information window of (POSIX file \"\(path)\" as alias)"
     }
 }

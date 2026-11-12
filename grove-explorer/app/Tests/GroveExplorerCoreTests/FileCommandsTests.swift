@@ -119,4 +119,23 @@ import Testing
             script
                 == "tell application \"Finder\" to open information window of (POSIX file \"/Users/me/Downloads/a\\\" & (do shell script \\\"x\\\") & \\\"\\\\.md\" as alias)")
     }
+
+    @Test func severalItemsAreOneScript() {
+        let items = [file("a.md", in: downloads), file("b \"x\".md", in: downloads)]
+        #expect(
+            FileCommands.getInfoScript(for: items) == """
+                tell application "Finder"
+                open information window of (POSIX file "/Users/me/Downloads/a.md" as alias)
+                open information window of (POSIX file "/Users/me/Downloads/b \\"x\\".md" as alias)
+                end tell
+                """)
+        // One item: the same script as ever.
+        #expect(FileCommands.getInfoScript(for: [items[0]]) == FileCommands.getInfoScript(for: items[0]))
+        #expect(FileCommands.getInfoScript(for: []) == "")
+    }
+
+    @Test func getInfoOpensUpToTenItemsAtATime() {
+        #expect(FileCommands.getInfoLimit == 10)
+        #expect(FileCommands.getInfoTooMany == "Get Info opens up to 10 items at a time")
+    }
 }

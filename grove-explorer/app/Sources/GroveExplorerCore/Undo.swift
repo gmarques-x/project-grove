@@ -85,6 +85,11 @@ public actor UndoStack {
         self.runner = runner
     }
 
+    /// The items the last undo put back where they were, or the last redo
+    /// made or moved, for the window to select; empty when it was refused
+    /// and for what an undo sent to the Trash.
+    public private(set) var restored: [URL] = []
+
     public var canUndo: Bool { !working && !undos.isEmpty }
     public var canRedo: Bool { !working && !redos.isEmpty }
 
@@ -117,6 +122,7 @@ public actor UndoStack {
     /// refusal leaves.
     public func undo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't undo: another undo or redo is still going on") }
+        restored = []
         guard let entry = undos.last else { throw UndoRefusal(sentence: "There is nothing to undo") }
         working = true
         defer { working = false }
@@ -130,6 +136,7 @@ public actor UndoStack {
             undos.removeAll { $0.id == entry.id }
             // An operation recorded meanwhile has cleared redo: it stays so.
             if let again = entry.again, recorded == before { redos.append(again) }
+            restored = steps.compactMap(\.place)
             return "Undid: \(Self.lowered(entry.words))"
         case let .refused(problem):
             guard !problem.heals else { throw UndoRefusal(sentence: "Can't undo: \(problem.words)") }
@@ -147,6 +154,7 @@ public actor UndoStack {
     /// the ones answered about the first time.
     public func redo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't redo: another undo or redo is still going on") }
+        restored = []
         guard let again = redos.last else { throw UndoRefusal(sentence: "There is nothing to redo") }
         working = true
         defer { working = false }
@@ -172,6 +180,7 @@ public actor UndoStack {
         // By its own mark: an operation recorded meanwhile has cleared redo.
         redos.removeAll { $0.id == again.id }
         undos.append(entry)
+        restored = AfterOperation.newItems(of: outcome)
         return "Redid: \(Self.lowered(words))"
     }
 

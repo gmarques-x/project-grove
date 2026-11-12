@@ -213,6 +213,48 @@ private func refusal(_ body: () async throws -> String) async -> String? {
         #expect(box.listing() == before)
     }
 
+    // MARK: What came back
+
+    /// "src/notes.md": an item by its folder and name, whatever the path before.
+    private func places(_ urls: [URL]) -> Set<String> {
+        Set(urls.map { $0.deletingLastPathComponent().lastPathComponent + "/" + $0.lastPathComponent })
+    }
+
+    @Test func anUndoTellsWhatItPutBackAndARedoWhatItMade() async throws {
+        let items = try (1...2).map { try box.makeFile("src/file-\($0).txt", "file \($0)") }
+        #expect(await stack.restored.isEmpty)
+        await perform(.move(items: items, to: dest))
+
+        _ = try await stack.undo()
+        #expect(places(await stack.restored) == ["src/file-1.txt", "src/file-2.txt"])
+        _ = try await stack.redo()
+        #expect(places(await stack.restored) == ["dest/file-1.txt", "dest/file-2.txt"])
+    }
+
+    @Test func whatAnUndoSentToTheTrashIsNotAmongWhatCameBack() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        try box.makeFile("dest/notes.md", "old")
+        await perform(.copy(items: [file], to: dest), choice: .replace)
+
+        // The newcomer goes to the Trash; the replaced one is back.
+        _ = try await stack.undo()
+        #expect(places(await stack.restored) == ["dest/notes.md"])
+
+        let other = try box.makeFile("src/other.md", "other")
+        await perform(.copy(items: [other], to: dest))
+        _ = try await stack.undo()
+        #expect(await stack.restored.isEmpty)
+    }
+
+    @Test func aRefusedUndoBroughtNothingBack() async throws {
+        let file = try box.makeFile("src/notes.md", "some notes")
+        await perform(.trash(items: [file]))
+        _ = try await stack.undo()
+        #expect(places(await stack.restored) == ["src/notes.md"])
+        #expect(await refusal { try await self.stack.undo() } == "There is nothing to undo")
+        #expect(await stack.restored.isEmpty)
+    }
+
     // MARK: Every operation, undone and redone
 
     @Test func aCopyIsUndoneByPuttingTheCopiesInTheTrash() async throws {
