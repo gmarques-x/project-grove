@@ -28,7 +28,9 @@ struct WindowView: View {
         let theme = model.colors
         return VStack(spacing: 0) {
             GroveWindowHeader("Grove Explorer", middle: { history(theme) }, trailing: { paneSwitch })
-            if let problem = model.config.problem ?? model.writeProblem { banner(problem, theme) }
+            // What the user just did and couldn't first, then the config's own.
+            if let problem = model.writeProblem { banner(problem, theme) }
+            if let problem = model.config.problem { banner(problem, theme) }
             GeometryReader { geometry in
                 parts(width: geometry.size.width)
             }

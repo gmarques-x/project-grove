@@ -130,11 +130,16 @@ extension AppModel {
 
     // MARK: The keyboard in the sidebar
 
-    /// ⌥⌘←: the keyboard goes to the sidebar, on the lit row.
+    /// ⌥⌘←: the keyboard goes to the sidebar, on the lit row. The keys
+    /// themselves stay with the active pane's list, which hands them on
+    /// (`CommandTable.handle`): so a path field that had them closes, and
+    /// the list is asked to take them.
     func focusSidebar() {
         if sidebarHidden { sidebarHidden = false }
+        if pathField != nil { pathField = nil }
         let places = places
         sidebarCursor = litPlace(among: places) ?? 0
+        listFocus += 1
     }
 
     /// A key while the keyboard is in the sidebar: ↑ ↓ move, Return opens
@@ -163,17 +168,23 @@ extension AppModel {
 
     /// The volumes now, and again whenever one comes or goes.
     func followVolumes() {
-        hasCloud = Disk.isFolder(home.appendingPathComponent(Self.cloudFolder, isDirectory: true))
         mounts = MountObserver { [weak self] in self?.readVolumes() }
         readVolumes()
     }
 
     private func readVolumes() {
+        // Numbered like a pane's reads: of two on their way the later one answers.
+        volumeReads += 1
+        let number = volumeReads
+        let cloud = home.appendingPathComponent(Self.cloudFolder, isDirectory: true)
         Task {
-            let mounted = await Task.detached { Volume.mounted() }.value
+            let (mounted, hasCloud) = await Task.detached { (Volume.mounted(), Disk.isFolder(cloud)) }.value
+            guard number == volumeReads else { return }
+            if hasCloud != self.hasCloud { self.hasCloud = hasCloud }
             guard mounted != volumes else { return }
             let gone = Set(volumes.map(\.id)).subtracting(mounted.map(\.id))
-            // The icons are asked for here, not while a row is drawn.
+            // The icons are asked for here, not while a row is drawn (on
+            // the main thread still: left so for now).
             IconCache.shared.forgetVolumes()
             for volume in mounted { _ = IconCache.shared.volumeIcon(volume.url) }
             volumes = mounted
@@ -185,46 +196,64 @@ extension AppModel {
         }
     }
 
+    /// Whether `url` is on a volume that is being ejected.
+    func isBeingEjected(_ url: URL) -> Bool {
+        guard !ejecting.isEmpty else { return false }
+        let path = url.standardizedFileURL.path
+        return ejecting.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
     /// The eject button: a spinner while macOS works, the reason under the
-    /// row when it refuses (gone on the next try).
+    /// row when it refuses (gone on the next try). The app first lets go of
+    /// the disk itself (the size walks on it and the watchers of the panes
+    /// that show it), or it would be the one holding it; if the disk stays,
+    /// they start again.
     func eject(_ volume: Volume) {
         guard live, volume.ejectable, !ejecting.contains(volume.id) else { return }
         ejecting.insert(volume.id)
         ejectFailures[volume.id] = nil
+        // `wantedSizes` leaves out what is on a disk being ejected.
+        sizeQueue.keep(Set(wantedSizes()))
+        let held = sides.filter { side in browser.tab(side).map { isBeingEjected($0.folder) } ?? false }
+        for side in held {
+            watchers[side]?.watcher.stop()
+            watchers[side] = nil
+        }
         let url = volume.url
         Task {
             let failure = await Task.detached { Volume.eject(url) }.value
             ejecting.remove(volume.id)
-            if let failure { ejectFailures[volume.id] = failure }
-            // On success the unmount notification takes the row away.
+            guard let failure else { return }  // The unmount notification takes the row away.
+            ejectFailures[volume.id] = failure
+            for side in sides {
+                if let folder = browser.tab(side)?.folder, watchers[side] == nil { watch(folder, for: side) }
+            }
+            wantSizes()
         }
     }
 
     // MARK: Favourites
 
     /// Takes a favourite out of the sidebar and writes the list to
-    /// `explorer.local.toml`, the one config file the app writes.
+    /// `explorer.local.toml`, the one config file the app writes. The list
+    /// written is made from the two files as they are now, every favourite
+    /// in them: not from the window's own, which leaves out the folders
+    /// that weren't there at launch (a disk not mounted) and knows nothing
+    /// of what was added to the files since.
     func removeFavourite(id: String) {
-        saveFavourites(config.favourites.filter { $0.id != id })
-    }
-
-    /// Keeps `favourites` in `explorer.local.toml`, beside whatever else the
-    /// file holds, in one step. A file that can't be read as it is is left
-    /// alone: the banner says why, and the sidebar stays as it was.
-    func saveFavourites(_ favourites: [Favourite]) {
         guard live else { return }
-        let file = home.appendingPathComponent(".config/grove-explorer/explorer.local.toml")
+        let folder = home.appendingPathComponent(".config/grove-explorer", isDirectory: true)
+        let local = folder.appendingPathComponent("explorer.local.toml")
         do {
-            let existing: String?
-            if FileManager.default.fileExists(atPath: file.path) {
-                existing = try String(contentsOf: file, encoding: .utf8)
-            } else {
-                existing = nil
-            }
-            let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: existing)
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Data(text.utf8).write(to: file, options: .atomic)
-            config.favourites = favourites
+            let tracked = try? String(contentsOf: folder.appendingPathComponent("explorer.toml"), encoding: .utf8)
+            // A local file that is there and can't be read is not taken for no file.
+            let existing = FileManager.default.fileExists(atPath: local.path)
+                ? try String(contentsOf: local, encoding: .utf8) : nil
+            let kept = ExplorerConfig.allFavourites(tracked: tracked, local: existing, home: home).filter { $0.id != id }
+            let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: existing)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try Data(text.utf8).write(to: local, options: .atomic)
+            config.favourites.removeAll { $0.id == id }
             writeProblem = nil
         } catch let refused as ConfigWriteRefused {
             writeProblem = refused.description

@@ -72,6 +72,8 @@ final class AppModel: ObservableObject {
     let live: Bool
     var store: SessionStore?
     var mounts: MountObserver?
+    /// Counts the reads of the mounted volumes: the latest one answers.
+    var volumeReads = 0
     var typeJump = TypeJump()
     var noticeTimers: [Side: Task<Void, Never>] = [:]
     /// A name to select once the pane has read its folder (a link to a
@@ -86,7 +88,7 @@ final class AppModel: ObservableObject {
     private var revision = 0
     private var loads: [Side: Int] = [:]
     private var sorts: [Side: Int] = [:]
-    private var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
+    var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
     let sizeQueue = SizeQueue()
     /// A sort by size waiting for more totals to arrive, per pane.
     var sizeSorts: [Side: Task<Void, Never>] = [:]
@@ -109,10 +111,11 @@ final class AppModel: ObservableObject {
         // The window as it was left; the config's start only without a session.
         let store = SessionStore(file: SessionStore.standardFile())
         let saved = store.load()
-        var browser = saved?.browser
+        let browser = saved?.browser
             ?? Browser(start: config.start, twoPanes: config.twoPanes, showHidden: config.showHidden)
-        // A folder that went since falls back to its nearest parent (spec §9).
-        browser.repair(exists: Disk.isFolder, home: home)
+        // A folder that went since falls back to its nearest parent (spec
+        // §9): looked for in `start`, off the main thread, so the window
+        // opens at once whatever disk a tab was on.
         let model = AppModel(browser: browser, config: config, clock: ListClock(), live: true)
         model.split = SidebarLayout.clamped(split: saved?.split ?? 0.5)
         model.sidebarHidden = saved?.sidebarHidden ?? false
@@ -157,6 +160,9 @@ final class AppModel: ObservableObject {
         sync()
         followTheme()
         followVolumes()
+        // The panes' own folders say so when they are read; this finds the
+        // tabs not showing whose folders went since the session was saved.
+        repairGoneFolders()
     }
 
     // MARK: Changing the browser
@@ -167,7 +173,20 @@ final class AppModel: ObservableObject {
         var next = browser
         body(&next)
         guard next != browser else { return }
+        let was = browser
         browser = next
+        // Another folder, tab or pane has the keys now: letters typed for
+        // the last one are not a name's start here, and a path field open
+        // over it would say a folder that is no longer the one below it.
+        if was.active != next.active || was.activeTab.id != next.activeTab.id
+            || was.activeTab.folder != next.activeTab.folder
+        {
+            typeJump.reset()
+            if pathField != nil {
+                pathField = nil
+                listFocus += 1
+            }
+        }
         sync()
     }
 
@@ -280,8 +299,11 @@ final class AppModel: ObservableObject {
 
     /// The pane that has the keys.
     func activate(_ side: Side) {
+        // A click in a list takes the keyboard back from the sidebar.
+        if sidebarCursor != nil { sidebarCursor = nil }
         guard browser.active != side, sides.contains(side) else { return }
         browser.active = side
+        typeJump.reset()
     }
 
     /// Sorts the pane by `column`; by the column it is sorted by, the other way round.
@@ -327,7 +349,8 @@ final class AppModel: ObservableObject {
             // The folder went while it was shown, or back/forward landed on
             // one that is gone: its tabs move to the nearest folder that is
             // there (spec §13), and this pane reads that one instead.
-            if read.gone, repairGoneFolders(), browser.tab(side)?.folder != folder { return }
+            // Until the check returns the pane says the folder is gone.
+            if read.gone { repairGoneFolders() }
             if let old = listings[side], old.folder.standardizedFileURL.path == folder.standardizedFileURL.path,
                 old.all == read.all, old.problem == read.problem
             {
@@ -395,9 +418,10 @@ final class AppModel: ObservableObject {
 
     // MARK: Watching
 
-    private func watch(_ folder: URL, for side: Side) {
+    func watch(_ folder: URL, for side: Side) {
         let path = folder.standardizedFileURL.path
-        guard watchers[side]?.path != path else { return }
+        // A disk being ejected is let go of; `eject` watches again if it stays.
+        guard watchers[side]?.path != path, !isBeingEjected(folder) else { return }
         watchers[side]?.watcher.stop()
         // The call comes on the watcher's queue: over to the main actor.
         let watcher = FolderWatcher(folder: folder) { [weak self] in

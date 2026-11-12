@@ -26,6 +26,7 @@ struct ExplorerApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel.standard()
+    private var commandW: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         GroveIcons.load()
@@ -34,6 +35,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write(Data((problem + "\n").utf8))
         }
         model.start()
+        keepCommandWForTabs()
+    }
+
+    /// ⌘W closes a tab and never the window: on a pane's last tab it does
+    /// nothing. The system's own Close item has the same key and can't be
+    /// taken out of a SwiftUI menu, so the key is caught here, before any
+    /// menu sees it. The red button and ⌘Q close and quit as ever.
+    private func keepCommandWForTabs() {
+        commandW = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let stroke = CommandTable.stroke(of: event), stroke.key == "W", stroke.modifiers == [.command],
+                let self, let command = CommandTable.command("closeTab")
+            else { return event }
+            if command.isEnabled(self.model) { command.run(self.model) }
+            return nil
+        }
     }
 
     /// `groveexplorer://open?path=…` (spec §9): the folder in a new tab of

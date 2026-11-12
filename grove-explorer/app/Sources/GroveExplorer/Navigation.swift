@@ -21,6 +21,22 @@ enum Disk {
 
     static func isFolder(_ url: URL) -> Bool { kind(url) == .folder }
 
+    /// For each of `folders` and, where it is gone, each folder above it up
+    /// to the first that is there: whether it exists, by path. What
+    /// `Browser.repair` asks, answered in one go off the main thread.
+    static func existence(of folders: [URL]) -> [String: Bool] {
+        var known: [String: Bool] = [:]
+        for folder in folders {
+            var folder = folder
+            for _ in folder.pathComponents {
+                if known[folder.path] == nil { known[folder.path] = isFolder(folder) }
+                if known[folder.path] == true { break }
+                folder = folder.deletingLastPathComponent()
+            }
+        }
+        return known
+    }
+
     /// The names of the folders in `folder`, for the path field's Tab.
     static func folders(in folder: URL) -> [String] {
         let items = (try? FileManager.default.contentsOfDirectory(
@@ -181,6 +197,8 @@ extension AppModel {
     func commitPathField(_ typed: String) {
         guard let field = pathField, let tab = browser.tab(field.side) else { return }
         let url = PathBar.resolve(typed, relativeTo: tab.folder, home: home)
+        // One stat on the main thread, for a path the user just typed. Left
+        // so for now: on an unreachable network volume it waits for the answer.
         switch PathBar.destination(of: url, kind: Disk.kind) {
         case .missing:
             pathField?.missing = true
@@ -195,10 +213,18 @@ extension AppModel {
         }
     }
 
-    /// Tab in the field: what it completes `typed` to; nil when nothing.
-    func completePath(_ typed: String) -> String? {
-        guard let field = pathField, let tab = browser.tab(field.side) else { return nil }
-        return PathBar.completed(typed, relativeTo: tab.folder, home: home, folders: Disk.folders)
+    /// Tab in the field: `then` gets what `typed` completes to (nil when
+    /// nothing). The folder is listed off the main thread; the caller
+    /// drops an answer that comes after the text changed.
+    func completePath(_ typed: String, then: @escaping @MainActor (String?) -> Void) {
+        guard let field = pathField, let tab = browser.tab(field.side) else { return }
+        let folder = tab.folder, home = home
+        Task {
+            let completed = await Task.detached {
+                PathBar.completed(typed, relativeTo: folder, home: home, folders: { Disk.folders(in: $0) })
+            }.value
+            then(completed)
+        }
     }
 
     /// Shows `folder` in the pane, and selects `name` there once it is read.
@@ -226,6 +252,7 @@ extension AppModel {
     /// there is said in the status bar.
     func open(link: URL) {
         guard case .open(let target)? = ExplorerURL(link) else { return }
+        // One stat on the main thread, as in `commitPathField`: left so for now.
         switch PathBar.destination(of: target, kind: Disk.kind) {
         case .folder(let folder): show(folder, selecting: nil, in: browser.active, newTab: true)
         case .item(let file, in: let folder): show(folder, selecting: file.lastPathComponent, in: browser.active, newTab: true)
@@ -238,18 +265,25 @@ extension AppModel {
 
     /// Moves every tab whose folder is gone to its nearest folder that is
     /// there (an ejected disk's to Home), and says so in the panes it
-    /// changed. True when a tab moved.
-    @discardableResult
-    func repairGoneFolders() -> Bool {
-        let before = browser
-        change { $0.repair(exists: Disk.isFolder, home: home) }
-        guard browser != before else { return false }
-        for side in sides {
-            guard let old = before.tab(side), let new = browser.tab(side), old.id == new.id, old.folder != new.folder
-            else { continue }
-            say("\(old.folder.lastPathComponent) is no longer there: showing \(new.title)", in: side)
+    /// changed. The disk is asked off the main thread (a tab may be on a
+    /// volume that doesn't answer): the tabs move when the answer is back,
+    /// and a tab that has moved on meanwhile is left alone.
+    func repairGoneFolders() {
+        guard live else { return }
+        let folders = browser.panes.flatMap(\.tabs).map(\.folder)
+        Task {
+            let known = await Task.detached { Disk.existence(of: folders) }.value
+            let before = browser
+            // A folder not asked about (a tab that navigated since) counts as there.
+            change { $0.repair(exists: { known[$0.path] ?? true }, home: home) }
+            guard browser != before else { return }
+            for side in sides {
+                guard let old = before.tab(side), let new = browser.tab(side), old.id == new.id,
+                    old.folder != new.folder
+                else { continue }
+                say("\(old.folder.lastPathComponent) is no longer there: showing \(new.title)", in: side)
+            }
         }
-        return true
     }
 
     /// A sentence in the pane's status bar, for a few seconds.

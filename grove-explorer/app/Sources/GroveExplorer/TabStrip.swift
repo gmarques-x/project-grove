@@ -28,10 +28,14 @@ struct TabStrip: View {
     }
 
     var body: some View {
-        let pane = model.browser.panes[side.rawValue]
+        // A body can be asked for once more while two panes become one:
+        // a pane that is no longer there has no tabs to draw.
+        let panes = model.browser.panes
+        let pane = panes.indices.contains(side.rawValue) ? panes[side.rawValue] : nil
+        let tabs = pane?.tabs ?? []
         HStack(spacing: GroveSpace.s4) {
-            ForEach(Array(pane.tabs.enumerated()), id: \.element.id) { index, tab in
-                self.tab(tab, at: index, current: index == pane.current, closes: pane.tabs.count > 1)
+            ForEach(Array(tabs.enumerated()), id: \.element.id) { index, tab in
+                self.tab(tab, at: index, current: index == pane?.current, closes: tabs.count > 1)
             }
             Button { model.newTab(in: side) } label: {
                 GroveIcon(.add, size: GroveType.label)

@@ -150,10 +150,13 @@ private struct PathTextField: NSViewRepresentable {
                 model?.cancelPathField()
                 return true
             case #selector(NSResponder.insertTab(_:)):
-                if let completed = model?.completePath(textView.string) {
+                let typed = textView.string
+                model?.completePath(typed) { [weak self, weak textView] completed in
+                    // Typed on meanwhile: the answer is for a text that is gone.
+                    guard let completed, let textView, textView.string == typed else { return }
                     textView.string = completed
                     textView.setSelectedRange(NSRange(location: (completed as NSString).length, length: 0))
-                    model?.pathFieldEdited()
+                    self?.model?.pathFieldEdited()
                 }
                 return true
             default:

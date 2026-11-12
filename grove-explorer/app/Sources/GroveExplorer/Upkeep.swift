@@ -30,6 +30,8 @@ extension AppModel {
                 SizeWanted.Pane(tabFolder: $0.folder, listedFolder: listing(for: side)?.folder, shown: entries(for: side))
             }
         })
+        // Nothing is walked on a disk that is being ejected: a walk would hold it.
+        .filter { !isBeingEjected($0) }
     }
 
     /// The rows in view: their totals come before the others'.
