@@ -73,7 +73,7 @@ struct RecorderPill: View {
                 .font(GroveFont.mono(GroveType.label))
                 .foregroundStyle(recording ? theme.ink(theme.green) : Color(theme.fg))
                 .lineLimit(1)
-                .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+                .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
                 .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
                 .overlay(RoundedRectangle(cornerRadius: GroveRadius.control)
                     .strokeBorder(recording ? Color(theme.green) : theme.line, lineWidth: 1))

@@ -28,7 +28,7 @@ struct WindowView: View {
         let theme = model.colors
         VStack(alignment: .leading, spacing: 0) {
             header(theme)
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: GroveSpace.s12) {
                 if let line = model.redLine {
                     // In light the sentence is fg and the outline carries the red.
                     Text(line)
@@ -44,7 +44,7 @@ struct WindowView: View {
                 }
             }
             .padding(.horizontal, GroveSpace.s24)
-            .padding(.bottom, model.redLine == nil && model.permissions.granted ? 0 : 10)
+            .padding(.bottom, model.redLine == nil && model.permissions.granted ? 0 : GroveSpace.s12)
 
             switch tab.wrappedValue {
             case .keyboard:
@@ -85,7 +85,7 @@ struct WindowView: View {
                     .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
                 }
             }
-            .padding(3)
+            .padding(GroveSpace.s2)
             .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             .lightOutline(cornerRadius: GroveRadius.control)
             .padding(.leading, GroveSpace.s24)
@@ -98,7 +98,7 @@ struct WindowView: View {
             .foregroundStyle(theme.quiet)
         }
         .padding(.leading, Self.buttonsClearance)
-        .padding(.trailing, 14)
+        .padding(.trailing, GroveSpace.s16)
         .frame(height: 44)
     }
 
@@ -120,7 +120,7 @@ private struct PermissionBanner: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: GroveSpace.s8) {
             if !permissions.accessibility {
                 line("Grove Keys needs Accessibility", Permissions.accessibilitySettings)
             }
@@ -144,7 +144,7 @@ private struct PermissionBanner: View {
                 Text("Open Settings")
                     .font(GroveFont.mono(GroveType.label, .semibold))
                     .foregroundStyle(Color(theme.onAccent))
-                    .padding(.horizontal, 10).padding(.vertical, 3)
+                    .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
                     .background(Color(theme.orange), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             }
             .buttonStyle(.plain)

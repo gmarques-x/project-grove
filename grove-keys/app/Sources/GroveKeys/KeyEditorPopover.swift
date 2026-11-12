@@ -65,7 +65,7 @@ struct KeyEditorPopover: View {
     private var action: KeyAction { model.keys.action(layerID: target.layerID, shortcut: target.shortcut) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: GroveSpace.s12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(Shortcut(aerospace: target.shortcut)?.symbols ?? target.shortcut)
                     .font(GroveFont.mono(GroveType.heading, .semibold))
@@ -107,7 +107,7 @@ struct KeyEditorPopover: View {
             .foregroundStyle(theme.quiet)
             .lineLimit(1)
         }
-        .padding(14)
+        .padding(GroveSpace.s12)
         .frame(width: 330)
         .font(GroveFont.mono(GroveType.label))
         .foregroundStyle(Color(theme.fg))
@@ -117,13 +117,13 @@ struct KeyEditorPopover: View {
     // MARK: Segments
 
     private var segments: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: GroveSpace.s2) {
             segment("Launcher", .launcher, enabled: isHyper)
                 .help(isHyper ? "" : "Launchers live on the Hyper layer")
             segment("AeroSpace", .aerospace, enabled: true)
             segment("None", .none, enabled: model.canEdit)
         }
-        .padding(3)
+        .padding(GroveSpace.s2)
         .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .lightOutline(cornerRadius: GroveRadius.control)
     }
@@ -155,7 +155,7 @@ struct KeyEditorPopover: View {
         let query = search.wrappedValue.trimmingCharacters(in: .whitespaces)
         let shown = query.isEmpty ? apps.wrappedValue
             : apps.wrappedValue.filter { $0.name.localizedCaseInsensitiveContains(query) }
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: GroveSpace.s8) {
             TextField("Search apps", text: search.projectedValue)
                 .textFieldStyle(.plain)
                 .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s8)

@@ -7,14 +7,14 @@ import SwiftUI
 /// keeps the status line).
 struct GalleryView: View {
     @Environment(ThemesModel.self) private var model
-    /// The window fits the cards: 760 wide, as tall as they need (≈ 774 pt:
-    /// 44 above, two rows of ≈ 165, 12 between, the logo and wallpaper rows
-    /// ≈ 170 each with their labels, 16 below), never shorter, so it keeps its
-    /// size while the first `list` loads or the CLI is missing. (776 with the
-    /// 18 pt margins: 4 less above and below, and each row of cards, 4 pt
-    /// wider in all, is 0.75 taller.)
+    /// The window fits the cards: 760 wide, as tall as they need (≈ 762 pt:
+    /// 44 above, two rows of ≈ 163, 12 between, the logo and wallpaper rows
+    /// ≈ 166 each with their labels, 16 below), never shorter, so it keeps its
+    /// size while the first `list` loads or the CLI is missing. (776 with
+    /// 18 pt margins and 10 pt inside the cards: every change since is taken
+    /// off as the content, laid out off screen, measured it: 758, now 744.)
     static let width: CGFloat = 760
-    static let height: CGFloat = 774
+    static let height: CGFloat = 762
     static let buttonsClearance: CGFloat = 28
     /// `State` used directly: see GroveThemesApp on why not `@State`.
     private var focus = State(initialValue: KeyboardFocus(layout: .gallery))

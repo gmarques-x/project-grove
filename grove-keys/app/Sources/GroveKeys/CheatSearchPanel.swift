@@ -184,7 +184,7 @@ private struct CheatSearchView: View {
                         Text(section.title)
                             .font(GroveFont.mono(GroveType.body, .semibold))
                             .foregroundStyle(theme.quiet)
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, GroveSpace.s8)
                             .padding(.top, GroveSpace.s12)
                             .padding(.bottom, GroveSpace.s4)
                         ForEach(section.rows) { row in
@@ -193,7 +193,7 @@ private struct CheatSearchView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 6)
+                .padding(.horizontal, GroveSpace.s8)
                 .padding(.bottom, GroveSpace.s8)
             }
             .frame(maxWidth: .infinity)
@@ -207,7 +207,7 @@ private struct CheatSearchView: View {
     /// The key in a cap, as the keyboard's; what it does; ↩ on the selected
     /// row when Return runs it.
     private func row(_ row: CheatRow, selected: Bool, _ theme: ThemeColors) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: GroveSpace.s12) {
             Text(row.keys)
                 .font(GroveFont.mono(GroveType.body, .medium))
                 .foregroundStyle(Color(theme.fg))
@@ -225,7 +225,7 @@ private struct CheatSearchView: View {
                 Text("↩").foregroundStyle(theme.quiet)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, GroveSpace.s8)
         .frame(height: Self.rowHeight)
         .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .lightOutline(cornerRadius: GroveRadius.control, when: selected)

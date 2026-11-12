@@ -63,7 +63,7 @@ struct KeyboardView: View {
             legend
         }
         .padding(.horizontal, GroveSpace.s24)
-        .padding(.top, 6)
+        .padding(.top, GroveSpace.s8)
         .padding(.bottom, GroveSpace.s24)
         .focusable(interactions: .edit)
         .focusEffectDisabled()
@@ -171,7 +171,7 @@ struct KeyboardView: View {
         let rows = layer.bindings.values.filter { !KeyboardLayout.names.contains($0.key) }.sorted { $0.key < $1.key }
         return Group {
             if !rows.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     Text("NOT ON THE KEYBOARD")
                         .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
                         .foregroundStyle(theme.quiet)
@@ -198,7 +198,7 @@ struct KeyboardView: View {
             HStack(spacing: GroveSpace.s8) {
                 Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
                     .font(GroveFont.mono(GroveType.body))
-                    .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+                    .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
                     .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
                     .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
                 // The kind's colour: on the label in dark; in light, where it
@@ -222,7 +222,7 @@ struct KeyboardView: View {
     // MARK: Legend
 
     private var legend: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: GroveSpace.s16) {
             swatch(theme.green, "workspace")
             swatch(theme.aqua, "focus · move")
             swatch(theme.blue, "launcher")
@@ -236,7 +236,7 @@ struct KeyboardView: View {
 
     /// `outlined`: a background colour's swatch, which needs its outline in light.
     private func swatch(_ color: RGB, _ text: String, outlined: Bool = false) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: GroveSpace.s8) {
             RoundedRectangle(cornerRadius: GroveRadius.inline).fill(Color(color)).frame(width: 10, height: 10)
                 .lightOutline(cornerRadius: GroveRadius.inline, when: outlined)
             Text(text)

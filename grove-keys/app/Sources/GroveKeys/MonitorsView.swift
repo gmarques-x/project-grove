@@ -27,9 +27,9 @@ struct MonitorsView: View {
             }
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, GroveSpace.s8)
             if saved.isEmpty { note("Not set for this Mac yet") }
-            HStack(spacing: 6) {
+            HStack(spacing: GroveSpace.s4) {
                 ForEach(1...9, id: \.self) { n in
                     cell(n, target: targets[String(n)], choices: choices)
                 }
@@ -58,7 +58,7 @@ struct MonitorsView: View {
                 }
             }
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: GroveSpace.s4) {
                 Text(String(n)).font(GroveFont.mono(GroveType.heading, .semibold)).foregroundStyle(theme.ink(theme.green))
                 Text((target ?? "main") + " ▾")
                     .font(GroveFont.mono(GroveType.finePrint))
@@ -66,7 +66,7 @@ struct MonitorsView: View {
                     .lineLimit(1).truncationMode(.middle)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6).padding(.horizontal, GroveSpace.s2)
+            .padding(.vertical, GroveSpace.s4).padding(.horizontal, GroveSpace.s2)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             .lightOutline(cornerRadius: GroveRadius.control)
             .contentShape(Rectangle())
@@ -82,6 +82,6 @@ struct MonitorsView: View {
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 6).padding(.vertical, GroveSpace.s2)
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
     }
 }

@@ -19,7 +19,7 @@ struct DropdownView: View {
                 row("LIGHT", model.schemes(dark: false), theme)
             }
             if let list = model.list {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     ChoiceRowLabel(title: "TERMINAL LOGO")
                     HStack(spacing: GroveSpace.s8) {
                         ForEach(list.logos, id: \.self) { logo in
@@ -32,7 +32,7 @@ struct DropdownView: View {
                         }
                     }
                 }
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     ChoiceRowLabel(title: "WALLPAPER")
                     HStack(spacing: GroveSpace.s8) {
                         ForEach(list.wallpapers, id: \.self) { wallpaper in
@@ -57,7 +57,7 @@ struct DropdownView: View {
                 Rectangle().fill(theme.softLine(dark: 0.18)).frame(height: 1)
             }
         }
-        .padding(14)
+        .padding(GroveSpace.s12)
         .frame(width: 320)
         .keyboardNavigation(focus.projectedValue, list: model.list,
                             schemesDisabled: model.switchingDisabled, activate: run)
@@ -87,7 +87,7 @@ struct DropdownView: View {
     }
 
     private func header(_ theme: ThemeColors) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: GroveSpace.s12) {
             PineShape()
                 .fill(Color(theme.green))
                 .frame(width: 26, height: 26)
@@ -101,7 +101,7 @@ struct DropdownView: View {
     }
 
     private func row(_ label: String, _ schemes: [String], _ theme: ThemeColors) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: GroveSpace.s8) {
             Text(label)
                 .font(GroveFont.mono(GroveType.finePrint))
                 .tracking(0.8)
@@ -137,7 +137,7 @@ private struct MenuRow: View {
         Button(action: action) {
             Text(title)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, GroveSpace.s8)
                 .padding(.vertical, GroveSpace.s4)
                 .background(hovering.wrappedValue ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
                 .contentShape(Rectangle())

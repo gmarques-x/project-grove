@@ -54,7 +54,7 @@ struct BindingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: GroveSpace.s12) {
             if !model.canEdit, model.redLine == nil {
                 Text("keys.toml isn't loaded yet")
                     .foregroundStyle(theme.quiet)
@@ -77,7 +77,7 @@ struct BindingsView: View {
                 }
                 .disabled(!model.canEdit)
                 .padding(.horizontal, GroveSpace.s24)
-                .padding(.top, 6)
+                .padding(.top, GroveSpace.s8)
                 .padding(.bottom, GroveSpace.s24)
             }
         }
@@ -108,7 +108,7 @@ struct BindingsView: View {
                         onRemove: { model.edit { $0.remove([slot]) } }
                     ) {
                         Button { pickApp(anchor: row, key: key) } label: {
-                            HStack(spacing: 6) {
+                            HStack(spacing: GroveSpace.s8) {
                                 Text(binding?.label ?? key)
                                     .strikethrough(missing)
                                     .foregroundStyle(missing ? theme.quiet : Color(theme.fg))
@@ -182,7 +182,7 @@ struct BindingsView: View {
                         onRemove: { model.edit { $0.remove(r.keys.map { .binding(mode: mode, key: $0) }) } }
                     ) {
                         if r.count > 1 {
-                            HStack(spacing: 6) {
+                            HStack(spacing: GroveSpace.s8) {
                                 Text(r.action).lineLimit(1)
                                 Text("\(r.count) rows").font(GroveFont.mono(GroveType.body)).foregroundStyle(theme.quiet)
                             }
@@ -208,7 +208,7 @@ struct BindingsView: View {
                     Text(open ? "Fold runs of 1…9" : "Show all \(bindings.count) · runs of 1…9 fold into one row")
                         .font(GroveFont.mono(GroveType.label))
                         .foregroundStyle(theme.quiet)
-                        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+                        .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -317,7 +317,7 @@ struct BindingsView: View {
             // "+ Add …": all green in dark; in light the + keeps the green.
             (Text("+").foregroundStyle(Color(theme.green)) + Text(" " + title).foregroundStyle(theme.ink(theme.green)))
                 .font(GroveFont.mono(GroveType.label))
-                .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+                .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -332,7 +332,7 @@ struct BindingsView: View {
                 .foregroundStyle(Color(theme.orange))
         }
         if let c = clash.wrappedValue, c.row == row {
-            HStack(spacing: 10) {
+            HStack(spacing: GroveSpace.s12) {
                 theme.marked("\(describe(c.to)) already: " + c.clashes.map(action).joined(separator: "; "), theme.orange)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -340,7 +340,7 @@ struct BindingsView: View {
                 small("Cancel", primary: false) { clash.wrappedValue = nil }
             }
             .font(GroveFont.mono(GroveType.body))
-            .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
         }
     }
 
@@ -368,7 +368,7 @@ struct BindingsView: View {
             Text(title)
                 .font(GroveFont.mono(GroveType.label, .semibold))
                 .foregroundStyle(Color(primary ? theme.onAccent : theme.fg))
-                .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+                .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
                 .background(Color(primary ? theme.orange : theme.bg3), in: RoundedRectangle(cornerRadius: GroveRadius.control))
                 .lightOutline(cornerRadius: GroveRadius.control, when: !primary)
                 .contentShape(Rectangle())
@@ -381,7 +381,7 @@ struct BindingsView: View {
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(theme.quiet)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, GroveSpace.s8)
     }
 }
 
@@ -404,7 +404,7 @@ struct BindingsGroup<Content: View>: View {
             }
             content
         }
-        .padding(.horizontal, 14).padding(.vertical, GroveSpace.s12)
+        .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.card))
         .lightOutline(cornerRadius: GroveRadius.card)
@@ -436,7 +436,7 @@ private struct RowView<Action: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: GroveSpace.s12) {
             RecorderPill(text: shortcut, recording: recording, enabled: recordable, action: onRecord)
                 .help(recordable ? "Click, then press the new shortcut · esc cancels" : "Show all to change one of them")
                 .frame(width: 128, alignment: .leading)
@@ -451,7 +451,7 @@ private struct RowView<Action: View>: View {
             .buttonStyle(.plain)
             .help("Remove")
         }
-        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+        .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
         .background(hover.wrappedValue || recording ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .onHover { hover.wrappedValue = $0 }
     }

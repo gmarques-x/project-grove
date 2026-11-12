@@ -130,6 +130,8 @@ private struct LauncherView: View {
     static let rowHeight: CGFloat = 30
     static let rowsShown = 10
     static let iconSize: CGFloat = 18
+    /// Around the rows; with a row's own 8 its text is under the field's.
+    static let listInset = GroveSpace.s8
 
     var body: some View {
         let theme = model.colors
@@ -161,7 +163,7 @@ private struct LauncherView: View {
                     .foregroundStyle(theme.quiet)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, GroveSpace.s16)
-                    .frame(height: Self.rowHeight + 12)
+                    .frame(height: Self.rowHeight + 2 * Self.listInset)
             } else {
                 rows(theme)
             }
@@ -181,9 +183,9 @@ private struct LauncherView: View {
                             .id(item.id)
                     }
                 }
-                .padding(6)
+                .padding(Self.listInset)
             }
-            .frame(height: CGFloat(min(launcher.results.count, Self.rowsShown)) * Self.rowHeight + 12)
+            .frame(height: CGFloat(min(launcher.results.count, Self.rowsShown)) * Self.rowHeight + 2 * Self.listInset)
             .onChange(of: launcher.selection) { _, now in
                 if launcher.results.indices.contains(now) { scroll.scrollTo(launcher.results[now].id) }
             }
@@ -214,7 +216,7 @@ private struct LauncherView: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, GroveSpace.s8)
         .frame(height: Self.rowHeight)
         .background(selected ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .lightOutline(cornerRadius: GroveRadius.control, when: selected)

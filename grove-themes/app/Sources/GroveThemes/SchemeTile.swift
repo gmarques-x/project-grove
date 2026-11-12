@@ -16,9 +16,9 @@ struct SchemeTile: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: GroveRadius.card)
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: GroveSpace.s8) {
                 Text("Aa").font(GroveFont.mono(GroveType.title, .semibold))
-                HStack(spacing: 3) {
+                HStack(spacing: GroveSpace.s4) {
                     ForEach(Array([colors.red, colors.yellow, colors.green, colors.aqua, colors.blue].enumerated()),
                             id: \.offset) { _, dot in
                         Circle().fill(Color(dot)).frame(width: 7, height: 7)
@@ -37,7 +37,7 @@ struct SchemeTile: View {
                     Text("✓")
                         .font(GroveFont.mono(GroveType.body, .bold))
                         .foregroundStyle(Color(colors.fg))
-                        .padding(.top, 6)
+                        .padding(.top, GroveSpace.s8)
                         .padding(.trailing, GroveSpace.s8)
                 }
             }

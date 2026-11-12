@@ -29,7 +29,7 @@ struct SchemeCard: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(GroveSpace.s8)
             .overlay {
                 shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
                                    lineWidth: isCurrent ? 2 : 1)

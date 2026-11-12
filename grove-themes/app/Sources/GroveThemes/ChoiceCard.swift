@@ -58,7 +58,7 @@ struct ChoiceCard: View {
     var isFocused = false
     /// Logos sit inside the panel with a margin; wallpapers fill its height,
     /// shown whole.
-    var margin: CGFloat = 10
+    var margin: CGFloat = GroveSpace.s8
     let action: () -> Void
     @Environment(\.theme) private var theme
 
@@ -88,7 +88,7 @@ struct ChoiceCard: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(GroveSpace.s8)
             .overlay {
                 shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line,
                                    lineWidth: isCurrent ? 2 : 1)
@@ -114,7 +114,7 @@ struct ChoicePill: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: GroveRadius.control)
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: GroveSpace.s8) {
                 if isBusy {
                     ProgressView().controlSize(.mini)
                 } else {
@@ -123,7 +123,7 @@ struct ChoicePill: View {
                 Text(choiceName(name)).font(GroveFont.mono(GroveType.label))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.vertical, GroveSpace.s4)
             .background(Color(theme.bg1), in: shape)
             .overlay { shape.strokeBorder(isCurrent ? Color(theme.green) : theme.line, lineWidth: 1) }
             .contentShape(shape)

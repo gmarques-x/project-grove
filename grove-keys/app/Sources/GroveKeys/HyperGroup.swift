@@ -74,14 +74,14 @@ struct HyperGroup: View {
             control()
         }
         .font(GroveFont.mono(GroveType.label))
-        .padding(.horizontal, 6).padding(.vertical, GroveSpace.s4)
+        .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
     }
 
     private func pill(_ text: String) -> some View {
         Text(text)
             .font(GroveFont.mono(GroveType.label))
             .foregroundStyle(Color(theme.fg))
-            .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
             .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
             .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
     }
@@ -114,7 +114,7 @@ private struct MsField: View {
             Text("ms").foregroundStyle(theme.quiet)
         }
         .font(GroveFont.mono(GroveType.label))
-        .padding(.horizontal, GroveSpace.s8).padding(.vertical, 3)
+        .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
         .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
         .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(valid ? theme.line : Color(theme.red), lineWidth: 1))
         .help(valid ? "Milliseconds · ↩ saves" : "A whole number of milliseconds, 0 or more")
