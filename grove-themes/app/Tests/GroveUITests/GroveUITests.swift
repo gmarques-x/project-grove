@@ -84,7 +84,8 @@ import Testing
              "cable.connector.horizontal", "hifispeaker", "mic", "paintpalette", "keyboard",
                 "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle",
                 // Grove Explorer.
-                "chevron.up", "xmark", "eject.fill", "trash", "icloud", "rectangle", "rectangle.split.2x1"])
+                "chevron.up", "xmark", "eject.fill", "trash", "icloud", "rectangle", "rectangle.split.2x1",
+                "magnifyingglass"])
     }
 
     /// The bar panels' outline is the palette's orange, in every scheme.

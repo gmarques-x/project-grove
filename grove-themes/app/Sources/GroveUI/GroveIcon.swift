@@ -124,6 +124,8 @@ public struct GroveIcon: View {
         case onePane = "rectangle"
         /// The window shows two panes side by side.
         case twoPanes = "rectangle.split.2x1"
+        /// A field that filters or searches what is under it.
+        case search = "magnifyingglass"
 
         /// The SF Symbol's name.
         public var symbol: String { rawValue }

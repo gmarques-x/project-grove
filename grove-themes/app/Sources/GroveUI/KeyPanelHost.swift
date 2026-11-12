@@ -123,15 +123,20 @@ public struct FilterField: NSViewRepresentable {
     let onMove: @MainActor (Int) -> Void
     let onReturn: @MainActor () -> Void
     let onEscape: @MainActor () -> Void
+    let onFocus: (@MainActor (Bool) -> Void)?
 
     /// `size`: the text's, from `GroveType`. `takesFocus`: false leaves the
     /// keyboard where it is when the field appears. `focus`: a count; when
     /// it goes up the field takes the keyboard (a click on something that
-    /// means "type here").
+    /// means "type here"). `onFocus`: told true when the field takes the
+    /// keyboard and false when it gives it up, for an owner whose other
+    /// keys depend on it; it may be called while SwiftUI updates its views.
     public init(text: String, placeholder: String, theme: ThemeColors, size: CGFloat = GroveType.title,
                 takesFocus: Bool = true, focus: Int = 0,
                 onChange: @escaping @MainActor (String) -> Void, onMove: @escaping @MainActor (Int) -> Void,
-                onReturn: @escaping @MainActor () -> Void, onEscape: @escaping @MainActor () -> Void) {
+                onReturn: @escaping @MainActor () -> Void, onEscape: @escaping @MainActor () -> Void,
+                onFocus: (@MainActor (Bool) -> Void)? = nil) {
+        self.onFocus = onFocus
         self.text = text
         self.placeholder = placeholder
         self.theme = theme
@@ -157,6 +162,7 @@ public struct FilterField: NSViewRepresentable {
         field.usesSingleLineMode = true
         field.lineBreakMode = .byTruncatingTail
         field.delegate = context.coordinator
+        field.onFocus = { [weak coordinator = context.coordinator] in coordinator?.field.onFocus?(true) }
         return field
     }
 
@@ -185,6 +191,10 @@ public struct FilterField: NSViewRepresentable {
             field.onChange(text)
         }
 
+        public func controlTextDidEndEditing(_ note: Notification) {
+            field.onFocus?(false)
+        }
+
         public func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             switch selector {
             case #selector(NSResponder.moveUp(_:)): field.onMove(-1)
@@ -200,6 +210,14 @@ public struct FilterField: NSViewRepresentable {
 
 private final class FirstResponderField: NSTextField {
     var takesFocus = true
+    /// The field took the keyboard.
+    var onFocus: (() -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let took = super.becomeFirstResponder()
+        if took { onFocus?() }
+        return took
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
