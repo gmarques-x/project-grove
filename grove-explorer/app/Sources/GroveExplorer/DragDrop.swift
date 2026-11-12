@@ -103,6 +103,17 @@ private enum DragBoard {
         return made
     }
 
+    /// The drag is over: its items are let go of.
+    static func forget() {
+        change = -1
+        items = []
+        firstVolume = nil
+        folders = nil
+        volumes = [:]
+        paths = nil
+        plans = [:]
+    }
+
     static func items(on board: NSPasteboard) -> [URL] {
         bring(board)
         return items
@@ -193,6 +204,7 @@ extension AppModel {
     /// A drag is over: no place stays marked, in any list (a row's mark
     /// alone is not published, so the lists are told here).
     func clearDropMarkEverywhere() {
+        DragBoard.forget()
         guard dropMark != nil else { return }
         objectWillChange.send()
         dropMark = nil
