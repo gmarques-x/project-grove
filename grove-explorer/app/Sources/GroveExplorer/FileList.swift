@@ -187,6 +187,17 @@ struct FileList: NSViewRepresentable {
                 // The table is called by its folder's name.
                 table.setAccessibilityLabel(model.browser.tab(side)?.title ?? listing.folder.lastPathComponent)
                 reportVisible()
+            } else if listing == nil, !entries.isEmpty {
+                // The pane has nothing of its tab's folder: no row of
+                // another folder stays in the table to be opened or dragged.
+                revision = -1
+                entries = []
+                dates = [:]
+                newRows = true
+                settingSelection = true
+                table.reloadData()
+                settingSelection = false
+                reloadVisible = false
             }
             if reloadVisible {
                 // Every row the table has made, not only those in view: it
@@ -346,6 +357,11 @@ struct FileList: NSViewRepresentable {
         /// listing's index while the table shows that listing's rows.
         func item(onRow row: Int) -> URL? { entries.indices.contains(row) ? entries[row].url : nil }
 
+        /// Whether the table's rows are the ones the model has for the
+        /// pane now. Not for the moment between a change to the model and
+        /// this list's next update: a row is then not opened or dragged.
+        var showsModelRows: Bool { model.listing(for: side)?.revision == revision }
+
         func row(of item: URL) -> Int? {
             if let listing = model.listing(for: side), listing.revision == revision { return listing.rows[item] }
             return entries.firstIndex { $0.url == item }
@@ -376,7 +392,7 @@ struct FileList: NSViewRepresentable {
         }
 
         @objc func opened(_ sender: Any?) {
-            guard let table, entries.indices.contains(table.clickedRow) else { return }
+            guard let table, showsModelRows, entries.indices.contains(table.clickedRow) else { return }
             model.activate(side)
             // ⌘-double-click a folder: a new tab (spec §6).
             model.open(entries[table.clickedRow], inNewTab: NSEvent.modifierFlags.contains(.command))

@@ -342,7 +342,7 @@ extension FileList.Coordinator {
 
     /// A row dragged: its file's URL, for the panes, Finder and other apps.
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-        guard model.canTakeDrop, entries.indices.contains(row) else { return nil }
+        guard model.canTakeDrop, showsModelRows, entries.indices.contains(row) else { return nil }
         return entries[row].url as NSURL
     }
 

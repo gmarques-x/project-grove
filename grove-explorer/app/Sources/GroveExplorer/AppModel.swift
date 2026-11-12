@@ -196,6 +196,12 @@ final class AppModel: ObservableObject {
         let was = browser
         browser = next
         filtersFollow(was, next)
+        // A tab that shows another folder now has nothing selected: what
+        // was selected is in the folder it left, and no command is to act
+        // on that from here (`PaneRows`).
+        for tab in PaneRows.tabsThatMoved(from: was, to: next) where selections[tab] != nil {
+            selections[tab] = nil
+        }
         // Another folder, tab or pane has the keys now: letters typed for
         // the last one are not a name's start here, and a path field open
         // over it would say a folder that is no longer the one below it.
@@ -245,14 +251,23 @@ final class AppModel: ObservableObject {
             // listings, the one that needs least.
             let wanted = arrangement(for: tab)
             let known = before
-                .filter { $0.value.folder.standardizedFileURL.path == path }
+                .filter { $0.value.isRead && $0.value.folder.standardizedFileURL.path == path }
                 .map { (side: $0.key, listing: $0.value, reuse: $0.value.state.reuse(for: wanted, entries: $0.value.all.count)) }
                 .min { ($0.reuse, $0.side == side ? 0 : 1) < ($1.reuse, $1.side == side ? 0 : 1) }
             // A sort still on its way was for the tab the pane showed:
             // given up, unless it is the very one this tab waits for.
             let waitsOn = known?.reuse == .keepWaiting && known?.side == side
             if !waitsOn { sorts[side] = (sorts[side] ?? 0) + 1 }
-            guard let known else { continue }
+            guard let known else {
+                // No pane has this folder's rows: the pane is blank until
+                // they are read. It never shows the rows of the folder it
+                // left under the new folder's path bar, so what the user
+                // sees and what a command acts on are one thing.
+                revision += 1
+                listings[side] = Listing(
+                    folder: tab.folder, state: .awaiting(wanted), revision: revision, isRead: false)
+                continue
+            }
             revision += 1
             var listing = known.listing
             listing.revision = revision
@@ -292,10 +307,21 @@ final class AppModel: ObservableObject {
     /// The sides that have a pane, left first.
     var sides: [Side] { browser.panes.count == 2 ? [.left, .right] : [.left] }
 
-    /// The pane's rows: sorted, and without the hidden items unless they are shown.
-    func entries(for side: Side) -> [Entry] { listings[side]?.shown ?? [] }
+    /// The pane's rows: sorted, and without the hidden items unless they
+    /// are shown. None while the pane's listing is not of its tab's folder.
+    func entries(for side: Side) -> [Entry] { listing(for: side)?.shown ?? [] }
 
-    func listing(for side: Side) -> Listing? { listings[side] }
+    /// What the pane lists of the folder its tab is on; nil while it has
+    /// nothing of that folder (`PaneRows.areCurrent`). The one way to a
+    /// pane's rows for every view and every command: rows of a folder the
+    /// tab has left are never returned, so nothing is drawn of them and
+    /// no command (⌘⌫, F5, ⌘A, Quick Look…) can act on them.
+    func listing(for side: Side) -> Listing? {
+        guard let listing = listings[side],
+            PaneRows.areCurrent(listed: listing.folder, tabFolder: browser.tab(side)?.folder)
+        else { return nil }
+        return listing
+    }
 
     func selection(for side: Side) -> Set<URL> {
         browser.tab(side).flatMap { selections[$0.id] } ?? []
@@ -305,7 +331,7 @@ final class AppModel: ObservableObject {
     /// Worked out from the selection (never by walking the folder), and
     /// only when the rows, the selection or the sizes changed.
     func status(for side: Side) -> String {
-        guard let listing = listings[side] else { return "" }
+        guard let listing = listing(for: side) else { return "" }
         if listing.problem != nil { return listing.needsPermission ? "No access" : "" }
         // Blank until its rows arrive: nothing to count yet.
         if listing.state.isAwaitingRows { return "" }
@@ -348,11 +374,16 @@ final class AppModel: ObservableObject {
     // MARK: What the views ask for
 
     /// The pane's selection is now `urls`; under a filter, those of them
-    /// that it shows (no command acts on a row the user can't see).
+    /// that it shows (no command acts on a row the user can't see), and
+    /// nothing while the pane has not read its tab's folder.
     func select(_ urls: Set<URL>, in side: Side) {
         var urls = urls
-        if let listing = listings[side], listing.filteredFrom != nil {
-            urls = Filter.visibleSelection(urls, among: listing.shown)
+        if let listing = listing(for: side), listing.isRead {
+            if listing.filteredFrom != nil { urls = Filter.visibleSelection(urls, among: listing.shown) }
+        } else {
+            // Not read yet: a click that still found a row of the folder
+            // before selects nothing here.
+            urls = []
         }
         guard let tab = browser.tab(side), selections[tab.id] ?? [] != urls else { return }
         selections[tab.id] = urls
@@ -366,7 +397,7 @@ final class AppModel: ObservableObject {
 
     /// The rows changed under a filter: what it hides is selected no more.
     private func keepVisibleSelection(in side: Side) {
-        guard let tab = browser.tab(side), let listing = listings[side], listing.filteredFrom != nil,
+        guard let tab = browser.tab(side), let listing = listing(for: side), listing.filteredFrom != nil,
             let chosen = selections[tab.id], !chosen.isEmpty
         else { return }
         let kept = Filter.visibleSelection(chosen, among: listing.shown)
@@ -480,7 +511,9 @@ final class AppModel: ObservableObject {
     /// arrived), off the main thread: the list shows the old order until
     /// the new one is ready.
     func arrange(_ side: Side) {
-        guard let tab = browser.tab(side), let listing = listings[side] else { return }
+        // Nothing to sort before the folder is read: the read arranges its
+        // own, and asks again when the tab wants something else by then.
+        guard let tab = browser.tab(side), let listing = listing(for: side), listing.isRead else { return }
         let all = listing.all, wanted = arrangement(for: tab), sizes = sizes
         guard live else {
             show(FolderListing.arranged(all, by: wanted, sizes: sizes), by: wanted, in: side)

@@ -14,8 +14,8 @@ extension AppModel {
     /// and forgets the totals of what is no longer shown.
     func wantSizes() {
         guard live else { return }
-        // Totals are kept for every row on screen, the rows of a folder a
-        // pane is just leaving included (they show until the new read lands).
+        // Totals are kept for every row on screen. (A pane between two
+        // folders has none: `entries(for:)`.)
         let shown = Set(sides.flatMap { entries(for: $0) }.map(\.url))
         if sizes.keys.contains(where: { !shown.contains($0) }) { sizes = sizes.filter { shown.contains($0.key) } }
         sizeQueue.want(wantedSizes().filter { sizes[$0] == nil })

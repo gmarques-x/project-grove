@@ -3,9 +3,8 @@ import GroveExplorerCore
 
 /// What a pane shows of its tab's folder.
 struct Listing {
-    /// The folder these entries are of. For a moment after a navigation it
-    /// is still the one before: the list shows the old rows until the new
-    /// ones are read.
+    /// The folder these entries are of: the pane's tab's, or the listing
+    /// is not handed out (`AppModel.listing(for:)`).
     var folder: URL
     /// As read, in no order, hidden items included.
     var all: [Entry] = []
@@ -29,6 +28,10 @@ struct Listing {
     var state: RowsState
     /// Changes whenever `shown` does: what the table reloads by.
     var revision = 0
+    /// False for the blank listing a pane has from the moment its tab
+    /// goes to a folder until that folder is read: `all` is then not "the
+    /// folder has nothing", and there is nothing to arrange or to reuse.
+    var isRead = true
 }
 
 /// "Now", and how dates are written: the user's in the app, fixed in a render.
