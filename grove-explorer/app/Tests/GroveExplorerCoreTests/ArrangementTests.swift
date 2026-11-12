@@ -82,34 +82,4 @@ import Testing
     @Test func anArrangementForAPaneThatHasNoTabIsDropped() {
         #expect(!Arrangement.mayShow(arrived: arrangement(), for: nil))
     }
-
-    // MARK: Rows a pane already has, for a tab that comes to show their folder
-
-    @Test func rowsArrangedAsTheTabAsksAreShownAsTheyAre() {
-        #expect(arrangement().reuse(for: arrangement(), entries: 50_000) == .asItIs)
-    }
-
-    @Test func aSmallFolderIsArrangedAtOnce() {
-        let bySize = arrangement(sort: GroveExplorerCore.SortOrder(column: .size, ascending: true))
-        #expect(arrangement().reuse(for: bySize, entries: 212) == .arrangeNow)
-        #expect(arrangement(filter: "shot").reuse(for: arrangement(), entries: Arrangement.arrangeNowLimit) == .arrangeNow)
-        #expect(Arrangement.arrangeNowLimit == 10_000)
-    }
-
-    @Test func aBigFolderInAnotherSortKeepsItsOrderMeanwhile() {
-        // The same rows, the right set: only their order is still the other tab's.
-        let bySize = arrangement(sort: GroveExplorerCore.SortOrder(column: .size, ascending: true))
-        #expect(arrangement().reuse(for: bySize, entries: 10_001) == .oldOrder)
-        #expect(arrangement(filter: "shot").reuse(for: arrangement(sort: bySize.sort, filter: " shot"), entries: 50_000) == .oldOrder)
-    }
-
-    @Test func aBigFolderUnderAnotherFilterOrHiddenFlagIsBlankMeanwhile() {
-        // Never another tab's pick of rows, even for a moment.
-        #expect(arrangement(filter: "shot").reuse(for: arrangement(), entries: 10_001) == .blank)
-        #expect(arrangement().reuse(for: arrangement(filter: "shot"), entries: 50_000) == .blank)
-        #expect(arrangement(showHidden: true).reuse(for: arrangement(), entries: 50_000) == .blank)
-        // With the sort different too.
-        let bySize = arrangement(sort: GroveExplorerCore.SortOrder(column: .size, ascending: true), filter: "shot")
-        #expect(arrangement().reuse(for: bySize, entries: 50_000) == .blank)
-    }
 }

@@ -156,7 +156,7 @@ final class AppModel: ObservableObject {
             model.listings[side] = Listing(
                 folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows,
                 problem: problems[side]?.sentence, needsPermission: problems[side]?.needsPermission ?? false,
-                free: free, filteredFrom: arranged.filteredFrom, arrangedBy: wanted, revision: 1)
+                free: free, filteredFrom: arranged.filteredFrom, state: .arranged(by: wanted), revision: 1)
             model.selections[tab.id] = selected[side] ?? []
         }
         model.revision = 1
@@ -235,44 +235,47 @@ final class AppModel: ObservableObject {
             guard shownKeys[side] != key else { continue }
             shownKeys[side] = key
             changed.append(side)
-            // A sort still on its way was for the tab the pane showed.
-            sorts[side] = (sorts[side] ?? 0) + 1
-            // Rows of this folder that a pane already has (the other
-            // pane's, or this pane's other tab's) are shown at once when
-            // they were arranged by this tab's own sort and filter: never
-            // another tab's filter's pick without its field. Otherwise as
-            // `Arrangement.reuse` says, by the folder's size.
+            // Rows of this folder that a pane already has (this pane's
+            // other tab's, or the other pane's) are shown at once, as
+            // `RowsState.reuse` says: as they are only when they are what
+            // this tab asks for; never another tab's filter's pick without
+            // its field, and never rows that are not there yet. Of several
+            // listings, the one that needs least.
             let wanted = arrangement(for: tab)
-            let ofFolder = before.values.filter { $0.folder.standardizedFileURL.path == path }
-            if let known = ofFolder.first(where: { $0.arrangedBy.serves(wanted) }) ?? ofFolder.first {
-                revision += 1
-                var listing = known
-                listing.revision = revision
-                listing.arranging = false
-                var later = false
-                switch known.arrangedBy.reuse(for: wanted, entries: known.all.count) {
-                case .asItIs:
-                    break
-                case .arrangeNow:
-                    let arranged = FolderListing.arranged(known.all, by: wanted, sizes: sizes)
-                    listing.shown = arranged.shown
-                    listing.rows = arranged.rows
-                    listing.filteredFrom = arranged.filteredFrom
-                    listing.arrangedBy = wanted
-                case .oldOrder:
-                    later = true
-                case .blank:
-                    listing.shown = []
-                    listing.rows = [:]
-                    listing.filteredFrom = nil
-                    listing.arranging = true
-                    later = true
-                }
-                listings[side] = listing
-                keepVisibleSelection(in: side)
-                // Off the main thread; `arrangedBy` says meanwhile that
-                // the rows are not yet this tab's.
-                if later { arrange(side) }
+            let known = before
+                .filter { $0.value.folder.standardizedFileURL.path == path }
+                .map { (side: $0.key, listing: $0.value, reuse: $0.value.state.reuse(for: wanted, entries: $0.value.all.count)) }
+                .min { ($0.reuse, $0.side == side ? 0 : 1) < ($1.reuse, $1.side == side ? 0 : 1) }
+            // A sort still on its way was for the tab the pane showed:
+            // given up, unless it is the very one this tab waits for.
+            let waitsOn = known?.reuse == .keepWaiting && known?.side == side
+            if !waitsOn { sorts[side] = (sorts[side] ?? 0) + 1 }
+            guard let known else { continue }
+            revision += 1
+            var listing = known.listing
+            listing.revision = revision
+            listing.state = known.listing.state.after(known.reuse, for: wanted)
+            switch known.reuse {
+            case .asItIs, .oldOrder, .keepWaiting:
+                break
+            case .arrangeNow:
+                let arranged = FolderListing.arranged(listing.all, by: wanted, sizes: sizes)
+                listing.shown = arranged.shown
+                listing.rows = arranged.rows
+                listing.filteredFrom = arranged.filteredFrom
+            case .blank:
+                listing.shown = []
+                listing.rows = [:]
+                listing.filteredFrom = nil
+            }
+            listings[side] = listing
+            keepVisibleSelection(in: side)
+            // The tab's own rows are arranged off the main thread; the
+            // state says meanwhile that they are not here yet.
+            switch known.reuse {
+            case .oldOrder, .blank: arrange(side)
+            case .keepWaiting: if !waitsOn { arrange(side) }
+            case .asItIs, .arrangeNow: break
             }
         }
         guard !changed.isEmpty else { return }
@@ -302,6 +305,8 @@ final class AppModel: ObservableObject {
     func status(for side: Side) -> String {
         guard let listing = listings[side] else { return "" }
         if listing.problem != nil { return listing.needsPermission ? "No access" : "" }
+        // Blank until its rows arrive: nothing to count yet.
+        if listing.state.isAwaitingRows { return "" }
         // The tab too: another tab of the pane has another selection.
         let tab = browser.tab(side)?.id
         if let kept = statuses[side], kept.tab == tab, kept.revision == listing.revision,
@@ -428,11 +433,12 @@ final class AppModel: ObservableObject {
             // Until the check returns the pane says the folder is gone.
             if read.gone { repairGoneFolders() }
             if let old = listings[side], old.folder.standardizedFileURL.path == folder.standardizedFileURL.path,
-                old.all == read.all, old.problem == read.problem, old.arrangedBy.serves(asked)
+                old.all == read.all, old.problem == read.problem, old.state.isUnchanged(byReadFor: asked)
             {
                 // A watcher's tick that changed nothing the list shows: the
                 // rows, the icons and the table stay as they are. (Rows
-                // arranged for another tab are not "nothing changed".)
+                // arranged for another tab, in an old order or not there
+                // yet are not "nothing changed": they take the read's.)
                 if old.free != read.free { listings[side]?.free = read.free }
             } else {
                 // An older sort of what was there before has nothing to say now.
@@ -441,7 +447,7 @@ final class AppModel: ObservableObject {
                 listings[side] = Listing(
                     folder: folder, all: read.all, shown: read.arranged.shown, rows: read.arranged.rows,
                     problem: read.problem, needsPermission: read.needsPermission, free: read.free,
-                    filteredFrom: read.arranged.filteredFrom, arrangedBy: asked, revision: revision)
+                    filteredFrom: read.arranged.filteredFrom, state: .arranged(by: asked), revision: revision)
                 let present = Set(read.all.map(\.url))
                 let chosen = selections[tab.id] ?? []
                 if !chosen.isSubset(of: present) { selections[tab.id] = chosen.intersection(present) }
@@ -492,11 +498,14 @@ final class AppModel: ObservableObject {
         // tab the pane no longer shows or for what it no longer asks.
         guard let listing = listings[side],
             listing.folder.standardizedFileURL.path == arrangement.folder.standardizedFileURL.path,
-            Arrangement.mayShow(arrived: arrangement, for: browser.tab(side).map(self.arrangement(for:)))
+            let state = listing.state.arrival(of: arrangement, tabWants: browser.tab(side).map(self.arrangement(for:)))
         else { return }
-        if listing.arrangedBy != arrangement { listings[side]?.arrangedBy = arrangement }
-        if listing.arranging { listings[side]?.arranging = false }
-        guard arranged.shown != listing.shown || arranged.filteredFrom != listing.filteredFrom else { return }
+        let wasBlank = listing.state.isAwaitingRows
+        if listing.state != state { listings[side]?.state = state }
+        // Rows that were awaited are shown even when there are none (a
+        // filter that matches nothing): the pane then says so.
+        guard wasBlank || arranged.shown != listing.shown || arranged.filteredFrom != listing.filteredFrom
+        else { return }
         revision += 1
         listings[side]?.shown = arranged.shown
         listings[side]?.rows = arranged.rows

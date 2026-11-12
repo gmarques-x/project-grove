@@ -22,13 +22,11 @@ struct Listing {
     var free: Int64?
     /// Under a filter: how many items the list would show without it.
     var filteredFrom: Int?
-    /// What `shown` was arranged by: the rows are a tab's to show only
-    /// when this serves the tab's own (`Arrangement.serves`).
-    var arrangedBy: Arrangement
-    /// No rows are shown because the tab's own are still being arranged
-    /// (a large folder another tab had under another filter): the pane is
-    /// blank for that moment and does not say the folder is empty.
-    var arranging = false
+    /// What `shown` is: the rows of an arrangement, rows in an old order
+    /// until the tab's own arrive, or no rows yet. A pane, a read and a
+    /// sort that comes back all ask this (`RowsState`) before they trust
+    /// the rows.
+    var state: RowsState
     /// Changes whenever `shown` does: what the table reloads by.
     var revision = 0
 }

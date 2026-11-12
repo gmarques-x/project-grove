@@ -45,32 +45,115 @@ public struct Arrangement: Equatable, Sendable {
         return arrived.serves(wanted)
     }
 
+    /// Whether this and `other` show the same items (the same folder,
+    /// filter words and hidden flag), whatever their order.
+    func hasSameItems(as other: Arrangement) -> Bool {
+        folder.standardizedFileURL.path == other.folder.standardizedFileURL.path
+            && showHidden == other.showHidden && words == other.words
+    }
+}
+
+/// What the rows a pane shows of a folder are, in one value: the rows and
+/// what they were arranged by can't be told apart from each other.
+public enum RowsState: Equatable, Sendable {
+    /// The rows are this arrangement's.
+    case arranged(by: Arrangement)
+    /// The rows are `of`'s, shown until `awaiting`'s arrive: the same
+    /// items in another order.
+    case oldOrder(of: Arrangement, awaiting: Arrangement)
+    /// No rows are shown until this arrangement's arrive: the pane is
+    /// blank, and its folder is not thereby empty.
+    case awaiting(Arrangement)
+
     /// A folder of up to this many entries is arranged again at once, on
     /// the main thread, when a tab comes to show it; a larger one off it,
     /// so the window never waits for a sort.
     public static let arrangeNowLimit = 10_000
 
-    /// What a pane does with rows it already has of a folder when a tab
-    /// comes to show that folder.
-    public enum Reuse: Equatable, Sendable {
-        /// They were arranged as the tab asks: shown as they are.
+    /// What a pane does with a listing it already has of a folder when a
+    /// tab comes to show that folder. In the order of preference among
+    /// several listings: the one that needs least.
+    public enum Reuse: Int, Comparable, Sendable {
+        /// The rows are what the tab asks for: shown as they are.
         case asItIs
-        /// Few enough to arrange by the tab's own before they are shown.
+        /// The folder is small enough to arrange by the tab's own before
+        /// anything is shown.
         case arrangeNow
-        /// Many, and only the sort differs: the same rows are shown in
-        /// the order they have until the tab's order is ready.
+        /// A big folder whose rows are the right items in another order:
+        /// shown so until the tab's order, arranged off the main thread, is ready.
         case oldOrder
-        /// Many, and the filter or the hidden items differ: no rows are
-        /// shown until the tab's own are ready (another tab's pick would
-        /// hide files, or show hidden ones).
+        /// The rows the tab asks for are already awaited: nothing is
+        /// shown differently, and the arrange on its way is not begun
+        /// again (a pane taking another pane's listing begins its own).
+        case keepWaiting
+        /// A big folder whose rows are other items than the tab's (another
+        /// filter, hidden items) or are not there yet: no rows are shown
+        /// until the tab's own, arranged off the main thread, are ready.
         case blank
+
+        public static func < (one: Reuse, other: Reuse) -> Bool { one.rawValue < other.rawValue }
     }
 
-    /// See `Reuse`. `self` is what the rows were arranged by, `wanted` what
-    /// the tab asks for, `entries` how many items the folder has.
+    /// See `Reuse`: `wanted` is what the tab asks for, `entries` how many
+    /// items the folder has. Rows that are awaited are never reused as
+    /// rows, whatever they await.
     public func reuse(for wanted: Arrangement, entries: Int) -> Reuse {
-        if serves(wanted) { return .asItIs }
+        /// The rows there are, if any, and what they are arranged by.
+        let shown: Arrangement?
+        switch self {
+        case let .arranged(by):
+            shown = by
+        case let .oldOrder(of, awaiting):
+            if of.serves(wanted) { return .asItIs }
+            if awaiting.serves(wanted) { return .keepWaiting }
+            shown = of
+        case let .awaiting(awaited):
+            if awaited.serves(wanted) { return .keepWaiting }
+            shown = nil
+        }
+        if let shown, shown.serves(wanted) { return .asItIs }
         if entries <= Self.arrangeNowLimit { return .arrangeNow }
-        return showHidden == wanted.showHidden && words == wanted.words ? .oldOrder : .blank
+        if let shown, shown.hasSameItems(as: wanted) { return .oldOrder }
+        return .blank
+    }
+
+    /// The state once `reuse` (what `reuse(for:entries:)` said for
+    /// `wanted`) has been applied.
+    public func after(_ reuse: Reuse, for wanted: Arrangement) -> RowsState {
+        switch (reuse, self) {
+        case (.arrangeNow, _): .arranged(by: wanted)
+        case (.blank, _): .awaiting(wanted)
+        case (.keepWaiting, _): self
+        // Rows in an old order are, for the tab that has that order, simply its rows.
+        case let (.asItIs, .oldOrder(of, _)): .arranged(by: of)
+        case (.asItIs, _): self
+        case let (.oldOrder, .arranged(by)): .oldOrder(of: by, awaiting: wanted)
+        case let (.oldOrder, .oldOrder(of, _)): .oldOrder(of: of, awaiting: wanted)
+        // No rows to keep in any order.
+        case (.oldOrder, .awaiting): .awaiting(wanted)
+        }
+    }
+
+    /// Rows arranged off the main thread by `arrived` come back: the state
+    /// when they are shown, or nil when they are dropped because the
+    /// pane's tab does not ask for them now (`Arrangement.mayShow`).
+    public func arrival(of arrived: Arrangement, tabWants wanted: Arrangement?) -> RowsState? {
+        Arrangement.mayShow(arrived: arrived, for: wanted) ? .arranged(by: arrived) : nil
+    }
+
+    /// Whether a read of the folder that found the same entries, arranged
+    /// as `asked`, changes nothing the pane shows: only when its rows are
+    /// there and arranged so. Rows in an old order, or awaited, take the
+    /// read's.
+    public func isUnchanged(byReadFor asked: Arrangement) -> Bool {
+        if case let .arranged(by) = self { return by.serves(asked) }
+        return false
+    }
+
+    /// The pane is blank for the moment: nothing is to be said of its
+    /// folder (not "empty", not "0 items").
+    public var isAwaitingRows: Bool {
+        if case .awaiting = self { return true }
+        return false
     }
 }
