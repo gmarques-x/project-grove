@@ -11,6 +11,14 @@ let testSettings: [SwiftSetting] = FileManager.default.fileExists(atPath: testin
     ? [.unsafeFlags(["-plugin-path", testingPlugins])]
     : []
 
+// The app's resources are the Grove Icons font and map, copied in from
+// grove-dotfiles by make-resources.sh (the folder is git-ignored). Without
+// them the build stops here and says so, rather than at "resource not found".
+let resources = Context.packageDirectory + "/Sources/GroveExplorer/Resources"
+for file in ["seti.woff", "grove-icon-theme.json"] where !FileManager.default.fileExists(atPath: resources + "/" + file) {
+    fatalError("Grove Explorer's resources are missing (\(file)): run grove-explorer/app/make-resources.sh, then build again")
+}
+
 let package = Package(
     name: "GroveExplorer",
     platforms: [.macOS(.v14)],
@@ -28,7 +36,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "GroveExplorer",
-            dependencies: ["GroveExplorerCore", .product(name: "GroveUI", package: "grove-themes")]
+            dependencies: [
+                "GroveExplorerCore",
+                .product(name: "GroveUI", package: "grove-themes"),
+                .product(name: "GroveThemesCore", package: "grove-themes"),
+            ],
+            resources: [.copy("Resources")]
         ),
         .testTarget(
             name: "GroveExplorerCoreTests",

@@ -1,1 +1,3 @@
 .build/
+# The Grove Icons font and map, copied in by make-resources.sh.
+Sources/GroveExplorer/Resources/
