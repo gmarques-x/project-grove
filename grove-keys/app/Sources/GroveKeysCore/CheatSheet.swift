@@ -278,6 +278,8 @@ public enum CommandWords {
         case .appMenu: return "App menu"
         case .menu: return "Grove Keys menu"
         case .row: return nil
+        case .panel(let name): return name.prefix(1).uppercased() + name.dropFirst() + " panel"
+        case .closePanel: return "Close the bar's panel"
         }
     }
 

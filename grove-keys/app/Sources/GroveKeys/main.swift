@@ -65,4 +65,9 @@ if CommandLine.arguments.contains("--render-aerospace") { renderAeroSpace() }
 if let flag = CommandLine.arguments.firstIndex(of: "--check-menu") {
     checkMenu(Array(CommandLine.arguments[(flag + 1)...]))
 }
+// `--render-panel <name> <out.png> [scheme] [left|right]`: a bar panel on its
+// sample data, drawn to a PNG. No window is shown and the app never starts.
+if let flag = CommandLine.arguments.firstIndex(of: "--render-panel") {
+    BarPanelRender.run(Array(CommandLine.arguments[(flag + 1)...]))
+}
 GroveKeysApp.main()

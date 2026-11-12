@@ -35,7 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // No Dock icon, as LSUIElement in the bundle (also when run bare from .build).
         NSApp.setActivationPolicy(.accessory)
         AppModel.shared.start()
-        MainActor.assumeIsolated { PointerMenu.shared.start() }
+        MainActor.assumeIsolated {
+            PointerMenu.shared.start()
+            // No bar panel is open yet, whatever a crash left in the bar's file.
+            BarPanelHost.shared.shutdown()
+        }
     }
 
     /// The `grovekeys://` links (see `KeysURL`); anything else is ignored.
@@ -46,12 +50,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { BarPanelHost.shared.shutdown() }
         AppModel.shared.shutdown()
     }
 }
 
 /// What each `grovekeys://` link does. The Grove bar's pine and app name
-/// send `grove-menu` and `app-menu`, AeroSpace's hotkey `cheatsheet`; `launcher` is for a
+/// send `grove-menu` and `app-menu`, its other pills `panel/<name>` (the bar's panels: `BarPanelHost`), AeroSpace's hotkey `cheatsheet`; `launcher` is for a
 /// terminal or a binding of one's own (its key, ⌘Space, comes through the key tap); an `open` row of the Grove menu naming one of these links is
 /// answered here too, without going round through macOS.
 @MainActor
@@ -64,6 +69,10 @@ enum Links {
         case .appMenu: PointerMenu.shared.showAppMenu()
         case .launcher: LauncherPanel.shared.toggle()
         case .cheatSheet: CheatSearchPanel.shared.toggle()
+        case .panel(let name): BarPanelHost.shared.toggle(name)
+        case .closePanel:
+            BarPanelHost.shared.close(handBack: false)
+            PointerMenu.shared.handBackAfterLink()
         }
     }
 }

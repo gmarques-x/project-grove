@@ -31,6 +31,21 @@ import Testing
         #expect(KeysURL(try #require(URL(string: "grovekeys://CheatSheet/"))) == .cheatSheet)
     }
 
+    @Test func aBarPanelIsNamedInThePath() throws {
+        for name in ["clock", "system", "battery", "wifi", "sound", "grove"] {
+            #expect(KeysURL(try #require(URL(string: "grovekeys://panel/\(name)"))) == .panel(name: name))
+        }
+        #expect(KeysURL(try #require(URL(string: "grovekeys://PANEL/Clock"))) == .panel(name: "clock"))
+        #expect(KeysURL(try #require(URL(string: "grovekeys://panel/close"))) == .closePanel)
+        // No name, a second part, or something that isn't a name: ignored.
+        for text in ["grovekeys://panel", "grovekeys://panel/", "grovekeys://panel/clock/x", "grovekeys://panel/a%20b",
+                     "grovekeys://panel/a.b", "grovekeys://panel/" + String(repeating: "a", count: 25)] {
+            #expect(KeysURL(try #require(URL(string: text))) == nil, "\(text)")
+        }
+        // The Grove menu's link is as it was.
+        #expect(KeysURL(try #require(URL(string: "grovekeys://grove-menu"))) == .groveMenu)
+    }
+
     @Test func anythingElseIsIgnored() throws {
         for text in ["grovekeys://other", "http://menu", "grovekeys:", "grovekeys://", "grovekeys://menu/a/b",
                      "grovekeys://launcher/x", "grovekeys://palette/x", "grovekeys://cheatsheet/x", "http://launcher"] {

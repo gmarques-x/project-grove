@@ -95,19 +95,63 @@ Open detail for stage 2: both Keep Awake and Ignore Lid must show on the bar whi
 
 ## 7. The host (Grove Keys)
 
-- **Window.** A borderless `NSPanel`, `.nonactivatingPanel`, at the status-bar level (above normal windows and the window borders; it starts 1.5 pt below the strip, so nothing of the bar is covered), on every Space, no shadow. It takes the keyboard (`canBecomeKey`) without Grove Keys coming forward, so sliders, switches and the arrow keys work.
+- **Window.** A borderless `NSPanel`, `.nonactivatingPanel`, at the status-bar level (above normal windows and the window borders; it starts 1.5 pt below the strip, so nothing of the bar is covered), on every Space, no shadow. It takes the keyboard (`canBecomeKey`) without Grove Keys coming forward, so sliders, switches and the arrow keys work. It opens on the screen the pointer is on.
 - **Closing.** Escape; a click anywhere outside it; another app coming forward; an AeroSpace workspace change (the bar's workspaces plugin sends `grovekeys://panel/close`, only while a panel is open: one file test otherwise); a Space change; a change of the screens; `panel/close`; the toggle link.
 - **The click on its own pill.** That click is first a click outside (the panel closes), then the toggle link arrives. A toggle for the panel that an outside click closed within the last half second is that same "put away", not a new "show" (`BarPanelToggle`, pure, tested).
 - **Focus.** The app in front is never deactivated by opening a panel; if macOS did bring Grove Keys forward, the app that was in front gets the keyboard back on closing. Not when the panel closed because of what was chosen (a footer that opens Settings, Activity Monitor) or because another app came forward.
 - **Cost.** A panel's model is made the first time it opens and kept; `start()` runs at each opening and `stop()` at each closing. Closed, a panel runs nothing: no timer, no process.
 - **The open pill.** On opening, Grove Keys writes the pill's name to `$GROVE_STATE/bar-panel` and fills the pill (`sketchybar --set pill.<x> background.color=<hover fill>`); on closing it removes the file and clears the fill (unless the pointer is still over the pill, whose hover keeps it). The bar's hover helper (`sb_hover`) leaves the open pill filled when the pointer leaves; a reload of the bar fills it again.
-- **One-shot.** `GroveKeys --render-panel <name> <out.png> [scheme]` draws a panel with its sample data to a PNG at 2x and exits, without starting the app or showing a window (as `--check-menu`).
+- **One-shot.** `GroveKeys --render-panel <name> <out.png> [scheme] [left|right]` draws a panel with its sample data to a PNG at 2x and exits, without starting the app or showing a window (as `--check-menu`).
 
 ## 8. The bar
 
 - Every pill's click sends its link: clock → `panel/clock`; cpu and mem → `panel/system`; battery → `panel/battery`; wifi → `panel/wifi`; volume → `panel/sound`. The pine keeps `grovekeys://grove-menu` until its panel exists.
 - Gone: the popups and what only they used (`plugins/popup.sh`, `clock_popup.sh`, `network_popup.sh`, `system_popup.sh`, `battery_popup.sh`, `net_sample.sh` and its hidden item, the popup and chart items, the popup helpers and the parsers only they called). The bar's own labels and icons are as they were.
 - The end gaps of §5.
+
+## 9. For panel authors
+
+A panel is one file in `grove-keys/app/Sources/GroveKeys/Panels/`. The four placeholders (`SystemPanel.swift`, `BatteryPanel.swift`, `WifiPanel.swift`, `SoundPanel.swift`) are registered and open from their pills already: building one means replacing that file's model and body, and touching neither `BarPanels.swift` (the list) nor `BarPanelHost.swift` (the window). `ClockPanel.swift` is the worked example.
+
+**Registering.** The file's view declares
+
+```swift
+static let registration = BarPanelRegistration("battery", pill: "pill.battery", width: width,
+                                               model: BatteryModel.init) { BatteryPanel(model: $0) }
+```
+
+`name` is the link's (`grovekeys://panel/battery`), `pill` the bar's bracket the panel hangs from, `width` the same number its `BarPanel(width:)` is given, `anchor:` `.trailing` by default (`.leading` is the Grove menu's). A new panel also adds its registration to `BarPanels.all`.
+
+**The model.** A `@MainActor final class …: ObservableObject, BarPanelModel` with `init(_ data: BarPanelData)`:
+
+- `.live`: made once, the first time the panel opens, and kept (so a speed test's last result survives a closing). `start()` runs at every opening, before the panel is drawn: read what it shows, start what keeps it current. `stop()` runs at every closing: every timer, process and observer ends there. Closed, a panel must cost nothing.
+- `.sample`: fixed data for the render (below); `start()` is never called on it, and it must read nothing from the Mac.
+- `key(_:) -> Bool` (optional): a key pressed while the panel has the keyboard, offered to the model before any control (`.left`, `.right`, `.up`, `.down`, `.home`, `.end`, `.pageUp`, `.pageDown`, `.enter`, `.space`, `.character("t")`). Return true when used. Escape never arrives: it closes the panel.
+- State in views: the Command Line Tools have no `@State` macro; use the model's `@Published` properties, or `State(initialValue:)` with a comment.
+
+**The view.** A `BarPanel(width:)` from `GroveUI` holding sections separated by `PanelRule()`. The parts (all in `GroveUI`, `PanelKit.swift` and `PanelCharts.swift`): `PanelHeader(icon, accent:, title:) { trailing }`, `PanelValue`, `PanelCaption`, `PanelDetail(label, value)`, `PanelStatus(text, accent:)` (a dot and a word: how a panel says "warning"), `PanelRows { PanelRow(action:) { … } }` (rows with the hover fill), `PanelFooter(title, note:, action:)`, `PanelPairs` (name and value lines), `PanelButton`, `PanelSwitch(label, isOn:)`, `PanelSlider(label, value:)`, `Sparkline` (one or two series, values 0...1; `SparklineGeometry.normalized` for rates), `PanelMeter` and `PanelLegend` (`MeterPart`s), `CoreBars`. Icons are `GroveIcon.Name` cases; the ones the six panels need are there. Colours from `@Environment(\.theme)`, roles only; nothing orange inside.
+
+**Height.** A panel is as tall as its content, and may change while open (a section opened, a row appearing): nothing to call. The host sees the new size and re-places the window with the top and the anchored edge where they were. No popover inside a panel (it takes the keyboard, which closes the panel); a `GroveSelect`'s menu is fine.
+
+**The host's actions.** `@Environment(\.barPanel) private var panel`:
+
+- `panel.close()`: puts the panel away; the app in front keeps the keyboard.
+- `panel.open(url)`: opens a link in its app and puts the panel away, leaving the keyboard with what opened: a Settings pane, e.g. `x-apple.systempreferences:com.apple.Battery-Settings.extension`.
+- `panel.openApp(bundleID:)`: the same for an app ("Activity Monitor…", `com.apple.ActivityMonitor`).
+- `panel.leave { … }`: the general form, for anything else that brings a window forward.
+
+**Seeing it without the live UI.**
+
+```
+swift build
+"$(swift build --show-bin-path)/GroveKeys" --render-panel battery out.png                 # dark-medium
+"$(swift build --show-bin-path)/GroveKeys" --render-panel battery out.png light-medium
+"$(swift build --show-bin-path)/GroveKeys" --render-panel clock out.png ../../grove-dotfiles/theme/everforest-light-medium right
+```
+
+Draws the panel's `.sample` model at 2x on a bg0 ground and exits; no window is shown and the app is not started, so it is safe beside the installed Grove Keys (never run the binary without a one-shot flag). The scheme is a name (through the installed `grove-themes`) or a theme file's path; `left` or `right` draws that top corner as it follows a window border. Switches and sliders are drawn as stand-ins there (`\.panelStandIns`), since AppKit leaves their tint out off screen. To feed it data, make `.sample` build the model's published state from fixed values (the mock-ups' numbers are a good set); to see a second state (a running speed test), switch on an environment variable inside `.sample`.
+
+**Pure logic** (parsing a tool's output, a grid, a rate) goes in `GroveKeysCore` with tests, as `MonthGrid` does; the model in the app target only reads the Mac and publishes.
 
 ## Out of scope (stage 1)
 
