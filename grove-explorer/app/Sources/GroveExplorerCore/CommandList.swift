@@ -28,6 +28,20 @@ public struct CommandInfo: Equatable, Sendable {
     }
 }
 
+/// A key of spec §7 that is no command: the list does it itself.
+public struct ListKey: Equatable, Sendable {
+    /// As spec §7 writes it: "↑", "Home", "Page Up"; "Letters" for typing a name's start.
+    public let key: String
+    public let modifiers: Set<Modifier>
+    public let does: String
+
+    public init(key: String, modifiers: Set<Modifier> = [], does: String) {
+        self.key = key
+        self.modifiers = modifiers
+        self.does = does
+    }
+}
+
 /// Every command of spec §7, grouped by its menu. What each one does is the
 /// app's (`Commands`); the rows that move the selection (the arrows, Home,
 /// End, Page Up and Down) and typing a name's start are the list's own and
@@ -36,6 +50,23 @@ public enum CommandList {
     public static let menus = ["File", "Edit", "View", "Go"]
 
     public static let all: [CommandInfo] = file + edit + view + go
+
+    /// The rows of spec §7 that are not commands: moving and extending the
+    /// selection is the table's own, and letters jump to a name
+    /// (`TypeJump`). They have no menu row and no action in the app's
+    /// table; they are listed so the whole of §7 can be checked against
+    /// `all` and this together.
+    public static let listKeys: [ListKey] = [
+        ListKey(key: "↑", does: "Select the row above"),
+        ListKey(key: "↓", does: "Select the row below"),
+        ListKey(key: "↑", modifiers: [.shift], does: "Extend the selection upwards"),
+        ListKey(key: "↓", modifiers: [.shift], does: "Extend the selection downwards"),
+        ListKey(key: "Home", does: "Scroll to the top"),
+        ListKey(key: "End", does: "Scroll to the bottom"),
+        ListKey(key: "Page Up", does: "Scroll a page up"),
+        ListKey(key: "Page Down", does: "Scroll a page down"),
+        ListKey(key: "Letters", does: "Jump to a name"),
+    ]
 
     /// Commands that are a second key for another one (⌘↓ opens as ⌘O does,
     /// ⌘L goes to a path as ⌘⇧G does) and the nine tab keys: they have a key

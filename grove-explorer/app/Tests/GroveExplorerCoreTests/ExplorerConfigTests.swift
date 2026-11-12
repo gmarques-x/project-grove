@@ -333,4 +333,53 @@ import Testing
             try ExplorerConfig.localText(favourites: [], home: home, keeping: "[colours]\nred = true\n")
         }
     }
+
+    // MARK: The favourites as the files give them
+
+    @Test func allFavouritesAreTheMergedListWhetherTheirFoldersExistOrNot() {
+        #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: nil, home: home).map(\.id)
+            == ["applications", "home", "developer", "documents", "downloads"])
+        let local = "[favourites.disk]\npath = \"/Volumes/Away/work\"\n\n[favourites.music]\npath = \"~/Music\"\n"
+        #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: local, home: home).map(\.id)
+            == ["disk", "music"])
+        // A local file that can't be read counts for nothing, as in `load`.
+        #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: "[favourites.x\n", home: home).count == 5)
+    }
+
+    /// The window's list leaves out a favourite on a disk that isn't
+    /// mounted. Removing another one must not write that shortened list.
+    @Test func aFavouriteWhoseFolderIsNotThereSurvivesTheRemovalOfAnother() throws {
+        let local = """
+            [favourites.disk]
+            path = "/Volumes/Away/work"
+
+            [favourites.music]
+            path = "~/Music"
+
+            [favourites.films]
+            path = "~/Movies"
+
+            """
+        let mounted: (URL) -> Bool = { !$0.path.hasPrefix("/Volumes/Away") }
+        // What the sidebar shows: the disk's favourite is left out.
+        #expect(load(local: local, exists: mounted).favourites.map(\.id) == ["music", "films"])
+
+        let kept = ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: local, home: home)
+            .filter { $0.id != "music" }
+        let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: local)
+        #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: text, home: home).map(\.id)
+            == ["disk", "films"])
+        // The disk comes back: its favourite is in the sidebar again.
+        #expect(load(local: text).favourites.map(\.url.path) == ["/Volumes/Away/work", "/Users/someone/Movies"])
+    }
+
+    @Test func removingATrackedFavouriteWritesTheOthersToTheLocalFile() throws {
+        let kept = ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: nil, home: home)
+            .filter { $0.id != "developer" }
+        let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: nil)
+        // Nothing exists but Home: the window shows one, the file still holds four.
+        #expect(load(local: text, exists: { $0 == self.home }).favourites.map(\.id) == ["home"])
+        #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: text, home: home).map(\.id)
+            == ["applications", "home", "documents", "downloads"])
+    }
 }

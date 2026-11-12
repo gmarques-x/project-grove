@@ -122,4 +122,63 @@ import Testing
         #expect(!CommandList.keysOnly.contains("open"))
         #expect(CommandList.keysOnly.allSatisfy { command($0) != nil })
     }
+
+    // MARK: The list's own keys, and the whole of spec §7
+
+    @Test func theListsOwnKeysAreTheRowsThatAreNotCommands() {
+        #expect(CommandList.listKeys.map(\.key) == ["↑", "↓", "↑", "↓", "Home", "End", "Page Up", "Page Down", "Letters"])
+        #expect(CommandList.listKeys[2].modifiers == [.shift])
+        #expect(CommandList.listKeys.allSatisfy { !$0.does.isEmpty })
+        // None of them is also a command's key.
+        for key in CommandList.listKeys {
+            #expect(CommandList.command(key: key.key, modifiers: key.modifiers) == nil)
+        }
+    }
+
+    /// Every key in the two tables of the spec's §7 is a command's
+    /// (`CommandList.all`) or the list's own (`CommandList.listKeys`).
+    @Test func everyKeyOfTheSpecsTablesIsACommandsOrTheLists() throws {
+        // …/grove-explorer/app/Tests/GroveExplorerCoreTests/<this file>
+        var repo = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { repo.deleteLastPathComponent() }
+        let spec = try String(
+            contentsOf: repo.appendingPathComponent("grove-dotfiles/docs/specs/2026-11-12-grove-explorer-design.md"),
+            encoding: .utf8)
+        let section = try #require(spec.components(separatedBy: "\n## 7. Keys\n").last?.components(separatedBy: "\n## 8.").first)
+        let cells = section.split(separator: "\n").filter { $0.hasPrefix("| ") }
+            .compactMap { $0.split(separator: "|").first.map { $0.trimmingCharacters(in: .whitespaces) } }
+            .filter { $0 != "Key" && !$0.hasPrefix("---") }
+        // 18 rows of Finder's keys and 11 of Grove's.
+        #expect(cells.count == 29)
+
+        var strokes: [String] = []
+        for cell in cells {
+            for part in cell.split(separator: ",").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+                if part == "Page Up/Down" {
+                    strokes += ["Page Up", "Page Down"]
+                } else if part == "⌘1…⌘9" {
+                    strokes += (1...9).map { "⌘\($0)" }
+                } else if part.contains(" "), part.split(separator: " ").allSatisfy({ $0.count <= 2 }) {
+                    // "↑ ↓", "⇧↑ ⇧↓": two keys in one breath.
+                    strokes += part.split(separator: " ").map(String.init)
+                } else {
+                    strokes.append(part)
+                }
+            }
+        }
+        // 34 keys in Finder's rows and 22 in Grove's.
+        #expect(strokes.count == 56)
+        let marks: [Character: GroveExplorerCore.Modifier] = ["⌘": .command, "⌥": .option, "⇧": .shift, "⌃": .control]
+        for stroke in strokes {
+            var modifiers: Set<GroveExplorerCore.Modifier> = []
+            var key = Substring(stroke)
+            while let first = key.first, let modifier = marks[first], key.count > 1 {
+                modifiers.insert(modifier)
+                key = key.dropFirst()
+            }
+            let isCommand = CommandList.command(key: String(key), modifiers: modifiers) != nil
+            let isTheLists = CommandList.listKeys.contains { $0.key == String(key) && $0.modifiers == modifiers }
+            #expect(isCommand || isTheLists, "\(stroke) of spec §7 is in neither table")
+        }
+    }
 }

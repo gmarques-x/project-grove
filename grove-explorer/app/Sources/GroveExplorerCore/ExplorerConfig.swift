@@ -85,6 +85,15 @@ public struct ExplorerConfig: Equatable, Sendable {
             problem: problem)
     }
 
+    /// Every favourite the two files give, merged as `load` merges them,
+    /// whether its folder exists or not. This is the list to change and
+    /// write back: `load`'s own leaves out the folders that weren't there
+    /// when it was read (a disk not mounted), and writing that one would
+    /// drop them from the file for good.
+    public static func allFavourites(tracked: String?, local: String?, home: URL) -> [Favourite] {
+        load(tracked: tracked, local: local, home: home, exists: { _ in true }).favourites
+    }
+
     /// What the app writes to `explorer.local.toml` to keep `favourites`: a
     /// table each, in order, with folders under `home` written from `~`. No
     /// favourites at all is a bare `[favourites]` table, which still replaces
