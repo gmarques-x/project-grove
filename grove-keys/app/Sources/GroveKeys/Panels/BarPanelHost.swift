@@ -457,11 +457,6 @@ private final class BarPanelLayout: ObservableObject {
     }
 }
 
-private struct BarPanelSizeKey: PreferenceKey {
-    static let defaultValue = CGSize.zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
-}
-
 /// A panel's view in its window: the scheme's colours (they follow a theme
 /// switch while open), the host's actions, the corners, and the size
 /// reported back.
@@ -472,15 +467,24 @@ private struct BarPanelRoot: View {
     let actions: BarPanelActions
 
     var body: some View {
-        content
-            .background(GeometryReader { geo in Color.clear.preference(key: BarPanelSizeKey.self, value: geo.size) })
-            .onPreferenceChange(BarPanelSizeKey.self) { [layout] size in
-                // After this layout pass: the window can't be resized inside it.
-                Task { @MainActor in layout.report(size) }
-            }
-            .padding(.leading, layout.inset.x)
-            .padding(.top, layout.inset.y)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // The window is exactly this clear view; the panel lies over it from
+        // the top-left at its own height, whatever the window's is, so its
+        // size can be read and the window made to fit. (A preference read
+        // through a frame that fills the window was never reported, and a
+        // panel taller than its window was drawn centred and cut off at
+        // both ends: the Wi-Fi panel after a speed test.)
+        Color.clear.overlay(alignment: .topLeading) {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { geo in
+                    // After this layout pass: the window can't be resized inside it.
+                    Color.clear
+                        .onAppear { [layout] in DispatchQueue.main.async { layout.report(geo.size) } }
+                        .onChange(of: geo.size) { [layout] _, size in DispatchQueue.main.async { layout.report(size) } }
+                })
+                .padding(.leading, layout.inset.x)
+                .padding(.top, layout.inset.y)
+        }
             // A panel opens key, so without this its first control would open
             // with a focus ring; Tab shows it, a click hides it.
             .keyboardFocusRing()
