@@ -25,6 +25,10 @@ struct Listing {
     /// What `shown` was arranged by: the rows are a tab's to show only
     /// when this serves the tab's own (`Arrangement.serves`).
     var arrangedBy: Arrangement
+    /// No rows are shown because the tab's own are still being arranged
+    /// (a large folder another tab had under another filter): the pane is
+    /// blank for that moment and does not say the folder is empty.
+    var arranging = false
     /// Changes whenever `shown` does: what the table reloads by.
     var revision = 0
 }

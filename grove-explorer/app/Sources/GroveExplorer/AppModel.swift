@@ -235,25 +235,44 @@ final class AppModel: ObservableObject {
             guard shownKeys[side] != key else { continue }
             shownKeys[side] = key
             changed.append(side)
-            // Rows of this folder that a pane already has are shown at once
-            // (the other pane's, or this pane's other tab's): as they are
-            // when they were arranged by this tab's own sort and filter,
-            // else arranged by them here and now (never another tab's
-            // order or, worse, its filter's pick without its field).
-            if let known = before.values.first(where: { $0.folder.standardizedFileURL.path == path }) {
+            // A sort still on its way was for the tab the pane showed.
+            sorts[side] = (sorts[side] ?? 0) + 1
+            // Rows of this folder that a pane already has (the other
+            // pane's, or this pane's other tab's) are shown at once when
+            // they were arranged by this tab's own sort and filter: never
+            // another tab's filter's pick without its field. Otherwise as
+            // `Arrangement.reuse` says, by the folder's size.
+            let wanted = arrangement(for: tab)
+            let ofFolder = before.values.filter { $0.folder.standardizedFileURL.path == path }
+            if let known = ofFolder.first(where: { $0.arrangedBy.serves(wanted) }) ?? ofFolder.first {
                 revision += 1
                 var listing = known
                 listing.revision = revision
-                let wanted = arrangement(for: tab)
-                if !known.arrangedBy.serves(wanted) {
+                listing.arranging = false
+                var later = false
+                switch known.arrangedBy.reuse(for: wanted, entries: known.all.count) {
+                case .asItIs:
+                    break
+                case .arrangeNow:
                     let arranged = FolderListing.arranged(known.all, by: wanted, sizes: sizes)
                     listing.shown = arranged.shown
                     listing.rows = arranged.rows
                     listing.filteredFrom = arranged.filteredFrom
                     listing.arrangedBy = wanted
+                case .oldOrder:
+                    later = true
+                case .blank:
+                    listing.shown = []
+                    listing.rows = [:]
+                    listing.filteredFrom = nil
+                    listing.arranging = true
+                    later = true
                 }
                 listings[side] = listing
                 keepVisibleSelection(in: side)
+                // Off the main thread; `arrangedBy` says meanwhile that
+                // the rows are not yet this tab's.
+                if later { arrange(side) }
             }
         }
         guard !changed.isEmpty else { return }
@@ -469,11 +488,14 @@ final class AppModel: ObservableObject {
     }
 
     private func show(_ arranged: FolderListing.Arranged, by arrangement: Arrangement, in side: Side) {
-        // The rows it was made from are another folder's by now: not shown.
+        // Not shown: rows made from another folder's, or arranged for a
+        // tab the pane no longer shows or for what it no longer asks.
         guard let listing = listings[side],
-            listing.folder.standardizedFileURL.path == arrangement.folder.standardizedFileURL.path
+            listing.folder.standardizedFileURL.path == arrangement.folder.standardizedFileURL.path,
+            Arrangement.mayShow(arrived: arrangement, for: browser.tab(side).map(self.arrangement(for:)))
         else { return }
         if listing.arrangedBy != arrangement { listings[side]?.arrangedBy = arrangement }
+        if listing.arranging { listings[side]?.arranging = false }
         guard arranged.shown != listing.shown || arranged.filteredFrom != listing.filteredFrom else { return }
         revision += 1
         listings[side]?.shown = arranged.shown
