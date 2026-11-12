@@ -49,14 +49,9 @@ struct MonitorsView: View {
     }
 
     private func cell(_ n: Int, target: String?, choices: [String]) -> some View {
-        Menu {
-            ForEach(choices, id: \.self) { choice in
-                Button {
-                    model.editMonitors { $0.set(workspace: String(n), target: choice) }
-                } label: {
-                    if choice == target { Label(choice, systemImage: "checkmark") } else { Text(choice) }
-                }
-            }
+        GroveSelect("Workspace \(n)'s monitor", options: choices.map { GroveSelectOption($0, $0) }, selection: target,
+                    valueText: target ?? "not set, main screen") { choice in
+            model.editMonitors { $0.set(workspace: String(n), target: choice) }
         } label: {
             VStack(spacing: GroveSpace.s4) {
                 Text(String(n)).font(GroveFont.mono(GroveType.heading, .semibold)).foregroundStyle(theme.ink(theme.green))
@@ -71,9 +66,6 @@ struct MonitorsView: View {
             .lightOutline(cornerRadius: GroveRadius.control)
             .contentShape(Rectangle())
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
         .help(target.map { "Workspace \(n) → \($0)" } ?? "Workspace \(n): not set (main screen)")
     }
 

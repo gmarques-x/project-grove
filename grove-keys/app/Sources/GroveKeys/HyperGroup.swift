@@ -20,16 +20,10 @@ struct HyperGroup: View {
                     .labelsHidden()
             }
             setting("Tap alone sends") {
-                Menu {
-                    Button("Escape") { update { $0.tap = .escape } }
-                    Button("None") { update { $0.tap = .none } }
-                } label: {
-                    pill(h.tap == .escape ? "Escape ▾" : "None ▾")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
+                GroveSelect("Tap alone sends",
+                            options: [GroveSelectOption(TapAction.escape, "Escape"), GroveSelectOption(.none, "None")],
+                            selection: h.tap) { tap in update { $0.tap = tap } }
+                    .fixedSize()
             }
             setting("A tap is shorter than") {
                 MsField(value: h.tapMs) { ms in update { $0.tapMs = ms } }.id(h.tapMs)
@@ -75,15 +69,6 @@ struct HyperGroup: View {
         }
         .font(GroveFont.mono(GroveType.label))
         .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
-    }
-
-    private func pill(_ text: String) -> some View {
-        Text(text)
-            .font(GroveFont.mono(GroveType.label))
-            .foregroundStyle(Color(theme.fg))
-            .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
-            .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
-            .overlay(RoundedRectangle(cornerRadius: GroveRadius.control).strokeBorder(theme.line, lineWidth: 1))
     }
 }
 
