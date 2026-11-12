@@ -62,6 +62,11 @@ import Testing
         ("goDownloads", "L", [.command, .option], "Go"),
         ("goApplications", "A", [.command, .shift], "Go"),
         ("getInfo", "I", [.command], "File"),
+        // Finder's View › Sort By: the column headers, by key.
+        ("sortByName", "1", [.control, .option, .command], "View"),
+        ("sortByKind", "2", [.control, .option, .command], "View"),
+        ("sortByDate", "5", [.control, .option, .command], "View"),
+        ("sortBySize", "6", [.control, .option, .command], "View"),
     ] as [(String, String, [Modifier], String)])
     func findersKeys(id: String, key: String, modifiers: [Modifier], menu: String) {
         let found = command(id)
@@ -87,6 +92,12 @@ import Testing
         ("focusSidebar", "←", [.option, .command], "View"),
         ("openInGhostty", "T", [.command, .option], "File"),
         ("copyPaths", "C", [.command, .option], "Edit"),
+        // The whole window by keyboard (Task 15).
+        ("contextMenu", "Return", [.control], "File"),
+        ("contextMenuF10", "F10", [.shift], "File"),
+        ("eject", "E", [.command], "File"),
+        ("cancelOperation", ".", [.command], "File"),
+        ("showFailures", "F", [.command, .shift], "View"),
     ] as [(String, String, [Modifier], String)])
     func grovesKeys(id: String, key: String, modifiers: [Modifier], menu: String) {
         let found = command(id)
@@ -119,8 +130,38 @@ import Testing
         #expect(CommandList.keysOnly.contains("openWithArrow"))
         #expect(CommandList.keysOnly.contains("goToPath"))
         #expect(CommandList.keysOnly.contains("tab5"))
+        #expect(CommandList.keysOnly.contains("contextMenuF10"))
+        #expect(!CommandList.keysOnly.contains("contextMenu"))
         #expect(!CommandList.keysOnly.contains("open"))
         #expect(CommandList.keysOnly.allSatisfy { command($0) != nil })
+    }
+
+    /// Return is Rename's. Where the folder can't be read there is nothing
+    /// to rename and the list takes it for Open Privacy Settings, which is
+    /// a command with a menu row and no key of its own.
+    @Test func openPrivacySettingsHasNoKeyOfItsOwn() {
+        let found = command("openPrivacySettings")
+        #expect(found?.title == "Open Privacy Settings…")
+        #expect(found?.key == nil)
+        #expect(found?.menu == "Go")
+        #expect(CommandList.command(key: "Return", modifiers: [])?.id == "rename")
+    }
+
+    /// The keys that reach what only the pointer reached, each its own.
+    @Test func theKeysOfTheWholeKeyboardPass() {
+        #expect(CommandList.command(key: "Return", modifiers: [.control])?.id == "contextMenu")
+        #expect(CommandList.command(key: "F10", modifiers: [.shift])?.id == "contextMenuF10")
+        #expect(CommandList.command(key: "e", modifiers: [.command])?.id == "eject")
+        #expect(CommandList.command(key: ".", modifiers: [.command])?.id == "cancelOperation")
+        #expect(CommandList.command(key: ".", modifiers: [.command, .shift])?.id == "toggleHidden")
+        #expect(CommandList.command(key: "F", modifiers: [.command, .shift])?.id == "showFailures")
+        #expect(CommandList.command(key: "F", modifiers: [.command])?.id == "filter")
+        // ⌘1 is a tab's; with ⌃ and ⌥ too it is a column's.
+        #expect(CommandList.command(key: "1", modifiers: [.command])?.id == "tab1")
+        #expect(CommandList.command(key: "1", modifiers: [.control, .option, .command])?.id == "sortByName")
+        // F10 alone is the system's (the menu bar), and is nobody's here.
+        #expect(CommandList.command(key: "F10", modifiers: []) == nil)
+        #expect(command("contextMenu")?.title == command("contextMenuF10")?.title)
     }
 
     // MARK: The list's own keys, and the whole of spec §7
@@ -148,8 +189,8 @@ import Testing
         let cells = section.split(separator: "\n").filter { $0.hasPrefix("| ") }
             .compactMap { $0.split(separator: "|").first.map { $0.trimmingCharacters(in: .whitespaces) } }
             .filter { $0 != "Key" && !$0.hasPrefix("---") }
-        // 18 rows of Finder's keys and 11 of Grove's.
-        #expect(cells.count == 29)
+        // 19 rows of Finder's keys and 16 of Grove's.
+        #expect(cells.count == 35)
 
         var strokes: [String] = []
         for cell in cells {
@@ -166,8 +207,8 @@ import Testing
                 }
             }
         }
-        // 34 keys in Finder's rows and 22 in Grove's.
-        #expect(strokes.count == 56)
+        // 38 keys in Finder's rows and 28 in Grove's.
+        #expect(strokes.count == 66)
         let marks: [Character: GroveExplorerCore.Modifier] = ["⌘": .command, "⌥": .option, "⇧": .shift, "⌃": .control]
         for stroke in strokes {
             var modifiers: Set<GroveExplorerCore.Modifier> = []

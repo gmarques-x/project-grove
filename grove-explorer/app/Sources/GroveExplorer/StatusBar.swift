@@ -96,11 +96,13 @@ struct StatusBar: View {
 struct FailureList: View {
     let summary: String
     let items: [String]
+    /// The first item in view when the list is longer than the card (↑ ↓ move it).
+    var top = 0
     let onClose: () -> Void
     @Environment(\.theme) private var theme
 
     /// No taller than this many rows: the rest scrolls.
-    private static let rows = 8
+    static let rows = 8
 
     var body: some View {
         VStack(alignment: .leading, spacing: GroveSpace.s8) {
@@ -119,11 +121,16 @@ struct FailureList: View {
                         .foregroundStyle(Color(theme.fg))
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
+                        .id(item.offset)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if items.count > Self.rows {
-                ScrollView { list }.frame(height: CGFloat(Self.rows) * ListMetrics.row)
+                ScrollViewReader { reader in
+                    ScrollView { list }
+                        .frame(height: CGFloat(Self.rows) * ListMetrics.row)
+                        .onChange(of: top) { _, top in reader.scrollTo(top, anchor: .top) }
+                }
             } else {
                 list
             }

@@ -97,7 +97,11 @@ final class FileWork: ObservableObject {
     @Published var prompt: ConflictPromptState?
     @Published var rename: RenameState?
     /// The pane whose list of failed items is open.
-    @Published var failuresShown: Side?
+    @Published var failuresShown: Side? {
+        didSet { if failuresShown != oldValue, failuresTop != 0 { failuresTop = 0 } }
+    }
+    /// The first item in view of a list longer than its card (↑ ↓ scroll it).
+    @Published var failuresTop = 0
 
     /// What the prompt's answer goes to; nil when none is awaited.
     var reply: CheckedContinuation<(button: ConflictButton, applyToAll: Bool), Never>?

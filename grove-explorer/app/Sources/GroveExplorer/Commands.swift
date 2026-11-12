@@ -43,6 +43,11 @@ enum CommandTable {
             "copyToOtherPane": files({ $0.toOtherPane(moving: false) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
             "moveToOtherPane": files({ $0.toOtherPane(moving: true) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
             "moveToTrash": files({ $0.trashSelection() }, when: { $0.hasSelection }),
+            // Not while a name or a path is being typed: ⌃Return there is the field's.
+            "contextMenu": ({ $0.showContextMenu() }, { $0.pathField == nil }),
+            "contextMenuF10": ({ $0.showContextMenu() }, { $0.pathField == nil }),
+            "eject": files({ $0.ejectByKey() }, when: { $0.canEject }),
+            "cancelOperation": ({ $0.cancelOperation() }, { $0.canCancelOperation }),
             // Edit
             "undo": files({ $0.undoLast() }, when: { $0.canUndo }),
             "redo": files({ $0.redoLast() }, when: { $0.canRedo }),
@@ -58,6 +63,12 @@ enum CommandTable {
             "focusSidebar": always { $0.focusSidebar() },
             "toggleHidden": always { $0.toggleHidden() },
             "filter": always { $0.beginFilter() },
+            "showFailures": ({ $0.toggleFailures() }, { $0.failuresSide != nil }),
+            // As a click on the column's title: by it, or the other way round.
+            "sortByName": always { $0.sort(by: .name, in: $0.browser.active) },
+            "sortByKind": always { $0.sort(by: .kind, in: $0.browser.active) },
+            "sortByDate": always { $0.sort(by: .modified, in: $0.browser.active) },
+            "sortBySize": always { $0.sort(by: .size, in: $0.browser.active) },
             "nextTab": always { $0.nextTab() },
             "previousTab": always { $0.previousTab() },
             // Go
@@ -71,6 +82,7 @@ enum CommandTable {
             "goApplications": always { $0.go(to: URL(fileURLWithPath: "/Applications", isDirectory: true)) },
             "goToFolder": always { $0.beginPathField() },
             "goToPath": always { $0.beginPathField() },
+            "openPrivacySettings": ({ $0.openPrivacySettings() }, { $0.canOpenPrivacySettings }),
         ]
         for number in 1...9 {
             let index = number - 1
@@ -80,16 +92,35 @@ enum CommandTable {
         return actions
     }()
 
-    /// Every command, in `CommandList`'s order. A command without an action
-    /// here is a mistake in this file: it stops the program at once (a
-    /// render too), not on the day its key is pressed.
-    static let all: [Command] = CommandList.all.map { info in
-        guard let action = actions[info.id] else { fatalError("no action for the command \(info.id)") }
+    /// Every command, in `CommandList`'s order, with what it does here. A
+    /// command without an action is a mistake in this file: it is left
+    /// out (its key and menu row do nothing), `missingActions` names it,
+    /// and a debug build stops at launch (`checkEveryCommandHasItsAction`).
+    static let all: [Command] = CommandList.all.compactMap { info in
+        guard let action = actions[info.id] else { return nil }
         // Under the conflict prompt the window does nothing but answer it;
         // while a name is being typed in a row, every key is the field's.
         return Command(
             info: info, run: action.run,
             isEnabled: { $0.work.prompt == nil && $0.work.rename == nil && action.isEnabled($0) })
+    }
+
+    /// The commands of `CommandList` that have no action here, and the
+    /// actions here that are no command's: both empty, or this file and
+    /// Core's table have come apart.
+    static var missingActions: [String] { CommandList.all.map(\.id).filter { actions[$0] == nil } }
+    static var strayActions: [String] {
+        let ids = Set(CommandList.all.map(\.id))
+        return actions.keys.filter { !ids.contains($0) }.sorted()
+    }
+
+    /// At launch, in a debug build only (`assert` is compiled out of a
+    /// release build; a render and the accessibility audit never launch):
+    /// the app target has no tests, so this is where the two tables are
+    /// held together.
+    static func checkEveryCommandHasItsAction() {
+        assert(missingActions.isEmpty, "commands without an action: \(missingActions)")
+        assert(strayActions.isEmpty, "actions that are no command's: \(strayActions)")
     }
 
     private static let byID = Dictionary(uniqueKeysWithValues: all.map { ($0.info.id, $0) })
@@ -109,6 +140,10 @@ enum CommandTable {
 
     // MARK: Keys
 
+    /// The commands that, while the keyboard is in the sidebar (⌥⌘←), work
+    /// on the row it is on and leave it there.
+    static let sidebarCommands: Set<String> = ["contextMenu", "contextMenuF10", "eject"]
+
     /// A key event as `CommandList` writes keys; nil for one that is no key of its own.
     static func stroke(of event: NSEvent) -> (key: String, modifiers: Set<GroveExplorerCore.Modifier>)? {
         var modifiers: Set<GroveExplorerCore.Modifier> = []
@@ -119,7 +154,7 @@ enum CommandTable {
         if flags.contains(.control) { modifiers.insert(.control) }
         let named: [UInt16: String] = [
             36: "Return", 76: "Return", 48: "Tab", 49: "Space", 51: "⌫", 53: "Escape",
-            123: "←", 124: "→", 125: "↓", 126: "↑", 96: "F5", 97: "F6",
+            123: "←", 124: "→", 125: "↓", 126: "↑", 96: "F5", 97: "F6", 109: "F10",
         ]
         if let key = named[event.keyCode] { return (key, modifiers) }
         // The key itself, whatever ⇧ and ⌥ make of it ("." under ⌘⇧., not ">").
@@ -132,24 +167,33 @@ enum CommandTable {
     /// arrows, Home, End, Page Up and Down).
     static func handle(_ event: NSEvent, in model: AppModel, side: Side) -> Bool {
         guard let stroke = stroke(of: event) else { return false }
-        // Escape closes the list of what could not be done.
-        if model.work.failuresShown != nil, stroke.key == "Escape", stroke.modifiers.isEmpty {
-            model.work.failuresShown = nil
-            return true
-        }
+        // The list of what could not be done is up: Escape closes it, ↑ ↓ scroll a long one.
+        if stroke.modifiers.isEmpty, model.failuresKey(stroke.key) { return true }
         // Escape in a filtered list clears the filter, as in its field.
         if stroke.key == "Escape", stroke.modifiers.isEmpty, model.filterText(for: side) != nil {
             model.clearFilter(in: side)
             return true
         }
         if model.sidebarCursor != nil {
-            // The keyboard is in the sidebar; a command's key (with ⌘, ⌃ or
-            // a function key) still does its command.
+            // The keyboard is in the sidebar: a plain key is the sidebar's.
             if stroke.modifiers.isEmpty, stroke.key != "F5", stroke.key != "F6" {
                 model.sidebarKey(stroke.key)
                 return true
             }
-            model.sidebarCursor = nil
+            // A command's key (with ⌘, ⌃ or a function key) still does its
+            // command, and the keyboard is the list's again; but the
+            // commands that work on the sidebar's row find it there.
+            let onTheRow = CommandList.command(key: stroke.key, modifiers: stroke.modifiers)
+                .map { sidebarCommands.contains($0.id) } ?? false
+            if !onTheRow { model.sidebarCursor = nil }
+        }
+        // Return where the folder can't be read: nothing to rename, and the
+        // one thing to do is the note's button.
+        if stroke.key == "Return", stroke.modifiers.isEmpty, let command = byID["openPrivacySettings"],
+            command.isEnabled(model)
+        {
+            command.run(model)
+            return true
         }
         let typing = stroke.modifiers.isSubset(of: [.shift])
         // ⇧Tab would otherwise walk the keyboard out of the list, backwards.

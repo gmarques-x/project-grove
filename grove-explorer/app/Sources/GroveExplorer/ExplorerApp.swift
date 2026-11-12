@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var commandW: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        CommandTable.checkEveryCommandHasItsAction()
         GroveIcons.load()
         // Without the icons the list still works (macOS's icons): say why on stderr.
         if let problem = GroveIcons.problem {

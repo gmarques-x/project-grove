@@ -185,6 +185,9 @@ final class FileTableView: NSTableView {
     }
     /// A right-click on a row (-1: on the list's empty space): the menu to show.
     var onMenu: ((Int) -> NSMenu?)?
+    /// The system's key for a context menu (⌃Return unless the user chose
+    /// another), or VoiceOver's "show menu", came to the list.
+    var onMenuKey: (() -> Void)?
     /// Fills the Quick Look panel while this list has the keyboard (`QuickLook.swift`).
     weak var quickLook: QuickLookController?
     /// A drag left the list or ended over it.
@@ -224,6 +227,13 @@ final class FileTableView: NSTableView {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         onMenu?(row(at: convert(event.locationInWindow, from: nil)))
+    }
+
+    /// From macOS 15 the system has a key for "the menu of what is
+    /// selected" and sends this; before, ⌃Return comes as a key (`onKey`).
+    @available(macOS 15.0, *)
+    override func showContextMenuForSelection(_ sender: Any?) {
+        onMenuKey?()
     }
 
     override func keyDown(with event: NSEvent) {

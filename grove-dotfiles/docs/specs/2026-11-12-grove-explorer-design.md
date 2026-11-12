@@ -155,6 +155,7 @@ Finder's, unchanged:
 | ⌘⇧G, ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
 | ⌘I | Finder's Get Info for the selection (macOS asks once to let Grove Explorer control Finder) |
+| ⌃⌥⌘1, ⌃⌥⌘2, ⌃⌥⌘5, ⌃⌥⌘6 | Sort by Name, Kind, Date Modified, Size, as a click on the column's title (again: the other way round) |
 | Letters | Jump to a name |
 
 Grove's:
@@ -172,6 +173,13 @@ Grove's:
 | ⌥⌘← | The keyboard to the sidebar: ↑ ↓ move, Return opens the place, → or Esc returns to the list |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
+| ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
+| ⌘E | Eject: while the keyboard is in the sidebar, the disk it is on; otherwise the disk the active pane shows |
+| ⌘. | Cancel the operation that is running |
+| ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
+| Return | In a folder macOS won't let the app read (nothing to rename there): Open Privacy Settings |
+
+Everything in the window but dragging the line between the panes has a key: the tabs' "+" and close marks are ⌘T and ⌘W, the path bar's parts ⌘↑ and ⌘L, the header's arrows ⌘[ and ⌘], its pane switch ⌘\, the columns' titles ⌃⌥⌘1, 2, 5 and 6. Tab and ⇧Tab stay the lists' ("the other pane") and never walk the window's controls.
 
 The right-click menu is the system's (`.contextMenu`): its own font and the Mac's accent colour, as every native menu in Grove. Rows: Open, Open With ▸, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder, Open in Ghostty; on empty space: New Folder, Paste, Show Hidden Items. The app's menu bar menus (reached through Grove's Global Menu) carry the same commands with their keys.
 

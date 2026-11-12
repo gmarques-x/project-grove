@@ -79,7 +79,7 @@ struct PaneView: View {
     /// the list while the status bar's line was clicked.
     @ViewBuilder private var failures: some View {
         if work.failuresShown == side, case let .failed(_, summary, items, _)? = work.statuses[side] {
-            FailureList(summary: summary, items: items) { work.failuresShown = nil }
+            FailureList(summary: summary, items: items, top: work.failuresTop) { work.failuresShown = nil }
         }
     }
 

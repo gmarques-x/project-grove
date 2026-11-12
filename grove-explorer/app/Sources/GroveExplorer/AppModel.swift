@@ -72,6 +72,8 @@ final class AppModel: ObservableObject {
         }
     }
     let drags = DragState()
+    /// What a key needs of the views to open a menu (`KeyboardReach.swift`).
+    let reach = KeyboardReach()
     /// The ⌘F filters (`FilterBar.swift`).
     @Published var filter = FilterState()
 

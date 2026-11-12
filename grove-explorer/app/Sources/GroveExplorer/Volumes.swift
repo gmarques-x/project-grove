@@ -188,6 +188,7 @@ extension AppModel {
             IconCache.shared.forgetVolumes()
             for volume in mounted { _ = IconCache.shared.volumeIcon(volume.url) }
             volumes = mounted
+            keepSidebarCursorOnARow()
             ejecting.subtract(gone)
             for id in gone { ejectFailures[id] = nil }
             forgetPathParts()

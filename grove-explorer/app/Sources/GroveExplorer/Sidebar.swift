@@ -101,14 +101,11 @@ struct Sidebar: View {
             .accessibilityLabel(place.title)
             .accessibilityAddTraits(lit ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.open(place) }
+            // The same rows a key opens (⌃Return with the keyboard here).
             .contextMenu {
-                if place.kind != .trash {
-                    Button("Open in New Tab") { model.open(place, inNewTab: true) }
-                }
-                if let favourite = favourite(place) {
-                    Button("Remove from Sidebar") { model.removeFavourite(id: favourite) }
-                }
+                ForEach(model.menuRows(for: place)) { row in Button(row.title) { row.run() } }
             }
+            .background { if cursor { MenuAnchor(model: model).allowsHitTesting(false) } }
             .onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, target: dropTarget(place)))
             .draggedOut(favourite(place), model: model)
             // The eject that failed (spec §13): why, under the row, until the next try.

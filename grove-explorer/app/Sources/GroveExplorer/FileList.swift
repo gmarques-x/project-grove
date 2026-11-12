@@ -69,6 +69,7 @@ struct FileList: NSViewRepresentable {
         coordinator.quickLook.table = table
         table.quickLook = coordinator.quickLook
         coordinator.setUpDragging(table)
+        coordinator.offerMenuByKey()
         return scroll
     }
 

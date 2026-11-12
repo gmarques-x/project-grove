@@ -13,7 +13,7 @@ public struct CommandInfo: Equatable, Sendable {
     public let title: String
     /// The key as spec §7 writes it: a letter in upper case ("T"), a mark
     /// (".", "\\", "["), or one of "Return", "Space", "Tab", "⌫", "↑", "↓",
-    /// "←", "F5", "F6". Nil for a command without a key.
+    /// "←", "F5", "F6", "F10". Nil for a command without a key.
     public let key: String?
     public let modifiers: Set<Modifier>
     /// The menu-bar menu it sits in: one of `CommandList.menus`.
@@ -69,9 +69,10 @@ public enum CommandList {
     ]
 
     /// Commands that are a second key for another one (⌘↓ opens as ⌘O does,
-    /// ⌘L goes to a path as ⌘⇧G does) and the nine tab keys: they have a key
-    /// and no row of their own in a menu.
-    public static let keysOnly: Set<String> = Set(["openWithArrow", "goToPath"] + (1...9).map { "tab\($0)" })
+    /// ⌘L goes to a path as ⌘⇧G does, ⇧F10 shows the menu as ⌃Return does)
+    /// and the nine tab keys: they have a key and no row of their own in a menu.
+    public static let keysOnly: Set<String> = Set(
+        ["openWithArrow", "goToPath", "contextMenuF10"] + (1...9).map { "tab\($0)" })
 
     /// The command a key stroke means; nil when it is nobody's. `key` as in
     /// `CommandInfo.key`; a letter in either case.
@@ -106,6 +107,12 @@ public enum CommandList {
         row("copyToOtherPane", "Copy to the Other Pane", "F5", in: "File"),
         row("moveToOtherPane", "Move to the Other Pane", "F6", in: "File"),
         row("moveToTrash", "Move to Trash", "⌫", [.command], in: "File"),
+        // What only the pointer reached (the right-click menus, a disk's
+        // eject button, the status bar's Cancel), by a key.
+        row("contextMenu", "Show Context Menu", "Return", [.control], in: "File"),
+        row("contextMenuF10", "Show Context Menu", "F10", [.shift], in: "File"),
+        row("eject", "Eject", "E", [.command], in: "File"),
+        row("cancelOperation", "Cancel Operation", ".", [.command], in: "File"),
     ]
 
     private static let edit: [CommandInfo] = [
@@ -125,6 +132,12 @@ public enum CommandList {
         row("focusSidebar", "Keyboard to the Sidebar", "←", [.option, .command], in: "View"),
         row("toggleHidden", "Show or Hide Hidden Items", ".", [.command, .shift], in: "View"),
         row("filter", "Filter This Folder", "F", [.command], in: "View"),
+        row("showFailures", "Show or Hide Failed Items", "F", [.command, .shift], in: "View"),
+        // The column headers, by Finder's keys for View › Sort By.
+        row("sortByName", "Sort by Name", "1", [.control, .option, .command], in: "View"),
+        row("sortByKind", "Sort by Kind", "2", [.control, .option, .command], in: "View"),
+        row("sortByDate", "Sort by Date Modified", "5", [.control, .option, .command], in: "View"),
+        row("sortBySize", "Sort by Size", "6", [.control, .option, .command], in: "View"),
         row("nextTab", "Show Next Tab", "Tab", [.control], in: "View"),
         row("previousTab", "Show Previous Tab", "Tab", [.control, .shift], in: "View"),
     ] + (1...9).map { row("tab\($0)", "Show Tab \($0)", String($0), [.command], in: "View") }
@@ -140,5 +153,8 @@ public enum CommandList {
         row("goApplications", "Applications", "A", [.command, .shift], in: "Go"),
         row("goToFolder", "Go to Folder…", "G", [.command, .shift], in: "Go"),
         row("goToPath", "Go to Folder…", "L", [.command], in: "Go"),
+        // Return's in a folder the app may not read (there is nothing to
+        // rename there): no key of its own.
+        row("openPrivacySettings", "Open Privacy Settings…", nil, in: "Go"),
     ]
 }
