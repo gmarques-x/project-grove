@@ -352,6 +352,9 @@ private struct BarPanelRoot: View {
             .padding(.leading, layout.inset.x)
             .padding(.top, layout.inset.y)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // A panel opens key, so without this its first control would open
+            // with a focus ring; Tab shows it, a click hides it.
+            .keyboardFocusRing()
             .environment(\.theme, app.colors)
             .environment(\.barPanel, actions)
             .environment(\.barPanelShape, layout.shape)
