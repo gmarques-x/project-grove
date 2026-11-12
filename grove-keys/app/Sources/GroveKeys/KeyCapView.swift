@@ -45,7 +45,7 @@ struct KeyCapView: View {
             let shape = RoundedRectangle(cornerRadius: GroveRadius.control)
             ZStack {
                 shape.fill(baseColor)
-                if let tint, !held, !isModifier { shape.fill(tint.opacity(0.16)) }
+                if let accent, !held, !isModifier { shape.fill(theme.tintFill(accent, .cap)) }
             }
         }
         .overlay {

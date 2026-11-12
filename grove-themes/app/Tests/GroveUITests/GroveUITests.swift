@@ -63,6 +63,12 @@ import Testing
         #expect(GroveSpace.scale == [2, 4, 8, 12, 16, 24])
     }
 
+    /// The soft fills keep the strengths the dark schemes were tuned on.
+    @Test func tintStrengthsAreTheTunedOnes() {
+        #expect(TintStrength.banner.rawValue == 0.14)
+        #expect(TintStrength.cap.rawValue == 0.16)
+    }
+
     // MARK: FocusRing
 
     func key(_ code: UInt16, _ characters: String = "", command: Bool = false, control: Bool = false,

@@ -63,6 +63,17 @@ extension ThemeColors {
         isDark ? Color(bg0).opacity(0.5) : Color(onAccent).opacity(0.35)
     }
 
+    /// The card of a sheet on the scrim (the cheat sheets, the launcher): bg0,
+    /// a little see-through.
+    public var sheetFill: Color { Color(bg0).opacity(0.94) }
+
+    /// An accent's soft fill, behind text: a banner in the accent's colour, a
+    /// bound key cap in its kind's. How soft is named by what is filled
+    /// (`TintStrength`), so no view writes an opacity.
+    public func tintFill(_ accent: RGB, _ strength: TintStrength) -> Color {
+        Color(accent).opacity(strength.rawValue)
+    }
+
     /// Words set in an accent: the accent in dark, fg in light (`accentInk`).
     public func ink(_ accent: RGB) -> Color { Color(accentInk(accent)) }
 
@@ -73,6 +84,15 @@ extension ThemeColors {
         guard isLight else { return Text(text).foregroundStyle(Color(accent)) }
         return (Text("● ").foregroundStyle(Color(accent)) + Text(verbatim: text)).foregroundStyle(Color(fg))
     }
+}
+
+/// How strong `ThemeColors.tintFill` is, by what it fills. The values the
+/// dark schemes were tuned on.
+public enum TintStrength: Double, Sendable {
+    /// A banner across a window (an error in red, a warning in orange).
+    case banner = 0.14
+    /// A bound key cap, in its kind's colour.
+    case cap = 0.16
 }
 
 /// The current scheme's colours, set at the top of each window, dropdown and

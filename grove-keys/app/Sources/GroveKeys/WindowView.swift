@@ -36,7 +36,7 @@ struct WindowView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
-                        .background(Color(theme.red).opacity(0.14), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+                        .background(theme.tintFill(theme.red, .banner), in: RoundedRectangle(cornerRadius: GroveRadius.card))
                         .lightOutline(cornerRadius: GroveRadius.card, accent: theme.red)
                 }
                 if !model.permissions.granted {
@@ -114,7 +114,8 @@ struct WindowView: View {
     }
 }
 
-/// Spec §10: a missing permission, with Open Settings.
+/// Spec §10: a missing permission, with Open Settings. A warning: orange
+/// throughout (fill, outline, words, button).
 private struct PermissionBanner: View {
     let permissions: PermissionStatus
     @Environment(\.theme) private var theme
@@ -133,7 +134,7 @@ private struct PermissionBanner: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s8)
-        .background(Color(theme.yellow).opacity(0.14), in: RoundedRectangle(cornerRadius: GroveRadius.card))
+        .background(theme.tintFill(theme.orange, .banner), in: RoundedRectangle(cornerRadius: GroveRadius.card))
         .lightOutline(cornerRadius: GroveRadius.card, accent: theme.orange)
     }
 
