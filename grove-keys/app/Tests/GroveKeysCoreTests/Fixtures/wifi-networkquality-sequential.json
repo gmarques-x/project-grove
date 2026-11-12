@@ -1,0 +1,21 @@
+{
+  "base_rtt": 21.496034622192383,
+  "dl_bytes_transferred": 579429709,
+  "dl_flows": 5,
+  "dl_phase_duration": 4.171923995018005,
+  "dl_phase_end": "2026-11-12 05:34:27.272",
+  "dl_phase_start": "2026-11-12 05:34:23.100",
+  "dl_responsiveness": 1213.990234375,
+  "dl_throughput": 878703744,
+  "draft_version": 8,
+  "end_date": "2026-11-12 05:34:51.528",
+  "interface_name": "en0",
+  "start_date": "2026-11-12 05:34:22.894",
+  "ul_bytes_transferred": 2056454149,
+  "ul_flows": 15,
+  "ul_phase_duration": 14.810719966888428,
+  "ul_phase_end": "2026-11-12 05:34:43.217",
+  "ul_phase_start": "2026-11-12 05:34:28.407",
+  "ul_responsiveness": 500.7439880371094,
+  "ul_throughput": 802649024
+}
