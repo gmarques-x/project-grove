@@ -12,7 +12,6 @@ struct Sidebar: View {
     @ObservedObject var model: AppModel
     let rail: Bool
     @Environment(\.theme) private var theme
-    @Environment(\.focusRingShown) private var ringShown
     /// The row under the pointer. `State` used directly: no SwiftUI macros here.
     private var hovered = State<String?>(initialValue: nil)
 
