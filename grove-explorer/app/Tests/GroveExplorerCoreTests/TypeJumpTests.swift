@@ -22,6 +22,16 @@ import Testing
         #expect(jump.typed("a", at: start.addingTimeInterval(3)) == "a")
     }
 
+    @Test func typingIsUnderWayUntilThePauseHasPassed() {
+        var jump = TypeJump()
+        #expect(!jump.isUnderWay(at: start))
+        _ = jump.typed("g", at: start)
+        #expect(jump.isUnderWay(at: start.addingTimeInterval(0.9)))
+        #expect(!jump.isUnderWay(at: start.addingTimeInterval(1)))
+        jump.reset()
+        #expect(!jump.isUnderWay(at: start.addingTimeInterval(0.1)))
+    }
+
     @Test func resetForgetsWhatWasTyped() {
         var jump = TypeJump()
         _ = jump.typed("g", at: start)

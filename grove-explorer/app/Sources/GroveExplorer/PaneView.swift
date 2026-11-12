@@ -14,8 +14,9 @@ struct Line: View {
     }
 }
 
-/// One pane: the line over it (green on the pane that has the keys), the
-/// header row, the list, the status bar. Its columns follow its own width.
+/// One pane (spec §5): the line over it (green on the pane that has the
+/// keys), the tab strip, the path bar, the column titles, the list, the
+/// status bar. Its columns follow its own width.
 struct PaneView: View {
     @ObservedObject var model: AppModel
     let side: Side
@@ -25,39 +26,70 @@ struct PaneView: View {
         GeometryReader { geometry in
             let columns = ListColumns(paneWidth: geometry.size.width)
             let active = model.browser.active == side
+            let listing = model.listing(for: side)
+            // Nothing to list: no column titles, since there is nothing under them.
+            let bare = listing.map { $0.problem != nil || $0.shown.isEmpty } ?? false
             VStack(spacing: 0) {
                 Line(color: active ? Color(theme.green) : nil)
-                ColumnHeader(columns: columns, sort: model.browser.tab(side)?.sort ?? .byName) {
-                    model.sort(by: $0, in: side)
+                TabStrip(model: model, side: side)
+                Line()
+                if let field = model.pathField, field.side == side {
+                    PathField(model: model, state: field, showsHint: columns.showsDate)
+                } else {
+                    PathBarView(model: model, side: side)
                 }
                 Line()
-                content(columns)
+                if !bare {
+                    ColumnHeader(columns: columns, sort: model.browser.tab(side)?.sort ?? .byName) {
+                        model.sort(by: $0, in: side)
+                    }
+                    Line()
+                }
+                // The list is always there, even with no rows: it is what
+                // holds the keyboard for the pane.
+                FileList(model: model, side: side, columns: columns)
+                    .overlay { if let listing, bare { note(listing) } }
                 Line()
                 StatusBar(
-                    text: model.status(for: side), free: model.listing(for: side)?.free, showsFree: columns.showsKind)
+                    text: model.status(for: side), notice: model.notices[side], free: listing?.free,
+                    showsFree: columns.showsKind)
             }
         }
         .background(Color(theme.bg0))
     }
 
-    @ViewBuilder private func content(_ columns: ListColumns) -> some View {
-        let listing = model.listing(for: side)
-        if let problem = listing?.problem {
-            note(problem)
-        } else if let listing, listing.shown.isEmpty {
-            note("This folder is empty")
-        } else {
-            FileList(model: model, side: side, columns: columns)
+    /// In the list's place: "This folder is empty", or why the folder
+    /// can't be read, with the way to Privacy Settings when that helps.
+    @ViewBuilder private func note(_ listing: Listing) -> some View {
+        VStack(spacing: GroveSpace.s12) {
+            if let problem = listing.problem {
+                theme.marked(problem, theme.orange, size: GroveType.label)
+                    .font(GroveFont.mono(GroveType.label))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                if listing.needsPermission {
+                    Text(verbatim: "macOS asks once per folder. Allow it there, then open the folder again.")
+                        .font(GroveFont.mono(GroveType.body))
+                        .foregroundStyle(theme.quiet)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    PanelButton("Open Privacy Settings…") { model.openPrivacySettings() }
+                }
+            } else {
+                Text(verbatim: "This folder is empty")
+                    .font(GroveFont.mono(GroveType.label))
+                    .foregroundStyle(theme.quiet)
+            }
         }
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(verbatim: text)
-            .font(GroveFont.mono(GroveType.label))
-            .foregroundStyle(theme.quiet)
-            .multilineTextAlignment(.center)
-            .padding(GroveSpace.s24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(GroveSpace.s24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(theme.bg0))
+        // It covers the list: a click here is a click in the pane.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.activate(side)
+            model.focusList()
+        }
     }
 }
 

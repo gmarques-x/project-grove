@@ -42,6 +42,9 @@ struct FileList: NSViewRepresentable {
         table.delegate = coordinator
         table.target = coordinator
         table.doubleAction = #selector(Coordinator.opened(_:))
+        // Typing a name is the model's (a second's pause, accents ignored), not the table's.
+        table.allowsTypeSelect = false
+        table.onKey = { [weak coordinator] in coordinator?.key($0) ?? false }
         table.onActivate = { [weak coordinator] in coordinator?.activate() }
         table.onPointerRow = { [weak coordinator] in coordinator?.pointerMoved(to: $0) }
 
@@ -94,6 +97,8 @@ struct FileList: NSViewRepresentable {
         private var dates: [URL: String] = [:]
         /// True while the table's selection changes by this coordinator's hand, not the user's.
         private var settingSelection = false
+        /// The model's last call for the keyboard that this list answered.
+        private var listFocus = 0
 
         init(model: AppModel, side: Side) {
             self.model = model
@@ -173,6 +178,24 @@ struct FileList: NSViewRepresentable {
             }
             if let stand = model.pointerStandIn[side] {
                 table.pointerRow = listing?.rows[stand] ?? -1
+            }
+            if let url = model.takeReveal(for: side), let row = listing?.rows[url], row < table.numberOfRows {
+                table.scrollRowToVisible(row)
+            }
+            takeKeyboardIfAsked(table, active: active)
+        }
+
+        /// The model asked for the keys to be in the active pane's list (a
+        /// pane switch, the path field closed, the launch): this list takes
+        /// them when it is that pane's. After the turn, since this runs
+        /// while SwiftUI is updating its views; asked again on the next
+        /// update while the table has no window yet.
+        private func takeKeyboardIfAsked(_ table: FileTableView, active: Bool) {
+            guard active, model.listFocus != listFocus, table.window != nil else { return }
+            listFocus = model.listFocus
+            DispatchQueue.main.async { [weak table] in
+                guard let table, let window = table.window, window.firstResponder !== table else { return }
+                window.makeFirstResponder(table)
             }
         }
 
@@ -284,11 +307,6 @@ struct FileList: NSViewRepresentable {
             return text
         }
 
-        /// Typing letters selects the first name that starts with them.
-        func tableView(_ tableView: NSTableView, typeSelectStringFor tableColumn: NSTableColumn?, row: Int) -> String? {
-            entries.indices.contains(row) ? entries[row].name : nil
-        }
-
         // MARK: The user does
 
         func tableViewSelectionDidChange(_ notification: Notification) {
@@ -299,7 +317,14 @@ struct FileList: NSViewRepresentable {
         @objc func opened(_ sender: Any?) {
             guard let table, entries.indices.contains(table.clickedRow) else { return }
             model.activate(side)
-            model.open(entries[table.clickedRow])
+            // ⌘-double-click a folder: a new tab (spec §6).
+            model.open(entries[table.clickedRow], inNewTab: NSEvent.modifierFlags.contains(.command))
+        }
+
+        /// A key pressed in the list: a command's, the sidebar's, a letter
+        /// of a name; false for what the table does itself.
+        func key(_ event: NSEvent) -> Bool {
+            CommandTable.handle(event, in: model, side: side)
         }
 
         func activate() { model.activate(side) }
@@ -329,6 +354,8 @@ struct FileList: NSViewRepresentable {
 /// pane is clicked (so it becomes the active one).
 final class FileTableView: NSTableView {
     var onActivate: (() -> Void)?
+    /// A key was pressed: true when it was dealt with.
+    var onKey: ((NSEvent) -> Bool)?
     var onPointerRow: ((Int) -> Void)?
     /// The row under the pointer; -1 for none.
     var pointerRow = -1 {
@@ -355,6 +382,10 @@ final class FileTableView: NSTableView {
         guard let window, window.isKeyWindow else { return }
         let place = convert(window.mouseLocationOutsideOfEventStream, from: nil)
         pointerRow = visibleRect.contains(place) ? row(at: place) : -1
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if onKey?(event) != true { super.keyDown(with: event) }
     }
 
     override func mouseDown(with event: NSEvent) {

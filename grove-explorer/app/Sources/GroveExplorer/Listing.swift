@@ -16,6 +16,8 @@ struct Listing {
     var rows: [URL: Int] = [:]
     /// Why the folder couldn't be read, as the pane says it; nil when it could.
     var problem: String?
+    /// The problem is a permission macOS's Privacy Settings can grant.
+    var needsPermission = false
     /// Free room on the folder's volume, in bytes.
     var free: Int64?
     /// Changes whenever `shown` does: what the table reloads by.
@@ -42,6 +44,9 @@ enum FolderListing {
         var all: [Entry] = []
         var arranged = Arranged()
         var problem: String?
+        var needsPermission = false
+        /// The folder is not there (any more).
+        var gone = false
         var free: Int64?
     }
 
@@ -57,6 +62,8 @@ enum FolderListing {
             // is refused only when opened. That tells the two apart.
             let byMode = error == .noPermission && access(folder.path, R_OK | X_OK) != 0 && errno == EACCES
             let local = (try? folder.resourceValues(forKeys: [.volumeIsLocalKey]))?.volumeIsLocal ?? true
+            read.needsPermission = error == .noPermission && !byMode
+            read.gone = error == .missing
             read.problem = ReadProblem.sentence(
                 for: error, folder: folder, home: FileManager.default.homeDirectoryForCurrentUser,
                 refusedByMode: byMode, onNetworkVolume: !local)

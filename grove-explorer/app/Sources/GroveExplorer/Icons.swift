@@ -219,6 +219,7 @@ final class IconCache {
     private var byPath: [String: NSImage] = [:]
     private var byExtension: [String: NSImage] = [:]
     private var custom: [String: Bool] = [:]
+    private var volumes: [String: NSImage] = [:]
     private let home = FileManager.default.homeDirectoryForCurrentUser
 
     func icon(for entry: Entry, light: Bool) -> EntryIcon {
@@ -242,6 +243,17 @@ final class IconCache {
         byPath = [:]
         custom = [:]
     }
+
+    /// A volume's own icon, for the sidebar: kept until the volumes change
+    /// (`forgetVolumes`), so a row never asks the disk while it is drawn.
+    func volumeIcon(_ url: URL) -> NSImage {
+        if let known = volumes[url.path] { return known }
+        let image = NSWorkspace.shared.icon(forFile: url.path)
+        volumes[url.path] = image
+        return image
+    }
+
+    func forgetVolumes() { volumes = [:] }
 
     private func own(_ url: URL) -> NSImage {
         if let known = byPath[url.path] { return known }

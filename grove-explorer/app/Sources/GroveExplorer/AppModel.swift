@@ -9,13 +9,15 @@ import SwiftUI
 /// config and the theme. Thin: what can be pure is in GroveExplorerCore.
 @MainActor
 final class AppModel: ObservableObject {
-    @Published private(set) var browser: Browser
+    @Published private(set) var browser: Browser {
+        didSet { if browser != oldValue { sessionChanged() } }
+    }
     /// Folder and package totals known so far, by `Entry.url`.
-    @Published private(set) var sizes: [URL: Int64] = [:] {
+    @Published var sizes: [URL: Int64] = [:] {
         didSet { sizesVersion += 1 }
     }
     /// The current scheme's colours; they follow a scheme switch.
-    @Published private(set) var colors = ThemeColors.fallback
+    @Published var colors = ThemeColors.fallback
     @Published private var listings: [Side: Listing] = [:]
     /// Each tab's selection, by the tab's id.
     @Published private var selections: [UUID: Set<URL>] = [:] {
@@ -26,25 +28,73 @@ final class AppModel: ObservableObject {
     private(set) var sizesVersion = 0
     private(set) var selectionVersion = 0
 
-    let config: ExplorerConfig
+    @Published var config: ExplorerConfig
     let clock: ListClock
-    /// A render only: the row drawn as under the pointer, per pane.
-    var pointerStandIn: [Side: URL] = [:]
+    let home = FileManager.default.homeDirectoryForCurrentUser
 
-    /// False in a render: nothing is read, watched or measured.
-    private let live: Bool
+    // The window's own layout, kept in the session.
+    /// ⌘⌥S: the sidebar is put away.
+    @Published var sidebarHidden = false {
+        didSet { if sidebarHidden != oldValue { sessionChanged() } }
+    }
+    /// The left pane's share of the two panes' width.
+    @Published var split = 0.5 {
+        didSet { if split != oldValue { sessionChanged() } }
+    }
+
+    // The path field, the sidebar and what the status bars say for a while.
+    /// ⌘L: the pane whose path bar is a text field, and what it says.
+    @Published var pathField: PathFieldState?
+    /// The sidebar row the keyboard is on (⌥⌘←); nil while the keys are the list's.
+    @Published var sidebarCursor: Int?
+    /// The mounted volumes, and the ones being ejected or that couldn't be.
+    @Published var volumes: [Volume] = []
+    @Published var ejecting: Set<String> = []
+    @Published var ejectFailures: [String: String] = [:]
+    /// Whether iCloud Drive's folder exists.
+    @Published var hasCloud = false
+    /// What a pane's status bar says for a few seconds ("x is no longer there").
+    @Published var notices: [Side: String] = [:]
+    /// A problem the whole window is about, beside the config's own: the
+    /// favourites couldn't be saved.
+    @Published var writeProblem: String?
+    /// Goes up when the active pane's list should take the keyboard (again).
+    @Published var listFocus = 1
+
+    /// Renders only: the row, the tab and the sidebar row drawn as under
+    /// the pointer, and icons for volumes that aren't there.
+    var pointerStandIn: [Side: URL] = [:]
+    var tabPointerStandIn: [Side: Int] = [:]
+    var ejectPointerStandIn: String?
+    var volumeIconStandIn: [String: NSImage] = [:]
+
+    /// False in a render: nothing is read, watched, measured or saved.
+    let live: Bool
+    var store: SessionStore?
+    var mounts: MountObserver?
+    var typeJump = TypeJump()
+    var noticeTimers: [Side: Task<Void, Never>] = [:]
+    /// A name to select once the pane has read its folder (a link to a
+    /// file, a file's path typed in the path field).
+    var selectWhenRead: [Side: String] = [:]
+    /// A row the pane's list should scroll to; the list takes it.
+    private var reveals: [Side: URL] = [:]
+    /// The tab and folder each pane's rows were last asked for.
+    private var shownKeys: [Side: String] = [:]
+    /// The path bar's parts, kept per folder: the volume's name is asked of the system.
+    private var partsCache: [String: [PathBar.Part]] = [:]
     private var revision = 0
     private var loads: [Side: Int] = [:]
     private var sorts: [Side: Int] = [:]
     private var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
-    private let sizeQueue = SizeQueue()
+    let sizeQueue = SizeQueue()
     /// A sort by size waiting for more totals to arrive, per pane.
-    private var sizeSorts: [Side: Task<Void, Never>] = [:]
+    var sizeSorts: [Side: Task<Void, Never>] = [:]
     /// The status bar's words, kept while nothing they are made of changed.
     private var statuses: [Side: (tab: UUID?, revision: Int, selection: Int, sizes: Int, text: String)] = [:]
 
-    private var themeWatcher: FolderWatcher?
-    private var themeState: Data?
+    var themeWatcher: FolderWatcher?
+    var themeState: Data?
 
     /// The app's model: the config from `~/.config/grove-explorer`, a window on its `start`.
     static func standard() -> AppModel {
@@ -56,14 +106,25 @@ final class AppModel: ObservableObject {
         let config = ExplorerConfig.load(
             tracked: text("explorer.toml"), local: text("explorer.local.toml"), home: home,
             exists: { FileManager.default.fileExists(atPath: $0.path) })
-        let browser = Browser(start: config.start, twoPanes: config.twoPanes, showHidden: config.showHidden)
-        return AppModel(browser: browser, config: config, clock: ListClock(), live: true)
+        // The window as it was left; the config's start only without a session.
+        let store = SessionStore(file: SessionStore.standardFile())
+        let saved = store.load()
+        var browser = saved?.browser
+            ?? Browser(start: config.start, twoPanes: config.twoPanes, showHidden: config.showHidden)
+        // A folder that went since falls back to its nearest parent (spec §9).
+        browser.repair(exists: Disk.isFolder, home: home)
+        let model = AppModel(browser: browser, config: config, clock: ListClock(), live: true)
+        model.split = SidebarLayout.clamped(split: saved?.split ?? 0.5)
+        model.sidebarHidden = saved?.sidebarHidden ?? false
+        model.store = store
+        return model
     }
 
     /// A model that shows what it is given and reads nothing: for a render.
     static func fixed(
         browser: Browser, config: ExplorerConfig, clock: ListClock, colors: ThemeColors,
-        entries: [Side: [Entry]], sizes: [URL: Int64], free: Int64, selected: [Side: Set<URL>]
+        entries: [Side: [Entry]], sizes: [URL: Int64], free: Int64, selected: [Side: Set<URL>],
+        problems: [Side: (sentence: String, needsPermission: Bool)] = [:]
     ) -> AppModel {
         let model = AppModel(browser: browser, config: config, clock: clock, live: false)
         model.colors = colors
@@ -72,7 +133,9 @@ final class AppModel: ObservableObject {
             guard let tab = browser.tab(side) else { continue }
             let arranged = FolderListing.arranged(all, sort: tab.sort, showHidden: browser.showHidden, sizes: sizes)
             model.listings[side] = Listing(
-                folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows, free: free, revision: 1)
+                folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows,
+                problem: problems[side]?.sentence, needsPermission: problems[side]?.needsPermission ?? false,
+                free: free, revision: 1)
             model.selections[tab.id] = selected[side] ?? []
         }
         model.revision = 1
@@ -91,8 +154,64 @@ final class AppModel: ObservableObject {
     /// Reads the folders, and starts following them and the theme.
     func start() {
         guard live else { return }
-        for side in sides { load(side) }
+        sync()
         followTheme()
+        followVolumes()
+    }
+
+    // MARK: Changing the browser
+
+    /// Every change to the panes, tabs and folders goes through here: the
+    /// panes then read what they newly show.
+    func change(_ body: (inout Browser) -> Void) {
+        var next = browser
+        body(&next)
+        guard next != browser else { return }
+        browser = next
+        sync()
+    }
+
+    /// Brings the listings in line with the browser: a pane whose tab or
+    /// folder changed reads its folder; a pane that went gives up its rows.
+    private func sync() {
+        let tabs = Set(browser.panes.flatMap(\.tabs).map(\.id))
+        if selections.keys.contains(where: { !tabs.contains($0) }) {
+            selections = selections.filter { tabs.contains($0.key) }
+        }
+        guard live else { return }
+        let before = listings
+        var changed: [Side] = []
+        for side in [Side.left, .right] {
+            guard let tab = browser.tab(side) else {
+                if shownKeys[side] != nil {
+                    shownKeys[side] = nil
+                    listings[side] = nil
+                    loads[side] = (loads[side] ?? 0) + 1
+                    watchers[side]?.watcher.stop()
+                    watchers[side] = nil
+                }
+                continue
+            }
+            let path = tab.folder.standardizedFileURL.path
+            let key = tab.id.uuidString + path
+            guard shownKeys[side] != key else { continue }
+            shownKeys[side] = key
+            changed.append(side)
+            // Rows of this folder that a pane already has are shown at once
+            // (the other pane's, or this pane's other tab's), in this tab's order.
+            if let known = before.values.first(where: { $0.folder.standardizedFileURL.path == path }) {
+                revision += 1
+                var listing = known
+                listing.revision = revision
+                listings[side] = listing
+                arrange(side)
+            }
+        }
+        guard !changed.isEmpty else { return }
+        // The walks on their way for a folder just left give their slots
+        // back; those for what a pane still shows go on.
+        sizeQueue.keep(Set(wantedSizes()))
+        for side in changed { load(side) }
     }
 
     // MARK: What the views read
@@ -114,6 +233,7 @@ final class AppModel: ObservableObject {
     /// only when the rows, the selection or the sizes changed.
     func status(for side: Side) -> String {
         guard let listing = listings[side] else { return "" }
+        if listing.problem != nil { return listing.needsPermission ? "No access" : "" }
         // The tab too: another tab of the pane has another selection.
         let tab = browser.tab(side)?.id
         if let kept = statuses[side], kept.tab == tab, kept.revision == listing.revision,
@@ -152,19 +272,6 @@ final class AppModel: ObservableObject {
 
     // MARK: What the views ask for
 
-    /// Opens an entry of the active pane: a folder (a disk, a link to a
-    /// folder) in this tab; a file in its app; a package as what it is.
-    func open(_ entry: Entry) {
-        switch entry.kind {
-        case .folder, .volume, .symlink(toFolder: true):
-            browser.go(to: entry.url)
-            folderChanged(browser.active)
-        case .file, .package, .alias, .symlink(toFolder: false):
-            guard live else { return }
-            NSWorkspace.shared.open(entry.url)
-        }
-    }
-
     /// The pane's selection is now `urls`.
     func select(_ urls: Set<URL>, in side: Side) {
         guard let tab = browser.tab(side), selections[tab.id] ?? [] != urls else { return }
@@ -184,23 +291,25 @@ final class AppModel: ObservableObject {
         arrange(side)
     }
 
-    func goBack() {
-        if browser.goBack() { folderChanged(browser.active) }
+    /// The list of `side` should scroll to `url`.
+    func reveal(_ url: URL, in side: Side) { reveals[side] = url }
+
+    /// The row the pane's list is to scroll to, once: the list asks after each update.
+    func takeReveal(for side: Side) -> URL? { reveals.removeValue(forKey: side) }
+
+    /// The path bar's parts for the pane's folder.
+    func pathParts(for side: Side) -> [PathBar.Part] {
+        guard let folder = browser.tab(side)?.folder else { return [] }
+        if let known = partsCache[folder.path] { return known }
+        let parts = PathBar.parts(of: folder, home: home, volumes: volumes.map(\.url))
+        partsCache[folder.path] = parts
+        return parts
     }
 
-    func goForward() {
-        if browser.goForward() { folderChanged(browser.active) }
-    }
+    /// The volumes changed: a path may start at another one now.
+    func forgetPathParts() { partsCache = [:] }
 
     // MARK: Reading
-
-    private func folderChanged(_ side: Side) {
-        guard live else { return }
-        // The walks on their way for the folder just left give their slots
-        // back; those for what the other pane shows go on.
-        sizeQueue.keep(Set(wantedSizes()))
-        load(side)
-    }
 
     /// Reads the pane's folder and sorts it, off the main thread; the pane
     /// keeps what it shows until then. The folder is watched from here on.
@@ -215,6 +324,10 @@ final class AppModel: ObservableObject {
             let read = await Task.detached { FolderListing.read(folder, sort: sort, showHidden: showHidden, sizes: sizes) }.value
             // A later read of this pane answers instead.
             guard loads[side] == number else { return }
+            // The folder went while it was shown, or back/forward landed on
+            // one that is gone: its tabs move to the nearest folder that is
+            // there (spec §13), and this pane reads that one instead.
+            if read.gone, repairGoneFolders(), browser.tab(side)?.folder != folder { return }
             if let old = listings[side], old.folder.standardizedFileURL.path == folder.standardizedFileURL.path,
                 old.all == read.all, old.problem == read.problem
             {
@@ -227,11 +340,17 @@ final class AppModel: ObservableObject {
                 revision += 1
                 listings[side] = Listing(
                     folder: folder, all: read.all, shown: read.arranged.shown, rows: read.arranged.rows,
-                    problem: read.problem, free: read.free, revision: revision)
+                    problem: read.problem, needsPermission: read.needsPermission, free: read.free, revision: revision)
                 let present = Set(read.all.map(\.url))
                 let chosen = selections[tab.id] ?? []
                 if !chosen.isSubset(of: present) { selections[tab.id] = chosen.intersection(present) }
                 IconCache.shared.forgetPaths()
+            }
+            if let name = selectWhenRead.removeValue(forKey: side),
+                let entry = read.all.first(where: { $0.name == name })
+            {
+                selections[tab.id] = [entry.url]
+                reveal(entry.url, in: side)
             }
             // The header was clicked, hidden items were switched or a total
             // arrived while this read was on its way: what it sorted by is
@@ -248,7 +367,7 @@ final class AppModel: ObservableObject {
     /// Sorts what the pane already has again (another column, a size that
     /// arrived), off the main thread: the list shows the old order until
     /// the new one is ready.
-    private func arrange(_ side: Side) {
+    func arrange(_ side: Side) {
         guard let tab = browser.tab(side), let listing = listings[side] else { return }
         let all = listing.all, sort = tab.sort, showHidden = browser.showHidden, sizes = sizes
         guard live else {
@@ -292,81 +411,6 @@ final class AppModel: ObservableObject {
         else { return }
         load(side)
         sizeQueue.changed(folder)
-    }
-
-    // MARK: Sizes
-
-    /// Asks for the total of every folder and package the panes show whose
-    /// total isn't known, in the order shown (so the top of the list first),
-    /// and forgets the totals of what is no longer shown.
-    private func wantSizes() {
-        guard live else { return }
-        // Totals are kept for every row on screen, the rows of a folder a
-        // pane is just leaving included (they show until the new read lands).
-        let shown = Set(sides.flatMap { entries(for: $0) }.map(\.url))
-        if sizes.keys.contains(where: { !shown.contains($0) }) { sizes = sizes.filter { shown.contains($0.key) } }
-        sizeQueue.want(wantedSizes().filter { sizes[$0] == nil })
-    }
-
-    /// The folders and packages whose totals are wanted: the rows of each
-    /// pane that shows the folder its tab is on. A pane between two folders
-    /// (navigated, the new one not yet read) wants none of its old rows.
-    private func wantedSizes() -> [URL] {
-        SizeWanted.urls(in: sides.compactMap { side in
-            browser.tab(side).map {
-                SizeWanted.Pane(tabFolder: $0.folder, listedFolder: listings[side]?.folder, shown: entries(for: side))
-            }
-        })
-    }
-
-    /// The rows in view: their totals come before the others'.
-    func wantSizesFirst(for visible: [URL]) {
-        sizeQueue.first(visible)
-    }
-
-    private func measured(_ url: URL, _ size: Int64) {
-        sizes[url] = size
-        for side in sides where browser.tab(side)?.sort.column == .size { arrangeSoon(side) }
-    }
-
-    /// Sorted by size, totals arrive one after the other: one sort once
-    /// they have paused, not one for each.
-    private func arrangeSoon(_ side: Side) {
-        sizeSorts[side]?.cancel()
-        sizeSorts[side] = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            arrange(side)
-        }
-    }
-
-    // MARK: Theme
-
-    /// The scheme's colours now, and again whenever grove-themes' state file
-    /// changes (its folder is what can be watched).
-    private func followTheme() {
-        let environment = ProcessInfo.processInfo.environment
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let state = StatePath.url(environment: environment, home: home)
-        let cli = environment["GROVE_THEMES_CLI"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
-            ?? home.appendingPathComponent(".local/bin/grove-themes")
-        let themes = GroveThemesClient(runner: ProcessRunner(path: cli))
-        let refresh: @MainActor (AppModel) -> Void = { model in
-            // Other files change in that folder too: only the scheme's own counts.
-            let now = try? Data(contentsOf: state)
-            guard model.themeWatcher == nil || now != model.themeState else { return }
-            model.themeState = now
-            Task {
-                guard let list = try? await themes.list() else { return }
-                model.colors = list.palettes[list.current].flatMap(ThemeColors.init(palette:)) ?? .fallback
-            }
-        }
-        refresh(self)
-        themeWatcher = FolderWatcher(folder: state.deletingLastPathComponent()) { [weak self] in
-            Task { @MainActor in
-                if let self { refresh(self) }
-            }
-        }
     }
 }
 

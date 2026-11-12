@@ -94,7 +94,7 @@ public struct IconMap: Sendable {
 
     // MARK: Folders
 
-    private static func mark(for folder: URL, home: URL) -> FolderMark {
+    public static func mark(for folder: URL, home: URL) -> FolderMark {
         let path = folder.standardizedFileURL.path
         let home = home.standardizedFileURL
         if path == home.path { return .home }

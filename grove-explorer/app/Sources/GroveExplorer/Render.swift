@@ -21,17 +21,51 @@ enum Render {
         let size: CGSize
         let panes: [Sample.Pane]
         var showHidden = false
+        var extras = Sample.Extras()
     }
 
+    private static let full = CGSize(width: 1904, height: 1180)
+    private static let half = CGSize(width: 948, height: 1180)
+    /// The mock-ups' small windows for a pane's states and the sidebar's.
+    private static let small = CGSize(width: 760, height: 420)
+
     private static let scenes: [(name: String, scene: Scene)] = [
-        // The mock-ups' three: the full screen with one pane and with two,
-        // and the half-width tile.
-        ("one-pane", Scene(size: CGSize(width: 1904, height: 1180), panes: [Sample.grove(selected: ["grove-keys"])])),
-        ("two-panes", Scene(size: CGSize(width: 1904, height: 1180), panes: [
+        // The mock-ups' windows: the full screen with one pane and with two
+        // (the second tab under the pointer), and the half-width tile with
+        // one pane and with two (where the sidebar is the rail).
+        ("one-pane", Scene(size: full, panes: [Sample.grove(selected: ["grove-keys"])])),
+        ("two-panes", Scene(size: full, panes: [
+            Sample.grove(selected: ["grove-keys"], pointer: "grove-wallpapers", pointerTab: 1),
+            Sample.downloads(selected: ["Screenshot 2026-11-11 at 17.30.02.png", "Screenshot 2026-11-12 at 09.12.44.png"]),
+        ])),
+        ("half-width", Scene(size: half, panes: [Sample.grove(selected: ["grove-keys"])])),
+        ("sidebar-rail", Scene(size: half, panes: [
             Sample.grove(selected: ["grove-keys"], pointer: "grove-wallpapers"),
             Sample.downloads(selected: ["Screenshot 2026-11-11 at 17.30.02.png", "Screenshot 2026-11-12 at 09.12.44.png"]),
         ])),
-        ("half-width", Scene(size: CGSize(width: 948, height: 1180), panes: [Sample.grove(selected: ["grove-keys"])])),
+        // ⌘L: the path bar as a field; and on a path that isn't there.
+        ("path-field", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["grove-keys"])],
+            extras: Sample.Extras(pathField: "~/Developer/project-grove/grove-d"))),
+        ("path-field-missing", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["grove-keys"])],
+            extras: Sample.Extras(pathField: "~/Developer/project-grove/grove-d", pathMissing: true))),
+        // A pane with nothing to list.
+        ("empty", Scene(size: small, panes: [
+            Sample.bare(Sample.home.appendingPathComponent("Developer/new-folder", isDirectory: true)),
+        ])),
+        ("no-permission", Scene(size: CGSize(width: 900, height: 420), panes: [
+            Sample.bare(
+                Sample.home.appendingPathComponent("Desktop", isDirectory: true),
+                problem: "Grove Explorer needs the Desktop Folder permission to open Desktop (Privacy & Security › Files and Folders)",
+                needsPermission: true),
+        ])),
+        // Ejecting the external disk: the pointer on its button, the disk
+        // being ejected, and the eject that failed.
+        ("eject", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(ejectPointer: true))),
+        ("ejecting", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(ejecting: true))),
+        ("eject-failed", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
+            ejectFailure: "The disk “Backup” wasn’t ejected because Ghostty is using it."))),
         // The list's three fills side by side, and hidden items selected and
         // not: the active pane at the left, the other at the right.
         ("list-states", Scene(size: CGSize(width: 948, height: 480), panes: [
@@ -57,7 +91,9 @@ enum Render {
         GroveIcons.load()
         if let problem = GroveIcons.problem { fail(problem) }
 
-        let model = Sample.model(panes: scene.panes, showHidden: scene.showHidden, colors: colors)
+        let model = Sample.model(panes: scene.panes, showHidden: scene.showHidden, colors: colors, extras: scene.extras)
+        // Every command has its action, or the program stops here.
+        _ = CommandTable.all
         let size = scene.size
         let view = WindowView(model: model).content
             .frame(width: size.width, height: size.height)
@@ -155,143 +191,5 @@ private struct WindowButtonsStandIn: View {
             }
         }
         .padding(.leading, 9).padding(.top, 9)
-    }
-}
-
-/// The mock-ups' folders, as entries: nothing here is read from the disk.
-@MainActor
-enum Sample {
-    struct Pane {
-        var folder: URL
-        var entries: [Entry]
-        var sizes: [URL: Int64]
-        var selected: Set<String>
-        var pointer: String?
-    }
-
-    /// 12 Nov 2026, 09:45, in a calendar and a locale of its own, so a
-    /// render says the same on any Mac at any time.
-    static let calendar: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }()
-    static let now = date(2026, 11, 12, 9, 45)
-    static let home = FileManager.default.homeDirectoryForCurrentUser
-
-    static func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
-        calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
-    }
-
-    static func model(panes: [Pane], showHidden: Bool, colors: ThemeColors) -> AppModel {
-        var browser = Browser(start: panes[0].folder, twoPanes: panes.count == 2, showHidden: showHidden)
-        if panes.count == 2 { browser.panes[1].tabs[0].folder = panes[1].folder }
-        let sides: [Side] = [.left, .right]
-        var entries: [Side: [Entry]] = [:], selected: [Side: Set<URL>] = [:], sizes: [URL: Int64] = [:]
-        var pointer: [Side: URL] = [:]
-        for (side, pane) in zip(sides, panes) {
-            entries[side] = pane.entries
-            selected[side] = Set(pane.entries.filter { pane.selected.contains($0.name) }.map(\.url))
-            sizes.merge(pane.sizes) { $1 }
-            pointer[side] = pane.entries.first { $0.name == pane.pointer }?.url
-        }
-        // The built-in defaults: no file is read.
-        let config = ExplorerConfig.load(tracked: nil, local: nil, home: home, exists: { _ in true })
-        let now = now
-        let clock = ListClock(now: { now }, calendar: calendar, locale: Locale(identifier: "en_GB"))
-        let model = AppModel.fixed(
-            browser: browser, config: config, clock: clock, colors: colors, entries: entries, sizes: sizes,
-            free: 212_400_000_000, selected: selected)
-        model.pointerStandIn = pointer
-        return model
-    }
-
-    private static let kinds: [String: String] = [
-        "md": "Markdown", "toml": "TOML", "csv": "CSV", "zip": "ZIP Archive", "dmg": "Disk Image", "svg": "SVG Image",
-        "pdf": "PDF Document", "json": "JSON", "png": "PNG Image", "sh": "Shell Script", "mp4": "MPEG-4 Movie",
-        "swift": "Swift Source",
-    ]
-
-    /// A pane on `folder`: folders are (name, total size or nil while it is
-    /// being measured, date), files (name, size, date).
-    static func pane(
-        _ folder: URL, folders: [(String, Int64?, Date)], files: [(String, Int64, Date)], selected: Set<String>,
-        pointer: String?
-    ) -> Pane {
-        var entries: [Entry] = [], sizes: [URL: Int64] = [:]
-        for (name, size, modified) in folders {
-            let url = folder.appendingPathComponent(name, isDirectory: true)
-            entries.append(Entry(url: url, name: name, kind: .folder, size: nil, modified: modified,
-                                 isHidden: name.hasPrefix("."), typeDescription: "Folder"))
-            sizes[url] = size
-        }
-        for (name, size, modified) in files {
-            let ext = name.hasPrefix(".") ? "" : URL(fileURLWithPath: name).pathExtension.lowercased()
-            entries.append(Entry(url: folder.appendingPathComponent(name), name: name, kind: .file, size: size,
-                                 modified: modified, isHidden: name.hasPrefix("."),
-                                 typeDescription: kinds[ext] ?? "Document"))
-        }
-        return Pane(folder: folder, entries: entries, sizes: sizes, selected: selected, pointer: pointer)
-    }
-
-    /// project-grove, with its hidden items (shown only when the scene says so).
-    static func grove(selected: Set<String>, pointer: String? = nil) -> Pane {
-        pane(home.appendingPathComponent("Developer/project-grove", isDirectory: true), folders: [
-            (".git", 48_900_000, date(2026, 11, 12, 9, 41)),
-            (".github", 12_000, date(2026, 11, 2, 10, 15)),
-            ("artifacts", 1_840_000_000, date(2026, 11, 12, 9, 12)),
-            ("assets", 12_600_000, date(2026, 11, 9, 2, 4)),
-            ("docs", 348_000, date(2026, 11, 11, 18, 2)),
-            ("grove-dotfiles", 9_100_000, date(2026, 11, 12, 8, 47)),
-            ("grove-keys", 214_300_000, date(2026, 11, 12, 9, 41)),
-            ("grove-themes", nil, date(2026, 11, 11, 23, 15)),
-            ("grove-wallpapers", 86_200_000, date(2026, 11, 3, 21, 40)),
-        ], files: [
-            (".gitignore", 312, date(2026, 10, 28, 14, 22)),
-            ("CHANGELOG.md", 6_000, date(2026, 11, 11, 18, 2)),
-            ("LICENSE", 1_000, date(2026, 10, 28, 14, 22)),
-            ("README.md", 4_000, date(2026, 11, 12, 9, 41)),
-        ], selected: selected, pointer: pointer)
-    }
-
-    static func downloads(selected: Set<String>, pointer: String? = nil) -> Pane {
-        pane(home.appendingPathComponent("Downloads", isDirectory: true), folders: [
-            ("fonts", 18_200_000, date(2026, 11, 2, 10, 15)),
-            ("invoices-2026", 4_700_000, date(2026, 10, 30, 16, 48)),
-        ], files: [
-            ("config.toml", 2_000, date(2026, 11, 5, 11, 20)),
-            ("data-export.csv", 418_000, date(2026, 11, 6, 9, 3)),
-            ("everforest-master.zip", 3_900_000, date(2026, 11, 1, 22, 10)),
-            ("Ghostty.dmg", 41_600_000, date(2026, 11, 11, 20, 31)),
-            ("icon-set.svg", 28_000, date(2026, 11, 4, 13, 37)),
-            ("JetBrainsMono-2.304.zip", 5_600_000, date(2026, 10, 31, 8, 12)),
-            ("keyboard-shortcuts.pdf", 1_200_000, date(2026, 11, 9, 2, 4)),
-            ("notes.md", 3_000, date(2026, 11, 12, 9, 41)),
-            ("package.json", 1_000, date(2026, 11, 7, 15, 55)),
-            ("Screenshot 2026-11-11 at 17.30.02.png", 2_400_000, date(2026, 11, 11, 17, 30)),
-            ("Screenshot 2026-11-12 at 09.12.44.png", 1_800_000, date(2026, 11, 12, 9, 12)),
-            ("setup.sh", 4_000, date(2026, 11, 8, 19, 26)),
-            ("talk-recording.mp4", 128_400_000, date(2026, 10, 27, 21, 2)),
-            ("theme.swift", 9_000, date(2026, 11, 10, 12, 44)),
-            ("wallpaper-forest.png", 6_300_000, date(2026, 11, 3, 21, 40)),
-        ], selected: selected, pointer: pointer)
-    }
-
-    /// The folders that carry a mark, each at the path that gives it one, and a plain one.
-    static func knownFolders() -> Pane {
-        let places: [(String, URL)] = [
-            ("Applications", URL(fileURLWithPath: "/Applications", isDirectory: true)),
-            ("Desktop", home.appendingPathComponent("Desktop", isDirectory: true)),
-            ("Developer", home.appendingPathComponent("Developer", isDirectory: true)),
-            ("Documents", home.appendingPathComponent("Documents", isDirectory: true)),
-            ("Downloads", home.appendingPathComponent("Downloads", isDirectory: true)),
-            ("Home", home),
-            ("Other", home.appendingPathComponent("Other", isDirectory: true)),
-        ]
-        let entries = places.map { name, url in
-            Entry(url: url, name: name, kind: .folder, size: nil, modified: date(2026, 11, 12, 9, 41), isHidden: false,
-                  typeDescription: "Folder")
-        }
-        return Pane(folder: home, entries: entries, sizes: [:], selected: ["Desktop"], pointer: nil)
     }
 }

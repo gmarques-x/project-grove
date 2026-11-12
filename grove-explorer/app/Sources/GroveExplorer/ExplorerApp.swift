@@ -17,6 +17,9 @@ struct ExplorerApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 700)
+        // A groveexplorer:// link goes to the delegate, not to a new window.
+        .handlesExternalEvents(matching: [])
+        .commands { MenuBar(model: delegate.model) }
     }
 }
 
@@ -31,6 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write(Data((problem + "\n").utf8))
         }
         model.start()
+    }
+
+    /// `groveexplorer://open?path=…` (spec §9): the folder in a new tab of
+    /// the active pane, and the window brought forward.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { model.open(link: url) }
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+    }
+
+    /// The session is saved a second after each change; this is the last one.
+    func applicationWillTerminate(_ notification: Notification) {
+        model.saveSession()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

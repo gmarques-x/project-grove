@@ -18,6 +18,13 @@ public struct TypeJump: Sendable {
         return text
     }
 
+    /// Whether letters were typed less than a pause ago: what is typed now
+    /// (a space, say) goes on with them.
+    public func isUnderWay(at now: Date) -> Bool {
+        guard let last, !text.isEmpty else { return false }
+        return now.timeIntervalSince(last) < Self.pause
+    }
+
     public mutating func reset() {
         text = ""
         last = nil
