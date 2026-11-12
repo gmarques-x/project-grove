@@ -28,6 +28,8 @@ enum Render {
     private static let half = CGSize(width: 948, height: 1180)
     /// The mock-ups' small windows for a pane's states and the sidebar's.
     private static let small = CGSize(width: 760, height: 420)
+    /// One pane wide enough for all its columns and the free room.
+    private static let wide = CGSize(width: 1100, height: 420)
 
     private static let scenes: [(name: String, scene: Scene)] = [
         // The mock-ups' windows: the full screen with one pane and with two
@@ -72,6 +74,36 @@ enum Render {
             Sample.grove(selected: [".github", "artifacts", ".gitignore"], pointer: "docs"),
             Sample.grove(selected: [".git", "grove-keys", "grove-themes"], pointer: "assets"),
         ], showHidden: true)),
+        // File operations. The status bar while a copy runs, with its meter
+        // and Cancel; what a move did, with ⌘Z; the items a copy could not
+        // do, with the list a click shows.
+        ("copying", Scene(size: wide, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
+            status: .running(words: "Copying 128 of 342 to Downloads", fraction: 0.37, percent: "37%")))),
+        ("undo-line", Scene(
+            size: wide, panes: [Sample.downloads(selected: ["config.toml", "data-export.csv", "everforest-master.zip"])],
+            extras: Sample.Extras(status: .done("Moved 3 items to Downloads", changed: true, hint: true)))),
+        ("failures", Scene(size: wide, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
+            status: .failed(
+                line: "3 items could not be copied", summary: "Copied 2 of 5 items (3 failed)",
+                items: [
+                    "Ghostty.dmg: you don't have permission",
+                    "notes.md: an item with that name appeared",
+                    "talk-recording.mp4: it is no longer there",
+                ], changed: true),
+            failuresShown: true))),
+        // A name is taken: the prompt over the scrimmed window.
+        ("conflict", Scene(
+            size: CGSize(width: 1672, height: 668),
+            panes: [Sample.downloads(selected: ["notes.md"]), Sample.documents()],
+            extras: Sample.Extras(prompt: Sample.notesConflict()))),
+        // Return: the name as a field; and with a name that can't be used.
+        ("rename", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["README.md"])],
+            extras: Sample.Extras(rename: "README.md"))),
+        ("rename-bad-name", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["LICENSE"])],
+            extras: Sample.Extras(
+                rename: "LICENSE", renameText: "docs/LICENSE", renameReason: "A name can't have a “/” in it."))),
         // The folder with each of its marks, at list size.
         ("folder-marks", Scene(size: CGSize(width: 474, height: 300), panes: [Sample.knownFolders()])),
     ]

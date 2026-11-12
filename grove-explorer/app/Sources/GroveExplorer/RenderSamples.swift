@@ -33,6 +33,18 @@ enum Sample {
         var ejectPointer = false
         var ejecting = false
         var ejectFailure: String?
+        /// What the status bar of `statusSide` says of an operation.
+        var status: PaneStatus?
+        var statusSide = Side.left
+        /// The list of failed items is open over that pane.
+        var failuresShown = false
+        /// The conflict prompt is up.
+        var prompt: ConflictPromptState?
+        /// The left pane's row of this name is the rename field; saying
+        /// `renameText` instead when given, and red with `renameReason`.
+        var rename: String?
+        var renameText: String?
+        var renameReason: String?
     }
 
     static let backup = Volume(url: URL(fileURLWithPath: "/Volumes/Backup", isDirectory: true), name: "Backup", ejectable: true)
@@ -91,6 +103,14 @@ enum Sample {
         if let failure = extras.ejectFailure { model.ejectFailures = [backup.id: failure] }
         if let text = extras.pathField {
             model.pathField = PathFieldState(side: extras.active, text: text, missing: extras.pathMissing)
+        }
+        if let status = extras.status { model.work.statuses[extras.statusSide] = status }
+        if extras.failuresShown { model.work.failuresShown = extras.statusSide }
+        model.work.prompt = extras.prompt
+        if let name = extras.rename, let entry = entries[.left]?.first(where: { $0.name == name }) {
+            model.work.rename = RenameState(
+                id: UUID(), side: .left, url: entry.url, name: entry.name, isFolder: entry.kind == .folder,
+                reason: extras.renameReason, standIn: extras.renameText)
         }
         return model
     }
@@ -176,6 +196,29 @@ enum Sample {
             ("theme.swift", 9_000, date(2026, 11, 10, 12, 44)),
             ("wallpaper-forest.png", 6_300_000, date(2026, 11, 3, 21, 40)),
         ], selected: selected, pointer: pointer, otherTabs: [URL(fileURLWithPath: "/Applications", isDirectory: true)])
+    }
+
+    /// Documents, where the mock-ups' copy meets a "notes.md" that is there.
+    static func documents() -> Pane {
+        pane(home.appendingPathComponent("Documents", isDirectory: true), folders: [
+            ("archive", 1_200_000_000, date(2026, 10, 14, 11, 5)),
+            ("letters", 2_400_000, date(2026, 11, 2, 10, 15)),
+        ], files: [
+            ("contract.pdf", 38_000, date(2026, 11, 6, 9, 3)),
+            ("notes.md", 2_000, date(2026, 11, 9, 2, 4)),
+            ("todo.md", 1_000, date(2026, 11, 11, 18, 2)),
+        ], selected: [], pointer: nil)
+    }
+
+    /// The prompt about that "notes.md", with three more names after it.
+    static func notesConflict() -> ConflictPromptState {
+        ConflictPromptState(
+            question: Conflict.Question(
+                incoming: home.appendingPathComponent("Downloads/notes.md"),
+                existing: home.appendingPathComponent("Documents/notes.md"), remaining: 3,
+                incomingSize: 3_000, incomingDate: date(2026, 11, 12, 9, 41),
+                existingSize: 2_000, existingDate: date(2026, 11, 9, 2, 4)),
+            comingLabel: "Being copied")
     }
 
     /// The folders that carry a mark, each at the path that gives it one, and a plain one.
