@@ -450,6 +450,7 @@ private struct RowView<Action: View>: View {
             }
             .buttonStyle(.plain)
             .help("Remove")
+            .accessibilityLabel("Remove")
         }
         .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s4)
         .background(hover.wrappedValue || recording ? Color(theme.bg2) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
