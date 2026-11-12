@@ -1,0 +1,1529 @@
+import Foundation
+@testable import GroveExplorerCore
+import Testing
+
+// Foundation has an `Operation` and a `Progress` too.
+private typealias Operation = GroveExplorerCore.Operation
+private typealias Progress = GroveExplorerCore.Progress
+
+/// A value several threads may touch.
+private final class Locked<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+
+    init(_ value: Value) { stored = value }
+
+    var value: Value {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
+
+    @discardableResult func change<Result>(_ body: (inout Value) -> Result) -> Result {
+        lock.withLock { body(&stored) }
+    }
+}
+
+/// What the tests of both suites do to files: everything under one
+/// temporary folder, removed when the test ends, passed or failed. Whatever
+/// a run puts in the Trash is taken out of it again, by the address the
+/// Trash gave: nothing else in the Trash is looked at or touched.
+private final class Sandbox: @unchecked Sendable {
+    let root: URL
+    let files = FileManager.default
+    let inTrash = Locked<[URL]>([])
+
+    init(_ label: String) throws {
+        let made = files.temporaryDirectory
+            .appendingPathComponent("grove-explorer-\(label)-\(UUID().uuidString)", isDirectory: true)
+        try files.createDirectory(at: made, withIntermediateDirectories: true)
+        // The address as the system gives it for the folder (/private/var/…),
+        // so that an address in a Trash can be compared with it.
+        guard let real = realpath(made.path, nil) else { throw CocoaError(.fileNoSuchFile) }
+        defer { free(real) }
+        root = URL(fileURLWithPath: String(cString: real), isDirectory: true)
+    }
+
+    /// Call from `deinit`.
+    func cleanUp() {
+        let manager = FileManager.default
+        for url in inTrash.value { try? manager.removeItem(at: url) }
+        // A folder made read-only by a test would keep its contents.
+        if let all = manager.enumerator(at: root, includingPropertiesForKeys: nil) {
+            for case let url as URL in all {
+                var info = stat()
+                if lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR { chmod(url.path, 0o700) }
+            }
+        }
+        try? manager.removeItem(at: root)
+    }
+
+    func path(_ name: String) -> URL { root.appendingPathComponent(name) }
+
+    @discardableResult func makeFolder(_ name: String) throws -> URL {
+        try makeFolder(at: path(name))
+    }
+
+    @discardableResult func makeFolder(at url: URL) throws -> URL {
+        try files.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @discardableResult func makeFile(_ name: String, _ text: String = "text") throws -> URL {
+        try makeFile(at: path(name), Data(text.utf8))
+    }
+
+    @discardableResult func makeFile(at url: URL, _ data: Data) throws -> URL {
+        try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url)
+        return url
+    }
+
+    func text(_ url: URL) -> String? {
+        (try? Data(contentsOf: url)).map { String(decoding: $0, as: UTF8.self) }
+    }
+
+    /// There, as a file, a folder or a link (a link to nothing included).
+    func exists(_ url: URL) -> Bool {
+        var info = stat()
+        return lstat(url.path, &info) == 0
+    }
+
+    func names(in folder: URL) -> [String] {
+        ((try? files.contentsOfDirectory(atPath: folder.path)) ?? []).sorted()
+    }
+
+    /// The names a half-written copy would have.
+    func partials(in folder: URL) -> [String] {
+        names(in: folder).filter { $0.contains(".grove-partial-") }
+    }
+
+    func inode(_ url: URL) -> UInt64? {
+        var info = stat()
+        return lstat(url.path, &info) == 0 ? UInt64(info.st_ino) : nil
+    }
+
+    func mode(_ url: URL) -> mode_t? {
+        var info = stat()
+        return lstat(url.path, &info) == 0 ? info.st_mode & 0o7777 : nil
+    }
+
+    func modified(_ url: URL) -> Date? {
+        (try? files.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+
+    func setModified(_ date: Date, _ url: URL) throws {
+        try files.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+    }
+
+    func setAttribute(_ name: String, _ value: String, on url: URL) {
+        let bytes = Array(value.utf8)
+        #expect(setxattr(url.path, name, bytes, bytes.count, 0, XATTR_NOFOLLOW) == 0)
+    }
+
+    func attribute(_ name: String, of url: URL) -> String? {
+        var bytes = [UInt8](repeating: 0, count: 256)
+        let length = getxattr(url.path, name, &bytes, bytes.count, 0, XATTR_NOFOLLOW)
+        return length < 0 ? nil : String(decoding: bytes[..<length], as: UTF8.self)
+    }
+
+    func setTags(_ tags: [String], on url: URL) throws {
+        try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+    }
+
+    func tags(of url: URL) -> [String] {
+        // A fresh URL: a URL keeps the values it once read.
+        let fresh = URL(fileURLWithPath: url.path)
+        return (try? fresh.resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
+    }
+
+    /// Runs the operation. A name that exists gets `choice`; with none
+    /// given, being asked at all is a failure of the test.
+    func run(
+        _ operation: Operation, on runner: OperationRunner, choice: Conflict.Choice? = nil,
+        progress: @escaping @Sendable (Progress) -> Void = { _ in }
+    ) async -> Outcome {
+        let outcome = await runner.run(
+            operation,
+            resolve: { url in
+                if let choice { return choice }
+                Issue.record("asked what to do about \(url.lastPathComponent)")
+                return .skip
+            },
+            progress: progress)
+        for change in outcome.changes {
+            switch change {
+            case let .trashed(_, url), let .replaced(_, url): inTrash.change { $0.append(url) }
+            case .created, .moved: break
+            }
+        }
+        return outcome
+    }
+}
+
+// MARK: - On one volume
+
+/// Every operation against real files, in a temporary folder of the test's
+/// own. One test at a time: all at once they take every fast core, and the
+/// timed tests of other suites then miss their limits.
+@Suite(.serialized) final class OperationRunnerTests {
+    private let box: Sandbox
+    private let runner = OperationRunner()
+    private static let aDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    init() throws {
+        box = try Sandbox("operations")
+        try box.makeFolder("src")
+        try box.makeFolder("dest")
+    }
+
+    deinit { box.cleanUp() }
+
+    private var src: URL { box.path("src") }
+    private var dest: URL { box.path("dest") }
+
+    // MARK: Every operation
+
+    @Test func aCopiedFileKeepsItsDatesPermissionsAttributesAndTags() async throws {
+        let file = try box.makeFile("src/notes.md", "some notes")
+        box.setAttribute("com.projectgrove.test", "kept", on: file)
+        try box.setTags(["Grove Test"], on: file)
+        #expect(chmod(file.path, 0o640) == 0)
+        try box.files.setAttributes([.creationDate: Self.aDate - 86_400], ofItemAtPath: file.path)
+        try box.setModified(Self.aDate, file)
+
+        let outcome = await box.run(.copy(items: [file], to: dest), on: runner)
+
+        let copy = dest.appendingPathComponent("notes.md")
+        #expect(outcome == Outcome(
+            changes: [.created(copy)], failures: [], cancelled: false,
+            summary: "Copied notes.md to dest"))
+        #expect(box.text(copy) == "some notes")
+        #expect(box.text(file) == "some notes")
+        #expect(box.modified(copy) == Self.aDate)
+        let created = try box.files.attributesOfItem(atPath: copy.path)[.creationDate] as? Date
+        #expect(created == Self.aDate - 86_400)
+        #expect(box.mode(copy) == 0o640)
+        #expect(box.attribute("com.projectgrove.test", of: copy) == "kept")
+        #expect(box.tags(of: copy) == ["Grove Test"])
+        #expect(box.names(in: dest) == ["notes.md"])
+    }
+
+    @Test func aCopiedTreeIsWholeAndKeepsWhatItsFoldersAndFilesHad() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        try box.makeFile("src/Tree/a/two.txt", "two")
+        try box.makeFile("src/Tree/a/deep/three.txt", "three")
+        try box.makeFile("src/Tree/a/.hidden", "hidden")
+        try box.makeFolder("src/Tree/empty")
+        try box.makeFolder("src/Tree/locked")
+        try box.makeFile("src/Tree/locked/inside.txt", "inside")
+        let tree = box.path("src/Tree")
+        box.setAttribute("com.projectgrove.test", "a folder's", on: tree.appendingPathComponent("a"))
+        try box.setTags(["Grove Test"], on: tree.appendingPathComponent("a/two.txt"))
+        #expect(chmod(tree.appendingPathComponent("a/two.txt").path, 0o600) == 0)
+        try box.setModified(Self.aDate, tree.appendingPathComponent("a/deep/three.txt"))
+        // Last, so that nothing above changes them again: a folder that
+        // can't be written to, and the dates of two folders.
+        #expect(chmod(tree.appendingPathComponent("locked").path, 0o555) == 0)
+        try box.setModified(Self.aDate, tree.appendingPathComponent("a"))
+        try box.setModified(Self.aDate, tree)
+
+        let outcome = await box.run(.copy(items: [tree], to: dest), on: runner)
+
+        let copy = dest.appendingPathComponent("Tree")
+        #expect(outcome.changes == [.created(copy)])
+        #expect(outcome.failures == [])
+        #expect(outcome.summary == "Copied Tree to dest")
+        #expect(box.names(in: copy) == ["a", "empty", "locked", "one.txt"])
+        #expect(box.names(in: copy.appendingPathComponent("a")) == [".hidden", "deep", "two.txt"])
+        #expect(box.names(in: copy.appendingPathComponent("empty")) == [])
+        #expect(box.text(copy.appendingPathComponent("one.txt")) == "one")
+        #expect(box.text(copy.appendingPathComponent("a/two.txt")) == "two")
+        #expect(box.text(copy.appendingPathComponent("a/deep/three.txt")) == "three")
+        #expect(box.text(copy.appendingPathComponent("a/.hidden")) == "hidden")
+        #expect(box.text(copy.appendingPathComponent("locked/inside.txt")) == "inside")
+        #expect(box.mode(copy.appendingPathComponent("locked")) == 0o555)
+        #expect(box.mode(copy.appendingPathComponent("a/two.txt")) == 0o600)
+        #expect(box.attribute("com.projectgrove.test", of: copy.appendingPathComponent("a")) == "a folder's")
+        #expect(box.tags(of: copy.appendingPathComponent("a/two.txt")) == ["Grove Test"])
+        #expect(box.modified(copy.appendingPathComponent("a/deep/three.txt")) == Self.aDate)
+        #expect(box.modified(copy.appendingPathComponent("a")) == Self.aDate)
+        #expect(box.modified(copy) == Self.aDate)
+        #expect(box.names(in: dest) == ["Tree"])
+        // The source is as it was.
+        #expect(box.names(in: tree) == ["a", "empty", "locked", "one.txt"])
+    }
+
+    @Test func aMoveOnOneVolumeIsOneRename() async throws {
+        try box.makeFile("src/Tree/a/two.txt", "two")
+        let tree = box.path("src/Tree")
+        let file = try box.makeFile("src/notes.md", "notes")
+        let treeNumber = try #require(box.inode(tree))
+        let innerNumber = try #require(box.inode(tree.appendingPathComponent("a/two.txt")))
+        let fileNumber = try #require(box.inode(file))
+
+        let outcome = await box.run(.move(items: [tree, file], to: dest), on: runner)
+
+        let movedTree = dest.appendingPathComponent("Tree")
+        let movedFile = dest.appendingPathComponent("notes.md")
+        #expect(outcome == Outcome(
+            changes: [.moved(from: tree, to: movedTree), .moved(from: file, to: movedFile)],
+            failures: [], cancelled: false, summary: "Moved 2 items to dest"))
+        // The same items under another name, not copies: their numbers on
+        // the volume are the ones they had.
+        #expect(box.inode(movedTree) == treeNumber)
+        #expect(box.inode(movedTree.appendingPathComponent("a/two.txt")) == innerNumber)
+        #expect(box.inode(movedFile) == fileNumber)
+        #expect(box.names(in: src) == [])
+        #expect(box.names(in: dest) == ["Tree", "notes.md"])
+    }
+
+    @Test func duplicatesAreNamedCopyThenCopy2() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let folder = try box.makeFolder("src/docs")
+        try box.makeFile("src/docs/inside.txt", "inside")
+        let dotFile = try box.makeFile("src/.env", "secret")
+        let archive = try box.makeFile("src/archive.tar.gz", "archive")
+
+        let first = await box.run(.duplicate(items: [file, folder, dotFile, archive]), on: runner)
+        #expect(first.changes == [
+            .created(box.path("src/notes copy.md")), .created(box.path("src/docs copy")),
+            .created(box.path("src/.env copy")), .created(box.path("src/archive.tar copy.gz")),
+        ])
+        #expect(first.summary == "Duplicated 4 items")
+        #expect(box.text(box.path("src/notes copy.md")) == "notes")
+        #expect(box.text(box.path("src/docs copy/inside.txt")) == "inside")
+
+        let second = await box.run(.duplicate(items: [file, folder]), on: runner)
+        #expect(second.changes == [
+            .created(box.path("src/notes copy 2.md")), .created(box.path("src/docs copy 2")),
+        ])
+        let third = await box.run(.duplicate(items: [file]), on: runner)
+        #expect(third.changes == [.created(box.path("src/notes copy 3.md"))])
+        #expect(third.summary == "Duplicated notes.md")
+        #expect(box.names(in: src) == [
+            ".env", ".env copy", "archive.tar copy.gz", "archive.tar.gz", "docs", "docs copy",
+            "docs copy 2", "notes copy 2.md", "notes copy 3.md", "notes copy.md", "notes.md",
+        ])
+    }
+
+    @Test func renameGivesTheItemItsNewName() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let number = try #require(box.inode(file))
+
+        let outcome = await box.run(.rename(item: file, to: "ideas.md"), on: runner)
+
+        let renamed = box.path("src/ideas.md")
+        #expect(outcome == Outcome(
+            changes: [.moved(from: file, to: renamed)], failures: [], cancelled: false,
+            summary: "Renamed notes.md to ideas.md"))
+        #expect(box.inode(renamed) == number)
+        #expect(box.names(in: src) == ["ideas.md"])
+    }
+
+    @Test func renameToANameThatDiffersOnlyByCaseWorks() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let renamed = box.path("src/Notes.md")
+        #expect(await runner.existingNames(for: .rename(item: file, to: "Notes.md")) == [])
+
+        let outcome = await box.run(.rename(item: file, to: "Notes.md"), on: runner)
+
+        #expect(outcome.changes == [.moved(from: file, to: renamed)])
+        #expect(outcome.failures == [])
+        #expect(box.names(in: src) == ["Notes.md"])
+        #expect(box.text(renamed) == "notes")
+    }
+
+    @Test func renameNeverTakesTheNameOfAnotherItem() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let other = try box.makeFile("src/ideas.md", "ideas")
+        #expect(await runner.existingNames(for: .rename(item: file, to: "ideas.md")) == [other])
+
+        // Whatever the answer would be, a rename doesn't ask: it fails.
+        let outcome = await box.run(.rename(item: file, to: "ideas.md"), on: runner)
+
+        #expect(outcome.changes == [])
+        #expect(outcome.failures == [
+            ItemFailure(url: file, reason: "an item named “ideas.md” is already there")
+        ])
+        #expect(outcome.summary == "Nothing renamed (1 failed)")
+        #expect(box.text(file) == "notes")
+        #expect(box.text(other) == "ideas")
+    }
+
+    @Test func newFolderMakesOneAndNeverTakesANameInUse() async throws {
+        let operation = Operation.newFolder(in: dest, name: "Projects")
+        #expect(await runner.existingNames(for: operation) == [])
+
+        let outcome = await box.run(operation, on: runner)
+
+        let folder = dest.appendingPathComponent("Projects")
+        #expect(outcome == Outcome(
+            changes: [.created(folder)], failures: [], cancelled: false,
+            summary: "Made the folder Projects"))
+        var isFolder: ObjCBool = false
+        #expect(box.files.fileExists(atPath: folder.path, isDirectory: &isFolder) && isFolder.boolValue)
+
+        try box.makeFile(at: folder.appendingPathComponent("kept.txt"), Data("kept".utf8))
+        #expect(await runner.existingNames(for: operation) == [folder])
+        let again = await box.run(operation, on: runner)
+        #expect(again.changes == [])
+        #expect(again.failures == [
+            ItemFailure(url: folder, reason: "an item named “Projects” is already there")
+        ])
+        #expect(box.text(folder.appendingPathComponent("kept.txt")) == "kept")
+    }
+
+    @Test func trashReturnsWhereTheItemsAreInTheTrash() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        try box.makeFile("src/docs/inside.txt", "inside")
+        let folder = box.path("src/docs")
+
+        let outcome = await box.run(.trash(items: [file, folder]), on: runner)
+
+        #expect(outcome.failures == [])
+        #expect(outcome.summary == "Moved 2 items to the Trash")
+        try #require(outcome.changes.count == 2)
+        guard case let .trashed(firstOriginal, fileInTrash) = outcome.changes[0],
+            case let .trashed(secondOriginal, folderInTrash) = outcome.changes[1]
+        else {
+            Issue.record("not two items put in the Trash: \(outcome.changes)")
+            return
+        }
+        #expect(firstOriginal == file)
+        #expect(secondOriginal == folder)
+        #expect(box.names(in: src) == [])
+        // In the Trash, whole, and not anywhere under the test's folder.
+        #expect(!fileInTrash.path.hasPrefix(box.root.path))
+        #expect(fileInTrash.path.contains("/.Trash"))
+        #expect(box.text(fileInTrash) == "notes")
+        #expect(box.text(folderInTrash.appendingPathComponent("inside.txt")) == "inside")
+    }
+
+    @Test func anItemThatIsNotThereFailsAndTheOthersAreDone() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let missing = box.path("src/missing.md")
+
+        let outcome = await box.run(.trash(items: [missing, file]), on: runner)
+
+        #expect(outcome.failures == [ItemFailure(url: missing, reason: "it is no longer there")])
+        #expect(outcome.changes.count == 1)
+        #expect(outcome.summary == "Moved 1 of 2 items to the Trash (1 failed)")
+        #expect(box.names(in: src) == [])
+    }
+
+    // MARK: Refusals (Review Focus 2)
+
+    private func refusal(_ operation: Operation) async -> OperationRefusal? {
+        do throws(OperationRefusal) {
+            try await runner.validate(operation)
+            return nil
+        } catch {
+            return error
+        }
+    }
+
+    @Test func aFolderIsNotCopiedOrMovedIntoItself() async throws {
+        // By the paths alone: nothing of this is on the disk.
+        let a = URL(fileURLWithPath: "/a")
+        #expect(await refusal(.copy(items: [a], to: URL(fileURLWithPath: "/a/b"))) == .intoItself(a))
+        #expect(await refusal(.copy(items: [a], to: a)) == .intoItself(a))
+        #expect(await refusal(.move(items: [a], to: URL(fileURLWithPath: "/a/b/c"))) == .intoItself(a))
+        #expect(await refusal(.move(items: [a], to: URL(fileURLWithPath: "/a/../a/b"))) == .intoItself(a))
+        // A name that only starts the same is another folder.
+        #expect(await refusal(.copy(items: [a], to: URL(fileURLWithPath: "/ab"))) == nil)
+        #expect(await refusal(.copy(items: [a], to: URL(fileURLWithPath: "/b"))) == nil)
+    }
+
+    @Test func aFolderReachedThroughALinkOrAnotherSpellingIsStillItself() async throws {
+        let folder = try box.makeFolder("src/Folder")
+        let inner = try box.makeFolder("src/Folder/inner")
+        let link = box.path("link-to-inner")
+        try box.files.createSymbolicLink(at: link, withDestinationURL: inner)
+        let linkToFolder = box.path("link-to-folder")
+        try box.files.createSymbolicLink(at: linkToFolder, withDestinationURL: folder)
+
+        #expect(await refusal(.copy(items: [folder], to: link)) == .intoItself(folder))
+        #expect(await refusal(.move(items: [folder], to: linkToFolder)) == .intoItself(folder))
+        // The item named through a link in its path.
+        let throughLink = linkToFolder.appendingPathComponent("inner")
+        #expect(await refusal(.copy(items: [throughLink], to: inner)) == .intoItself(throughLink))
+        // A link is copied as a link, so it can go into the folder it points at.
+        #expect(await refusal(.copy(items: [linkToFolder], to: inner)) == nil)
+
+        // Where the volume takes "FOLDER" for "Folder", so does the check.
+        let shouted = box.path("src/FOLDER/inner")
+        if box.exists(shouted) {
+            #expect(await refusal(.copy(items: [folder], to: shouted)) == .intoItself(folder))
+        }
+
+        // And a run writes nothing.
+        let outcome = await box.run(.copy(items: [folder], to: link), on: runner)
+        #expect(outcome == Outcome(
+            changes: [], failures: [], cancelled: false, summary: "“Folder” can't be put inside itself."))
+        #expect(box.names(in: inner) == [])
+    }
+
+    @Test func anItemIsNotMovedToWhereItIs() async throws {
+        let x = URL(fileURLWithPath: "/a/x")
+        #expect(await refusal(.move(items: [x], to: URL(fileURLWithPath: "/a"))) == .ontoItself(x))
+        #expect(await refusal(.move(items: [x], to: URL(fileURLWithPath: "/a/"))) == .ontoItself(x))
+        #expect(await refusal(.move(items: [x], to: URL(fileURLWithPath: "/b"))) == nil)
+        // The second of two is found too.
+        let y = URL(fileURLWithPath: "/b/y")
+        #expect(await refusal(.move(items: [y, x], to: URL(fileURLWithPath: "/a"))) == .ontoItself(x))
+
+        // Through a link to the folder it is in.
+        let file = try box.makeFile("src/notes.md", "notes")
+        let link = box.path("link-to-src")
+        try box.files.createSymbolicLink(at: link, withDestinationURL: src)
+        #expect(await refusal(.move(items: [file], to: link)) == .ontoItself(file))
+
+        let outcome = await box.run(.move(items: [file], to: link), on: runner)
+        #expect(outcome.changes == [])
+        #expect(outcome.summary == "“notes.md” is already there.")
+        #expect(box.names(in: src) == ["notes.md"])
+    }
+
+    @Test func aNameThatCannotBeUsedIsRefusedWithAReason() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let cases: [(name: String, reason: String)] = [
+            ("", "A name can't be empty."),
+            ("a/b", "A name can't have a “/” in it."),
+            (".", "“.” is not a name an item can have."),
+            ("..", "“..” is not a name an item can have."),
+            (String(repeating: "n", count: 256), "That name is too long."),
+            ("a\0b", "A name can't have that character in it."),
+        ]
+        for (name, reason) in cases {
+            #expect(await refusal(.rename(item: file, to: name)) == .badName(name, reason: reason))
+            #expect(await refusal(.newFolder(in: dest, name: name)) == .badName(name, reason: reason))
+        }
+        #expect(await refusal(.rename(item: file, to: "ideas.md")) == nil)
+        #expect(await refusal(.rename(item: file, to: String(repeating: "n", count: 255))) == nil)
+        #expect(await refusal(.newFolder(in: dest, name: "Projects")) == nil)
+
+        // A run changes nothing and says why.
+        let outcome = await box.run(.rename(item: file, to: "a/b"), on: runner)
+        #expect(outcome == Outcome(
+            changes: [], failures: [], cancelled: false, summary: "A name can't have a “/” in it."))
+        #expect(box.names(in: src) == ["notes.md"])
+    }
+
+    @Test func nothingToDoIsRefused() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        #expect(await refusal(.copy(items: [], to: dest)) == .nothingToDo)
+        #expect(await refusal(.move(items: [], to: dest)) == .nothingToDo)
+        #expect(await refusal(.duplicate(items: [])) == .nothingToDo)
+        #expect(await refusal(.trash(items: [])) == .nothingToDo)
+        #expect(await refusal(.rename(item: file, to: "notes.md")) == .nothingToDo)
+        #expect(await refusal(.trash(items: [file])) == nil)
+        #expect(await refusal(.duplicate(items: [file])) == nil)
+    }
+
+    // MARK: Safety
+
+    /// A runner that tells `watch` each stage of its work.
+    private func watchedRunner(
+        _ watch: @escaping @Sendable (OperationRunner.Stage, OperationRunner) -> Void
+    ) -> OperationRunner {
+        let itself = Locked<OperationRunner?>(nil)
+        let runner = OperationRunner(watching: { stage in
+            if let runner = itself.value { watch(stage, runner) }
+        })
+        itself.value = runner
+        return runner
+    }
+
+    /// Cancels the run from inside it, and comes back when that is done.
+    private static func cancelAndWait(_ runner: OperationRunner) {
+        let done = DispatchSemaphore(value: 0)
+        Task {
+            await runner.cancel()
+            done.signal()
+        }
+        done.wait()
+    }
+
+    @Test func aCopyIsWrittenUnderAPartialNameAndRenamedAtTheEnd() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        try box.makeFile("src/Tree/a/two.txt", "two")
+        let tree = box.path("src/Tree")
+        let file = try box.makeFile("src/notes.md", "notes")
+        let seen = Locked<[[String]]>([])
+        let box = box
+        let dest = dest
+        let runner = watchedRunner { stage, _ in
+            if case .placing = stage { seen.change { $0.append(box.names(in: dest)) } }
+        }
+
+        let outcome = await box.run(.copy(items: [tree, file], to: dest), on: runner)
+
+        #expect(outcome.failures == [])
+        // Just before each item got its name: the tree whole under a partial
+        // name and nothing else; then the tree in place and the file partial.
+        let listings = seen.value
+        try #require(listings.count == 2)
+        try #require(listings[0].count == 1)
+        let partialTree = listings[0][0]
+        #expect(partialTree.hasPrefix(".Tree.grove-partial-"))
+        #expect(UUID(uuidString: String(partialTree.dropFirst(".Tree.grove-partial-".count))) != nil)
+        try #require(listings[1].count == 2)
+        #expect(listings[1][0].hasPrefix(".notes.md.grove-partial-"))
+        #expect(listings[1][1] == "Tree")
+        #expect(box.names(in: dest) == ["Tree", "notes.md"])
+    }
+
+    @Test func cancelInTheMiddleOfATreeLeavesNothingOfItAndKeepsWhatWasDone() async throws {
+        let first = try box.makeFile("src/first.txt", "first")
+        for index in 0..<10 { try box.makeFile("src/Tree/file-\(index).txt", "file \(index)") }
+        let tree = box.path("src/Tree")
+        let last = try box.makeFile("src/last.txt", "last")
+        let copied = Locked(0)
+        let runner = watchedRunner { stage, runner in
+            // The first file is first.txt; the fourth is the third of the tree.
+            if case .fileCopied = stage, copied.change({ $0 += 1; return $0 }) == 4 {
+                Self.cancelAndWait(runner)
+            }
+        }
+
+        let outcome = await box.run(.copy(items: [first, tree, last], to: dest), on: runner)
+
+        #expect(outcome == Outcome(
+            changes: [.created(dest.appendingPathComponent("first.txt"))], failures: [], cancelled: true,
+            summary: "Copied 1 of 3 items (cancelled)"))
+        // Stopped after the file in hand: the tree's other files were never read.
+        #expect(copied.value == 4)
+        #expect(box.names(in: dest) == ["first.txt"])
+        #expect(box.names(in: tree).count == 10)
+
+        // The cancel was that run's: the next one runs.
+        let next = await box.run(.copy(items: [last], to: dest), on: runner)
+        #expect(next.cancelled == false)
+        #expect(box.names(in: dest) == ["first.txt", "last.txt"])
+    }
+
+    @Test func aCancelWithNothingRunningCancelsNothing() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        await runner.cancel()
+
+        let outcome = await box.run(.copy(items: [file], to: dest), on: runner)
+
+        #expect(outcome.cancelled == false)
+        #expect(box.names(in: dest) == ["notes.md"])
+    }
+
+    @Test func cancelStopsAMoveBetweenItems() async throws {
+        let files = try (0..<4).map { try box.makeFile("src/file-\($0).txt", "file \($0)") }
+        let placed = Locked(0)
+        let runner = watchedRunner { stage, runner in
+            if case .placing = stage, placed.change({ $0 += 1; return $0 }) == 2 {
+                Self.cancelAndWait(runner)
+            }
+        }
+
+        let outcome = await box.run(.move(items: files, to: dest), on: runner)
+
+        // The second was in hand when the cancel came: it is finished.
+        #expect(outcome.cancelled)
+        #expect(outcome.changes.count == 2)
+        #expect(outcome.summary == "Moved 2 of 4 items (cancelled)")
+        #expect(box.names(in: dest) == ["file-0.txt", "file-1.txt"])
+        #expect(box.names(in: src) == ["file-2.txt", "file-3.txt"])
+    }
+
+    @Test func aFailureInTheMiddleOfATreeLeavesNothingOfIt() async throws {
+        try box.makeFile("src/Tree/a.txt", "a")
+        try box.makeFile("src/Tree/b/unreadable.txt", "secret")
+        try box.makeFile("src/Tree/c.txt", "c")
+        let tree = box.path("src/Tree")
+        #expect(chmod(tree.appendingPathComponent("b/unreadable.txt").path, 0) == 0)
+
+        let outcome = await box.run(.copy(items: [tree], to: dest), on: runner)
+
+        #expect(outcome.changes == [])
+        #expect(outcome.failures == [
+            ItemFailure(url: tree, reason: "“b/unreadable.txt” in it: you don't have permission")
+        ])
+        #expect(outcome.cancelled == false)
+        #expect(outcome.summary == "Nothing copied (1 failed)")
+        #expect(box.names(in: dest) == [])
+        #expect(box.names(in: tree) == ["a.txt", "b", "c.txt"])
+    }
+
+    @Test func oneUnreadableSourceAmongFiveFailsAloneAndTheRunGoesOn() async throws {
+        let files = try (0..<5).map { try box.makeFile("src/file-\($0).txt", "file \($0)") }
+        #expect(chmod(files[2].path, 0) == 0)
+
+        let outcome = await box.run(.copy(items: files, to: dest), on: runner)
+
+        #expect(outcome.changes == [0, 1, 3, 4].map { .created(dest.appendingPathComponent("file-\($0).txt")) })
+        #expect(outcome.failures == [ItemFailure(url: files[2], reason: "you don't have permission")])
+        #expect(outcome.cancelled == false)
+        #expect(outcome.summary == "Copied 4 of 5 items (1 failed)")
+        #expect(box.names(in: dest) == ["file-0.txt", "file-1.txt", "file-3.txt", "file-4.txt"])
+        #expect(box.text(dest.appendingPathComponent("file-4.txt")) == "file 4")
+    }
+
+    @Test func aTargetFolderThatIsNotThereFailsEveryItemAndMakesNothing() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        let nowhere = box.path("nowhere")
+
+        let copied = await box.run(.copy(items: [file], to: nowhere), on: runner)
+        let moved = await box.run(.move(items: [file], to: nowhere), on: runner)
+
+        #expect(copied.changes == [])
+        let reason = "the folder “nowhere” is not there"
+        #expect(copied.failures == [ItemFailure(url: file, reason: reason)])
+        #expect(moved.changes == [])
+        #expect(moved.failures == [ItemFailure(url: file, reason: reason)])
+        #expect(!box.exists(nowhere))
+        #expect(box.text(file) == "notes")
+    }
+
+    // MARK: A name that appears meanwhile (Review Focus 4)
+
+    @Test func anItemThatAppearsAfterTheNamesWereLookedUpIsNotOverwritten() async throws {
+        let file = try box.makeFile("src/notes.md", "mine")
+        let other = try box.makeFile("src/other.md", "other")
+        let operation = Operation.copy(items: [file, other], to: dest)
+        #expect(await runner.existingNames(for: operation) == [])
+        // Another program makes a file of that name before the run starts.
+        let theirs = try box.makeFile("dest/notes.md", "theirs")
+
+        // Even with "replace" as the answer: the question was never put for
+        // this name, so it is not an answer to it.
+        let outcome = await box.run(operation, on: runner, choice: .replace)
+
+        #expect(outcome.changes == [.created(dest.appendingPathComponent("other.md"))])
+        #expect(outcome.failures == [ItemFailure(url: file, reason: "an item with that name appeared")])
+        #expect(outcome.summary == "Copied 1 of 2 items (1 failed)")
+        #expect(box.text(theirs) == "theirs")
+        #expect(box.text(file) == "mine")
+        #expect(box.names(in: dest) == ["notes.md", "other.md"])
+    }
+
+    @Test func anItemThatAppearsJustBeforeTheLastRenameIsNotOverwritten() async throws {
+        let file = try box.makeFile("src/notes.md", "mine")
+        try box.makeFile("src/Tree/inside.txt", "mine")
+        let tree = box.path("src/Tree")
+        let box = box
+        // The copy is whole under its partial name; then the name is taken.
+        let runner = watchedRunner { stage, _ in
+            guard case let .placing(target) = stage else { return }
+            if target.lastPathComponent == "Tree" {
+                _ = try? box.makeFile(at: target.appendingPathComponent("theirs.txt"), Data("theirs".utf8))
+            } else if !target.lastPathComponent.contains(" 2") {
+                _ = try? box.makeFile(at: target, Data("theirs".utf8))
+            }
+        }
+
+        let copied = await box.run(.copy(items: [file, tree], to: dest), on: runner)
+
+        #expect(copied.changes == [])
+        #expect(copied.failures == [
+            ItemFailure(url: file, reason: "an item with that name appeared"),
+            ItemFailure(url: tree, reason: "an item with that name appeared"),
+        ])
+        #expect(box.text(dest.appendingPathComponent("notes.md")) == "theirs")
+        #expect(box.names(in: dest.appendingPathComponent("Tree")) == ["theirs.txt"])
+        #expect(box.names(in: dest) == ["Tree", "notes.md"])
+
+        // A move, a rename and a duplicate end with the same kind of rename.
+        let elsewhere = try box.makeFolder("elsewhere")
+        let moved = await box.run(.move(items: [file], to: elsewhere), on: runner)
+        #expect(moved.changes == [])
+        #expect(moved.failures == [ItemFailure(url: file, reason: "an item with that name appeared")])
+        #expect(box.text(elsewhere.appendingPathComponent("notes.md")) == "theirs")
+        #expect(box.text(file) == "mine")
+
+        let renamed = await box.run(.rename(item: file, to: "ideas.md"), on: runner)
+        #expect(renamed.changes == [])
+        #expect(renamed.failures == [ItemFailure(url: file, reason: "an item with that name appeared")])
+        #expect(box.text(box.path("src/ideas.md")) == "theirs")
+        #expect(box.text(file) == "mine")
+
+        // "Keep both" and a duplicate want any free name: they take the next.
+        let duplicated = await box.run(.duplicate(items: [file]), on: runner)
+        #expect(duplicated.changes == [.created(box.path("src/notes copy 2.md"))])
+        #expect(box.text(box.path("src/notes copy.md")) == "theirs")
+        #expect(box.text(box.path("src/notes copy 2.md")) == "mine")
+        #expect(box.partials(in: src) == [])
+        #expect(box.partials(in: dest) == [])
+    }
+
+    @Test func anItemThatAppearsWhereOneWasReplacedIsNotOverwritten() async throws {
+        let file = try box.makeFile("src/notes.md", "mine")
+        let old = try box.makeFile("dest/notes.md", "old")
+        let box = box
+        // The old one is in the Trash; then another program takes the name.
+        let runner = watchedRunner { stage, _ in
+            if case let .placing(target) = stage { _ = try? box.makeFile(at: target, Data("theirs".utf8)) }
+        }
+        let operation = Operation.copy(items: [file], to: dest)
+        #expect(await runner.existingNames(for: operation) == [old])
+
+        let outcome = await box.run(operation, on: runner, choice: .replace)
+
+        #expect(outcome.failures == [ItemFailure(url: file, reason: "an item with that name appeared")])
+        // What was done is said, so that it can be undone: the old one is in the Trash.
+        try #require(outcome.changes.count == 1)
+        guard case let .trashed(original, inTrash) = outcome.changes[0] else {
+            Issue.record("not put in the Trash: \(outcome.changes)")
+            return
+        }
+        #expect(original == old)
+        #expect(box.text(inTrash) == "old")
+        #expect(box.text(old) == "theirs")
+        #expect(box.names(in: dest) == ["notes.md"])
+    }
+
+    // MARK: Links (Review Focus 3)
+
+    @Test func aLinkIsCopiedAsALinkNotFollowed() async throws {
+        let folder = try box.makeFolder("src/Folder")
+        try box.makeFile("src/Folder/inside.txt", "inside")
+        let toFolder = box.path("src/to-folder")
+        try box.files.createSymbolicLink(atPath: toFolder.path, withDestinationPath: "Folder")
+        let toNothing = box.path("src/to-nothing")
+        try box.files.createSymbolicLink(atPath: toNothing.path, withDestinationPath: "/nowhere/at/all")
+        // And one inside a tree, pointing out of it.
+        try box.files.createSymbolicLink(
+            atPath: folder.appendingPathComponent("up").path, withDestinationPath: "../Folder")
+
+        let outcome = await box.run(.copy(items: [toFolder, toNothing, folder], to: dest), on: runner)
+
+        #expect(outcome.failures == [])
+        #expect(outcome.changes.count == 3)
+        let files = box.files
+        #expect(try files.destinationOfSymbolicLink(atPath: dest.appendingPathComponent("to-folder").path) == "Folder")
+        #expect(
+            try files.destinationOfSymbolicLink(atPath: dest.appendingPathComponent("to-nothing").path)
+                == "/nowhere/at/all")
+        #expect(try files.destinationOfSymbolicLink(atPath: dest.appendingPathComponent("Folder/up").path) == "../Folder")
+        #expect(box.names(in: dest.appendingPathComponent("Folder")) == ["inside.txt", "up"])
+
+        // Duplicated and moved as links too.
+        let duplicated = await box.run(.duplicate(items: [toNothing]), on: runner)
+        #expect(duplicated.changes == [.created(box.path("src/to-nothing copy"))])
+        #expect(try files.destinationOfSymbolicLink(atPath: box.path("src/to-nothing copy").path) == "/nowhere/at/all")
+        let elsewhere = try box.makeFolder("elsewhere")
+        let moved = await box.run(.move(items: [toNothing], to: elsewhere), on: runner)
+        #expect(moved.failures == [])
+        #expect(
+            try files.destinationOfSymbolicLink(atPath: elsewhere.appendingPathComponent("to-nothing").path)
+                == "/nowhere/at/all")
+    }
+
+    // MARK: What is done about a name that exists
+
+    @Test func existingNamesAreTheTargetsAlreadyThere() async throws {
+        let notes = try box.makeFile("src/notes.md", "new")
+        let ideas = try box.makeFile("src/ideas.md", "new")
+        let docs = try box.makeFolder("src/docs")
+        try box.makeFile("dest/notes.md", "old")
+        try box.makeFolder("dest/docs")
+        // A link that points nowhere holds its name all the same.
+        let dangling = try box.makeFile("src/dangling", "new")
+        try box.files.createSymbolicLink(atPath: dest.appendingPathComponent("dangling").path, withDestinationPath: "/nowhere")
+
+        let items = [notes, ideas, docs, dangling]
+        let expected = ["notes.md", "docs", "dangling"].map { dest.appendingPathComponent($0) }
+        #expect(await runner.existingNames(for: .copy(items: items, to: dest)) == expected)
+        #expect(await runner.existingNames(for: .move(items: items, to: dest)) == expected)
+        #expect(await runner.existingNames(for: .duplicate(items: items)) == [])
+        #expect(await runner.existingNames(for: .trash(items: items)) == [])
+    }
+
+    @Test func aNameThatDiffersOnlyByCaseOrUnicodeFormExistsWhereTheVolumeSaysSo() async throws {
+        try box.makeFile("dest/Notes.md", "old")
+        try box.makeFile("dest/caf\u{E9}.txt", "old")  // é as one character
+        let notes = try box.makeFile("src/notes.md", "new")
+        let cafe = try box.makeFile("src/cafe\u{301}.txt", "new")  // e and an accent
+        // Asked of the volume itself: is "notes.md" there when "Notes.md" is?
+        let sameByCase = box.exists(dest.appendingPathComponent("notes.md"))
+        let sameByForm = box.exists(dest.appendingPathComponent("cafe\u{301}.txt"))
+
+        let existing = await runner.existingNames(for: .copy(items: [notes, cafe], to: dest))
+
+        var expected: [URL] = []
+        if sameByCase { expected.append(dest.appendingPathComponent("notes.md")) }
+        if sameByForm { expected.append(dest.appendingPathComponent("cafe\u{301}.txt")) }
+        #expect(existing == expected)
+
+        // "Keep both" then gives names that are free on this volume.
+        let outcome = await box.run(.copy(items: [notes, cafe], to: dest), on: runner, choice: .keepBoth)
+        #expect(outcome.failures == [])
+        #expect(box.names(in: dest).count == 4)
+        #expect(box.text(dest.appendingPathComponent("Notes.md")) == "old")
+        #expect(box.text(dest.appendingPathComponent("caf\u{E9}.txt")) == "old")
+        if sameByCase {
+            #expect(outcome.changes.first == .created(dest.appendingPathComponent("notes 2.md")))
+        }
+    }
+
+    @Test func skipLeavesBothAsTheyAre() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        let other = try box.makeFile("src/other.md", "other")
+        let old = try box.makeFile("dest/notes.md", "old")
+
+        let outcome = await box.run(.move(items: [file, other], to: dest), on: runner, choice: .skip)
+
+        #expect(outcome == Outcome(
+            changes: [.moved(from: other, to: dest.appendingPathComponent("other.md"))], failures: [],
+            cancelled: false, summary: "Moved 1 of 2 items (1 skipped)"))
+        #expect(box.text(old) == "old")
+        #expect(box.text(file) == "new")
+    }
+
+    @Test func keepBothTakesTheNextFreeNameAndKeepsTheExtension() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        let folder = try box.makeFolder("src/docs")
+        try box.makeFile("dest/notes.md", "old")
+        try box.makeFile("dest/notes 2.md", "older")
+        try box.makeFolder("dest/docs")
+
+        let copied = await box.run(.copy(items: [file, folder], to: dest), on: runner, choice: .keepBoth)
+
+        #expect(copied.changes == [
+            .created(dest.appendingPathComponent("notes 3.md")), .created(dest.appendingPathComponent("docs 2")),
+        ])
+        #expect(copied.summary == "Copied 2 items to dest")
+        #expect(box.text(dest.appendingPathComponent("notes.md")) == "old")
+        #expect(box.text(dest.appendingPathComponent("notes 2.md")) == "older")
+        #expect(box.text(dest.appendingPathComponent("notes 3.md")) == "new")
+
+        let moved = await box.run(.move(items: [file], to: dest), on: runner, choice: .keepBoth)
+        #expect(moved.changes == [.moved(from: file, to: dest.appendingPathComponent("notes 4.md"))])
+        #expect(box.names(in: dest) == ["docs", "docs 2", "notes 2.md", "notes 3.md", "notes 4.md", "notes.md"])
+    }
+
+    @Test func replaceSendsTheOldOneToTheTrashAndAFolderIsReplacedWhole() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        try box.makeFile("src/docs/new.txt", "new")
+        let folder = box.path("src/docs")
+        let oldFile = try box.makeFile("dest/notes.md", "old")
+        try box.makeFile("dest/docs/old.txt", "old")
+        let oldFolder = dest.appendingPathComponent("docs")
+
+        let outcome = await box.run(.copy(items: [file, folder], to: dest), on: runner, choice: .replace)
+
+        #expect(outcome.failures == [])
+        #expect(outcome.summary == "Copied 2 items to dest")
+        try #require(outcome.changes.count == 4)
+        guard case let .replaced(firstOriginal, fileInTrash) = outcome.changes[0],
+            case let .replaced(secondOriginal, folderInTrash) = outcome.changes[2]
+        else {
+            Issue.record("the old ones were not replaced first: \(outcome.changes)")
+            return
+        }
+        #expect(firstOriginal == oldFile)
+        #expect(outcome.changes[1] == .created(oldFile))
+        #expect(secondOriginal == oldFolder)
+        #expect(outcome.changes[3] == .created(oldFolder))
+        #expect(box.text(oldFile) == "new")
+        // Not merged: what the old folder had is gone with it.
+        #expect(box.names(in: oldFolder) == ["new.txt"])
+        #expect(box.text(fileInTrash) == "old")
+        #expect(box.names(in: folderInTrash) == ["old.txt"])
+        #expect(!fileInTrash.path.hasPrefix(box.root.path))
+    }
+
+    @Test func aMoveThatReplacesIsARenameAfterTheOldOneWentToTheTrash() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        let number = try #require(box.inode(file))
+        let old = try box.makeFile("dest/notes.md", "old")
+
+        let outcome = await box.run(.move(items: [file], to: dest), on: runner, choice: .replace)
+
+        try #require(outcome.changes.count == 2)
+        guard case let .replaced(original, inTrash) = outcome.changes[0] else {
+            Issue.record("the old one was not replaced first: \(outcome.changes)")
+            return
+        }
+        #expect(original == old)
+        #expect(outcome.changes[1] == .moved(from: file, to: old))
+        #expect(box.text(inTrash) == "old")
+        #expect(box.inode(old) == number)
+        #expect(box.names(in: src) == [])
+    }
+
+    @Test func replacingALinkSendsTheLinkToTheTrashNotWhatItPointsAt() async throws {
+        let file = try box.makeFile("src/notes.md", "new")
+        let precious = try box.makeFile("precious/notes.md", "precious")
+        try box.makeFile("precious-folder/inside.txt", "precious")
+        let link = dest.appendingPathComponent("notes.md")
+        try box.files.createSymbolicLink(at: link, withDestinationURL: precious)
+        let folder = try box.makeFolder("src/docs")
+        let folderLink = dest.appendingPathComponent("docs")
+        try box.files.createSymbolicLink(at: folderLink, withDestinationURL: box.path("precious-folder"))
+
+        let outcome = await box.run(.copy(items: [file, folder], to: dest), on: runner, choice: .replace)
+
+        #expect(outcome.failures == [])
+        #expect(outcome.changes.count == 4)
+        #expect(box.text(link) == "new")
+        #expect(box.names(in: dest.appendingPathComponent("docs")) == [])
+        #expect(box.mode(dest.appendingPathComponent("docs")) != nil)
+        #expect(box.text(precious) == "precious")
+        #expect(box.names(in: box.path("precious-folder")) == ["inside.txt"])
+        // What is in the Trash are the two links.
+        for change in outcome.changes {
+            if case let .replaced(_, inTrash) = change {
+                #expect((try? box.files.destinationOfSymbolicLink(atPath: inTrash.path)) != nil)
+            }
+        }
+    }
+
+    @Test func anItemNeverReplacesItselfOrTheFolderItIsIn() async throws {
+        let file = try box.makeFile("src/notes.md", "notes")
+        // Copied to the folder it is in, with "replace" as the answer.
+        let onto = await box.run(.copy(items: [file], to: src), on: runner, choice: .replace)
+        #expect(onto.changes == [])
+        #expect(onto.failures == [ItemFailure(url: file, reason: "it can't replace itself")])
+        #expect(box.text(file) == "notes")
+
+        // "Keep both" makes the copy beside it.
+        let beside = await box.run(.copy(items: [file], to: src), on: runner, choice: .keepBoth)
+        #expect(beside.changes == [.created(box.path("src/notes 2.md"))])
+
+        // src/docs/src would replace the folder src it is in.
+        let inner = try box.makeFolder("src/docs/src")
+        let around = await box.run(.copy(items: [inner], to: box.root), on: runner, choice: .replace)
+        #expect(around.changes == [])
+        #expect(around.failures == [
+            ItemFailure(url: inner, reason: "it is inside the item it would replace")
+        ])
+        #expect(box.exists(inner))
+        #expect(box.text(file) == "notes")
+    }
+
+    @Test func twoItemsOfOneNameDoNotOverwriteEachOther() async throws {
+        let first = try box.makeFile("src/a/notes.md", "first")
+        let second = try box.makeFile("src/b/notes.md", "second")
+
+        let outcome = await box.run(.copy(items: [first, second], to: dest), on: runner, choice: .replace)
+
+        #expect(outcome.changes == [.created(dest.appendingPathComponent("notes.md"))])
+        #expect(outcome.failures == [ItemFailure(url: second, reason: "an item with that name appeared")])
+        #expect(box.text(dest.appendingPathComponent("notes.md")) == "first")
+    }
+
+    // MARK: The source of a move to another volume, and the app's partial copies
+
+    /// A tree and a copy of it, as a move to another volume has them just
+    /// before the source goes.
+    private func treeAndCopy() throws -> (source: URL, copy: URL) {
+        try box.makeFile("src/Tree/one.txt", "one")
+        try box.makeFile("src/Tree/a/two.txt", "two")
+        try box.makeFolder("src/Tree/a/empty")
+        try box.files.createSymbolicLink(atPath: box.path("src/Tree/link").path, withDestinationPath: "a/two.txt")
+        let source = box.path("src/Tree")
+        let copy = dest.appendingPathComponent("Tree")
+        try box.files.copyItem(at: source, to: copy)
+        return (source, copy)
+    }
+
+    @Test func aCopyIsWholeOnlyWhenEveryItemOfTheSourceIsInItAndTheSame() async throws {
+        let (source, copy) = try treeAndCopy()
+        #expect(TreeCopier.isWhole(copy.path, of: source.path))
+
+        // A file of the source the copy doesn't have.
+        let extra = try box.makeFile("src/Tree/a/extra.txt", "extra")
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+        try box.files.removeItem(at: extra)
+        try box.setModified(try #require(box.modified(copy.appendingPathComponent("a"))), source.appendingPathComponent("a"))
+        #expect(TreeCopier.isWhole(copy.path, of: source.path))
+
+        // A file of another length; then of the same length, written later.
+        let two = source.appendingPathComponent("a/two.txt")
+        let date = try #require(box.modified(two))
+        try Data("two and more".utf8).write(to: two)
+        try box.setModified(date, two)
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+        try Data("owt".utf8).write(to: two)
+        try box.setModified(date + 60, two)
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+        try Data("two".utf8).write(to: two)
+        try box.setModified(date, two)
+        #expect(TreeCopier.isWhole(copy.path, of: source.path))
+
+        // A link to another place; a file where a folder was; one item more in the copy.
+        let link = copy.appendingPathComponent("link")
+        try box.files.removeItem(at: link)
+        try box.files.createSymbolicLink(atPath: link.path, withDestinationPath: "one.txt")
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+        try box.files.removeItem(at: link)
+        try box.files.createSymbolicLink(atPath: link.path, withDestinationPath: "a/two.txt")
+        #expect(TreeCopier.isWhole(copy.path, of: source.path))
+        try box.files.removeItem(at: copy.appendingPathComponent("a/empty"))
+        try box.makeFile(at: copy.appendingPathComponent("a/empty"), Data())
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+        try box.files.removeItem(at: copy.appendingPathComponent("a/empty"))
+        try box.makeFolder(at: copy.appendingPathComponent("a/empty"))
+        try box.makeFile(at: copy.appendingPathComponent("a/empty/more.txt"), Data())
+        #expect(!TreeCopier.isWhole(copy.path, of: source.path))
+    }
+
+    @Test func theSourceIsRemovedItemByItemAndWhatIsNotInTheCopyStays() async throws {
+        let (source, copy) = try treeAndCopy()
+        // Came after the copy was made, and one changed since.
+        let late = try box.makeFile("src/Tree/a/empty/late.txt", "late")
+        let one = source.appendingPathComponent("one.txt")
+        try Data("one, changed".utf8).write(to: one)
+
+        #expect(!TreeCopier.removeSource(source.path, copiedTo: copy.path))
+
+        // Neither is removed, nor the folders they are in; nothing of the copy is touched.
+        #expect(box.text(late) == "late")
+        #expect(box.text(one) == "one, changed")
+        #expect(box.text(copy.appendingPathComponent("one.txt")) == "one")
+        #expect(box.text(copy.appendingPathComponent("a/two.txt")) == "two")
+
+        // With the source as the copy has it, all of it goes, and only it.
+        try box.files.removeItem(at: late)
+        try box.files.removeItem(at: source)
+        try box.files.copyItem(at: copy, to: source)
+        #expect(TreeCopier.removeSource(source.path, copiedTo: copy.path))
+        #expect(!box.exists(source))
+        #expect(box.names(in: src) == [])
+        #expect(box.names(in: copy) == ["a", "link", "one.txt"])
+    }
+
+    @Test func onlyAPartialCopyIsEverRemovedDirectly() async throws {
+        try box.makeFile("dest/Tree/inside.txt", "the user's")
+        let users = dest.appendingPathComponent("Tree")
+        TreeCopier.removeTemporary(users.path)
+        #expect(box.text(users.appendingPathComponent("inside.txt")) == "the user's")
+
+        // A partial copy goes whole, a locked file and a read-only folder in it too.
+        let partial = dest.appendingPathComponent(".Tree.grove-partial-\(UUID().uuidString)")
+        let locked = try box.makeFile(at: partial.appendingPathComponent("closed/locked.txt"), Data("x".utf8))
+        #expect(chflags(locked.path, UInt32(UF_IMMUTABLE)) == 0)
+        #expect(chmod(partial.appendingPathComponent("closed").path, 0o555) == 0)
+        TreeCopier.removeTemporary(partial.path)
+        #expect(!box.exists(partial))
+        #expect(box.names(in: dest) == ["Tree"])
+    }
+
+    // MARK: One after the other
+
+    @Test func runsStartedTogetherAreDoneOneAfterTheOther() async throws {
+        let files = try (0..<6).map { try box.makeFile("src/file-\($0).txt", "file \($0)") }
+        let inHand = Locked(0)
+        let most = Locked(0)
+        let runner = watchedRunner { stage, _ in
+            guard case .placing = stage else { return }
+            let now = inHand.change { $0 += 1; return $0 }
+            most.change { $0 = max($0, now) }
+            usleep(20_000)
+            inHand.change { $0 -= 1 }
+        }
+        let box = box
+        let dest = dest
+
+        let outcomes = await withTaskGroup(of: Outcome.self) { group in
+            for file in files {
+                group.addTask { await box.run(.copy(items: [file], to: dest), on: runner) }
+            }
+            var all: [Outcome] = []
+            for await outcome in group { all.append(outcome) }
+            return all
+        }
+
+        #expect(outcomes.count == 6)
+        #expect(outcomes.allSatisfy { $0.failures.isEmpty && $0.changes.count == 1 })
+        #expect(most.value == 1)
+        #expect(box.names(in: dest).count == 6)
+    }
+
+    // MARK: Progress
+
+    @Test func progressOfACopyIsInBytesAndEndsAtTheTotal() async throws {
+        let small = try box.makeFile(at: box.path("src/small.bin"), Data(repeating: 1, count: 1_000))
+        try box.makeFile(at: box.path("src/Tree/a.bin"), Data(repeating: 2, count: 20_000))
+        try box.makeFile(at: box.path("src/Tree/deep/b.bin"), Data(repeating: 3, count: 300_000))
+        let tree = box.path("src/Tree")
+        let reports = Locked<[Progress]>([])
+
+        let outcome = await box.run(
+            .copy(items: [small, tree], to: dest), on: runner,
+            progress: { progress in reports.change { $0.append(progress) } })
+
+        #expect(outcome.failures == [])
+        let all = reports.value
+        #expect(all.first == Progress(done: 0, total: 321_000, itemsDone: 0, itemsTotal: 2))
+        #expect(all.last == Progress(done: 321_000, total: 321_000, itemsDone: 2, itemsTotal: 2))
+        #expect(zip(all, all.dropFirst()).allSatisfy { $0.done <= $1.done })
+    }
+
+    @Test func progressOfTheOthersIsInItems() async throws {
+        let files = try (0..<3).map { try box.makeFile("src/file-\($0).txt", "file \($0)") }
+        let reports = Locked<[Progress]>([])
+        let collect: @Sendable (Progress) -> Void = { progress in reports.change { $0.append(progress) } }
+
+        _ = await box.run(.move(items: files, to: dest), on: runner, progress: collect)
+        #expect(reports.value.first == Progress(done: 0, total: 3, itemsDone: 0, itemsTotal: 3))
+        #expect(reports.value.last == Progress(done: 3, total: 3, itemsDone: 3, itemsTotal: 3))
+
+        reports.value = []
+        let moved = files.map { dest.appendingPathComponent($0.lastPathComponent) }
+        _ = await box.run(.trash(items: moved), on: runner, progress: collect)
+        #expect(reports.value.first == Progress(done: 0, total: 3, itemsDone: 0, itemsTotal: 3))
+        #expect(reports.value.last == Progress(done: 3, total: 3, itemsDone: 3, itemsTotal: 3))
+
+        reports.value = []
+        _ = await box.run(.newFolder(in: dest, name: "Projects"), on: runner, progress: collect)
+        #expect(reports.value.last == Progress(done: 1, total: 1, itemsDone: 1, itemsTotal: 1))
+    }
+
+    @Test func progressIsReportedAtMostTenTimesASecondAndOnceAtTheEnd() async throws {
+        // Enough small files for the copy to take a few tenths of a second.
+        let tree = try box.makeFolder("src/Tree")
+        for folder in 0..<20 {
+            let directory = try box.makeFolder(at: tree.appendingPathComponent("folder-\(folder)"))
+            for index in 0..<200 {
+                try box.makeFile(at: directory.appendingPathComponent("file-\(index).txt"), Data("12345".utf8))
+            }
+        }
+        let times = Locked<[(at: ContinuousClock.Instant, progress: Progress)]>([])
+        let started = ContinuousClock.now
+
+        let outcome = await box.run(
+            .copy(items: [tree], to: dest), on: runner,
+            progress: { progress in times.change { $0.append((ContinuousClock.now, progress)) } })
+
+        let took = ContinuousClock.now - started
+        #expect(outcome.failures == [])
+        let all = times.value
+        try #require(all.count >= 2)
+        #expect(all.last?.progress == Progress(done: 20_000, total: 20_000, itemsDone: 1, itemsTotal: 1))
+        // Every report but the last comes a tenth of a second after the one
+        // before (a little less as seen from here: the clock is read twice).
+        let limited = all.dropLast()
+        for (earlier, later) in zip(limited, limited.dropFirst()) {
+            #expect(later.at - earlier.at >= .milliseconds(90))
+        }
+        #expect(Double(limited.count) <= took / .milliseconds(100) + 1)
+        // 4,000 files gave no more than these few reports.
+        #expect(all.count < 100)
+    }
+}
+
+// MARK: - Across volumes
+
+/// Moves and copies between two small disk images, attached under the
+/// test's own temporary folder and out of Finder's sight, and detached when
+/// the test ends, passed or failed. A test is skipped, with the reason, on
+/// a Mac where `hdiutil` can't make or attach an image.
+@Suite(.serialized) final class OperationRunnerVolumeTests {
+    private let box: Sandbox
+    private let attached = Locked<[URL]>([])
+    private let megabyte = 1_000_000
+
+    init() throws {
+        box = try Sandbox("volumes")
+    }
+
+    deinit {
+        for volume in attached.value {
+            _ = try? Self.hdiutil(["detach", volume.path, "-force"])
+        }
+        box.cleanUp()
+    }
+
+    private struct ToolFailure: Error, CustomStringConvertible {
+        let description: String
+    }
+
+    private static func hdiutil(_ arguments: [String]) throws {
+        let tool = Process()
+        tool.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        tool.arguments = arguments
+        let errors = Pipe()
+        tool.standardOutput = FileHandle.nullDevice
+        tool.standardError = errors
+        try tool.run()
+        let said = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        tool.waitUntilExit()
+        guard tool.terminationStatus == 0 else {
+            throw ToolFailure(description: "hdiutil \(arguments.first ?? "") failed: \(said)")
+        }
+    }
+
+    /// A new, empty volume of 20 MB, attached at a folder under the test's own.
+    private func volume(_ name: String, format: String = "APFS") throws -> URL {
+        let image = box.path("\(name).dmg")
+        let mountPoint = box.path("mnt-\(name)")
+        do {
+            try Self.hdiutil(["create", "-size", "20m", "-fs", format, "-volname", name, image.path])
+            try box.makeFolder(at: mountPoint)
+            try Self.hdiutil(["attach", image.path, "-mountpoint", mountPoint.path, "-nobrowse"])
+        } catch {
+            try Test.cancel("skipped: no disk image to test with (\(error))")
+        }
+        attached.change { $0.append(mountPoint) }
+        return mountPoint
+    }
+
+    private func bytes(_ megabytes: Int, of byte: UInt8) -> Data {
+        Data(repeating: byte, count: megabytes * megabyte)
+    }
+
+    @Test func aMoveToAnotherVolumeCopiesThenRemovesTheSourceOnlyWhenTheCopyIsWhole() async throws {
+        let a = try volume("GroveA")
+        let b = try volume("GroveB")
+        let tree = try box.makeFolder(at: a.appendingPathComponent("Tree"))
+        try box.makeFile(at: tree.appendingPathComponent("one.bin"), bytes(2, of: 1))
+        let two = try box.makeFile(at: tree.appendingPathComponent("a/two.txt"), Data("two".utf8))
+        try box.makeFolder(at: tree.appendingPathComponent("a/empty"))
+        try box.files.createSymbolicLink(atPath: tree.appendingPathComponent("link").path, withDestinationPath: "a/two.txt")
+        box.setAttribute("com.projectgrove.test", "kept", on: two)
+        try box.setTags(["Grove Test"], on: two)
+        #expect(chmod(two.path, 0o640) == 0)
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        try box.setModified(date, two)
+        let file = try box.makeFile(at: a.appendingPathComponent("notes.md"), Data("notes".utf8))
+
+        // At every stage up to the item getting its name, the source is whole.
+        let box = box
+        let sourceWhole = Locked<[Bool]>([])
+        let dataSeen = Locked<[Int64]>([])
+        let runner = OperationRunner(watching: { stage in
+            switch stage {
+            case .fileCopied, .placing:
+                sourceWhole.change {
+                    $0.append(
+                        box.names(in: tree) == ["a", "link", "one.bin"]
+                            && box.names(in: tree.appendingPathComponent("a")) == ["empty", "two.txt"]
+                            && box.text(two) == "two")
+                }
+            case let .copying(bytes):
+                dataSeen.change { $0.append(bytes) }
+            }
+        })
+        let reports = Locked<[Progress]>([])
+
+        let outcome = await box.run(
+            .move(items: [tree, file], to: b), on: runner,
+            progress: { progress in reports.change { $0.append(progress) } })
+
+        let moved = b.appendingPathComponent("Tree")
+        #expect(outcome == Outcome(
+            changes: [.moved(from: tree, to: moved), .moved(from: file, to: b.appendingPathComponent("notes.md"))],
+            failures: [], cancelled: false, summary: "Moved 2 items to mnt-GroveB"))
+        #expect(sourceWhole.value.count >= 4)
+        #expect(sourceWhole.value.prefix(4).allSatisfy { $0 })
+        // Then, and only then, the source went.
+        #expect(!box.exists(tree))
+        #expect(!box.exists(file))
+        #expect(box.names(in: a).filter { !$0.hasPrefix(".") } == [])
+        // And the copy is all of it.
+        #expect(box.names(in: moved) == ["a", "link", "one.bin"])
+        #expect(box.names(in: moved.appendingPathComponent("a")) == ["empty", "two.txt"])
+        #expect(try Data(contentsOf: moved.appendingPathComponent("one.bin")) == bytes(2, of: 1))
+        let movedTwo = moved.appendingPathComponent("a/two.txt")
+        #expect(box.text(movedTwo) == "two")
+        #expect(box.attribute("com.projectgrove.test", of: movedTwo) == "kept")
+        #expect(box.tags(of: movedTwo) == ["Grove Test"])
+        #expect(box.mode(movedTwo) == 0o640)
+        #expect(box.modified(movedTwo) == date)
+        #expect(try box.files.destinationOfSymbolicLink(atPath: moved.appendingPathComponent("link").path) == "a/two.txt")
+        #expect(box.partials(in: b) == [])
+        // Bytes were copied, so the progress is in bytes, and the copy of
+        // the large file told how far it was.
+        #expect(reports.value.last == Progress(done: 2_000_008, total: 2_000_008, itemsDone: 2, itemsTotal: 2))
+        #expect(dataSeen.value.contains { $0 > 0 && $0 <= 2_000_000 })
+    }
+
+    @Test func aSourceWrittenToWhileItWasCopiedIsLeftWhereItIs() async throws {
+        let a = try volume("GroveA")
+        let b = try volume("GroveB")
+        let tree = try box.makeFolder(at: a.appendingPathComponent("Tree"))
+        try box.makeFile(at: tree.appendingPathComponent("one.txt"), Data("one".utf8))
+        let growing = try box.makeFile(at: tree.appendingPathComponent("growing.txt"), Data("first".utf8))
+        // The copy is made; before it has its name, the source gets more.
+        let runner = OperationRunner(watching: { stage in
+            if case .placing = stage { try? Data("first and more".utf8).write(to: growing) }
+        })
+
+        let outcome = await box.run(.move(items: [tree], to: b), on: runner)
+
+        let copy = b.appendingPathComponent("Tree")
+        // The copy stays and is told, so that it can be undone; the source
+        // is whole, with what was written to it.
+        #expect(outcome.changes == [.created(copy)])
+        #expect(outcome.failures == [
+            ItemFailure(
+                url: tree,
+                reason: "it changed while it was copied: the copy is there, and it was left where it is")
+        ])
+        #expect(outcome.summary == "Nothing moved (1 failed)")
+        #expect(box.names(in: tree) == ["growing.txt", "one.txt"])
+        #expect(box.text(growing) == "first and more")
+        #expect(box.text(copy.appendingPathComponent("growing.txt")) == "first")
+    }
+
+    @Test func aMoveThatFailsOnTheWayLeavesTheSourceWholeAndNothingAtTheTarget() async throws {
+        let a = try volume("GroveA")
+        let b = try volume("GroveB")
+        let tree = try box.makeFolder(at: a.appendingPathComponent("Tree"))
+        try box.makeFile(at: tree.appendingPathComponent("a.txt"), Data("a".utf8))
+        let unreadable = try box.makeFile(at: tree.appendingPathComponent("b/unreadable.txt"), Data("secret".utf8))
+        try box.makeFile(at: tree.appendingPathComponent("c.txt"), Data("c".utf8))
+        #expect(chmod(unreadable.path, 0) == 0)
+
+        let outcome = await box.run(.move(items: [tree], to: b), on: OperationRunner())
+
+        #expect(outcome.changes == [])
+        #expect(outcome.failures == [
+            ItemFailure(url: tree, reason: "“b/unreadable.txt” in it: you don't have permission")
+        ])
+        #expect(outcome.summary == "Nothing moved (1 failed)")
+        #expect(box.names(in: tree) == ["a.txt", "b", "c.txt"])
+        #expect(box.text(tree.appendingPathComponent("a.txt")) == "a")
+        #expect(box.text(tree.appendingPathComponent("c.txt")) == "c")
+        #expect(box.names(in: tree.appendingPathComponent("b")) == ["unreadable.txt"])
+        #expect(box.names(in: b).filter { !$0.hasPrefix(".") || $0.contains("grove-partial") } == [])
+    }
+
+    @Test func aCancelledMoveLeavesTheSourceWholeAndNothingAtTheTarget() async throws {
+        let a = try volume("GroveA")
+        let b = try volume("GroveB")
+        let tree = try box.makeFolder(at: a.appendingPathComponent("Tree"))
+        for index in 0..<6 {
+            try box.makeFile(at: tree.appendingPathComponent("file-\(index).txt"), Data("file \(index)".utf8))
+        }
+        let itself = Locked<OperationRunner?>(nil)
+        let copied = Locked(0)
+        let runner = OperationRunner(watching: { stage in
+            guard case .fileCopied = stage, copied.change({ $0 += 1; return $0 }) == 3,
+                let runner = itself.value
+            else { return }
+            let done = DispatchSemaphore(value: 0)
+            Task {
+                await runner.cancel()
+                done.signal()
+            }
+            done.wait()
+        })
+        itself.value = runner
+
+        let outcome = await box.run(.move(items: [tree], to: b), on: runner)
+
+        #expect(outcome == Outcome(
+            changes: [], failures: [], cancelled: true, summary: "Nothing moved (cancelled)"))
+        #expect(box.names(in: tree).count == 6)
+        #expect(box.names(in: b).filter { !$0.hasPrefix(".") || $0.contains("grove-partial") } == [])
+    }
+
+    @Test func aFullTargetStopsTheRunKeepsWhatWasCopiedAndNamesTheMissingRoom() async throws {
+        let b = try volume("GroveB")
+        // 30 MB for a volume of 20: on this Mac's own disk, as a copy; and
+        // on another small volume, as a move.
+        let files = try (0..<5).map {
+            try box.makeFile(at: box.path("src/file-\($0).bin"), bytes(6, of: UInt8($0)))
+        }
+
+        let outcome = await box.run(.copy(items: files, to: b), on: OperationRunner())
+
+        let copied = outcome.changes.count
+        #expect(copied >= 1 && copied <= 3)
+        #expect(outcome.changes == (0..<copied).map { .created(b.appendingPathComponent("file-\($0).bin")) })
+        // The one that didn't fit failed; the ones after it were not tried.
+        #expect(outcome.failures == [ItemFailure(url: files[copied], reason: "the disk is full")])
+        #expect(outcome.cancelled == false)
+        // What was copied stays, whole; of the one that didn't fit, nothing.
+        #expect(box.names(in: b).filter { !$0.hasPrefix(".") || $0.contains("grove-partial") }
+            == (0..<copied).map { "file-\($0).bin" })
+        for index in 0..<copied {
+            #expect(try Data(contentsOf: b.appendingPathComponent("file-\(index).bin")) == bytes(6, of: UInt8(index)))
+        }
+        let prefix = "Copied \(copied) of 5 items (not enough room on GroveB: "
+        #expect(outcome.summary.hasPrefix(prefix))
+        #expect(outcome.summary.hasSuffix(" MB more needed)"))
+        // Between what the files left out need less the whole volume, and all they need.
+        let figure = Double(outcome.summary.dropFirst(prefix.count).dropLast(" MB more needed)".count))
+        let leftOut = Double(5 - copied) * 6
+        #expect(try #require(figure) > leftOut - 20 + Double(copied) * 6 - 1)
+        #expect(try #require(figure) <= leftOut)
+        // The sources are all still there.
+        #expect(box.names(in: box.path("src")).count == 5)
+
+        // A move onto the full volume: the source stays.
+        let a = try volume("GroveA")
+        let big = try box.makeFile(at: a.appendingPathComponent("big.bin"), bytes(12, of: 9))
+        let moved = await box.run(.move(items: [big], to: b), on: OperationRunner())
+        #expect(moved.changes == [])
+        #expect(moved.failures == [ItemFailure(url: big, reason: "the disk is full")])
+        #expect(moved.summary.hasPrefix("Nothing moved (not enough room on GroveB: "))
+        #expect(try Data(contentsOf: big) == bytes(12, of: 9))
+        #expect(box.partials(in: b) == [])
+    }
+
+    @Test func replacingOnAnotherVolumeUsesThatVolumesTrash() async throws {
+        let a = try volume("GroveA")
+        let b = try volume("GroveB")
+        let file = try box.makeFile(at: a.appendingPathComponent("notes.md"), Data("new".utf8))
+        let old = try box.makeFile(at: b.appendingPathComponent("notes.md"), Data("old".utf8))
+        let runner = OperationRunner()
+        let operation = Operation.move(items: [file], to: b)
+        #expect(await runner.existingNames(for: operation) == [old])
+
+        let outcome = await box.run(operation, on: runner, choice: .replace)
+
+        #expect(outcome.failures == [])
+        try #require(outcome.changes.count == 2)
+        guard case let .replaced(original, inTrash) = outcome.changes[0] else {
+            Issue.record("the old one was not replaced first: \(outcome.changes)")
+            return
+        }
+        #expect(original == old)
+        #expect(outcome.changes[1] == .moved(from: file, to: old))
+        // A volume has its own Trash; the item went there, not off the volume.
+        #expect(inTrash.path.hasPrefix(b.path + "/.Trashes/"))
+        #expect(box.text(inTrash) == "old")
+        #expect(box.text(old) == "new")
+        #expect(!box.exists(file))
+
+        // And an item trashed on it goes to the same place.
+        let trashed = await box.run(.trash(items: [old]), on: runner)
+        guard case let .trashed(_, there)? = trashed.changes.first else {
+            Issue.record("not put in the Trash: \(trashed)")
+            return
+        }
+        #expect(there.path.hasPrefix(b.path + "/.Trashes/"))
+        #expect(box.text(there) == "new")
+    }
+
+    /// ExFAT and FAT, the formats of most memory sticks and cards, have no
+    /// rename that refuses to replace. Nothing is written there by another
+    /// way that could overwrite: the item fails, and says why.
+    @Test func aVolumeWithoutASafeRenameGetsNothingWrittenThatCouldOverwrite() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let file = try box.makeFile("notes.md", "notes")
+        let onStick = try box.makeFile(at: stick.appendingPathComponent("there.md"), Data("there".utf8))
+        let runner = OperationRunner()
+        let reason = "this disk's format can't add an item without the risk of replacing another"
+
+        let copied = await box.run(.copy(items: [file], to: stick), on: runner)
+        #expect(copied.changes == [])
+        #expect(copied.failures == [ItemFailure(url: file, reason: reason)])
+        #expect(box.partials(in: stick) == [])
+        #expect(!box.exists(stick.appendingPathComponent("notes.md")))
+
+        let renamed = await box.run(.rename(item: onStick, to: "here.md"), on: runner)
+        #expect(renamed.changes == [])
+        #expect(renamed.failures == [ItemFailure(url: onStick, reason: reason)])
+        #expect(box.text(onStick) == "there")
+
+        // What needs no such rename works: a new folder, the Trash, and
+        // copying from the volume.
+        let made = await box.run(.newFolder(in: stick, name: "Projects"), on: runner)
+        #expect(made.changes == [.created(stick.appendingPathComponent("Projects"))])
+        let from = await box.run(.copy(items: [onStick], to: box.root), on: runner)
+        #expect(from.changes == [.created(box.path("there.md"))])
+        let trashed = await box.run(.trash(items: [onStick]), on: runner)
+        #expect(trashed.failures == [])
+        #expect(!box.exists(onStick))
+    }
+}
