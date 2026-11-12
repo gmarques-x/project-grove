@@ -117,35 +117,15 @@ struct KeyEditorPopover: View {
     // MARK: Segments
 
     private var segments: some View {
-        HStack(spacing: GroveSpace.s2) {
-            segment("Launcher", .launcher, enabled: isHyper)
-                .help(isHyper ? "" : "Launchers live on the Hyper layer")
-            segment("AeroSpace", .aerospace, enabled: true)
-            segment("None", .none, enabled: model.canEdit)
-        }
-        .padding(GroveSpace.s2)
-        .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
-        .lightOutline(cornerRadius: GroveRadius.control)
-    }
-
-    private func segment(_ title: String, _ value: Kind, enabled: Bool) -> some View {
-        let on = kind.wrappedValue == value
-        return Button {
+        GroveSegmented("What the key does", segments: [
+            GroveSegment(Kind.launcher, "Launcher", enabled: isHyper,
+                         help: isHyper ? "" : "Launchers live on the Hyper layer"),
+            GroveSegment(Kind.aerospace, "AeroSpace"),
+            GroveSegment(Kind.none, "None", enabled: model.canEdit),
+        ], selection: kind.wrappedValue, style: .pill(.base), fillsWidth: true) { value in
             kind.wrappedValue = value
             if value == .none { set(.none) }
-        } label: {
-            Text(title)
-                .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, GroveSpace.s4)
-                // One step inside the container's `control` radius.
-                .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.inline))
-                .lightOutline(cornerRadius: GroveRadius.inline, when: on)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.4)
     }
 
     // MARK: Launcher

@@ -109,26 +109,16 @@ struct KeyboardView: View {
                 .tracking(1)
                 .foregroundStyle(theme.quiet)
                 .padding(.trailing, GroveSpace.s8)
-            ForEach(layers) { layer in
-                let on = layer.id == current?.id
-                Button {
-                    layerID.wrappedValue = layer.id
-                    editing.wrappedValue = nil
-                } label: {
-                    HStack(spacing: GroveSpace.s4) {
-                        Text(layer.title).foregroundStyle(on ? Color(theme.fg) : theme.quiet)
-                        Text(String(layer.bindings.count))
-                            .font(GroveFont.mono(GroveType.finePrint))
-                            .foregroundStyle(theme.quiet(dark: 0.8))
-                    }
-                    .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s4)
-                    .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
-                    .lightOutline(cornerRadius: GroveRadius.control, when: on)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
+                .accessibilityHidden(true)
+            GroveSegmented("Layer", segments: layers.map {
+                GroveSegment($0.id, $0.title, detail: String($0.bindings.count))
+            }, selection: current?.id, style: .bare) { show(layer: $0) }
         }
+    }
+
+    private func show(layer id: String) {
+        layerID.wrappedValue = id
+        editing.wrappedValue = nil
     }
 
     // MARK: Keyboard

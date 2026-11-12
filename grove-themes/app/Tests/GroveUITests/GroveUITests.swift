@@ -69,6 +69,23 @@ import Testing
         #expect(TintStrength.cap.rawValue == 0.16)
     }
 
+    // MARK: GroveSegmented
+
+    @Test func arrowsStepToTheNextEnabledSegmentAndStopAtTheEnds() {
+        let all = [true, true, true]
+        #expect(GroveSegmentedStep.index(from: 0, step: 1, enabled: all) == 1)
+        #expect(GroveSegmentedStep.index(from: 1, step: -1, enabled: all) == 0)
+        #expect(GroveSegmentedStep.index(from: 2, step: 1, enabled: all) == nil)
+        #expect(GroveSegmentedStep.index(from: 0, step: -1, enabled: all) == nil)
+        // The key editor off the Hyper layer: Launcher can't be chosen.
+        #expect(GroveSegmentedStep.index(from: 1, step: -1, enabled: [false, true, true]) == nil)
+        #expect(GroveSegmentedStep.index(from: 0, step: 1, enabled: [true, false, true]) == 2)
+        #expect(GroveSegmentedStep.index(from: nil, step: 1, enabled: [false, true, true]) == 1)
+        #expect(GroveSegmentedStep.index(from: nil, step: -1, enabled: [false, false]) == nil)
+        #expect(GroveSegmentedStep.index(from: 7, step: 1, enabled: all) == 0)
+        #expect(GroveSegmentedMetrics.disabledOpacity == 0.4)
+    }
+
     // MARK: FocusRing
 
     func key(_ code: UInt16, _ characters: String = "", command: Bool = false, control: Bool = false,

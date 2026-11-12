@@ -70,24 +70,10 @@ struct WindowView: View {
     private func header(_ theme: ThemeColors) -> some View {
         HStack(spacing: 0) {
             Text("Grove Keys").font(GroveFont.lockup(15))
-            HStack(spacing: GroveSpace.s4) {
-                ForEach(Array(Tab.allCases.enumerated()), id: \.element) { i, t in
-                    let on = tab.wrappedValue == t
-                    Button { tab.wrappedValue = t } label: {
-                        Text(t.rawValue)
-                            .foregroundStyle(on ? Color(theme.fg) : theme.quiet)
-                            .padding(.horizontal, GroveSpace.s12).padding(.vertical, GroveSpace.s4)
-                            .background(on ? Color(theme.bg3) : .clear, in: RoundedRectangle(cornerRadius: GroveRadius.control))
-                            .lightOutline(cornerRadius: GroveRadius.control, when: on)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(KeyEquivalent(Character(String(i + 1))), modifiers: .command)
-                }
-            }
-            .padding(GroveSpace.s2)
-            .background(Color(theme.bg1), in: RoundedRectangle(cornerRadius: GroveRadius.control))
-            .lightOutline(cornerRadius: GroveRadius.control)
+            // ⌘1, ⌘2.
+            GroveSegmented("Tabs", segments: Tab.allCases.enumerated().map { i, t in
+                GroveSegment(t, t.rawValue, shortcut: KeyEquivalent(Character(String(i + 1))))
+            }, selection: tab.wrappedValue, style: .pill(.panel), role: .tabs) { tab.wrappedValue = $0 }
             .padding(.leading, GroveSpace.s24)
             Spacer()
             HStack(spacing: GroveSpace.s8) {
