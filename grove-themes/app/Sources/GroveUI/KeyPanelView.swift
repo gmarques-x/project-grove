@@ -133,11 +133,16 @@ public struct KeyPanelGroup<Row: Identifiable>: Identifiable {
 }
 
 /// A key panel's rows: one scrolling column, the selected row lit and
-/// scrolled into view, a click handed to `onClick`. The caller draws what is
-/// in a row (`row`, told whether it is the selected one) and a group's title
-/// (`header`); the row's height, inset and selection are drawn here, so every
-/// key panel's rows look alike. Several lists side by side make columns:
-/// each scrolls on its own, and a selection in another column moves nothing.
+/// scrolled into view, the row under the pointer lit less (`hoverFill`), a
+/// click handed to `onClick`. The caller draws what is in a row (`row`, told
+/// whether it is the selected one) and a group's title (`header`); the row's
+/// height, inset, selection and hover are drawn here, so every Grove list of
+/// this kind looks alike (the launcher, the cheat sheet, the key editor's
+/// lists). Several lists side by side make columns: each scrolls on its own,
+/// and a selection in another column moves nothing.
+///
+/// For VoiceOver a row is one button, selected or not, named by `label`
+/// (else by the texts in it).
 ///
 /// Not SwiftUI's `List(selection:)`, on purpose. A `List` moves its selection
 /// only while it has the keyboard focus, and here the focus has to stay in
@@ -152,7 +157,9 @@ public struct KeyPanelList<Row: Identifiable, Header: View, RowContent: View>: V
     let selection: Row.ID?
     let position: Int?
     let rowHeight: CGFloat
+    let rowSpacing: CGFloat
     let insets: EdgeInsets
+    let label: ((Row) -> String)?
     let onClick: @MainActor (Row) -> Void
     let header: (String) -> Header
     let row: (Row, Bool) -> RowContent
@@ -161,16 +168,21 @@ public struct KeyPanelList<Row: Identifiable, Header: View, RowContent: View>: V
     /// The selected row is scrolled into view when the selection changes.
     /// `position`: the selected row's place in the list, for a list that
     /// selects by place (the launcher: the first row of each new list): then
-    /// the row is scrolled to when its place changes, instead.
+    /// the row is scrolled to when its place changes, instead. `rowSpacing`:
+    /// a gap between rows (none in the panels). `label`: what VoiceOver
+    /// calls a row.
     public init(_ groups: [KeyPanelGroup<Row>], selection: Row.ID?, position: Int? = nil,
-                rowHeight: CGFloat, insets: EdgeInsets, onClick: @escaping @MainActor (Row) -> Void,
+                rowHeight: CGFloat, rowSpacing: CGFloat = 0, insets: EdgeInsets,
+                label: ((Row) -> String)? = nil, onClick: @escaping @MainActor (Row) -> Void,
                 @ViewBuilder header: @escaping (String) -> Header,
                 @ViewBuilder row: @escaping (Row, Bool) -> RowContent) {
         self.groups = groups
         self.selection = selection
         self.position = position
         self.rowHeight = rowHeight
+        self.rowSpacing = rowSpacing
         self.insets = insets
+        self.label = label
         self.onClick = onClick
         self.header = header
         self.row = row
@@ -179,24 +191,25 @@ public struct KeyPanelList<Row: Identifiable, Header: View, RowContent: View>: V
     public var body: some View {
         ScrollViewReader { scroll in
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: rowSpacing) {
                     ForEach(groups) { group in
-                        if let title = group.title { header(title) }
+                        if let title = group.title { header(title).accessibilityAddTraits(.isHeader) }
                         ForEach(group.rows) { item in
                             let selected = item.id == selection
-                            row(item, selected)
-                                .padding(.horizontal, GroveSpace.s8)
-                                .frame(height: rowHeight)
-                                .background(selected ? Color(theme.bg2) : .clear,
-                                            in: RoundedRectangle(cornerRadius: GroveRadius.control))
-                                .lightOutline(cornerRadius: GroveRadius.control, when: selected)
-                                .contentShape(Rectangle())
-                                .onTapGesture { onClick(item) }
-                                .id(item.id)
+                            KeyPanelRow(selected: selected, height: rowHeight, label: label?(item),
+                                        onClick: { onClick(item) }) {
+                                row(item, selected)
+                            }
+                            .id(item.id)
                         }
                     }
                 }
                 .padding(insets)
+            }
+            // A list that opens on a row further down (the key editor's, on
+            // the current value) starts with it in view.
+            .onAppear {
+                if let selection { scroll.scrollTo(selection) }
             }
             // A row that isn't in this list (another column's) scrolls nothing.
             .onChange(of: position.map(AnyHashable.init) ?? selection.map(AnyHashable.init)) { _, _ in
@@ -208,10 +221,52 @@ public struct KeyPanelList<Row: Identifiable, Header: View, RowContent: View>: V
 
 extension KeyPanelList where Header == EmptyView {
     /// One list of rows, without titles.
-    public init(_ rows: [Row], selection: Row.ID?, position: Int? = nil, rowHeight: CGFloat, insets: EdgeInsets,
+    public init(_ rows: [Row], selection: Row.ID?, position: Int? = nil, rowHeight: CGFloat,
+                rowSpacing: CGFloat = 0, insets: EdgeInsets, label: ((Row) -> String)? = nil,
                 onClick: @escaping @MainActor (Row) -> Void,
                 @ViewBuilder row: @escaping (Row, Bool) -> RowContent) {
         self.init([KeyPanelGroup(rows: rows)], selection: selection, position: position, rowHeight: rowHeight,
-                  insets: insets, onClick: onClick, header: { _ in EmptyView() }, row: row)
+                  rowSpacing: rowSpacing, insets: insets, label: label, onClick: onClick,
+                  header: { _ in EmptyView() }, row: row)
+    }
+}
+
+/// One row of a `KeyPanelList`: its inset and height, lit when selected
+/// (`selectedFill`, outlined in light) and, less, under the pointer.
+private struct KeyPanelRow<Content: View>: View {
+    let selected: Bool
+    let height: CGFloat
+    let label: String?
+    let onClick: @MainActor () -> Void
+    let content: Content
+    @Environment(\.theme) private var theme
+    /// `State` used directly: the Command Line Tools ship no SwiftUI macros.
+    private var hovering = State(initialValue: false)
+
+    init(selected: Bool, height: CGFloat, label: String?, onClick: @escaping @MainActor () -> Void,
+         @ViewBuilder content: () -> Content) {
+        self.selected = selected
+        self.height = height
+        self.label = label
+        self.onClick = onClick
+        self.content = content()
+    }
+
+    var body: some View {
+        let fill = selected ? theme.selectedFill(on: .base)
+            : (hovering.wrappedValue ? theme.hoverFill(on: .base) : Color.clear)
+        let row = content
+            .padding(.horizontal, GroveSpace.s8)
+            .frame(height: height)
+            .background(fill, in: RoundedRectangle(cornerRadius: GroveRadius.control))
+            .lightOutline(cornerRadius: GroveRadius.control, when: selected)
+            .contentShape(Rectangle())
+            .onTapGesture { onClick() }
+            .onHover { hovering.wrappedValue = $0 }
+            // A trait, not a `Button`: a button would take the keyboard from the field.
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+            .accessibilityAction { onClick() }
+        if let label { row.accessibilityLabel(label) } else { row }
     }
 }

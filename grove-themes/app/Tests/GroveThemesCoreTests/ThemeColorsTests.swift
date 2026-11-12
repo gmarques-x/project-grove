@@ -97,6 +97,24 @@ import Testing
                 == RGB(hex: "#ABCDEF"))
     }
 
+    /// `hover` is bg1 on the dark schemes and bg3 on the light, sent or not.
+    @Test func hoverIsOneStepUpAndStandsInForAnOlderCLI() throws {
+        let list = try GroveThemesClient.decoder.decode(SchemeList.self, from: Fixture.data("list.json"))
+        for (scheme, palette) in list.palettes {
+            let colors = try #require(ThemeColors(palette: palette))
+            #expect(palette.colors["hover"] != nil, "\(scheme)")
+            #expect(colors.hover == (colors.isDark ? colors.bg1 : colors.bg3), "\(scheme)")
+        }
+        let dark = try #require(ThemeColors(palette: oldPalette("dark")))
+        let light = try #require(ThemeColors(palette: oldPalette("light")))
+        #expect(dark.hover == dark.bg1)
+        #expect(light.hover == light.bg3)
+        var hex = oldPalette("light").colors
+        hex["hover"] = "#ABCDEF"
+        #expect(try #require(ThemeColors(palette: Palette(name: "X", appearance: "light", colors: hex))).hover
+                == RGB(hex: "#ABCDEF"))
+    }
+
     @Test func darkKeepsItsTuningAndLightDropsIt() throws {
         let dark = try #require(ThemeColors(palette: oldPalette("dark")))
         let light = try #require(ThemeColors(palette: oldPalette("light")))

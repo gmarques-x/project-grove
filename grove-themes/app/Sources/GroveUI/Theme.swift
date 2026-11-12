@@ -26,7 +26,7 @@ extension ThemeColors {
         "fg": "#D3C6AA", "grey1": "#859289", "red": "#E67E80", "orange": "#E69875",
         "yellow": "#DBBC7F", "green": "#A7C080", "aqua": "#83C092", "blue": "#7FBBB3",
         "purple": "#D699B6", "border": "#475258", "on_accent": "#2D353B", "dim": "#859289",
-        "lockup_ink": "#DAC7A2",
+        "lockup_ink": "#DAC7A2", "hover": "#343F44",
     ]))!
 
     /// For `.preferredColorScheme`, so the system's own controls match.
@@ -63,6 +63,21 @@ extension ThemeColors {
         isDark ? Color(bg0).opacity(0.5) : Color(onAccent).opacity(0.35)
     }
 
+    /// The fill of the selected row or segment: two background steps above
+    /// what it sits on (bg2 on bg0, bg3 on a bg1 panel). In light a step is
+    /// 1.06 to 1.2:1, so the caller adds `.lightOutline`. Never the system's
+    /// accent: selection looks the same in every Grove list.
+    public func selectedFill(on surface: Surface) -> Color {
+        Color(surface == .base ? bg2 : bg3)
+    }
+
+    /// The fill under the pointer on a row: one step above what it sits on
+    /// (the `hover` role on bg0; bg2 on a bg1 panel), so it reads as less
+    /// than the selection in dark.
+    public func hoverFill(on surface: Surface) -> Color {
+        Color(surface == .base ? hover : bg2)
+    }
+
     /// The card of a sheet on the scrim (the cheat sheets, the launcher): bg0,
     /// a little see-through.
     public var sheetFill: Color { Color(bg0).opacity(0.94) }
@@ -84,6 +99,14 @@ extension ThemeColors {
         guard isLight else { return Text(text).foregroundStyle(Color(accent)) }
         return (Text("● ").foregroundStyle(Color(accent)) + Text(verbatim: text)).foregroundStyle(Color(fg))
     }
+}
+
+/// What a row or a segment sits on, for `selectedFill` and `hoverFill`.
+public enum Surface: Sendable {
+    /// The window's or a sheet's own background, or a well in a panel: bg0.
+    case base
+    /// A panel on the window (a group, a pill): bg1.
+    case panel
 }
 
 /// How strong `ThemeColors.tintFill` is, by what it fills. The values the

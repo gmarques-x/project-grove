@@ -142,7 +142,7 @@ gt_copy_config() {
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].appearance')" = light ]
   [ "$(printf '%s' "$output" | jq -r '.palettes["light-soft"].colors.bg0')" = "#F3EAD3" ]
   [ "$(printf '%s' "$output" | jq -c '.palettes[].colors | keys' | sort -u | wc -l | tr -d ' ')" -eq 1 ]
-  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","lockup_ink","on_accent","orange","purple","red","yellow"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.palettes["dark-hard"].colors | keys')" = '["aqua","bg0","bg1","bg2","bg3","blue","border","dim","fg","green","grey1","hover","lockup_ink","on_accent","orange","purple","red","yellow"]' ]
 }
 
 @test "list --json carries the three roles, each scheme's own pick" {
@@ -161,6 +161,13 @@ gt_copy_config() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("dark")) | .value.colors.lockup_ink] | unique')" = '["#DAC7A2"]' ]
   [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("light")) | .value.colors.lockup_ink] | unique')" = '["#27332A"]' ]
+}
+
+@test "list --json carries hover: bg1 on the dark schemes, bg3 on the light" {
+  run "$CLI" list --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("dark")) | .value.colors | .hover == .bg1] | unique')" = '[true]' ]
+  [ "$(printf '%s' "$output" | jq -c '[.palettes | to_entries[] | select(.key | startswith("light")) | .value.colors | .hover == .bg3] | unique')" = '[true]' ]
 }
 
 @test "logo prints grove by default" {

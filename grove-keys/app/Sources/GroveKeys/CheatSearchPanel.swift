@@ -6,8 +6,9 @@ import SwiftUI
 
 /// The cheat sheet to search in (`grovekeys://cheatsheet`, Hyper + K, Show
 /// cheat sheet): every key Grove relies on, in sections, filtered as you
-/// type. ↑/↓ move across the rows, Return runs the row where it can be run
-/// (a launcher, a binding) and closes, Escape or a click outside the card
+/// type. ↑/↓ move across the rows, Return or a click runs the row where it
+/// can be run (a launcher, a binding) and closes, as in the launcher; a click
+/// on a row that can't be run selects it. Escape or a click outside the card
 /// closes. The panel, the field, the card and the rows are GroveUI's key
 /// panel, as the launcher's; the sections, the two columns and what Return
 /// runs are here.
@@ -68,8 +69,11 @@ final class CheatSearchPanel: ObservableObject {
         selection.move(step)
     }
 
-    func select(_ row: CheatRow) {
+    /// A click: the row is run, as Return would (the launcher's rule); one
+    /// that has nothing to run is only selected, and the sheet stays.
+    func click(_ row: CheatRow) {
         selection.select(row.id)
+        if row.action != .none { runSelection() }
     }
 
     func runSelection() {
@@ -155,7 +159,7 @@ private struct CheatSearchView: View {
         KeyPanelList(sections.map { KeyPanelGroup(id: $0.id, title: $0.title, rows: $0.rows) },
                      selection: sheet.selection.selected, rowHeight: Self.rowHeight,
                      insets: EdgeInsets(top: 0, leading: GroveSpace.s8, bottom: GroveSpace.s8, trailing: GroveSpace.s8),
-                     onClick: sheet.select) { title in
+                     label: { $0.keys + ", " + $0.text }, onClick: sheet.click) { title in
             Text(title)
                 .font(GroveFont.mono(GroveType.body, .semibold))
                 .foregroundStyle(theme.quiet)

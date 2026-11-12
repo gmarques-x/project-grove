@@ -158,10 +158,20 @@ private struct LauncherView: View {
                             position: launcher.selection.index, rowHeight: Self.rowHeight,
                             insets: EdgeInsets(top: Self.listInset, leading: Self.listInset,
                                                bottom: Self.listInset, trailing: Self.listInset),
-                            onClick: launcher.run) { item, _ in
+                            label: label, onClick: launcher.run) { item, _ in
             row(item, icons: icons, theme)
         }
         .frame(height: CGFloat(min(launcher.results.count, Self.rowsShown)) * Self.rowHeight + 2 * Self.listInset)
+    }
+
+    /// What VoiceOver calls a row: the app's name; a menu row's way and
+    /// title, and that it is ticked.
+    private func label(_ item: LauncherItem) -> String {
+        switch item {
+        case .app(let app): return app.name
+        case .row(let entry):
+            return entry.path.joined(separator: ", ") + (launcher.checked.contains(entry.id) ? ", on" : "")
+        }
     }
 
     /// An app: its icon and name. A Grove menu row, "Appearance › Dark

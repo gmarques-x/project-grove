@@ -21,7 +21,7 @@ grove-themes render [--scheme S] [--config DIR]
 
 The current scheme is kept in `$GROVE_STATE/theme` (default `~/.local/state/grove/theme`). `grove install` links the command into `~/.local/bin` and renders the configs.
 
-`list --json` also carries `palettes`: for each scheme its `name` (e.g. `Dark Medium`), `appearance` (`dark` or `light`) and `colors` (`bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple`, then the four roles `border on_accent dim lockup_ink`, as `#RRGGBB`). The palettes define two more roles, `hover` and `muted`, which templates can use.
+`list --json` also carries `palettes`: for each scheme its `name` (e.g. `Dark Medium`), `appearance` (`dark` or `light`) and `colors` (`bg0 bg1 bg2 bg3 fg grey1 red orange yellow green aqua blue purple`, then the five roles `border on_accent dim lockup_ink hover`, as `#RRGGBB`). The palettes define one more role, `muted`, which templates can use.
 
 Every `set` whose configs rendered is logged to `$GROVE_STATE/theme-log.jsonl` (`{"time", "scheme", "exit", "steps"}`, the last 50 kept). `log` prints it newest first, one `<time> <scheme> exit=<n>` line per switch, or `{"entries": [...]}` with `--json`; damaged lines are skipped.
 

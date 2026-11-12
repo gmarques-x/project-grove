@@ -33,6 +33,11 @@ public struct ThemeColors: Equatable, Sendable {
     /// an Everforest one; one for the dark schemes, one for the light. A CLI
     /// older than the role sends none: `ThemeColors.lockupInk(dark:)`.
     public let lockupInk: RGB
+    /// The fill under the pointer on something clickable (`hover`): bg1 on a
+    /// dark scheme, bg3 on a light one (bg1 on bg0 is 1.06:1 there). A CLI
+    /// older than the role sends none: those two stand in, as the theme
+    /// files have them.
+    public let hover: RGB
     /// The palette's `appearance` is "dark".
     public let isDark: Bool
     /// Not dark. The apps were tuned in the dark schemes: what only a pale
@@ -56,6 +61,7 @@ public struct ThemeColors: Equatable, Sendable {
         dim = color("dim") ?? grey1
         isDark = palette.appearance == "dark"
         lockupInk = color("lockup_ink") ?? Self.lockupInk(dark: isDark)
+        hover = color("hover") ?? (isDark ? bg1 : bg3)
     }
 
     /// What the theme files have as `lockup_ink` (ThemeColorsTests and
