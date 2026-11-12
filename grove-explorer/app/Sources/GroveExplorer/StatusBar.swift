@@ -31,10 +31,12 @@ struct StatusBar: View {
 
     var body: some View {
         HStack(spacing: GroveSpace.s8) {
-            if case let .running(_, words, fraction, percent)? = status {
-                running(words, fraction, percent)
-            } else if let notice {
+            // A notice first, for its few seconds: a refusal said while
+            // another operation's meter runs is otherwise never seen.
+            if let notice {
                 theme.marked(notice, theme.orange).truncationMode(.middle)
+            } else if case let .running(_, words, fraction, percent)? = status {
+                running(words, fraction, percent)
             } else if case let .done(summary, changed, hint)? = status {
                 if changed { theme.marked(summary, theme.green) } else { Text(verbatim: summary) }
                 if hint { Text(verbatim: "· " + OperationStatus.undoHint).fixedSize() }

@@ -241,8 +241,9 @@ extension AppModel {
         work.statusTimers[side] = nil
         work.statuses[side] = status
         if case .failed = status {} else if work.failuresShown == side { work.failuresShown = nil }
-        // What the pane said before about its folder is over.
-        if notices[side] != nil { notices[side] = nil }
+        // What the pane said before about its folder is over; not for a
+        // meter's next step, which would take every notice away unread.
+        if case .running = status {} else if notices[side] != nil { notices[side] = nil }
         guard let seconds else { return }
         work.statusTimers[side] = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
