@@ -183,6 +183,8 @@ final class FileTableView: NSTableView {
             enumerateAvailableRowViews { view, row in (view as? FileRowView)?.isDropTarget = row == dropRow }
         }
     }
+    /// A right-click on a row (-1: on the list's empty space): the menu to show.
+    var onMenu: ((Int) -> NSMenu?)?
     /// Fills the Quick Look panel while this list has the keyboard (`QuickLook.swift`).
     weak var quickLook: QuickLookController?
     /// A drag left the list or ended over it.
@@ -218,6 +220,10 @@ final class FileTableView: NSTableView {
         guard let window, window.isKeyWindow else { return }
         let place = convert(window.mouseLocationOutsideOfEventStream, from: nil)
         pointerRow = visibleRect.contains(place) ? row(at: place) : -1
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        onMenu?(row(at: convert(event.locationInWindow, from: nil)))
     }
 
     override func keyDown(with event: NSEvent) {

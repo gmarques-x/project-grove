@@ -52,7 +52,11 @@ struct PaneView: View {
                 // The list is always there, even with no rows: it is what
                 // holds the keyboard for the pane.
                 FileList(model: model, work: work, side: side, columns: columns)
-                    .overlay { if let listing, bare { note(listing) } }
+                    // "This folder is empty" lets the pointer through to the
+                    // list under it, which takes the click, the right-click
+                    // (New Folder, Paste) and a drop of files; a problem's
+                    // note has a button of its own.
+                    .overlay { if let listing, bare { note(listing).allowsHitTesting(listing.problem != nil) } }
                     .overlay(alignment: .bottomLeading) { failures }
                 Line()
                 StatusBar(

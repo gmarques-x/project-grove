@@ -52,6 +52,7 @@ struct FileList: NSViewRepresentable {
         table.onActivate = { [weak coordinator] in coordinator?.activate() }
         table.onClick = { [weak coordinator] in coordinator?.clicked() }
         table.onPointerRow = { [weak coordinator] in coordinator?.pointerMoved(to: $0) }
+        table.onMenu = { [weak coordinator] in coordinator?.menu(forRow: $0) }
 
         let scroll = NSScrollView()
         scroll.documentView = table
@@ -115,12 +116,14 @@ struct FileList: NSViewRepresentable {
         private var listFocus = 0
         private let rename: RenameEditor
         let quickLook: QuickLookController
+        let menu: ListMenu
 
         init(model: AppModel, side: Side) {
             self.model = model
             self.side = side
             rename = RenameEditor(model: model)
             quickLook = QuickLookController(model: model, side: side)
+            menu = ListMenu(model: model, side: side)
         }
 
         // MARK: Following the model
