@@ -59,14 +59,14 @@ enum AccessibilityAudit {
         }
         var failed = false
         for state in states {
-            let (view, _, _) = Render.window(showing: state, colors: ThemeColors.fallback)
+            let (view, _, model) = Render.window(showing: state, colors: ThemeColors.fallback)
             wakeAccessibility(of: view)
             var count = Count()
             if tree { print("\(state):") }
             walk(view, depth: 1, path: [], tree: tree, into: &count)
             print(
                 "\(state): \(count.elements) elements, \(count.controls) controls, \(count.unlabelled.count) unlabelled"
-                    + (count.identityChecked > 0 ? ", \(count.identityChecked) rows equal across answers and a reload" : ""))
+                    + (count.identityChecked > 0 ? ", \(count.identityChecked) rows the same objects across answers and a reload" : ""))
             for line in count.unlabelled { print("  UNLABELLED \(line)") }
             // The header alone has more: SwiftUI's part of the tree was not there to walk.
             if count.elements < 10 {
@@ -74,6 +74,15 @@ enum AccessibilityAudit {
                 failed = true
             }
             if !count.unlabelled.isEmpty { failed = true }
+            // Then the lists as an assistive app is served them.
+            if let window = view.window {
+                let live = AccessibilityLive.check(window, model: model)
+                print(
+                    "  through the accessibility server: \(live.tables) lists, \(live.asked) questions, "
+                        + "\(live.problems.count) problems")
+                for problem in live.problems { print("  LIVE \(problem)") }
+                if !live.problems.isEmpty { failed = true }
+            }
         }
         let missing = CommandTable.missingActions, stray = CommandTable.strayActions
         print("commands without an action: \(missing.isEmpty ? "none" : missing.joined(separator: ", "))")
@@ -145,29 +154,30 @@ enum AccessibilityAudit {
         ] {
             let old = table.perform(older, with: attribute as NSString)?.takeUnretainedValue() as? [NSObject] ?? []
             let new = table.value(forKey: getter) as? [NSObject] ?? []
-            if old.count != new.count || zip(old, new).contains(where: { !$0.isEqual($1) }) {
+            if old.count != new.count || zip(old, new).contains(where: { $0 !== $1 }) {
                 count.unlabelled.append(
                     (path + ["\(attribute) asked the older way gives other elements"]).joined(separator: " › "))
             }
         }
     }
 
-    /// VoiceOver keeps its place on a row by asking whether the row it has
-    /// is one of those it is given next: a table's rows must be equal
-    /// (and hash alike) from one answer to the next, and after the list
-    /// is loaded again, as a folder that changes does to it.
+    /// An assistive app holds a row by the object it was given: a table's
+    /// rows must be the same objects from one answer to the next, and
+    /// after the list is loaded again, as a folder that changes does to
+    /// it. (`AccessibilityLive` asks the same through the server.)
     private static func checkRowsKeepTheirIdentity(in table: NSObject, path: [String], into count: inout Count) {
         func rows() -> [NSObject] { table.value(forKey: "accessibilityRows") as? [NSObject] ?? [] }
+        // The same objects: a token an assistive app holds is one object's.
         func same(_ a: [NSObject], _ b: [NSObject]) -> Bool {
-            a.count == b.count && zip(a, b).allSatisfy { $0.isEqual($1) && $0.hash == $1.hash }
+            a.count == b.count && zip(a, b).allSatisfy { $0 === $1 }
         }
-        let first = rows(), second = rows()
+        let first = autoreleasepool { rows() }, second = autoreleasepool { rows() }
         (table as? NSTableView)?.reloadData()
-        let afterReload = rows()
+        let afterReload = autoreleasepool { rows() }
         var problems: [String] = []
-        if !same(first, second) { problems.append("two answers in a row give rows that are not equal") }
-        if !same(first, afterReload) { problems.append("the rows after a reload are not equal to those before") }
-        if first.count > 1, first[0].isEqual(first[1]) { problems.append("two different rows are equal") }
+        if !same(first, second) { problems.append("two answers in a row give rows that are not the same objects") }
+        if !same(first, afterReload) { problems.append("the rows after a reload are not the same objects as before") }
+        if first.count > 1, first[0] === first[1] { problems.append("two different rows are one object") }
         for problem in problems { count.unlabelled.append((path + [problem]).joined(separator: " › ")) }
         count.identityChecked += first.count
     }
