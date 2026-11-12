@@ -82,7 +82,9 @@ struct StatusBar: View {
 
     @ViewBuilder private func percentAndCancel(_ percent: String) -> some View {
         Text(verbatim: percent).fixedSize()
+        // Never cut short: it is the one way to stop the run.
         PanelButton("Cancel", icon: .close, action: onCancel)
+            .fixedSize()
             .help("Stop after the file it is on")
     }
 }

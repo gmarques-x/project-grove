@@ -84,6 +84,12 @@ enum Render {
         ("notice-while-copying", Scene(size: wide, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
             status: .running(run: 1, words: "Copying 128 of 342 to Downloads", fraction: 0.37, percent: "37%"),
             notice: "“fonts” can't be put inside itself."))),
+        // The same in the right pane of the half-width tile: Cancel whole.
+        ("notice-while-copying-narrow", Scene(
+            size: half, panes: [Sample.grove(selected: []), Sample.downloads(selected: [])],
+            extras: Sample.Extras(
+                status: .running(run: 1, words: "Copying 128 of 342 to Downloads", fraction: 0.37, percent: "37%"),
+                statusSide: .right, notice: "“invoices-2026” can't be put inside itself."))),
         ("undo-line", Scene(
             size: wide, panes: [Sample.downloads(selected: ["config.toml", "data-export.csv", "everforest-master.zip"])],
             extras: Sample.Extras(status: .done("Moved 3 items to Downloads", changed: true, hint: true)))),
