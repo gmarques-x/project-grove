@@ -98,10 +98,11 @@ final class FileWork: ObservableObject {
     @Published var rename: RenameState?
     /// The pane whose list of failed items is open.
     @Published var failuresShown: Side? {
-        didSet { if failuresShown != oldValue, failuresTop != 0 { failuresTop = 0 } }
+        didSet { if failuresShown != oldValue, failuresTop != nil { failuresTop = nil } }
     }
-    /// The first item in view of a list longer than its card (↑ ↓ scroll it).
-    @Published var failuresTop = 0
+    /// The item at the top of a list longer than its card: the scroll
+    /// view says which as it scrolls, and ↑ ↓ set it. Nil: not scrolled yet.
+    @Published var failuresTop: Int?
 
     /// What the prompt's answer goes to; nil when none is awaited.
     var reply: CheckedContinuation<(button: ConflictButton, applyToAll: Bool), Never>?
@@ -109,7 +110,8 @@ final class FileWork: ObservableObject {
     /// Counts the runs, and the number of the one going: progress that
     /// comes in after its run has ended is not shown.
     var run = 0
-    var runInHand: Int?
+    /// Published: "Cancel Operation" in the menu bar follows it.
+    @Published var runInHand: Int?
     /// The app was asked to quit and waits for the command in hand to end:
     /// nothing new is taken in, and nothing not yet running starts.
     var quitting = false

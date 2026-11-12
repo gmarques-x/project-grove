@@ -68,6 +68,12 @@ enum Render {
         ("ejecting", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(ejecting: true))),
         ("eject-failed", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
             ejectFailure: "The disk “Backup” wasn’t ejected because Ghostty is using it."))),
+        // An eject asked for while a copy goes to the disk: refused, and why.
+        ("eject-refused", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
+            ejectFailure: VolumeUse.ejectRefusal(
+                of: Sample.backup.name, at: Sample.backup.url,
+                commands: [.operation(.copy(items: [], to: Sample.backup.url))]),
+            status: .running(run: 1, words: "Copying 128 of 342 to Backup", fraction: 0.37, percent: "37%")))),
         // The list's three fills side by side, and hidden items selected and
         // not: the active pane at the left, the other at the right.
         ("list-states", Scene(size: CGSize(width: 948, height: 480), panes: [

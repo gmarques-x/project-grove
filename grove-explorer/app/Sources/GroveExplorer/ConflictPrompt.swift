@@ -9,7 +9,7 @@ import SwiftUI
 /// Both (the button Return takes: it loses nothing), for this name or with
 /// the box for all the names after it; Cancel gives up the whole operation.
 ///
-/// Keys: Return takes the button in the focus box, Escape is Cancel, Tab
+/// Keys: Return takes the button in the focus box, Escape and ⌘. are Cancel, Tab
 /// and ← → move the box, Space ticks "Apply to all".
 struct ConflictPrompt: View {
     let model: AppModel
@@ -105,6 +105,11 @@ extension AppModel {
             else { return event }
             // Quitting, hiding and minimising stay the app's.
             if stroke.modifiers == [.command], ["Q", "H", "M"].contains(stroke.key) { return event }
+            // ⌘. is Cancel, as in every Mac dialog.
+            if stroke.modifiers == [.command], stroke.key == "." {
+                self.answerPrompt(.cancel)
+                return nil
+            }
             self.promptKey(stroke.key, shift: stroke.modifiers == [.shift], plain: stroke.modifiers.isEmpty)
             return nil
         }

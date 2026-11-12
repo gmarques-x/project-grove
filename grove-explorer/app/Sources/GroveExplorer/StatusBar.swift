@@ -98,8 +98,9 @@ struct StatusBar: View {
 struct FailureList: View {
     let summary: String
     let items: [String]
-    /// The first item in view when the list is longer than the card (↑ ↓ move it).
-    var top = 0
+    /// The item at the top of a list longer than the card: the scroll
+    /// view writes it as it scrolls, and ↑ ↓ set it (`AppModel.failuresKey`).
+    var top: Binding<Int?> = .constant(nil)
     let onClose: () -> Void
     @Environment(\.theme) private var theme
 
@@ -128,11 +129,11 @@ struct FailureList: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if items.count > Self.rows {
-                ScrollViewReader { reader in
-                    ScrollView { list }
-                        .frame(height: CGFloat(Self.rows) * ListMetrics.row)
-                        .onChange(of: top) { _, top in reader.scrollTo(top, anchor: .top) }
-                }
+                // By item, not by a count of lines: an item may wrap, and
+                // the last one is reached whatever the others' heights.
+                ScrollView { list.scrollTargetLayout() }
+                    .scrollPosition(id: top, anchor: .top)
+                    .frame(height: CGFloat(Self.rows) * ListMetrics.row)
             } else {
                 list
             }

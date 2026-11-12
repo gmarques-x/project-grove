@@ -10,8 +10,9 @@ import SwiftUI
 //   the right-click menu of the selection ......... ⌃Return, ⇧F10
 //   a sidebar row's menu (Open in New Tab,
 //     Remove from Sidebar, Eject) ................. the same, after ⌥⌘←
-//   a disk's eject button ......................... ⌘E
-//   the status bar's Cancel ....................... ⌘.
+//   a disk's eject button ......................... ⌘E, after ⌥⌘← (on that row only)
+//   the status bar's Cancel ....................... ⌘. (in a text field ⌘. is the field's Escape)
+//   the conflict prompt's Cancel .................. Esc, ⌘.
 //   the list of failed items ...................... ⌘⇧F, ↑ ↓, Esc
 //   "Open Privacy Settings…" ...................... Return, where the folder can't be read
 //
@@ -29,6 +30,18 @@ final class KeyboardReach {
     var listMenus: [Side: @MainActor () -> Void] = [:]
     /// The sidebar row the keyboard is on, as a view a menu can open at.
     weak var sidebarAnchor: NSView?
+    /// A menu opened from a key is up: a second way the same key arrived
+    /// by (the menu bar's row and the system's own key) opens no second one.
+    var menuIsUp = false
+
+    /// Opens `menu` at `point` of `view`, unless one opened from a key is
+    /// up already; returns when it has closed.
+    func popUp(_ menu: NSMenu, at point: NSPoint, in view: NSView) {
+        guard !menuIsUp else { return }
+        menuIsUp = true
+        defer { menuIsUp = false }
+        menu.popUp(positioning: nil, at: point, in: view)
+    }
 }
 
 /// One row of a sidebar place's menu: the right-click menu and the one a
@@ -59,6 +72,7 @@ extension AppModel {
             let id = String(place.id.dropFirst("favourite.".count))
             rows.append(PlaceMenuRow(title: "Remove from Sidebar") { [weak self] in self?.removeFavourite(id: id) })
         }
+        // Offered while the disk is in use too: the row then says why not.
         if case .volume(let volume) = place.kind, volume.ejectable, !ejecting.contains(volume.id) {
             rows.append(PlaceMenuRow(title: "Eject") { [weak self] in self?.eject(volume) })
         }
@@ -78,7 +92,7 @@ extension AppModel {
             guard let self, self.sidebarCursor == cursor, let anchor = self.reach.sidebarAnchor, anchor.window != nil
             else { return }
             // Under the row, at its left edge.
-            menu.popUp(positioning: nil, at: NSPoint(x: 0, y: anchor.isFlipped ? anchor.bounds.maxY : 0), in: anchor)
+            self.reach.popUp(menu, at: NSPoint(x: 0, y: anchor.isFlipped ? anchor.bounds.maxY : 0), in: anchor)
             self.keepSidebarCursorOnARow()
         }
     }
@@ -93,24 +107,34 @@ extension AppModel {
 
     // MARK: Eject
 
-    /// What ⌘E ejects: while the keyboard is in the sidebar, the disk it
-    /// is on (none on any other row); otherwise the disk the active pane
-    /// shows. Nil when that can't be ejected (the startup disk).
+    /// What ⌘E ejects: the disk the keyboard is on in the sidebar (⌥⌘←).
+    /// None with the keyboard in a list (one stray ⌘E there, beside ⌘W
+    /// and ⌘D, must not take a disk away), on a row that is no disk, or on
+    /// one that can't be ejected (the startup disk).
     var ejectTarget: Volume? {
-        if let cursor = sidebarCursor {
-            let places = places
-            guard places.indices.contains(cursor), case .volume(let volume) = places[cursor].kind else { return nil }
-            return volume.ejectable ? volume : nil
-        }
-        let path = browser.activeTab.folder.standardizedFileURL.path
-        // The volume the folder is on is the deepest one above it.
-        let on = volumes
-            .filter { $0.id == "/" || path == $0.id || path.hasPrefix($0.id + "/") }
-            .max { $0.id.count < $1.id.count }
-        return on.flatMap { $0.ejectable ? $0 : nil }
+        guard let cursor = sidebarCursor else { return nil }
+        let places = places
+        guard places.indices.contains(cursor), case .volume(let volume) = places[cursor].kind else { return nil }
+        return volume.ejectable ? volume : nil
     }
 
+    /// Offered while the disk is in use too: the row then says why not.
     var canEject: Bool { live && (ejectTarget.map { !ejecting.contains($0.id) } ?? false) }
+
+    /// Why `volume` is not ejected now (`VolumeUse.ejectRefusal`): a file
+    /// command in hand or waiting reads from it or writes to it, or an
+    /// undo or a redo is. Nil when it may be.
+    func ejectRefusal(for volume: Volume) -> String? {
+        let jobs = (work.pending.inHand.map { [$0] } ?? []) + work.pending.waiting
+        let commands = jobs.map { job -> VolumeUse.Command in
+            switch job {
+            case let .operation(job): .operation(job.operation)
+            case .undo: .undo
+            case .redo: .redo
+            }
+        }
+        return VolumeUse.ejectRefusal(of: volume.name, at: volume.url, commands: commands)
+    }
 
     func ejectByKey() {
         if let volume = ejectTarget { eject(volume) }
@@ -118,7 +142,9 @@ extension AppModel {
 
     // MARK: The operation that runs, and what one could not do
 
-    var canCancelOperation: Bool { work.runInHand != nil }
+    /// With the keyboard in a list or the sidebar. While the path or the
+    /// filter field has it, ⌘. is the field's (what Escape does there).
+    var canCancelOperation: Bool { work.runInHand != nil && pathField == nil && filter.focused == nil }
 
     /// ⌘.: as the status bar's Cancel, for whichever pane tells of the run.
     func cancelOperation() {
@@ -137,21 +163,36 @@ extension AppModel {
         }
     }
 
+    /// ⌘⇧F. The pane whose list it shows gets the keys: the arrows are
+    /// then that list's, and Escape closes it.
     func toggleFailures() {
-        work.failuresShown = work.failuresShown == nil ? failuresSide : nil
+        guard work.failuresShown == nil else {
+            work.failuresShown = nil
+            return
+        }
+        guard let side = failuresSide else { return }
+        work.failuresShown = side
+        if browser.active != side {
+            activate(side)
+            focusList()
+        }
     }
 
-    /// A key while the list of failed items is up: Escape closes it, and
-    /// ↑ ↓ scroll one that is longer than its card. False for any other.
+    /// A key while the list of failed items is up: Escape closes it; ↑ ↓
+    /// move a list that scrolls (more items than its card has rows) by one
+    /// item, but only the active pane's own (the other pane's card leaves
+    /// the arrows to the list that has the keys). False for any other.
     func failuresKey(_ key: String) -> Bool {
         guard let side = work.failuresShown, case let .failed(_, _, items, _)? = work.statuses[side] else { return false }
-        let last = items.count - FailureList.rows
-        switch key {
-        case "Escape": work.failuresShown = nil
-        case "↓" where last > 0: work.failuresTop = min(work.failuresTop + 1, last)
-        case "↑" where last > 0: work.failuresTop = max(work.failuresTop - 1, 0)
-        default: return false
+        if key == "Escape" {
+            work.failuresShown = nil
+            return true
         }
+        guard side == browser.active, items.count > FailureList.rows, key == "↓" || key == "↑" else { return false }
+        // From the item at the card's top now (the scroll view keeps it,
+        // a wheel's scroll included) to the next one, down to the last.
+        let top = work.failuresTop ?? 0
+        work.failuresTop = key == "↓" ? min(top + 1, items.count - 1) : max(top - 1, 0)
         return true
     }
 
@@ -220,9 +261,9 @@ extension FileList.Coordinator {
         // Under the row, where its name starts.
         let start = ListColumns.edge + IconMetrics.cell + ListMetrics.iconGap
         // After the turn: a menu holds the run loop while it is up.
-        DispatchQueue.main.async { [weak table] in
+        DispatchQueue.main.async { [weak self, weak table] in
             guard let table, table.window != nil else { return }
-            menu.popUp(positioning: nil, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table)
+            self?.model.reach.popUp(menu, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table)
         }
     }
 }

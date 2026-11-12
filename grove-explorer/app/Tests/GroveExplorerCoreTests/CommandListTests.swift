@@ -189,7 +189,9 @@ import Testing
         let cells = section.split(separator: "\n").filter { $0.hasPrefix("| ") }
             .compactMap { $0.split(separator: "|").first.map { $0.trimmingCharacters(in: .whitespaces) } }
             .filter { $0 != "Key" && !$0.hasPrefix("---") }
-        // 19 rows of Finder's keys and 16 of Grove's.
+        // 19 rows of Finder's keys and 16 of Grove's. (The fix round after
+        // Task 15's review reworded two of Grove's rows, ⌘E and ⌘., and
+        // added or took away none: the counts stand.)
         #expect(cells.count == 35)
 
         var strokes: [String] = []

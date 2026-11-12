@@ -174,8 +174,8 @@ Grove's:
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 | ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
-| ⌘E | Eject: while the keyboard is in the sidebar, the disk it is on; otherwise the disk the active pane shows |
-| ⌘. | Cancel the operation that is running |
+| ⌘E | Eject the disk the keyboard is on, with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why |
+| ⌘. | Cancel the operation that is running, with the keyboard in a list or the sidebar; in the path or the filter field it does what Esc does there; in the conflict prompt it is Cancel |
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
 | Return | In a folder macOS won't let the app read (nothing to rename there): Open Privacy Settings |
 
