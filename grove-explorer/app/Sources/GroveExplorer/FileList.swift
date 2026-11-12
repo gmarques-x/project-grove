@@ -202,8 +202,11 @@ struct FileList: NSViewRepresentable {
         private func takeKeyboardIfAsked(_ table: FileTableView, active: Bool) {
             guard active, model.listFocus != listFocus, table.window != nil else { return }
             listFocus = model.listFocus
-            DispatchQueue.main.async { [weak table] in
-                guard let table, let window = table.window, window.firstResponder !== table else { return }
+            DispatchQueue.main.async { [weak table, model] in
+                // A rename field that opened meanwhile keeps the keyboard:
+                // taking it away would commit the name as it stands.
+                guard let table, let window = table.window, window.firstResponder !== table, model.work.rename == nil
+                else { return }
                 window.makeFirstResponder(table)
             }
         }
