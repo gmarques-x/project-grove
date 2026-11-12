@@ -43,4 +43,14 @@ import Testing
         #expect(KeyNames.name(53) == "esc")
         #expect(KeyNames.name(41) == "semicolon")
     }
+
+    @Test func commandQAndWLeaveTheRecorder() throws {
+        #expect(try #require(Shortcut(aerospace: "cmd-q")).leavesRecorder)
+        #expect(try #require(Shortcut(aerospace: "cmd-w")).leavesRecorder)
+        #expect(!(try #require(Shortcut(aerospace: "cmd-shift-q")).leavesRecorder))
+        #expect(!(try #require(Shortcut(aerospace: "alt-q")).leavesRecorder))
+        #expect(!(try #require(Shortcut(aerospace: "cmd-e")).leavesRecorder))
+        #expect(!(try #require(Shortcut(aerospace: "hyper-w")).leavesRecorder))
+        #expect(!(try #require(Shortcut(aerospace: "q")).leavesRecorder))
+    }
 }

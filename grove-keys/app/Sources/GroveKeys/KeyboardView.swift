@@ -261,7 +261,8 @@ struct KeyboardView: View {
         return .handled
     }
 
-    private static func direction(_ press: KeyPress) -> KeyboardLayout.Direction? {
+    /// An arrow or Ctrl+H/J/K/L as a direction (the Bindings tab uses it too).
+    static func direction(_ press: KeyPress) -> KeyboardLayout.Direction? {
         switch press.key {
         case .leftArrow: return .left
         case .rightArrow: return .right

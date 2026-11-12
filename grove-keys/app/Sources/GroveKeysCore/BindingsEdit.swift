@@ -26,6 +26,13 @@ extension Shortcut {
         !modifiers.isDisjoint(with: [.ctrl, .alt, .cmd])
     }
 
+    /// ⌘Q and ⌘W are not recorded: while a row is recording they cancel it
+    /// and go on to the app (quit, close the window), so recording can't
+    /// trap the two keys that leave.
+    public var leavesRecorder: Bool {
+        modifiers == [.cmd] && (key == "q" || key == "w")
+    }
+
     // NSEvent.ModifierFlags raw values (Core doesn't import AppKit).
     private static let flagBits: [(UInt, Modifier)] = [
         (1 << 17, .shift), (1 << 18, .ctrl), (1 << 19, .alt), (1 << 20, .cmd),

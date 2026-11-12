@@ -42,6 +42,26 @@ public enum BindingRows {
         return out
     }
 
+    // MARK: Selection
+
+    /// ↑ (−1) and ↓ (1) on the Bindings tab, over the rows' ids in the order
+    /// they are shown (the groups one after another): stops at the first and
+    /// the last row. With no row selected (or one that is gone), ↓ selects
+    /// the first and ↑ the last.
+    public static func step(from current: String?, by step: Int, in ids: [String]) -> String? {
+        guard !ids.isEmpty else { return nil }
+        guard let current, let at = ids.firstIndex(of: current) else { return step > 0 ? ids.first : ids.last }
+        return ids[min(max(at + step, 0), ids.count - 1)]
+    }
+
+    /// The row to select when `id` is removed: the one after it, else the
+    /// one before; nil when it was the only one (or isn't listed).
+    public static func neighbor(ofRemoved id: String, in ids: [String]) -> String? {
+        guard let at = ids.firstIndex(of: id) else { return nil }
+        if ids.indices.contains(at + 1) { return ids[at + 1] }
+        return at > 0 ? ids[at - 1] : nil
+    }
+
     private static func symbols(_ key: String) -> String {
         Shortcut(aerospace: key)?.symbols ?? key
     }

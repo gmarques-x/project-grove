@@ -9,6 +9,12 @@ import SwiftUI
 /// caught with a local `NSEvent` monitor and swallowed. All four modifiers
 /// make `hyper-`; Esc cancels; a key with no AeroSpace name is ignored and
 /// recording goes on. One row records at a time.
+///
+/// Built by hand because macOS has no shortcut-recorder control (AppKit and
+/// SwiftUI offer none). While recording every key is the recorder's, with
+/// two exceptions that pass through after cancelling it: ⌘Q and ⌘W
+/// (`Shortcut.leavesRecorder`), so the app can still be quit and its window
+/// closed.
 @MainActor
 final class ShortcutRecorder: ObservableObject {
     /// The row that is recording now.
@@ -25,8 +31,8 @@ final class ShortcutRecorder: ObservableObject {
         self.onRecord = onRecord
         self.onCancel = onCancel
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            MainActor.assumeIsolated { self?.handle(event) }
-            return nil
+            let swallowed = MainActor.assumeIsolated { self?.handle(event) ?? false }
+            return swallowed ? nil : event
         }
     }
 
@@ -37,16 +43,22 @@ final class ShortcutRecorder: ObservableObject {
         callback?()
     }
 
-    private func handle(_ event: NSEvent) {
+    /// True when the key was the recorder's (swallowed); false lets it go on to the app.
+    private func handle(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if event.keyCode == 53, flags.intersection([.command, .control, .option, .shift]).isEmpty {
             cancel()
-            return
+            return true
         }
-        guard let shortcut = Shortcut(keyCode: event.keyCode, flags: UInt(flags.rawValue)) else { return }
+        guard let shortcut = Shortcut(keyCode: event.keyCode, flags: UInt(flags.rawValue)) else { return true }
+        if shortcut.leavesRecorder {
+            cancel()
+            return false
+        }
         let callback = onRecord
         stop()
         callback?(shortcut)
+        return true
     }
 
     private func stop() {

@@ -29,4 +29,24 @@ import Testing
         #expect(rows.contains { $0.keys == ["alt-1"] })
         #expect(rows.count == 34 - 1 - 9 + 1)
     }
+
+    @Test func arrowsWalkTheRowsAcrossGroupsAndStopAtTheEnds() {
+        let ids = ["launch:t", "launch:b", "mode:main:alt-h", "mode:service:r"]
+        #expect(BindingRows.step(from: nil, by: 1, in: ids) == "launch:t")
+        #expect(BindingRows.step(from: nil, by: -1, in: ids) == "mode:service:r")
+        #expect(BindingRows.step(from: "launch:b", by: 1, in: ids) == "mode:main:alt-h")
+        #expect(BindingRows.step(from: "mode:main:alt-h", by: -1, in: ids) == "launch:b")
+        #expect(BindingRows.step(from: "launch:t", by: -1, in: ids) == "launch:t")
+        #expect(BindingRows.step(from: "mode:service:r", by: 1, in: ids) == "mode:service:r")
+        #expect(BindingRows.step(from: "gone", by: 1, in: ids) == "launch:t")
+        #expect(BindingRows.step(from: "launch:t", by: 1, in: []) == nil)
+    }
+
+    @Test func removingARowSelectsTheNextElseThePrevious() {
+        let ids = ["a", "b", "c"]
+        #expect(BindingRows.neighbor(ofRemoved: "a", in: ids) == "b")
+        #expect(BindingRows.neighbor(ofRemoved: "c", in: ids) == "b")
+        #expect(BindingRows.neighbor(ofRemoved: "a", in: ["a"]) == nil)
+        #expect(BindingRows.neighbor(ofRemoved: "x", in: ids) == nil)
+    }
 }
