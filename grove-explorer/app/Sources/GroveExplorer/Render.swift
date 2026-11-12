@@ -65,20 +65,7 @@ enum Render {
             .clipShape(RoundedRectangle(cornerRadius: GroveRadius.window))
             .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(colors.line, lineWidth: 1))
             .environment(\.theme, colors)
-        let hosting = NSHostingView(rootView: view)
-        // Far off every screen, and never ordered in.
-        let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: size.width, height: size.height),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: colors.isDark ? .darkAqua : .aqua)
-        window.backgroundColor = .clear
-        window.contentView = hosting
-        hosting.frame = NSRect(origin: .zero, size: size)
-        window.layoutIfNeeded()
-        // SwiftUI settles its layout, and the table its rows, over a few turns of the run loop.
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        hosting.layoutSubtreeIfNeeded()
-        hosting.displayIfNeeded()
+        let hosting = offscreen(view, size: size, colors: colors)
         guard let bitmap = NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -95,9 +82,32 @@ enum Render {
         exit(0)
     }
 
+    /// `view` laid out and drawn in a window that is never shown.
+    static func offscreen(_ view: some View, size: CGSize, colors: ThemeColors) -> NSView {
+        let hosting = NSHostingView(rootView: view)
+        // Far off every screen, and never ordered in.
+        let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: size.width, height: size.height),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: colors.isDark ? .darkAqua : .aqua)
+        window.backgroundColor = .clear
+        window.contentView = hosting
+        hosting.frame = NSRect(origin: .zero, size: size)
+        window.layoutIfNeeded()
+        // SwiftUI settles its layout, and the table its rows, over a few turns of the run loop.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        hosting.layoutSubtreeIfNeeded()
+        hosting.displayIfNeeded()
+        windows.append(window)
+        return hosting
+    }
+
+    /// Kept so the window outlives the call that made it.
+    private static var windows: [NSWindow] = []
+
     /// A scheme's colours: from a theme file when `scheme` is a path, else
     /// from `grove-themes list --json`.
-    private static func theme(_ scheme: String) -> ThemeColors {
+    static func theme(_ scheme: String) -> ThemeColors {
         if scheme.contains("/") {
             guard let text = try? String(contentsOfFile: scheme, encoding: .utf8) else { fail("\(scheme): can't be read") }
             var colors: [String: String] = [:]
@@ -204,7 +214,7 @@ enum Sample {
 
     /// A pane on `folder`: folders are (name, total size or nil while it is
     /// being measured, date), files (name, size, date).
-    private static func pane(
+    static func pane(
         _ folder: URL, folders: [(String, Int64?, Date)], files: [(String, Int64, Date)], selected: Set<String>,
         pointer: String?
     ) -> Pane {

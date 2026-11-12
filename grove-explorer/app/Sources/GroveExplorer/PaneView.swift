@@ -43,7 +43,7 @@ struct PaneView: View {
     @ViewBuilder private func content(_ columns: ListColumns) -> some View {
         let listing = model.listing(for: side)
         if let problem = listing?.problem {
-            note(Self.sentence(for: problem, folder: listing?.folder.lastPathComponent ?? ""))
+            note(problem)
         } else if let listing, listing.shown.isEmpty {
             note("This folder is empty")
         } else {
@@ -58,15 +58,6 @@ struct PaneView: View {
             .multilineTextAlignment(.center)
             .padding(GroveSpace.s24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private static func sentence(for problem: FolderReadError, folder: String) -> String {
-        switch problem {
-        case .noPermission: "Grove Explorer needs permission to open \(folder)"
-        case .missing: "\(folder) is no longer there"
-        case .notAFolder: "\(folder) is not a folder"
-        case .other(let words): words
-        }
     }
 }
 

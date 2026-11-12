@@ -11,4 +11,9 @@ func fail(_ message: String) -> Never {
 if let flag = CommandLine.arguments.firstIndex(of: "--render") {
     Render.run(Array(CommandLine.arguments[(flag + 1)...]))
 }
+// `--time-list [rows]`: how long the list takes over a large folder (made
+// up, not read), printed in milliseconds. Offscreen like a render.
+if let flag = CommandLine.arguments.firstIndex(of: "--time-list") {
+    ListTiming.run(Array(CommandLine.arguments[(flag + 1)...]))
+}
 ExplorerApp.main()

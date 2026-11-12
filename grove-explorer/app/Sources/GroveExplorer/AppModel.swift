@@ -4,31 +4,6 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// What a pane shows of its tab's folder.
-struct Listing {
-    /// The folder these entries are of. For a moment after a navigation it
-    /// is still the one before: the list shows the old rows until the new
-    /// ones are read.
-    var folder: URL
-    /// As read, in no order, hidden items included.
-    var all: [Entry] = []
-    /// Sorted, and without the hidden items unless they are shown.
-    var shown: [Entry] = []
-    /// Why the folder couldn't be read; nil when it could.
-    var problem: FolderReadError?
-    /// Free room on the folder's volume, in bytes.
-    var free: Int64?
-    /// Changes whenever `shown` does: what the table reloads by.
-    var revision = 0
-}
-
-/// "Now", and how dates are written: the user's in the app, fixed in a render.
-struct ListClock: Sendable {
-    var now: @Sendable () -> Date = { Date() }
-    var calendar = Calendar.current
-    var locale = Locale.current
-}
-
 /// The window's state and what keeps it current: the browser (panes, tabs,
 /// folders, sort), each pane's listing, the selection, the folder sizes, the
 /// config and the theme. Thin: what can be pure is in GroveExplorerCore.
@@ -36,12 +11,20 @@ struct ListClock: Sendable {
 final class AppModel: ObservableObject {
     @Published private(set) var browser: Browser
     /// Folder and package totals known so far, by `Entry.url`.
-    @Published private(set) var sizes: [URL: Int64] = [:]
+    @Published private(set) var sizes: [URL: Int64] = [:] {
+        didSet { sizesVersion += 1 }
+    }
     /// The current scheme's colours; they follow a scheme switch.
     @Published private(set) var colors = ThemeColors.fallback
     @Published private var listings: [Side: Listing] = [:]
     /// Each tab's selection, by the tab's id.
-    @Published private var selections: [UUID: Set<URL>] = [:]
+    @Published private var selections: [UUID: Set<URL>] = [:] {
+        didSet { selectionVersion += 1 }
+    }
+    /// Change with `sizes` and with the selections: what the list and the
+    /// status bar compare instead of the collections themselves.
+    private(set) var sizesVersion = 0
+    private(set) var selectionVersion = 0
 
     let config: ExplorerConfig
     let clock: ListClock
@@ -54,16 +37,11 @@ final class AppModel: ObservableObject {
     private var loads: [Side: Int] = [:]
     private var sorts: [Side: Int] = [:]
     private var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
-
-    private let calculator = SizeCalculator()
-    /// Folders and packages whose total is wanted, the next one first.
-    private var sizeQueue: [URL] = []
-    private var sizesInFlight: Set<URL> = []
-    /// Asked and answered with nothing (the walk was cancelled, or the folder
-    /// can't be read): asked again after the next change.
-    private var sizesUnanswered: Set<URL> = []
-    private var sizeRetry: Task<Void, Never>?
-    private static let sizesAtOnce = 4
+    private let sizeQueue = SizeQueue()
+    /// A sort by size waiting for more totals to arrive, per pane.
+    private var sizeSorts: [Side: Task<Void, Never>] = [:]
+    /// The status bar's words, kept while nothing they are made of changed.
+    private var statuses: [Side: (revision: Int, selection: Int, sizes: Int, text: String)] = [:]
 
     private var themeWatcher: FolderWatcher?
     private var themeState: Data?
@@ -92,10 +70,12 @@ final class AppModel: ObservableObject {
         model.sizes = sizes
         for (side, all) in entries {
             guard let tab = browser.tab(side) else { continue }
-            let shown = Self.arranged(all, sort: tab.sort, showHidden: browser.showHidden, sizes: sizes)
-            model.listings[side] = Listing(folder: tab.folder, all: all, shown: shown, free: free, revision: 1)
+            let arranged = FolderListing.arranged(all, sort: tab.sort, showHidden: browser.showHidden, sizes: sizes)
+            model.listings[side] = Listing(
+                folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows, free: free, revision: 1)
             model.selections[tab.id] = selected[side] ?? []
         }
+        model.revision = 1
         return model
     }
 
@@ -104,6 +84,8 @@ final class AppModel: ObservableObject {
         self.config = config
         self.clock = clock
         self.live = live
+        sizeQueue.onSize = { [weak self] url, size in self?.measured(url, size) }
+        sizeQueue.onAskAgain = { [weak self] in self?.wantSizes() }
     }
 
     /// Reads the folders, and starts following them and the theme.
@@ -128,19 +110,27 @@ final class AppModel: ObservableObject {
     }
 
     /// The left of the pane's status bar: "212 items", "3 of 212 selected · 48.2 MB".
+    /// Worked out from the selection (never by walking the folder), and
+    /// only when the rows, the selection or the sizes changed.
     func status(for side: Side) -> String {
-        let shown = entries(for: side)
-        let chosen = selection(for: side)
-        var bytes: Int64? = 0
-        for entry in shown where chosen.contains(entry.url) {
-            guard let total = bytes, let size = entry.size ?? sizes[entry.url] else {
-                bytes = nil
-                break
-            }
-            bytes = total + size
+        guard let listing = listings[side] else { return "" }
+        if let kept = statuses[side], kept.revision == listing.revision, kept.selection == selectionVersion,
+            kept.sizes == sizesVersion
+        {
+            return kept.text
         }
-        return GroveExplorerCore.StatusText.items(
-            total: shown.count, selected: chosen.count, selectedBytes: bytes, filteredFrom: nil)
+        var count = 0
+        var bytes: Int64? = 0
+        for url in selection(for: side) {
+            guard let row = listing.rows[url] else { continue }
+            count += 1
+            let entry = listing.shown[row]
+            if let total = bytes, let size = entry.size ?? sizes[url] { bytes = total + size } else { bytes = nil }
+        }
+        let text = GroveExplorerCore.StatusText.items(
+            total: listing.shown.count, selected: count, selectedBytes: bytes, filteredFrom: nil)
+        statuses[side] = (listing.revision, selectionVersion, sizesVersion, text)
+        return text
     }
 
     /// The Size column's words: a file's size; a folder's or a package's
@@ -204,6 +194,8 @@ final class AppModel: ObservableObject {
 
     private func folderChanged(_ side: Side) {
         guard live else { return }
+        // The walks on their way are for the folder just left.
+        sizeQueue.left()
         load(side)
     }
 
@@ -211,23 +203,41 @@ final class AppModel: ObservableObject {
     /// keeps what it shows until then. The folder is watched from here on.
     private func load(_ side: Side) {
         guard let tab = browser.tab(side) else { return }
-        let folder = tab.folder, sort = tab.sort, showHidden = browser.showHidden, sizes = sizes
+        let folder = tab.folder, sort = tab.sort, showHidden = browser.showHidden
+        let sizes = sizes, sizesWere = sizesVersion
         let number = (loads[side] ?? 0) + 1
         loads[side] = number
         watch(folder, for: side)
         Task {
-            let read = await Task.detached { Self.read(folder, sort: sort, showHidden: showHidden, sizes: sizes) }.value
+            let read = await Task.detached { FolderListing.read(folder, sort: sort, showHidden: showHidden, sizes: sizes) }.value
             // A later read of this pane answers instead.
             guard loads[side] == number else { return }
-            // An older sort of what was there before has nothing to say now.
-            sorts[side] = (sorts[side] ?? 0) + 1
-            revision += 1
-            listings[side] = Listing(
-                folder: folder, all: read.all, shown: read.shown, problem: read.problem, free: read.free,
-                revision: revision)
-            let present = Set(read.all.map(\.url))
-            selections[tab.id] = (selections[tab.id] ?? []).intersection(present)
-            IconCache.shared.forgetPaths()
+            if let old = listings[side], old.folder.standardizedFileURL.path == folder.standardizedFileURL.path,
+                old.all == read.all, old.problem == read.problem
+            {
+                // A watcher's tick that changed nothing the list shows: the
+                // rows, the icons and the table stay as they are.
+                if old.free != read.free { listings[side]?.free = read.free }
+            } else {
+                // An older sort of what was there before has nothing to say now.
+                sorts[side] = (sorts[side] ?? 0) + 1
+                revision += 1
+                listings[side] = Listing(
+                    folder: folder, all: read.all, shown: read.arranged.shown, rows: read.arranged.rows,
+                    problem: read.problem, free: read.free, revision: revision)
+                let present = Set(read.all.map(\.url))
+                let chosen = selections[tab.id] ?? []
+                if !chosen.isSubset(of: present) { selections[tab.id] = chosen.intersection(present) }
+                IconCache.shared.forgetPaths()
+            }
+            // The header was clicked, hidden items were switched or a total
+            // arrived while this read was on its way: what it sorted by is
+            // no longer what the pane asks for.
+            if let now = browser.tab(side), now.sort != sort || browser.showHidden != showHidden
+                || (now.sort.column == .size && sizesVersion != sizesWere)
+            {
+                arrange(side)
+            }
             wantSizes()
         }
     }
@@ -239,53 +249,26 @@ final class AppModel: ObservableObject {
         guard let tab = browser.tab(side), let listing = listings[side] else { return }
         let all = listing.all, sort = tab.sort, showHidden = browser.showHidden, sizes = sizes
         guard live else {
-            show(Self.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes), in: side)
+            show(FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes), in: side)
             return
         }
         let number = (sorts[side] ?? 0) + 1
         sorts[side] = number
         Task {
-            let shown = await Task.detached {
-                Self.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes)
+            let arranged = await Task.detached {
+                FolderListing.arranged(all, sort: sort, showHidden: showHidden, sizes: sizes)
             }.value
             guard sorts[side] == number else { return }
-            show(shown, in: side)
+            show(arranged, in: side)
         }
     }
 
-    private func show(_ shown: [Entry], in side: Side) {
-        guard shown != listings[side]?.shown else { return }
+    private func show(_ arranged: FolderListing.Arranged, in side: Side) {
+        guard arranged.shown != listings[side]?.shown else { return }
         revision += 1
-        listings[side]?.shown = shown
+        listings[side]?.shown = arranged.shown
+        listings[side]?.rows = arranged.rows
         listings[side]?.revision = revision
-    }
-
-    private struct Read: Sendable {
-        var all: [Entry] = []
-        var shown: [Entry] = []
-        var problem: FolderReadError?
-        var free: Int64?
-    }
-
-    private nonisolated static func read(
-        _ folder: URL, sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64]
-    ) -> Read {
-        var read = Read()
-        do {
-            read.all = try FolderReader().read(folder)
-        } catch {
-            read.problem = error
-        }
-        read.shown = arranged(read.all, sort: sort, showHidden: showHidden, sizes: sizes)
-        let values = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        read.free = values?.volumeAvailableCapacityForImportantUsage
-        return read
-    }
-
-    private nonisolated static func arranged(
-        _ all: [Entry], sort: GroveExplorerCore.SortOrder, showHidden: Bool, sizes: [URL: Int64]
-    ) -> [Entry] {
-        Sorting.sorted(showHidden ? all : all.filter { !$0.isHidden }, by: sort, folderSizes: sizes)
     }
 
     // MARK: Watching
@@ -305,59 +288,40 @@ final class AppModel: ObservableObject {
         guard let tab = browser.tab(side), tab.folder.standardizedFileURL.path == folder.standardizedFileURL.path
         else { return }
         load(side)
-        // The sizes of the folders this one is in are no longer right. A
-        // walk the calculator cancels for it answers nil: those are asked
-        // again once the folder has been quiet for a second, or a busy
-        // folder would never show a size.
-        Task { await calculator.invalidate(folder) }
-        sizeRetry?.cancel()
-        sizeRetry = Task {
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
-            sizesUnanswered = []
-            wantSizes()
-        }
+        sizeQueue.changed(folder)
     }
 
     // MARK: Sizes
 
-    /// Queues every folder and package the panes show whose total isn't
-    /// known, in the order shown (so the top of the list first), and forgets
-    /// the totals of what is no longer shown.
+    /// Asks for the total of every folder and package the panes show whose
+    /// total isn't known, in the order shown (so the top of the list first),
+    /// and forgets the totals of what is no longer shown.
     private func wantSizes() {
         guard live else { return }
         let measured = sides.flatMap { entries(for: $0) }.filter(\.isMeasured).map(\.url)
         let shown = Set(measured)
         if sizes.keys.contains(where: { !shown.contains($0) }) { sizes = sizes.filter { shown.contains($0.key) } }
-        sizeQueue = measured.filter { sizes[$0] == nil && !sizesInFlight.contains($0) && !sizesUnanswered.contains($0) }
-        pumpSizes()
+        sizeQueue.want(measured.filter { sizes[$0] == nil })
     }
 
     /// The rows in view: their totals come before the others'.
     func wantSizesFirst(for visible: [URL]) {
-        let first = Set(visible)
-        let (front, rest) = (sizeQueue.filter(first.contains), sizeQueue.filter { !first.contains($0) })
-        guard !front.isEmpty else { return }
-        sizeQueue = front + rest
-        pumpSizes()
+        sizeQueue.first(visible)
     }
 
-    /// A few at a time; the calculator walks two of them at once.
-    private func pumpSizes() {
-        while sizesInFlight.count < Self.sizesAtOnce, !sizeQueue.isEmpty {
-            let url = sizeQueue.removeFirst()
-            sizesInFlight.insert(url)
-            Task {
-                let size = await calculator.size(of: url)
-                sizesInFlight.remove(url)
-                if let size {
-                    sizes[url] = size
-                    for side in sides where browser.tab(side)?.sort.column == .size { arrange(side) }
-                } else {
-                    sizesUnanswered.insert(url)
-                }
-                pumpSizes()
-            }
+    private func measured(_ url: URL, _ size: Int64) {
+        sizes[url] = size
+        for side in sides where browser.tab(side)?.sort.column == .size { arrangeSoon(side) }
+    }
+
+    /// Sorted by size, totals arrive one after the other: one sort once
+    /// they have paused, not one for each.
+    private func arrangeSoon(_ side: Side) {
+        sizeSorts[side]?.cancel()
+        sizeSorts[side] = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            arrange(side)
         }
     }
 

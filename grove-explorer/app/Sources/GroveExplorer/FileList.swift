@@ -82,9 +82,14 @@ struct FileList: NSViewRepresentable {
         private var revision = -1
         private var columns: ListColumns?
         private var theme: ThemeColors?
-        private var sizes: [URL: Int64] = [:]
+        private var sizesVersion = -1
         private var paneIsActive = true
-        /// Each row's date as written, kept until the rows or the columns change.
+        /// The folder the rows are of, by its standardized path.
+        private var folder: String?
+        /// The model's selection as last put on the table.
+        private var selectionVersion = -1
+        /// Each row's date as written, kept until the rows change or the
+        /// dates turn short or long.
         private var dates: [URL: String] = [:]
         /// True while the table's selection changes by this coordinator's hand, not the user's.
         private var settingSelection = false
@@ -102,9 +107,9 @@ struct FileList: NSViewRepresentable {
             var reloadVisible = false
 
             if columns != self.columns {
+                if columns.shortDate != self.columns?.shortDate { dates = [:] }
                 self.columns = columns
                 layOut(columns, in: table)
-                dates = [:]
                 reloadVisible = true
             }
             if model.colors != theme {
@@ -117,29 +122,39 @@ struct FileList: NSViewRepresentable {
                 paneIsActive = active
                 redrawRows = true
             }
-            if model.sizes != sizes {
-                sizes = model.sizes
+            if model.sizesVersion != sizesVersion {
+                sizesVersion = model.sizesVersion
                 reloadVisible = true
             }
 
             let listing = model.listing(for: side)
+            var newRows = false
             if let listing, listing.revision != revision {
                 revision = listing.revision
                 entries = listing.shown
                 dates = [:]
+                newRows = true
                 // The table's own selection is by row: it means nothing in
                 // the new order, and `putSelection` below sets the right one.
                 settingSelection = true
                 table.reloadData()
                 settingSelection = false
                 reloadVisible = false
+                // A refresh keeps its place; another folder starts at its top.
+                let path = listing.folder.standardizedFileURL.path
+                if path != folder {
+                    if folder != nil { scrollToTop(table) }
+                    folder = path
+                }
                 reportVisible()
             }
             if reloadVisible {
-                let rows = table.rows(in: table.visibleRect)
-                table.reloadData(
-                    forRowIndexes: IndexSet(integersIn: rows.location..<(rows.location + rows.length)),
-                    columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns))
+                // Every row the table has made, not only those in view: it
+                // keeps some ready beyond the edges, and they scroll in as
+                // they were last drawn.
+                var rows = IndexSet()
+                table.enumerateAvailableRowViews { _, row in rows.insert(row) }
+                table.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns))
             }
             if redrawRows {
                 table.enumerateAvailableRowViews { view, _ in
@@ -148,10 +163,19 @@ struct FileList: NSViewRepresentable {
                     view.paneIsActive = active
                 }
             }
-            putSelection(on: table)
-            if let stand = model.pointerStandIn[side] {
-                table.pointerRow = entries.firstIndex { $0.url == stand } ?? -1
+            if newRows || model.selectionVersion != selectionVersion {
+                selectionVersion = model.selectionVersion
+                putSelection(on: table, rows: listing?.rows ?? [:])
             }
+            if let stand = model.pointerStandIn[side] {
+                table.pointerRow = listing?.rows[stand] ?? -1
+            }
+        }
+
+        private func scrollToTop(_ table: NSTableView) {
+            guard let scroll = table.enclosingScrollView else { return }
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: -scroll.contentInsets.top))
+            scroll.reflectScrolledClipView(scroll.contentView)
         }
 
         private func layOut(_ columns: ListColumns, in table: NSTableView) {
@@ -170,16 +194,17 @@ struct FileList: NSViewRepresentable {
             set(.kind, width: columns.showsKind ? ListColumns.gap + ListColumns.kind : nil)
         }
 
-        /// The model's selection, as rows; rows that went are no longer in it.
-        private func putSelection(on table: NSTableView) {
-            let chosen = model.selection(for: side)
-            var rows = IndexSet()
-            if !chosen.isEmpty {
-                for (row, entry) in entries.enumerated() where chosen.contains(entry.url) { rows.insert(row) }
+        /// The model's selection, as rows: found through the listing's row
+        /// index, so a selection costs its own size and not the folder's.
+        /// What is selected and not shown (a hidden item) has no row.
+        private func putSelection(on table: NSTableView, rows: [URL: Int]) {
+            var chosen = IndexSet()
+            for url in model.selection(for: side) {
+                if let row = rows[url] { chosen.insert(row) }
             }
-            guard rows != table.selectedRowIndexes else { return }
+            guard chosen != table.selectedRowIndexes else { return }
             settingSelection = true
-            table.selectRowIndexes(rows, byExtendingSelection: false)
+            table.selectRowIndexes(chosen, byExtendingSelection: false)
             settingSelection = false
         }
 
@@ -210,7 +235,7 @@ struct FileList: NSViewRepresentable {
                 cell.leading = ListColumns.edge
                 cell.theme = theme
                 cell.dimmed = entry.isHidden
-                cell.color = NSColor(entry.isHidden ? theme.hiddenInk : theme.fg)
+                cell.color = entry.isHidden ? NSColor(theme.hiddenText) : NSColor(theme.fg)
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
                 return cell
@@ -244,7 +269,7 @@ struct FileList: NSViewRepresentable {
         /// A cell of the quiet columns: 11 pt, in the quiet colour.
         private func detail(_ id: NSUserInterfaceItemIdentifier, in table: NSTableView, _ theme: ThemeColors) -> TextCellView {
             let cell = reused(TextCellView.self, id, in: table)
-            cell.color = NSColor(theme.dim)
+            cell.color = NSColor(theme.quiet)
             return cell
         }
 
