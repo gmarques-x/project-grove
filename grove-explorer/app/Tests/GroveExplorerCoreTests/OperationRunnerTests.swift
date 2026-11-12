@@ -941,6 +941,55 @@ private final class Sandbox: @unchecked Sendable {
         #expect(!fileInTrash.path.hasPrefix(box.root.path))
     }
 
+    @Test func aPlanOfAnswersIsWhatTheRunDoesAndOneForAllAnswersTheRest() async throws {
+        let names = ["a.md", "b.md", "c.md", "d.md"]
+        let items = try names.map { try box.makeFile("src/\($0)", "new") }
+        let old = try names.map { try box.makeFile("dest/\($0)", "old") }
+        let operation = Operation.copy(items: items, to: dest)
+
+        // As the prompt would: one question a name, until one is for all.
+        let existing = await runner.existingNames(for: operation)
+        #expect(existing == old)
+        var answers = ConflictPlan()
+        answers.answer(.replace, for: existing[0], applyToAll: false)
+        answers.answer(.keepBoth, for: existing[1], applyToAll: false)
+        answers.answer(.skip, for: existing[2], applyToAll: true)
+        let plan = answers
+
+        let outcome = await runner.run(
+            operation,
+            resolve: { url in
+                if let choice = plan.choice(for: url) { return choice }
+                Issue.record("no answer about \(url.lastPathComponent)")
+                return .skip
+            },
+            progress: { _ in })
+        for case let .replaced(_, inTrash) in outcome.changes { box.inTrash.change { $0.append(inTrash) } }
+
+        #expect(outcome.failures == [])
+        #expect(outcome.summary == "Copied 2 of 4 items (2 skipped)")
+        try #require(outcome.changes.count == 3)
+        // Replaced: the old one is in the Trash, whole.
+        guard case let .replaced(original, inTrash) = outcome.changes[0] else {
+            Issue.record("the first was not replaced: \(outcome.changes)")
+            return
+        }
+        #expect(original == old[0])
+        #expect(box.text(inTrash) == "old")
+        #expect(outcome.changes[1] == .created(old[0]))
+        #expect(box.text(old[0]) == "new")
+        // Both kept.
+        #expect(outcome.changes[2] == .created(dest.appendingPathComponent("b 2.md")))
+        #expect(box.text(old[1]) == "old")
+        #expect(box.text(dest.appendingPathComponent("b 2.md")) == "new")
+        // Skipped, the one asked about and the one after it: as they were,
+        // and no change tells of them.
+        #expect(box.text(old[2]) == "old")
+        #expect(box.text(old[3]) == "old")
+        #expect(box.names(in: dest) == ["a.md", "b 2.md", "b.md", "c.md", "d.md"])
+        #expect(box.names(in: src) == names)
+    }
+
     @Test func aMoveThatReplacesIsARenameAfterTheOldOneWentToTheTrash() async throws {
         let file = try box.makeFile("src/notes.md", "new")
         let number = try #require(box.inode(file))

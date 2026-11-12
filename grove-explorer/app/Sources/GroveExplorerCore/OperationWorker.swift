@@ -310,7 +310,7 @@ final class Worker {
             fail(item, code: code)
             return
         }
-        let next = { Self.freeName(beside: item, folder: kind == S_IFDIR, adding: " copy") }
+        let next = { Self.duplicateName(beside: item, folder: kind == S_IFDIR) }
         guard let target = next() else {
             fail(item, "no free name was found for it")
             return
@@ -630,30 +630,24 @@ final class Worker {
             .appendingPathComponent(".\(name)\(TreeCopier.partialMark)\(UUID().uuidString)", isDirectory: false)
     }
 
-    /// The first name beside `url` that nothing has, counting up: "notes
-    /// 2.md", "notes 3.md" (a folder's name is not split: "docs 2"). With
-    /// `adding` " copy": "notes copy.md", then "notes copy 2.md".
-    ///
-    /// Task 9's `Conflict.freeName` takes the place of this.
-    private static func freeName(beside url: URL, folder: Bool, adding: String = "") -> URL? {
-        let name = url.lastPathComponent
-        var stem = name
-        var ending = ""
-        // An extension: after the last dot, when that isn't the first
-        // character, something follows it, and that has no space.
-        if !folder, let dot = name.lastIndex(of: "."), dot != name.startIndex,
-            name.index(after: dot) != name.endIndex, !name[dot...].contains(where: \.isWhitespace)
-        {
-            stem = String(name[..<dot])
-            ending = String(name[dot...])
-        }
-        stem += adding
+    /// How far a free name is looked for.
+    private static let lastNumber = 10_000
+
+    /// Where an item goes when `url` is taken and both are kept: the first
+    /// of `Conflict.freeName`'s names that the volume says nothing has.
+    private static func freeName(beside url: URL, folder: Bool) -> URL? {
         let parent = url.deletingLastPathComponent()
-        for number in (adding.isEmpty ? 2 : 1)...10_000 {
-            let candidate = parent.appendingPathComponent(
-                (number == 1 ? stem : "\(stem) \(number)") + ending, isDirectory: folder)
-            if !OperationRunner.exists(candidate) { return candidate }
-        }
-        return nil
+        return Conflict.freeName(for: url.lastPathComponent, isFolder: folder, upTo: lastNumber) {
+            OperationRunner.exists(parent.appendingPathComponent($0, isDirectory: folder))
+        }.map { parent.appendingPathComponent($0, isDirectory: folder) }
+    }
+
+    /// Where the duplicate of `url` goes: the first of
+    /// `Conflict.duplicateName`'s names that the volume says nothing has.
+    private static func duplicateName(beside url: URL, folder: Bool) -> URL? {
+        let parent = url.deletingLastPathComponent()
+        return Conflict.duplicateName(for: url.lastPathComponent, isFolder: folder, upTo: lastNumber) {
+            OperationRunner.exists(parent.appendingPathComponent($0, isDirectory: folder))
+        }.map { parent.appendingPathComponent($0, isDirectory: folder) }
     }
 }

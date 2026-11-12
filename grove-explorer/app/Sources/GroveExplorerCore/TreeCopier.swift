@@ -126,9 +126,9 @@ final class TreeCopier {
                 // the order of its names: a `._name` with its `name` can't
                 // both be kept there, so it is the one left out.
                 // Such volumes take "X.TXT" for "x.txt": so does this.
-                let all = Set(names.map(OperationRunner.nameKey))
+                let all = Set(names.map { Conflict.nameKey($0, caseSensitive: false) })
                 let pairs = Set(names.filter {
-                    $0.hasPrefix("._") && all.contains(OperationRunner.nameKey(String($0.dropFirst(2))))
+                    $0.hasPrefix("._") && all.contains(Conflict.nameKey(String($0.dropFirst(2)), caseSensitive: false))
                 })
                 leftOut += names.filter(pairs.contains).map { name in inner.map { $0 + "/" + name } ?? name }
                 names.removeAll(where: pairs.contains)

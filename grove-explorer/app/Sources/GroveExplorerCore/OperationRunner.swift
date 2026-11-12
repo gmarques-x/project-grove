@@ -212,18 +212,11 @@ public actor OperationRunner {
     }
 
     /// Whether two names differ at most by capitals or by the way their
-    /// accents are written. Only ever used together with the volume's own
-    /// word that both are the same item: it decides nothing by itself.
-    ///
-    /// Task 9's `Conflict.sameName` takes the place of this.
+    /// accents are written: `Conflict.sameName` as a volume that ignores
+    /// case has it. Only ever used together with the volume's own word
+    /// that both are the same item: it decides nothing by itself.
     static func isSameName(_ one: String, _ other: String) -> Bool {
-        nameKey(one) == nameKey(other)
-    }
-
-    /// A name without its capitals and with its accents written one way:
-    /// equal for two names exactly when `isSameName` holds.
-    static func nameKey(_ name: String) -> String {
-        name.precomposedStringWithCanonicalMapping.folding(options: .caseInsensitive, locale: nil)
+        Conflict.sameName(one, other, caseSensitive: false)
     }
 
     /// Something is at the URL: a file, a folder, or a link, even to nothing.
