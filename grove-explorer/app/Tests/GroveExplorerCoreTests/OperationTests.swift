@@ -61,6 +61,10 @@ private typealias Operation = GroveExplorerCore.Operation
         #expect(summary(.rename(item: notes, to: "ideas.md"), done: 1) == "Renamed notes.md to ideas.md")
         #expect(summary(.newFolder(in: downloads, name: "Projects"), done: 1) == "Made the folder Projects")
         #expect(summary(.trash(items: items(2)), done: 2) == "Moved 2 items to the Trash")
+        // Every item came, but not all that was in them.
+        #expect(
+            summary(.copy(items: [notes], to: downloads), done: 1, failed: 2)
+                == "Copied notes.md to Downloads (2 left out)")
     }
 
     @Test func summaryOfARunThatStoppedOrLeftItemsOut() {

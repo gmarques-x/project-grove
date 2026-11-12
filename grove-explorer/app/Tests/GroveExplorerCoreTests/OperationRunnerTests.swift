@@ -1034,8 +1034,40 @@ private final class Sandbox: @unchecked Sendable {
         #expect(asked.value == 1)
         #expect(replaced.changes.count == 2)
         #expect(replaced.changes.last == .created(old))
-        #expect(replaced.failures == [ItemFailure(url: second, reason: "an item with that name appeared")])
+        #expect(replaced.failures == [
+            ItemFailure(url: second, reason: "another item of this operation has that name, and the answer was for it")
+        ])
         #expect(box.text(old) == "first")
+
+        // With "skip" as the answer the second is skipped as the first
+        // was: nothing appeared, and nothing is said to have.
+        #expect(await runner.existingNames(for: operation) == [old, old])
+        let skipped = await box.run(operation, on: runner, choice: .skip)
+        #expect(skipped == Outcome(
+            changes: [], failures: [], cancelled: false, summary: "Nothing copied (2 skipped)"))
+        #expect(box.text(old) == "first")
+    }
+
+    @Test func aNameIsTheItemsOwnOnlyInItsFolderAndInOtherCapitals() async throws {
+        // Another name for the same file (a hard link) is another item to a rename.
+        let file = try box.makeFile("src/notes.md", "notes")
+        let other = box.path("src/ideas.md")
+        try box.files.linkItem(at: file, to: other)
+        #expect(box.inode(file) == box.inode(other))
+
+        #expect(await runner.existingNames(for: .rename(item: file, to: "ideas.md")) == [other])
+        let outcome = await box.run(.rename(item: file, to: "ideas.md"), on: runner)
+
+        #expect(outcome.changes == [])
+        #expect(outcome.failures == [
+            ItemFailure(url: file, reason: "an item named “ideas.md” is already there")
+        ])
+        #expect(box.names(in: src) == ["ideas.md", "notes.md"])
+
+        #expect(OperationRunner.isSameName("notes.md", "Notes.MD"))
+        #expect(OperationRunner.isSameName("caf\u{E9}", "CAFE\u{301}"))
+        #expect(!OperationRunner.isSameName("notes.md", "ideas.md"))
+        #expect(!OperationRunner.isSameName("notes.md", "notes.md "))
     }
 
     // MARK: A replace whose newcomer doesn't come
@@ -1821,5 +1853,170 @@ private final class Sandbox: @unchecked Sendable {
         ])
         #expect(visible() == [])
         #expect(box.text(file) == "mine")
+    }
+
+    @Test func onAVolumeWithoutASafeRenameEmptyFilesAndNamesInUseAreSafe() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let box = box
+        let runner = OperationRunner()
+
+        // Empty files, which all look alike, are copied and renamed there.
+        let empty = try box.makeFile("empty.txt", "")
+        let alsoEmpty = try box.makeFile("also-empty.txt", "")
+        let copied = await box.run(.copy(items: [empty, alsoEmpty], to: stick), on: runner)
+        #expect(copied.failures == [])
+        #expect(copied.changes.count == 2)
+        let onStick = stick.appendingPathComponent("empty.txt")
+        let renamed = await box.run(.rename(item: onStick, to: "void.txt"), on: runner)
+        let void = stick.appendingPathComponent("void.txt")
+        #expect(renamed.changes == [.moved(from: onStick, to: void)])
+        #expect(box.allNames(in: stick).filter { !$0.hasPrefix(".") } == ["also-empty.txt", "void.txt"])
+
+        // A rename onto a name in use, of an empty file and of one that is
+        // not: refused before anything is tried.
+        let full = try box.makeFile(at: stick.appendingPathComponent("full.txt"), Data("full".utf8))
+        for (taken, name) in [(stick.appendingPathComponent("also-empty.txt"), "also-empty.txt"), (full, "full.txt")] {
+            #expect(await runner.existingNames(for: .rename(item: void, to: name)) == [taken])
+            let onto = await box.run(.rename(item: void, to: name), on: runner)
+            #expect(onto.changes == [])
+            #expect(onto.failures == [ItemFailure(url: void, reason: "an item named “\(name)” is already there")])
+        }
+        #expect(box.text(full) == "full")
+        #expect(box.text(void) == "")
+
+        // And when the name is taken only just before the rename, by an
+        // empty file and by one that is not.
+        for theirs in ["", "theirs"] {
+            let late = OperationRunner(watching: { stage in
+                if case let .placing(url) = stage { _ = try? box.makeFile(at: url, Data(theirs.utf8)) }
+            })
+            let name = theirs.isEmpty ? "late-empty.txt" : "late-full.txt"
+            let onto = await box.run(.rename(item: void, to: name), on: late)
+            #expect(onto.changes == [])
+            #expect(onto.failures == [ItemFailure(url: void, reason: "an item with that name appeared")])
+            #expect(box.text(stick.appendingPathComponent(name)) == theirs)
+            #expect(box.exists(void))
+        }
+        #expect(box.allNames(in: stick).filter { !$0.hasPrefix(".") }
+            == ["also-empty.txt", "full.txt", "late-empty.txt", "late-full.txt", "void.txt"])
+    }
+
+    @Test func aFileNamedLikeAnAttributeFileCannotGoBesideItsNameOnSuchAVolume() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let runner = OperationRunner()
+        // On this Mac's disk: twelve files, each with an attribute, and
+        // beside each a real file named as macOS would name its attribute file.
+        let pairs = try box.makeFolder("Pairs")
+        let names = (0..<12).map { "n\($0).txt" }
+        for name in names {
+            let file = try box.makeFile("Pairs/\(name)", "data of \(name)")
+            box.setAttribute("com.projectgrove.test", "kept", on: file)
+            try box.makeFile("Pairs/._\(name)", "real ._\(name)")
+        }
+        // The folder lists some names before their `._` file and some after:
+        // both orders are in the test.
+        let listed = try #require(TreeCopier.names(in: pairs.path))
+        let nameFirst = names.map { listed.firstIndex(of: $0)! < listed.firstIndex(of: "._" + $0)! }
+        #expect(nameFirst.contains(true) && nameFirst.contains(false))
+        let leftOut = names.map {
+            ItemFailure(
+                url: pairs.appendingPathComponent("._" + $0), reason: "it can't be kept beside “\($0)” on this disk")
+        }
+        func sorted(_ failures: [ItemFailure]) -> [ItemFailure] { failures.sorted { $0.url.path < $1.url.path } }
+
+        // Copied: the folder arrives with every file; every `._` file is
+        // told as left out, none is written, none overwritten unseen.
+        let copied = await box.run(.copy(items: [pairs], to: stick), on: runner)
+        let onStick = stick.appendingPathComponent("Pairs")
+        #expect(copied.changes == [.created(onStick)])
+        #expect(sorted(copied.failures) == sorted(leftOut))
+        #expect(copied.summary == "Copied Pairs to mnt-GROVEFAT (12 left out)")
+        for name in names {
+            #expect(box.text(onStick.appendingPathComponent(name)) == "data of \(name)")
+            #expect(box.attribute("com.projectgrove.test", of: onStick.appendingPathComponent(name)) == "kept")
+            // What is there under the `._` name is macOS's own.
+            #expect(TreeCopier.isAttributeFile(onStick.appendingPathComponent("._" + name).path))
+            #expect(box.text(pairs.appendingPathComponent("._" + name)) == "real ._\(name)")
+        }
+
+        // Moved: the copy is not all of it, so the source stays, whole.
+        try box.files.removeItem(at: onStick)
+        let moved = await box.run(.move(items: [pairs], to: stick), on: runner)
+        #expect(moved.changes == [.created(onStick)])
+        #expect(sorted(moved.failures) == sorted(leftOut + [
+            ItemFailure(
+                url: pairs, reason: "it was copied without what can't be kept on this disk, and left where it is")
+        ]))
+        #expect(box.allNames(in: pairs).count == 24)
+
+        // The two by themselves, in either order: the file goes, the `._` one doesn't.
+        let file = pairs.appendingPathComponent("n0.txt")
+        let dotted = pairs.appendingPathComponent("._n0.txt")
+        for (index, items) in [[file, dotted], [dotted, file]].enumerated() {
+            let folder = try box.makeFolder(at: stick.appendingPathComponent("order-\(index)"))
+            let both = await box.run(.copy(items: items, to: folder), on: runner)
+            #expect(both.changes == [.created(folder.appendingPathComponent("n0.txt"))])
+            #expect(both.failures == [
+                ItemFailure(url: dotted, reason: "it can't be kept beside “n0.txt” on this disk")
+            ])
+            #expect(box.text(folder.appendingPathComponent("n0.txt")) == "data of n0.txt")
+        }
+        // Without its name beside it, it is a file like any other.
+        let alone = try box.makeFolder(at: stick.appendingPathComponent("alone"))
+        let orphan = await box.run(.copy(items: [dotted], to: alone), on: runner)
+        #expect(orphan.failures == [])
+        #expect(box.text(alone.appendingPathComponent("._n0.txt")) == "real ._n0.txt")
+    }
+
+    @Test func aRealFileNamedLikeAnAttributeFileIsNotLostWhenItsNameMovesOffSuchAVolume() async throws {
+        let stick = try volume("GROVEFAT", format: "ExFAT")
+        let a = try volume("GroveA")
+        let runner = OperationRunner()
+        /// `name` in `folder` on the stick, and beside it a `._name` that
+        /// is a file of the user's, not macOS's attribute file.
+        func pair(_ name: String, in folder: URL) throws -> (file: URL, dotted: URL) {
+            let file = try box.makeFile(at: folder.appendingPathComponent(name), Data("data".utf8))
+            let dotted = folder.appendingPathComponent("._" + name)
+            try Data("real".utf8).write(to: dotted)
+            #expect(!TreeCopier.isAttributeFile(dotted.path))
+            return (file, dotted)
+        }
+        let folder = try box.makeFolder(at: stick.appendingPathComponent("Folder"))
+        _ = try pair("x.txt", in: folder)
+        let (file, dotted) = try pair("y.txt", in: stick)
+
+        // The user's `._` file is an item of its folder; the one macOS
+        // wrote for a file's attributes is not.
+        let plain = try box.makeFile(at: folder.appendingPathComponent("z.txt"), Data("z".utf8))
+        box.setAttribute("com.projectgrove.test", "kept", on: plain)
+        #expect(box.allNames(in: folder) == ["._x.txt", "._z.txt", "x.txt", "z.txt"])
+        let copier = TreeCopier(flag: CancelFlag(), reporter: Reporter(send: { _ in }, watching: nil), watching: nil)
+        #expect(copier.items(in: folder.path)?.sorted() == ["._x.txt", "x.txt", "z.txt"])
+        try box.files.removeItem(at: plain)
+        #expect(box.allNames(in: folder) == ["._x.txt", "x.txt"])
+
+        // What really happens there: macOS takes the `._` file for the
+        // attributes of its name, can't read them, and so the name can't be
+        // copied with its attributes. The item fails; nothing is removed,
+        // of the folder or of the pair, and nothing is left at the target.
+        let moved = await box.run(.move(items: [folder], to: a), on: runner)
+        #expect(moved.changes == [])
+        #expect(moved.failures == [
+            ItemFailure(url: folder, reason: "“x.txt” in it: its attributes can't be read")
+        ])
+        #expect(box.allNames(in: folder) == ["._x.txt", "x.txt"])
+        #expect(box.text(folder.appendingPathComponent("._x.txt")) == "real")
+
+        let alone = await box.run(.move(items: [file], to: a), on: runner)
+        #expect(alone.changes == [])
+        #expect(alone.failures == [ItemFailure(url: file, reason: "its attributes can't be read")])
+        #expect(box.text(file) == "data")
+        #expect(box.text(dotted) == "real")
+        #expect(box.allNames(in: a).filter { !$0.hasPrefix(".") || $0.contains("grove-partial") } == [])
+
+        // The `._` file by itself is a file like any other, and can go.
+        let only = await box.run(.copy(items: [dotted], to: a), on: runner)
+        #expect(only.failures == [])
+        #expect(box.text(a.appendingPathComponent("._y.txt")) == "real")
     }
 }

@@ -188,9 +188,10 @@ public actor OperationRunner {
         case let .rename(item, name):
             let target = target(for: item, in: item.deletingLastPathComponent(), named: name)
             // Its own name in other capitals is not another item's.
-            guard let there = FileIdentity.of(target.path)?.identity,
-                there != FileIdentity.of(item.path)?.identity
-            else { return [] }
+            guard let there = FileIdentity.of(target.path)?.identity else { return [] }
+            if there == FileIdentity.of(item.path)?.identity, isSameName(item.lastPathComponent, name) {
+                return []
+            }
             return [target]
         case let .newFolder(folder, name):
             let target = folder.appendingPathComponent(name, isDirectory: true)
@@ -208,6 +209,16 @@ public actor OperationRunner {
     static func target(for item: URL, in folder: URL, named name: String? = nil) -> URL {
         folder.appendingPathComponent(
             name ?? item.lastPathComponent, isDirectory: FileIdentity.of(item.path)?.kind == S_IFDIR)
+    }
+
+    /// Whether two names differ at most by capitals or by the way their
+    /// accents are written. Only ever used together with the volume's own
+    /// word that both are the same item: it decides nothing by itself.
+    ///
+    /// Task 9's `Conflict.sameName` takes the place of this.
+    static func isSameName(_ one: String, _ other: String) -> Bool {
+        one.precomposedStringWithCanonicalMapping
+            .compare(other.precomposedStringWithCanonicalMapping, options: .caseInsensitive) == .orderedSame
     }
 
     /// Something is at the URL: a file, a folder, or a link, even to nothing.

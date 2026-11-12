@@ -45,9 +45,13 @@ struct FileIdentity: Equatable {
 /// volume is attached is not gone into, and stops the copy.
 ///
 /// On a volume that can't hold extended attributes (ExFAT, FAT), macOS
-/// keeps a file's in a second file beside it, `._name`, which it makes and
-/// removes with the file. Those are not items: they are not copied, counted
-/// or removed here; the attributes go with the file itself.
+/// keeps a file's in a second file beside it, `._name`, which it makes,
+/// overwrites and removes with the file. Such a file (told by how its
+/// contents begin, not by its name) is not an item: it is not copied,
+/// counted or removed here; the attributes go with the file itself. Any
+/// other file named `._name` is an item like any other. Because macOS
+/// would overwrite it, a `._name` can't be kept beside a `name` on such a
+/// volume: copied there, it is left out and told (`leftOut`).
 final class TreeCopier {
     /// What a half-written copy has in its name. Only paths with it are
     /// ever removed by `removeTemporary`.
@@ -73,6 +77,9 @@ final class TreeCopier {
     private var stamps: [String: Stamp] = [:]
     /// Whether a volume keeps attributes in `._name` files, by its number.
     private var besideFiles: [dev_t: Bool] = [:]
+    /// What the last copy left out, as paths inside the item: each a
+    /// `._name` that can't be kept beside its `name` on the target volume.
+    private(set) var leftOut: [String] = []
 
     init(flag: CancelFlag, reporter: Reporter, watching: (@Sendable (OperationRunner.Stage) -> Void)?) {
         self.flag = flag
@@ -89,15 +96,22 @@ final class TreeCopier {
     ///
     /// With `remembering`, each file's length and modification time as they
     /// were when it was copied are kept, for `isWhole` and `removeSource`.
+    ///
+    /// Afterwards `leftOut` tells what of the item could not go to the
+    /// target volume; the rest is copied.
     func copy(_ source: String, to destination: String, remembering: Bool = false) throws(CopyStop) {
         stamps = [:]
+        leftOut = []
         var info = stat()
         guard lstat(source, &info) == 0 else { throw .failed(inner: nil, code: errno) }
-        try copy(source, to: destination, inner: nil, on: info.st_dev, remembering: remembering)
+        let pairs = keepsAttributesBesideFiles(at: (destination as NSString).deletingLastPathComponent)
+        try copy(
+            source, to: destination, inner: nil, on: info.st_dev, remembering: remembering, withoutPairs: pairs)
     }
 
     private func copy(
-        _ source: String, to destination: String, inner: String?, on volume: dev_t, remembering: Bool
+        _ source: String, to destination: String, inner: String?, on volume: dev_t, remembering: Bool,
+        withoutPairs: Bool
     ) throws(CopyStop) {
         if flag.isCancelled { throw .cancelled }
         var info = stat()
@@ -106,12 +120,22 @@ final class TreeCopier {
 
         switch info.st_mode & S_IFMT {
         case S_IFDIR:
+            guard var names = items(in: source) else { throw .failed(inner: inner, code: errno) }
+            if withoutPairs {
+                // Before anything of the folder is written, and whatever
+                // the order of its names: a `._name` with its `name` can't
+                // both be kept there, so it is the one left out.
+                let all = Set(names)
+                let pairs = names.filter { Self.isBeside($0, in: all) }
+                leftOut += pairs.map { name in inner.map { $0 + "/" + name } ?? name }
+                names.removeAll { pairs.contains($0) }
+            }
             guard mkdir(destination, 0o700) == 0 else { throw .failed(inner: inner, code: errno) }
-            guard let names = items(in: source) else { throw .failed(inner: inner, code: errno) }
             for name in names {
                 try copy(
                     source + "/" + name, to: destination + "/" + name,
-                    inner: inner.map { $0 + "/" + name } ?? name, on: volume, remembering: remembering)
+                    inner: inner.map { $0 + "/" + name } ?? name, on: volume, remembering: remembering,
+                    withoutPairs: withoutPairs)
             }
             // Last: its date would change with every item put in it, and a
             // folder that can't be written to could not be filled.
@@ -219,22 +243,42 @@ final class TreeCopier {
         return code == 0 ? names : nil
     }
 
-    /// The items of a folder: its names, less the `._name` files beside a
-    /// `name` on a volume that keeps attributes that way. Nil as `names`.
+    /// The items of a folder: its names, less the attribute files macOS
+    /// keeps there on a volume without attributes of its own: a `._name`
+    /// beside a `name` whose contents begin as such a file's do. Nil as `names`.
     func items(in folder: String) -> [String]? {
         guard let names = Self.names(in: folder) else { return nil }
-        var info = stat()
-        guard names.contains(where: { $0.hasPrefix("._") }), stat(folder, &info) == 0 else { return names }
-        let beside: Bool
-        if let known = besideFiles[info.st_dev] {
-            beside = known
-        } else {
-            beside = Self.keepsAttributesBesideFiles(folder)
-            besideFiles[info.st_dev] = beside
+        guard names.contains(where: { $0.hasPrefix("._") }), keepsAttributesBesideFiles(at: folder) else {
+            return names
         }
-        guard beside else { return names }
         let all = Set(names)
-        return names.filter { !($0.hasPrefix("._") && all.contains(String($0.dropFirst(2)))) }
+        return names.filter { !(Self.isBeside($0, in: all) && Self.isAttributeFile(folder + "/" + $0)) }
+    }
+
+    /// Whether `name` is a `._x` with its `x` among `names`.
+    static func isBeside(_ name: String, in names: Set<String>) -> Bool {
+        name.hasPrefix("._") && names.contains(String(name.dropFirst(2)))
+    }
+
+    /// Whether the file begins as the attribute files macOS writes do (the
+    /// AppleDouble format: 00 05 16 07). A file that can't be read is not one.
+    static func isAttributeFile(_ path: String) -> Bool {
+        let file = open(path, O_RDONLY | O_NOFOLLOW)
+        guard file >= 0 else { return false }
+        defer { close(file) }
+        var start = [UInt8](repeating: 0, count: 4)
+        return read(file, &start, 4) == 4 && start == [0x00, 0x05, 0x16, 0x07]
+    }
+
+    /// `keepsAttributesBesideFiles` for the volume of the folder at `path`,
+    /// asked once per volume.
+    func keepsAttributesBesideFiles(at path: String) -> Bool {
+        var info = stat()
+        guard stat(path, &info) == 0 else { return false }
+        if let known = besideFiles[info.st_dev] { return known }
+        let beside = Self.keepsAttributesBesideFiles(path)
+        besideFiles[info.st_dev] = beside
+        return beside
     }
 
     /// Whether the volume `path` is on has no extended attributes of its
@@ -311,11 +355,25 @@ final class TreeCopier {
 
     /// Removes the source of a move whose copy is whole: each file and link
     /// is looked at once more against its copy just before it goes, and a
-    /// folder is removed only when empty. So what was added to the source,
-    /// or changed in it, since the copy was made is never removed: it
-    /// stays, with the folders it is in, and the answer is false.
+    /// folder is removed only by `rmdir`. So what was changed in the source
+    /// since the copy was made is never removed, and what was added to it
+    /// stays, with the folders it is in; the answer is then false.
+    ///
+    /// On a volume that keeps attributes in `._name` files, macOS removes a
+    /// `._name` with its `name`, and with the folder when only such files
+    /// are left in it, whatever is in them. So there a `._name` goes before
+    /// any other item of its folder, when it has been looked at itself; but
+    /// one that is added after the folder was listed goes with the folder,
+    /// unseen.
     func removeSource(_ source: String, copiedTo copy: String) -> Bool {
         guard let volumes = Self.volumes(copy, source) else { return false }
+        // A `._name` beside the item itself that is not its attribute file
+        // would go with it, and it is not part of what was copied.
+        let folder = (source as NSString).deletingLastPathComponent
+        let beside = folder + "/._" + (source as NSString).lastPathComponent
+        if keepsAttributesBesideFiles(at: folder), FileIdentity.of(beside) != nil, !Self.isAttributeFile(beside) {
+            return false
+        }
         return removeSource(source, copiedTo: copy, on: volumes)
     }
 
@@ -330,7 +388,9 @@ final class TreeCopier {
         guard matches(copy, source, on: volumes) else { return false }
         guard kind == S_IFDIR else { return unlink(source) == 0 }
         guard let names = items(in: source) else { return false }
-        for name in names {
+        // Any `._name` first: see above.
+        let ordered = names.filter { $0.hasPrefix("._") } + names.filter { !$0.hasPrefix("._") }
+        for name in ordered {
             guard removeSource(source + "/" + name, copiedTo: copy + "/" + name, on: volumes) else { return false }
         }
         return rmdir(source) == 0

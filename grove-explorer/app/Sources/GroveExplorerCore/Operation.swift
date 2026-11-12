@@ -153,7 +153,8 @@ enum Wording {
     }
 
     /// What a run did, in one line. Everything done: "Moved 3 items to
-    /// Downloads". Otherwise how many, and why not the rest: "Copied 12 of
+    /// Downloads" ("Copied Photos to STICK (2 left out)" when something
+    /// inside an item could not go with it). Otherwise how many, and why not the rest: "Copied 12 of
     /// 40 items (cancelled)", "Nothing copied (1 failed)".
     static func summary(
         of operation: Operation, done: Int, skipped: Int, failed: Int, cancelled: Bool,
@@ -161,14 +162,17 @@ enum Wording {
     ) -> String {
         let total = operation.count
         if done == total {
+            let all: String
             switch operation {
-            case let .copy(items, folder): return "Copied \(subject(items)) to \(place(folder))"
-            case let .move(items, folder): return "Moved \(subject(items)) to \(place(folder))"
-            case let .duplicate(items): return "Duplicated \(subject(items))"
-            case let .rename(item, name): return "Renamed \(item.lastPathComponent) to \(name)"
-            case let .newFolder(_, name): return "Made the folder \(name)"
-            case let .trash(items): return "Moved \(subject(items)) to the Trash"
+            case let .copy(items, folder): all = "Copied \(subject(items)) to \(place(folder))"
+            case let .move(items, folder): all = "Moved \(subject(items)) to \(place(folder))"
+            case let .duplicate(items): all = "Duplicated \(subject(items))"
+            case let .rename(item, name): all = "Renamed \(item.lastPathComponent) to \(name)"
+            case let .newFolder(_, name): all = "Made the folder \(name)"
+            case let .trash(items): all = "Moved \(subject(items)) to the Trash"
             }
+            // Every item came, but not all that is in them.
+            return failed > 0 ? "\(all) (\(grouped(failed)) left out)" : all
         }
 
         let verb: String

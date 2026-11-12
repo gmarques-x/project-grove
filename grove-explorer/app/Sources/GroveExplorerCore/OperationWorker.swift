@@ -16,6 +16,8 @@ final class Worker {
     /// The targets that were there when the names were looked up, less the
     /// ones already asked about: an answer is for one item.
     private var known: Set<String>
+    /// The answers given, by target.
+    private var answered: [String: Conflict.Choice] = [:]
     private let files: FileManager
     private let flag: CancelFlag
     private let watching: (@Sendable (OperationRunner.Stage) -> Void)?
@@ -84,7 +86,9 @@ final class Worker {
                 cancelled = true
                 break
             }
-            if let volume {
+            if volume != nil, let partner = pairedName(of: item, among: items, in: folder) {
+                fail(item, Self.cannotBeBeside(partner))
+            } else if let volume {
                 transfer(item, to: folder, on: volume, moving: moving)
             } else {
                 fail(item, "the folder “\(folder.lastPathComponent)” is not there")
@@ -92,6 +96,32 @@ final class Worker {
             if cancelled || shortage != nil { break }
             reporter.itemFinished(bytes: size)
         }
+    }
+
+    /// For an item named `._x` going to a volume that keeps attributes in
+    /// files of that name: the `x` it would be beside there, in this
+    /// operation or in the folder already. macOS would overwrite it with
+    /// `x`'s attributes, or has its own file under the name.
+    private func pairedName(of item: URL, among items: [URL], in folder: URL) -> String? {
+        let name = item.lastPathComponent
+        guard name.hasPrefix("._"), copier.keepsAttributesBesideFiles(at: folder.path) else { return nil }
+        let partner = String(name.dropFirst(2))
+        let coming = items.contains { $0.lastPathComponent == partner }
+        return coming || OperationRunner.exists(folder.appendingPathComponent(partner)) ? partner : nil
+    }
+
+    private static func cannotBeBeside(_ partner: String) -> String {
+        "it can't be kept beside “\(partner)” on this disk"
+    }
+
+    /// Tells what the last copy left out of `item`, each as a failure of
+    /// its own. Whether there was anything.
+    private func tellLeftOut(of item: URL) -> Bool {
+        for inner in copier.leftOut {
+            let partner = String((inner as NSString).lastPathComponent.dropFirst(2))
+            fail(item.appendingPathComponent(inner), Self.cannotBeBeside(partner))
+        }
+        return !copier.leftOut.isEmpty
     }
 
     private func transfer(_ item: URL, to folder: URL, on volume: dev_t, moving: Bool) {
@@ -109,11 +139,21 @@ final class Worker {
             // about it, so no answer is about it.
             // And asked about once: a second item of the same name finds
             // the first one's arrival there, which nobody was asked about.
-            guard known.remove(OperationRunner.key(target)) != nil else {
-                fail(item, Self.appeared)
+            let key = OperationRunner.key(target)
+            guard known.remove(key) != nil else {
+                // Asked about already, for an earlier item of this name:
+                // skipped as that one was, or failed with what is true.
+                switch answered[key] {
+                case .skip?: skipped += 1
+                case .replace?, .keepBoth?:
+                    fail(item, "another item of this operation has that name, and the answer was for it")
+                case nil: fail(item, Self.appeared)
+                }
                 return
             }
-            switch resolve(target) {
+            let choice = resolve(target)
+            answered[key] = choice
+            switch choice {
             case .skip:
                 skipped += 1
                 return
@@ -188,13 +228,17 @@ final class Worker {
         switch place(partial.path, at: target, orAt: nextFree) {
         case let .at(final):
             if let replaced { changes.append(.replaced(original: target, inTrash: replaced)) }
+            let leftOut = tellLeftOut(of: item)
             guard moving else {
                 changes.append(.created(final))
                 done += 1
                 return
             }
             // The source goes only when the copy is all of it.
-            if !copier.isWhole(final.path, of: item.path) {
+            if leftOut {
+                changes.append(.created(final))
+                fail(item, "it was copied without what can't be kept on this disk, and left where it is")
+            } else if !copier.isWhole(final.path, of: item.path) {
                 changes.append(.created(final))
                 fail(item, "it changed while it was copied: the copy is there, and it was left where it is")
             } else if !copier.removeSource(item.path, copiedTo: final.path) {
@@ -264,6 +308,7 @@ final class Worker {
         guard let partial = copyToPartial(item, for: target, on: item.deletingLastPathComponent()) else { return }
         switch place(partial.path, at: target, orAt: next) {
         case let .at(final):
+            _ = tellLeftOut(of: item)
             changes.append(.created(final))
             done += 1
         case let other:
@@ -284,7 +329,9 @@ final class Worker {
         }
         let target = OperationRunner.target(for: item, in: item.deletingLastPathComponent(), named: name)
         // Its own name in other capitals is not another item.
-        if let there = FileIdentity.of(target.path)?.identity, there != source {
+        if let there = FileIdentity.of(target.path)?.identity,
+            !(there == source && OperationRunner.isSameName(item.lastPathComponent, name))
+        {
             fail(item, Self.alreadyThere(name))
             return
         }
@@ -391,7 +438,17 @@ final class Worker {
         if let there = FileIdentity.of(name)?.identity {
             // The item's own name in other capitals is one entry of the
             // folder, the item's: nothing else can be under it.
-            guard there == item else { return EEXIST }
+            // That it is the item's own is taken only from all three: the
+            // volume says it is the same item, in the same folder, and the
+            // names differ by no more than capitals or the form of accents.
+            // (A hard link is the same item under another name; an old FAT
+            // driver may give every empty file one number.)
+            let from = URL(fileURLWithPath: path)
+            guard there == item,
+                from.deletingLastPathComponent().standardizedFileURL.path
+                    == target.deletingLastPathComponent().standardizedFileURL.path,
+                OperationRunner.isSameName(from.lastPathComponent, target.lastPathComponent)
+            else { return EEXIST }
             return Darwin.rename(path, name) == 0 ? 0 : errno
         }
 
@@ -505,6 +562,7 @@ final class Worker {
         case ENAMETOOLONG: "its name is too long"
         case EROFS: "the disk can't be written to"
         case EFTYPE: "it is not a file, a folder or a link"
+        case ENOATTR: "its attributes can't be read"
         default: String(cString: strerror(code)).lowercased()
         }
     }
