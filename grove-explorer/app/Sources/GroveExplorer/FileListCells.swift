@@ -189,6 +189,15 @@ final class FileTableView: NSTableView {
     /// view (`RenameEditor`), where VoiceOver would not come by it: it is
     /// counted among the table's own (`ListAccessibility.swift`).
     weak var renameField: NSView?
+    /// The rows and columns VoiceOver has been given, each kept while its
+    /// item is listed (`ListAccessibility.swift`).
+    var spoken = (rows: [URL: ListRowElement](), columns: [ObjectIdentifier: ListColumnElement]())
+
+    override func reloadData() {
+        super.reloadData()
+        forgetUnlistedRowElements()
+    }
+
     /// A row as VoiceOver says it (`Spoken.row`), asked for when VoiceOver
     /// comes to the row and not while it is drawn.
     var onRowLabel: ((Int) -> String?)?
