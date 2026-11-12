@@ -58,6 +58,10 @@ struct KeyCapView: View {
         }
         .focusBox(focused, cornerRadius: GroveRadius.control, outset: 3)
         .help(help)
+        // One thing to VoiceOver, not a legend and a label apart. Where a cap
+        // can be clicked (the Keyboard tab) the caller adds the button trait.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CapWords.spoken(legend: legend, binding: binding, isModifier: isModifier))
     }
 
     /// The half-height up and down caps: legend and label on one line.
@@ -83,6 +87,7 @@ struct KeyCapView: View {
         guard let binding else { return "" }
         if binding.missingApp { return "\(binding.label) is not installed" }
         if binding.conflict { return "Also bound in AeroSpace; the launcher wins" }
-        return ""
+        // In words: the cap has room for a few letters only.
+        return binding.words
     }
 }

@@ -119,17 +119,54 @@ public enum KeyboardLayout {
             let step = direction == .up ? -1 : 1
             if slot.names.indices.contains(level + step) { return slot.names[level + step] }
             guard slots.indices.contains(r + step) else { return nil }
-            var best: (edge: Double, center: Double, name: String)?
-            for other in slots[r + step] {
-                guard let n = other.names.first, let n else { continue }
-                let x = slot.center
-                let edge = x < other.start ? other.start - x : (x > other.end ? x - other.end : 0)
-                let center = abs(other.center - x)
-                if best == nil || edge < best!.edge || (edge == best!.edge && center < best!.center) {
-                    best = (edge, center, n)
-                }
-            }
-            return best?.name
+            return nearest(in: r + step, to: slot.center)
         }
+    }
+
+    /// The named cap of row `r` over or under `x` (in key units): the one
+    /// `x` is in, else the nearest edge, the nearer centre breaking a tie.
+    private static func nearest(in r: Int, to x: Double) -> String? {
+        var best: (edge: Double, center: Double, name: String)?
+        for other in slots[r] {
+            guard let n = other.names.first, let n else { continue }
+            let edge = x < other.start ? other.start - x : (x > other.end ? x - other.end : 0)
+            let center = abs(other.center - x)
+            if best == nil || edge < best!.edge || (edge == best!.edge && center < best!.center) {
+                best = (edge, center, n)
+            }
+        }
+        return best?.name
+    }
+
+    // MARK: The bindings under the keyboard
+
+    /// The bindings without a cap ("not on the keyboard") are listed under
+    /// the keyboard in this many columns, filled row by row.
+    public static let extraColumns = 4
+
+    /// `neighbor(of:_:)` with the listed bindings (`extras`, their keys in
+    /// the order shown) joined on after the bottom row: ↓ from the bottom
+    /// row goes to the first listed row, into the column under the cap; ↑
+    /// from that row goes back to the cap over the column's middle; inside
+    /// the list the arrows move by one cell and stop at its edges.
+    public static func neighbor(of name: String, _ direction: Direction, extras: [String]) -> String? {
+        let last = slots.count - 1
+        let width = slots[last].last?.end ?? 1
+        if let at = extras.firstIndex(of: name), !names.contains(name) {
+            let column = at % extraColumns
+            switch direction {
+            case .left: return column > 0 ? extras[at - 1] : nil
+            case .right: return column < extraColumns - 1 && at + 1 < extras.count ? extras[at + 1] : nil
+            case .down: return at + extraColumns < extras.count ? extras[at + extraColumns] : nil
+            case .up:
+                if at >= extraColumns { return extras[at - extraColumns] }
+                return nearest(in: last, to: (Double(column) + 0.5) / Double(extraColumns) * width)
+            }
+        }
+        if let next = neighbor(of: name, direction) { return next }
+        guard direction == .down, !extras.isEmpty,
+              let slot = slots[last].first(where: { $0.names.contains(name) }) else { return nil }
+        let column = min(Int(slot.center / width * Double(extraColumns)), extraColumns - 1)
+        return extras[min(column, extras.count - 1)]
     }
 }

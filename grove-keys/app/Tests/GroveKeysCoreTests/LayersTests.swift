@@ -94,4 +94,52 @@ import Testing
             #expect(names.contains(kind.tint), "\(kind) tint \(kind.tint)")
         }
     }
+
+    /// `exec-and-forget open grovekeys://…` is named as the cheat sheet
+    /// names it, not by the command's first word.
+    @Test func aLinkBindingIsLabelledByWhatItOpens() throws {
+        func l(_ s: String) -> String { CommandLabel.label(.string(s)).0 }
+        #expect(l("exec-and-forget open grovekeys://cheatsheet") == "Cheat sheet")
+        #expect(l("exec-and-forget open grovekeys://launcher") == "Grove Launcher")
+        #expect(l("exec-and-forget open grovekeys://grove-menu") == "Grove menu")
+        #expect(l("exec-and-forget open grovekeys://menu/lock") == "menu row")
+        #expect(l("exec-and-forget open -a Safari") == "open -a Safari")
+        #expect(l("exec-and-forget") == "exec-and-forget")
+        #expect(CommandLabel.label(.array(["exec-and-forget open grovekeys://cheatsheet", "mode main"])).0 == "Cheat sheet")
+
+        let keys = try KeysFile(text: """
+        [launch]
+        t = "com.mitchellh.ghostty"
+        x = "com.example.missing"
+        [aerospace.main]
+        hyper-k = "exec-and-forget open grovekeys://cheatsheet" # every key, searchable
+        alt-1 = "workspace 1"
+        alt-h = "focus left"
+        """)
+        let layers = Layers.build(from: keys) { $0 == "com.mitchellh.ghostty" ? "Ghostty" : nil }
+        #expect(layers[0].bindings["k"]?.label == "Cheat sheet")
+        #expect(layers[0].bindings["k"]?.words == "Cheat sheet")
+        #expect(layers[0].bindings["t"]?.words == "opens Ghostty")
+        #expect(layers[0].bindings["x"]?.words == "missing, not installed")
+        #expect(layers[1].bindings["1"]?.words == "Workspace 1")
+        #expect(layers[1].bindings["h"]?.words == "Focus left")
+    }
+
+    @Test func whatVoiceOverSaysForACap() {
+        let ghostty = KeyBinding(key: "t", label: "Ghostty", words: "opens Ghostty", kind: .launcher,
+                                 source: .launcher(bundleID: "com.mitchellh.ghostty"))
+        #expect(CapWords.spoken(legend: "t", binding: ghostty) == "T, opens Ghostty")
+        var clash = ghostty
+        clash.conflict = true
+        #expect(CapWords.spoken(legend: "t", binding: clash) == "T, opens Ghostty, also bound in AeroSpace")
+        let two = KeyBinding(key: "2", label: "ws 2", words: "Workspace 2", kind: .workspace,
+                             source: .aerospace(mode: "main", key: "alt-2"))
+        #expect(CapWords.spoken(legend: "2", binding: two) == "2, Workspace 2")
+        #expect(CapWords.spoken(legend: "q", binding: nil) == "Q, free")
+        #expect(CapWords.spoken(legend: "", binding: nil) == "space, free")
+        #expect(CapWords.spoken(legend: "return", binding: nil) == "return, free")
+        #expect(CapWords.spoken(legend: "shift", binding: nil, isModifier: true) == "shift")
+        let bare = KeyBinding(key: "x", label: "close", kind: .other, source: .aerospace(mode: "service", key: "x"))
+        #expect(CapWords.spoken(legend: "x", binding: bare) == "X, close")
+    }
 }

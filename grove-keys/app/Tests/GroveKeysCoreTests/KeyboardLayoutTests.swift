@@ -154,4 +154,35 @@ import Testing
         #expect(L.neighbor(of: "nope", .right) == nil)
         #expect(L.firstKey == "1")
     }
+
+    /// The bindings listed under the keyboard, four to a row.
+    @Test func theListedBindingsFollowTheBottomRow() {
+        let extras = ["alt-shift-h", "alt-shift-j", "alt-shift-k", "alt-shift-l", "esc"]
+        func n(_ name: String, _ d: L.Direction) -> String? { L.neighbor(of: name, d, extras: extras) }
+        // Down from the bottom row: the column under the cap.
+        #expect(n("space", .down) == "alt-shift-j")
+        #expect(n("left", .down) == "alt-shift-l")
+        #expect(n("down", .down) == "alt-shift-l")
+        #expect(n("up", .down) == "down")
+        // Inside the list.
+        #expect(n("alt-shift-h", .right) == "alt-shift-j")
+        #expect(n("alt-shift-h", .left) == nil)
+        #expect(n("alt-shift-l", .right) == nil)
+        #expect(n("alt-shift-h", .down) == "esc")
+        #expect(n("alt-shift-j", .down) == nil)
+        #expect(n("esc", .up) == "alt-shift-h")
+        #expect(n("esc", .right) == nil)
+        #expect(n("esc", .down) == nil)
+        // Back up to the keyboard: the cap over the column.
+        #expect(n("alt-shift-h", .up) == "space")
+        #expect(n("alt-shift-j", .up) == "space")
+        #expect(n("alt-shift-l", .up) == "up")
+        // The caps move as without a list; with none, the bottom row is the end.
+        #expect(n("1", .right) == "2")
+        #expect(n("z", .down) == "space")
+        #expect(L.neighbor(of: "space", .down, extras: []) == nil)
+        // One listed binding: every column leads to it.
+        #expect(L.neighbor(of: "right", .down, extras: ["esc"]) == "esc")
+        #expect(L.neighbor(of: "esc", .up, extras: ["esc"]) == "space")
+    }
 }

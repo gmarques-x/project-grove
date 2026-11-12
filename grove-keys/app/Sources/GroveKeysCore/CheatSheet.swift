@@ -269,7 +269,8 @@ public enum CommandWords {
         }
     }
 
-    private static func linkName(_ link: KeysURL) -> String? {
+    /// A `grovekeys://` link by name; nil for a menu row's (its id says nothing).
+    static func linkName(_ link: KeysURL) -> String? {
         switch link {
         case .launcher: return "Grove Launcher"
         case .cheatSheet: return "Cheat sheet"

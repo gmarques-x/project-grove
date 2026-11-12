@@ -14,8 +14,14 @@ struct EditTarget: Equatable, Identifiable {
 
 /// The Keyboard tab (spec §7, mockup §1): the layer picker with binding
 /// counts, the MacBook keyboard for that layer, bindings that have no cap,
-/// and the legend. Arrows or Ctrl+H/J/K/L move between keys, Return opens the
-/// editor, Esc closes the editor, then the window.
+/// and the legend. Arrows or Ctrl+H/J/K/L move between keys and, past the
+/// bottom row, the bindings listed under the keyboard; Return or Space opens
+/// the editor; Esc closes the editor, then the window.
+///
+/// ⌘← and ⌘→ show the previous and next layer. Those two because nothing
+/// else has them here: the tabs are ⌘1 and ⌘2, AeroSpace's bindings are on
+/// ⌥ (⌥←/→ would be its to take), the recorder is on the other tab, and
+/// unlike ⌘[ and ⌘] they are the same keys on every keyboard layout.
 struct KeyboardView: View {
     @ObservedObject var model: AppModel
     @Environment(\.theme) private var theme
@@ -136,6 +142,10 @@ struct KeyboardView: View {
                     showFocus.wrappedValue = false
                     editing.wrappedValue = target
                 }
+                // A trait, not a `Button`: a button could take the keyboard
+                // from this view, and with it the arrows.
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { editing.wrappedValue = target }
                 .popover(isPresented: presented(target), arrowEdge: .bottom) {
                     editor(target, layer: layer)
                 }
@@ -158,14 +168,15 @@ struct KeyboardView: View {
     /// Escape (the function row) and, in a mode, keys with modifiers
     /// ("alt-shift-h"): listed under the keyboard, not drawn on caps.
     private func extras(_ layer: Layer) -> some View {
-        let rows = layer.bindings.values.filter { !KeyboardLayout.names.contains($0.key) }.sorted { $0.key < $1.key }
+        let rows = Self.extraBindings(layer)
         return Group {
             if !rows.isEmpty {
                 VStack(alignment: .leading, spacing: GroveSpace.s8) {
                     Text("NOT ON THE KEYBOARD")
                         .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
                         .foregroundStyle(theme.quiet)
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GroveSpace.s8, alignment: .leading), count: 4),
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: GroveSpace.s8, alignment: .leading),
+                                             count: KeyboardLayout.extraColumns),
                               alignment: .leading, spacing: GroveSpace.s4) {
                         ForEach(rows, id: \.key) { binding in
                             extraRow(binding, layer: layer)
@@ -176,13 +187,23 @@ struct KeyboardView: View {
         }
     }
 
-    private func extraRow(_ binding: KeyBinding, layer: Layer) -> some View {
-        let shortcut: String
-        switch binding.source {
-        case .aerospace(_, let key): shortcut = key
-        case .launcher: shortcut = KeyboardLayout.shortcut(layerID: layer.id, key: binding.key)
+    /// The layer's bindings that have no cap, in the order they are listed
+    /// (and the arrows walk them).
+    private static func extraBindings(_ layer: Layer) -> [KeyBinding] {
+        layer.bindings.values.filter { !KeyboardLayout.names.contains($0.key) }.sorted { $0.key < $1.key }
+    }
+
+    /// What the editor opens on for a cap's name or a listed binding's key.
+    private static func target(_ name: String, layer: Layer) -> EditTarget {
+        if !KeyboardLayout.names.contains(name), case .aerospace(_, let key) = layer.bindings[name]?.source {
+            return EditTarget(layerID: layer.id, shortcut: key)
         }
-        let target = EditTarget(layerID: layer.id, shortcut: shortcut)
+        return EditTarget(layerID: layer.id, shortcut: KeyboardLayout.shortcut(layerID: layer.id, key: name))
+    }
+
+    private func extraRow(_ binding: KeyBinding, layer: Layer) -> some View {
+        let target = Self.target(binding.key, layer: layer)
+        let shortcut = target.shortcut
         let tint = theme.named(binding.kind.tint)
         return Button { editing.wrappedValue = target } label: {
             HStack(spacing: GroveSpace.s8) {
@@ -204,6 +225,11 @@ struct KeyboardView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusBox(showFocus.wrappedValue && focused.wrappedValue == binding.key,
+                  cornerRadius: GroveRadius.control, outset: 3)
+        .help(binding.words)
+        .accessibilityLabel((Shortcut(aerospace: shortcut)?.symbols ?? shortcut) + ", "
+                            + (binding.words.isEmpty ? binding.label : binding.words))
         .popover(isPresented: presented(target), arrowEdge: .bottom) {
             editor(target, layer: layer)
         }
@@ -244,18 +270,32 @@ struct KeyboardView: View {
             }
             return .handled
         }
-        if press.key == .return {
-            guard let name = focused.wrappedValue, let layer = current else { return .ignored }
-            editing.wrappedValue = EditTarget(layerID: layer.id,
-                                              shortcut: KeyboardLayout.shortcut(layerID: layer.id, key: name))
+        // ⌘← and ⌘→: the previous and the next layer (no wrap).
+        if press.modifiers.contains(.command) {
+            guard press.key == .leftArrow || press.key == .rightArrow else { return .ignored }
+            let all = layers
+            let at = all.firstIndex { $0.id == current?.id }
+            if let next = GroveSegmentedStep.index(from: at, step: press.key == .leftArrow ? -1 : 1,
+                                                   enabled: all.map { _ in true }) {
+                show(layer: all[next].id)
+            }
+            return .handled
+        }
+        let extras = current.map { Self.extraBindings($0).map(\.key) } ?? []
+        // The key the box is on, if this layer still has it (a listed
+        // binding is the layer's own).
+        let here = focused.wrappedValue.flatMap { KeyboardLayout.names.contains($0) || extras.contains($0) ? $0 : nil }
+        if press.key == .return || press.key == .space {
+            guard let name = here, let layer = current else { return .ignored }
+            editing.wrappedValue = Self.target(name, layer: layer)
             return .handled
         }
         guard let direction = Self.direction(press) else { return .ignored }
-        if showFocus.wrappedValue, let name = focused.wrappedValue {
-            if let next = KeyboardLayout.neighbor(of: name, direction) { focused.wrappedValue = next }
+        if showFocus.wrappedValue, let name = here {
+            if let next = KeyboardLayout.neighbor(of: name, direction, extras: extras) { focused.wrappedValue = next }
         } else {
             // The first press shows the box where it is (or on 1).
-            if focused.wrappedValue == nil { focused.wrappedValue = KeyboardLayout.firstKey }
+            if here == nil { focused.wrappedValue = KeyboardLayout.firstKey }
             showFocus.wrappedValue = true
         }
         return .handled

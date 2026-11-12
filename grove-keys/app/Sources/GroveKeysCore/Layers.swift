@@ -23,16 +23,21 @@ public struct KeyBinding: Equatable, Sendable {
     }
 
     public var key: String
+    /// The few letters a cap has room for: "ws 1", "← focus", "Ghostty".
     public var label: String
+    /// What the key does in words, as the cheat sheet says it: "Workspace
+    /// 1", "Focus left", "opens Ghostty". For the tooltip and VoiceOver.
+    public var words: String
     public var kind: BindingKind
     public var source: Source
     public var conflict: Bool
     public var missingApp: Bool
 
-    public init(key: String, label: String, kind: BindingKind, source: Source,
+    public init(key: String, label: String, words: String = "", kind: BindingKind, source: Source,
                 conflict: Bool = false, missingApp: Bool = false) {
         self.key = key
         self.label = label
+        self.words = words
         self.kind = kind
         self.source = source
         self.conflict = conflict
@@ -83,7 +88,8 @@ public enum Layers {
             let name = appName(bundleID)
             let label = name ?? String(bundleID.split(separator: ".").last ?? Substring(bundleID))
             layers[0].bindings[key] = KeyBinding(
-                key: key, label: label, kind: .launcher,
+                key: key, label: label, words: name.map { "opens " + $0 } ?? label + ", not installed",
+                kind: .launcher,
                 source: .launcher(bundleID: bundleID), missingApp: name == nil)
             launcherKeys.insert(key)
         }
@@ -92,7 +98,7 @@ public enum Layers {
             for (text, value) in mode.bindings {
                 guard let sc = Shortcut(aerospace: text) else { continue }
                 let (label, kind) = CommandLabel.label(value)
-                let binding = KeyBinding(key: sc.key, label: label, kind: kind,
+                let binding = KeyBinding(key: sc.key, label: label, words: CommandWords.words(value), kind: kind,
                                          source: .aerospace(mode: mode.name, key: text))
                 let i: Int
                 if sc.isHyper {
@@ -121,12 +127,26 @@ public enum Layers {
                 let sc = Shortcut(aerospace: text)
                 let bare = sc?.modifiers.isEmpty ?? true
                 let key = bare ? (sc?.key ?? text) : text
-                layer.bindings[key] = KeyBinding(key: key, label: label, kind: kind,
+                layer.bindings[key] = KeyBinding(key: key, label: label, words: CommandWords.words(value), kind: kind,
                                                  source: .aerospace(mode: mode.name, key: text))
             }
             layers.append(layer)
         }
         return layers
+    }
+}
+
+/// What VoiceOver says for a drawn key.
+public enum CapWords {
+    /// "T, opens Ghostty", "2, Workspace 2", "Q, free"; a modifier cap
+    /// (`isModifier`) is its legend alone. The space bar's legend is empty.
+    public static func spoken(legend: String, binding: KeyBinding?, isModifier: Bool = false) -> String {
+        let key = legend.isEmpty ? "space" : (legend.count == 1 ? legend.uppercased() : legend)
+        if isModifier { return key }
+        guard let binding else { return key + ", free" }
+        var words = key + ", " + (binding.words.isEmpty ? binding.label : binding.words)
+        if binding.conflict { words += ", also bound in AeroSpace" }
+        return words
     }
 }
 
@@ -189,6 +209,17 @@ public enum CommandLabel {
             return ("reset layout", .mode)
         case "close-all-windows-but-current":
             return ("close others", .mode)
+        case "exec-and-forget":
+            // Not "exec-and-forget": a Grove Keys link by its name, as the
+            // cheat sheet has it ("Cheat sheet"); any other, what it runs.
+            switch CheatStep(command: command) {
+            case .link(let link):
+                return (CommandWords.linkName(link) ?? "menu row", .other)
+            case .shell(let shell):
+                return (shell, .other)
+            case .aerospace, nil:
+                break
+            }
         default:
             break
         }
