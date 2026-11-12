@@ -8,15 +8,36 @@ import Foundation
 /// it; Grove Keys makes them transparent while the overview is up and puts
 /// the scheme's colours back when it ends.
 public enum Borders {
-    /// What the Dock posts (Accessibility notifications on its application
-    /// element) when an overview comes up…
-    public static let enterNotifications = [
-        "AXExposeShowAllWindows",    // Mission Control
-        "AXExposeShowFrontWindows",  // App Exposé
-        "AXExposeShowDesktop",       // Show Desktop
+    /// macOS 27 doesn't say when an overview comes up or ends: the Dock's
+    /// old "AXExpose…" notifications are gone and WindowManager, which runs
+    /// the overview now, refuses them. What can be seen is its shield window,
+    /// on screen for as long as the overview is: `overviewIsUp`.
+    ///
+    /// Looking costs a few milliseconds (the bar alone is a hundred small
+    /// windows), so nothing polls. The Dock and WindowManager do post these
+    /// general Accessibility notifications when an overview opens and closes
+    /// (and at other times): each is only a reason to look.
+    public static let triggerNotifications = [
+        "AXSelectedChildrenChanged",
+        "AXFocusedUIElementChanged",
+        "AXCreated",
+        "AXUIElementDestroyed",
     ]
-    /// …and when it ends.
-    public static let exitNotification = "AXExposeExit"
+    /// Whose notifications: the Dock and WindowManager, by bundle ID.
+    public static let triggerApps = ["com.apple.dock", "com.apple.WindowManager"]
+
+    /// While an overview is up, how often to look for its end, in case the
+    /// notification for it is missed.
+    public static let recheck: TimeInterval = 0.5
+
+    /// An overview (Mission Control, App Exposé, Show Desktop) is on screen:
+    /// WindowManager has a window in the layers it uses only then (the
+    /// Spaces bar at 14, app icons at 17, the shield at 19). At rest its
+    /// windows are far below the desktop's. `windows` is the on-screen list
+    /// as (owner's name, layer); names need no Screen Recording permission.
+    public static func overviewIsUp(windows: [(owner: String, layer: Int)]) -> Bool {
+        windows.contains { $0.owner == "WindowManager" && (10...20).contains($0.layer) }
+    }
 
     /// Fully transparent, as `borders` takes colours (0xAARRGGBB).
     public static let transparent = "0x00000000"
@@ -60,7 +81,7 @@ public struct BordersMachine: Equatable, Sendable {
         case exited
         /// `Borders.lastResort` passed since the enter numbered `enter`.
         case timedOut(enter: Int)
-        /// The Dock restarted (its notifications with it): an exit may have been missed.
+        /// The Dock or WindowManager restarted (their notifications with it): an exit may have been missed.
         case dockRestarted
         /// Grove Keys is quitting or restarting.
         case shuttingDown

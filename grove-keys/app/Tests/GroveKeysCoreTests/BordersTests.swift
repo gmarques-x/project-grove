@@ -66,8 +66,8 @@ import Testing
 
     @Test func hidingChangesTheColoursOnly() {
         #expect(Borders.hideArguments == ["active_color=0x00000000", "inactive_color=0x00000000"])
-        #expect(Borders.enterNotifications.count == 3)
-        #expect(Borders.exitNotification == "AXExposeExit")
+        #expect(Borders.triggerNotifications.contains("AXSelectedChildrenChanged"))
+        #expect(Borders.triggerApps == ["com.apple.dock", "com.apple.WindowManager"])
     }
 
     @Test func theConfigAndTheBinaryAreFound() {
@@ -78,5 +78,19 @@ import Testing
         #expect(Borders.binary(environment: ["PATH": "/usr/bin:/usr/local/bin"]) { $0.hasPrefix("/usr/local") }
                 == "/usr/local/bin/borders")
         #expect(Borders.binary(environment: [:]) { _ in false } == nil)
+    }
+
+    @Test func anOverviewIsWindowManagersWindowInItsOverviewLayers() {
+        // As macOS 27 lists them at rest…
+        let rest: [(owner: String, layer: Int)] = [
+            ("WindowManager", -2147483603), ("WindowManager", -2147483624), ("borders", 0), ("Dock", 20), ("sketchybar", 25),
+        ]
+        #expect(!Borders.overviewIsUp(windows: rest))
+        // …and with Mission Control up: the Spaces bar, app icons, the shield.
+        #expect(Borders.overviewIsUp(windows: rest + [("WindowManager", 14), ("WindowManager", 17), ("WindowManager", 19)]))
+        #expect(Borders.overviewIsUp(windows: [("WindowManager", 19)]))
+        // Its highlight overlay at layer 0 alone isn't one, nor another app's window there.
+        #expect(!Borders.overviewIsUp(windows: [("WindowManager", 0), ("Finder", 19)]))
+        #expect(!Borders.overviewIsUp(windows: []))
     }
 }

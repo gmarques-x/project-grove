@@ -1,75 +1,79 @@
 import AppKit
 import ApplicationServices
+import CoreGraphics
 import GroveKeysCore
 
 /// Hides the window borders while Mission Control, App Exposé or Show
-/// Desktop is up, and puts them back when it ends (why: `Borders`). The
-/// Dock says when, in Accessibility notifications on its application
-/// element; what to do then is `BordersMachine`'s, and this runs it.
+/// Desktop is up, and puts them back when it ends (why: `Borders`). macOS
+/// doesn't announce an overview, so this looks for it (`Borders
+/// .overviewIsUp`) whenever the Dock or WindowManager post one of a few
+/// general Accessibility notifications, and every half second while one is
+/// up. What to do then is `BordersMachine`'s, and this runs it.
 ///
 /// It needs the Accessibility permission Grove Keys has anyway. Until that
-/// is granted there is no observer; `ensure()` (called with the permission
-/// poll) installs it then, and again when the Dock restarts. If macOS never
-/// posts the notifications, nothing here does anything.
+/// is granted there are no observers; `ensure()` (called with the
+/// permission poll) installs them then, and again when either process
+/// restarts.
 ///
-/// The log says once which it is: "borders watcher: watching the Dock (pid
-/// N) for Mission Control" or "borders watcher: not installed: <why>".
+/// The log says once which it is: "borders watcher: watching the Dock and
+/// WindowManager for an overview" or "borders watcher: not installed: <why>".
 @MainActor
 final class BordersWatcher {
     static let shared = BordersWatcher()
 
     private var machine = BordersMachine()
-    private var observer: AXObserver?
-    private var dockPID: pid_t?
+    /// One observer per process watched, by its pid.
+    private var observers: [pid_t: AXObserver] = [:]
+    /// The overview was up at the last look.
+    private var up = false
+    /// A look is already queued (several notifications arrive together).
+    private var lookQueued = false
+    private var recheck: Timer?
     /// What the log last said, so each state is said once.
     private var logged: String?
     private let runner = Runner()
 
     /// At launch: the borders show (an earlier run may have left them
-    /// hidden), then the observer if it can be had.
+    /// hidden), then the observers if they can be had, and a first look.
     func start() {
         perform(machine.handle(.started))
         ensure()
+        look()
     }
 
-    /// Installs the observer if there is none, or if the Dock is a new process.
+    /// Installs the observers that are missing, and drops those of a process
+    /// that has gone (the Dock or WindowManager restarted).
     func ensure() {
-        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else {
-            log("not installed: the Dock isn't running")
-            return
-        }
-        let pid = dock.processIdentifier
-        if observer != nil, pid == dockPID { return }
-        if observer != nil {
-            remove()
-            perform(machine.handle(.dockRestarted))
-        }
         guard AXIsProcessTrusted() else {
             log("not installed: Accessibility isn't granted yet")
             return
         }
-        var created: AXObserver?
-        let callback: AXObserverCallback = { _, _, notification, _ in
-            let name = notification as String
-            // Delivered on the main run loop, where the source was added.
-            MainActor.assumeIsolated { BordersWatcher.shared.received(name) }
+        let running = Borders.triggerApps.compactMap {
+            NSRunningApplication.runningApplications(withBundleIdentifier: $0).first?.processIdentifier
         }
-        guard AXObserverCreate(pid, callback, &created) == .success, let created else {
-            log("not installed: no observer for the Dock (pid \(pid))")
-            return
+        let gone = observers.keys.filter { !running.contains($0) }
+        for pid in gone { remove(pid) }
+        if !gone.isEmpty { perform(machine.handle(.dockRestarted)); up = false }
+        for pid in running where observers[pid] == nil {
+            var created: AXObserver?
+            let callback: AXObserverCallback = { _, _, _, _ in
+                // Delivered on the main run loop, where the source was added.
+                MainActor.assumeIsolated { BordersWatcher.shared.queueLook() }
+            }
+            guard AXObserverCreate(pid, callback, &created) == .success, let created else { continue }
+            let element = AXUIElementCreateApplication(pid)
+            let taken = Borders.triggerNotifications.filter {
+                AXObserverAddNotification(created, element, $0 as CFString, nil) == .success
+            }
+            guard !taken.isEmpty else { continue }
+            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
+            observers[pid] = created
         }
-        let element = AXUIElementCreateApplication(pid)
-        let names = Borders.enterNotifications + [Borders.exitNotification]
-        let refused = names.filter { AXObserverAddNotification(created, element, $0 as CFString, nil) != .success }
-        guard refused.count < names.count else {
-            log("not installed: the Dock (pid \(pid)) took none of the notifications")
-            return
+        if observers.isEmpty {
+            log("not installed: neither the Dock nor WindowManager took a notification")
+        } else {
+            log("watching the Dock and WindowManager for an overview (\(observers.count) of \(Borders.triggerApps.count))")
         }
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(created), .commonModes)
-        observer = created
-        dockPID = pid
-        log("watching the Dock (pid \(pid)) for Mission Control"
-            + (refused.isEmpty ? "" : "; refused: " + refused.joined(separator: ", ")))
     }
 
     /// Every exit path: borders hidden by this run come back, before the app goes.
@@ -78,24 +82,46 @@ final class BordersWatcher {
         remove()
     }
 
-    private func remove() {
-        if let observer {
+    private func remove(_ pid: pid_t? = nil) {
+        for (key, observer) in observers where pid == nil || key == pid {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+            observers[key] = nil
         }
-        observer = nil
-        dockPID = nil
+        if pid == nil {
+            recheck?.invalidate()
+            recheck = nil
+        }
     }
 
-    private func received(_ notification: String) {
-        if notification == Borders.exitNotification {
-            perform(machine.handle(.exited))
-        } else if Borders.enterNotifications.contains(notification) {
-            perform(machine.handle(.entered))
-            // The last resort, counted from this enter.
-            let enter = machine.enters
-            DispatchQueue.main.asyncAfter(deadline: .now() + Borders.lastResort) { [self] in
-                perform(machine.handle(.timedOut(enter: enter)))
+    /// A notification came: look once, shortly (they arrive in bursts).
+    private func queueLook() {
+        guard !lookQueued else { return }
+        lookQueued = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [self] in
+            lookQueued = false
+            look()
+        }
+    }
+
+    /// Is an overview on screen? Tells the machine when that changed, and
+    /// keeps looking for the end while one is up.
+    private func look() {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        let windows = list.map {
+            (owner: $0[kCGWindowOwnerName as String] as? String ?? "", layer: $0[kCGWindowLayer as String] as? Int ?? 0)
+        }
+        let now = Borders.overviewIsUp(windows: windows)
+        guard now != up else { return }
+        up = now
+        perform(machine.handle(now ? .entered : .exited))
+        recheck?.invalidate()
+        recheck = nil
+        if now {
+            let timer = Timer(timeInterval: Borders.recheck, repeats: true) { _ in
+                MainActor.assumeIsolated { BordersWatcher.shared.look() }
             }
+            RunLoop.main.add(timer, forMode: .common)
+            recheck = timer
         }
     }
 
