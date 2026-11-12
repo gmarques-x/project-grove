@@ -39,6 +39,67 @@ public struct GroveIcon: View {
         /// A dot that carries a colour ("on"; the dot of `ThemeColors.marked`).
         case dot = "circle.fill"
 
+        // The bar's panels (spec 2026-11-12-bar-panels-design): each bar
+        // item's symbol, then what their rows need.
+        /// The processor (the CPU & memory panel's first header).
+        case cpu = "cpu"
+        /// Memory.
+        case memory = "memorychip"
+        /// The battery, as the bar draws it: a bolt.
+        case battery = "bolt.fill"
+        /// Online through Wi-Fi.
+        case wifi = "wifi"
+        /// Online through a cable.
+        case ethernet = "cable.connector"
+        /// Online through a tunnel.
+        case vpn = "lock.shield"
+        /// Not online.
+        case offline = "wifi.slash"
+        /// Sound, at a middling level (the sound panel's header).
+        case sound = "speaker.wave.2.fill"
+        /// The quiet end of the volume slider.
+        case soundLow = "speaker.fill"
+        /// The loud end of the volume slider.
+        case soundHigh = "speaker.wave.3.fill"
+        /// Sound is muted.
+        case muted = "speaker.slash.fill"
+        /// A date.
+        case calendar = "calendar"
+        /// Arriving (a download rate).
+        case down = "arrow.down"
+        /// Leaving (an upload rate).
+        case up = "arrow.up"
+        /// Onwards: a row's submenu, the next month, a section to open.
+        case forward = "chevron.right"
+        /// Back: the previous month.
+        case back = "chevron.left"
+        /// A click copies this value.
+        case copy = "doc.on.doc"
+        /// Do it again ("Run again").
+        case again = "arrow.clockwise"
+        /// The Mac's own speakers or microphone.
+        case laptop = "laptopcomputer"
+        /// Earphones.
+        case airpods = "airpodspro"
+        /// A display (its speakers).
+        case display = "display"
+        /// Sound input.
+        case microphone = "mic"
+        /// The Grove menu's Appearance row.
+        case appearance = "paintpalette"
+        /// The Grove menu's Grove Keys row.
+        case keys = "keyboard"
+        /// The Grove menu's Update row.
+        case update = "arrow.triangle.2.circlepath"
+        /// The Grove menu's Learn row.
+        case learn = "book"
+        /// The Grove menu's About row.
+        case about = "info.circle"
+        /// The Grove menu's System row (lock, sleep, shut down).
+        case power = "power"
+        /// The Grove menu's Global Menu row: the front app's menus.
+        case globalMenu = "menubar.rectangle"
+
         /// The SF Symbol's name.
         public var symbol: String { rawValue }
     }

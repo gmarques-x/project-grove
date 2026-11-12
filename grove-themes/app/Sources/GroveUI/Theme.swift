@@ -78,6 +78,14 @@ extension ThemeColors {
         Color(surface == .base ? hover : bg2)
     }
 
+    /// The outline of a bar panel (a dropdown of the Grove bar): the palette's
+    /// `orange`, the colour of the bar's pills, 1 pt. A role over an existing
+    /// colour, so the palette files have no key for it. It is the dropdowns'
+    /// identity, not a warning: nothing inside a panel is outlined in orange,
+    /// no chart or meter is drawn in it, and a warning inside a panel is a
+    /// dot and a word (`PanelStatus`).
+    public var panelOutline: Color { Color(orange) }
+
     /// The card of a sheet on the scrim (the cheat sheets, the launcher): bg0,
     /// a little see-through.
     public var sheetFill: Color { Color(bg0).opacity(0.94) }

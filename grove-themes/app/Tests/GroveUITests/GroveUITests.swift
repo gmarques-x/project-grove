@@ -1,5 +1,6 @@
 import Foundation
 @testable import GroveThemesCore
+import SwiftUI
 import Testing
 @testable import GroveUI
 
@@ -73,7 +74,18 @@ import Testing
     /// the renders of 2026-11-12).
     @Test func theIconsAreTheseSymbols() {
         #expect(GroveIcon.Name.allCases.map(\.symbol)
-            == ["minus", "plus", "chevron.down", "checkmark", "return", "circle.fill"])
+            == ["minus", "plus", "chevron.down", "checkmark", "return", "circle.fill",
+                // The bar's panels.
+                "cpu", "memorychip", "bolt.fill", "wifi", "cable.connector", "lock.shield", "wifi.slash",
+                "speaker.wave.2.fill", "speaker.fill", "speaker.wave.3.fill", "speaker.slash.fill", "calendar",
+                "arrow.down", "arrow.up", "chevron.right", "chevron.left", "doc.on.doc", "arrow.clockwise",
+                "laptopcomputer", "airpodspro", "display", "mic", "paintpalette", "keyboard",
+                "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle"])
+    }
+
+    /// The bar panels' outline is the palette's orange, in every scheme.
+    @Test func thePanelOutlineIsThePalettesOrange() {
+        #expect(ThemeColors.fallback.panelOutline == Color(ThemeColors.fallback.orange))
     }
 
     // MARK: WindowHeaderMetrics
