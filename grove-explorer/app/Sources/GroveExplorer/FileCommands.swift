@@ -17,7 +17,25 @@ extension AppModel {
         return chosen.isEmpty ? [] : entries(for: side).filter { chosen.contains($0.url) }
     }
 
-    var hasSelection: Bool { !selection(for: browser.active).isEmpty }
+    /// Whether anything the active pane's list shows is selected. (What a
+    /// filter or the hidden-items switch leaves out, or a list still
+    /// blank, has no row: no command is offered for it.)
+    var hasSelection: Bool { visibleSelection(atMost: 1) > 0 }
+
+    /// Exactly one shown item is selected: what Rename works on.
+    var hasOneSelected: Bool { visibleSelection(atMost: 2) == 1 }
+
+    /// How many selected items the active pane's list shows, counted no
+    /// further than `limit`.
+    private func visibleSelection(atMost limit: Int) -> Int {
+        guard let rows = listing(for: browser.active)?.rows else { return 0 }
+        var count = 0
+        for url in selection(for: browser.active) where rows[url] != nil {
+            count += 1
+            if count == limit { break }
+        }
+        return count
+    }
 
     /// The folder showing in the pane that hasn't the keys.
     var otherPaneFolder: URL? {
