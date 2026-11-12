@@ -65,12 +65,19 @@ struct FileList: NSViewRepresentable {
             coordinator, selector: #selector(Coordinator.scrolled(_:)), name: NSView.boundsDidChangeNotification,
             object: scroll.contentView)
         coordinator.table = table
+        coordinator.quickLook.table = table
+        table.quickLook = coordinator.quickLook
         coordinator.setUpDragging(table)
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.update(columns: columns)
+    }
+
+    /// The pane closed: a Quick Look panel showing its selection goes with it.
+    static func dismantleNSView(_ scroll: NSScrollView, coordinator: Coordinator) {
+        coordinator.quickLook.detach()
     }
 
     enum Column: String, CaseIterable {
@@ -107,11 +114,13 @@ struct FileList: NSViewRepresentable {
         /// The model's last call for the keyboard that this list answered.
         private var listFocus = 0
         private let rename: RenameEditor
+        let quickLook: QuickLookController
 
         init(model: AppModel, side: Side) {
             self.model = model
             self.side = side
             rename = RenameEditor(model: model)
+            quickLook = QuickLookController(model: model, side: side)
         }
 
         // MARK: Following the model
@@ -184,6 +193,7 @@ struct FileList: NSViewRepresentable {
                 selectionVersion = model.selectionVersion
                 self.tab = tab
                 putSelection(on: table, rows: listing?.rows ?? [:])
+                quickLook.selectionChanged()
             }
             if let stand = model.pointerStandIn[side] {
                 table.pointerRow = listing?.rows[stand] ?? -1
@@ -328,6 +338,7 @@ struct FileList: NSViewRepresentable {
         func tableViewSelectionDidChange(_ notification: Notification) {
             guard let table, !settingSelection else { return }
             model.select(Set(table.selectedRowIndexes.compactMap { entries.indices.contains($0) ? entries[$0].url : nil }), in: side)
+            quickLook.selectionChanged()
         }
 
         @objc func opened(_ sender: Any?) {

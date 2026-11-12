@@ -183,6 +183,8 @@ final class FileTableView: NSTableView {
             enumerateAvailableRowViews { view, row in (view as? FileRowView)?.isDropTarget = row == dropRow }
         }
     }
+    /// Fills the Quick Look panel while this list has the keyboard (`QuickLook.swift`).
+    weak var quickLook: QuickLookController?
     /// A drag left the list or ended over it.
     var onDragLeft: (() -> Void)?
     private var tracking: NSTrackingArea?

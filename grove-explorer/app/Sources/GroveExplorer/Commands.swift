@@ -43,7 +43,7 @@ enum CommandTable {
             "getInfo": files { $0.getInfo() },
             "rename": files({ $0.beginRename() }, when: { $0.selection(for: $0.browser.active).count == 1 }),
             "duplicate": files({ $0.duplicateSelection() }, when: { $0.hasSelection }),
-            "quickLook": later,  // Task 14
+            "quickLook": files({ $0.toggleQuickLook() }, when: { $0.live && ($0.hasSelection || $0.quickLookIsUp) }),
             "copyToOtherPane": files({ $0.toOtherPane(moving: false) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
             "moveToOtherPane": files({ $0.toOtherPane(moving: true) }, when: { $0.hasSelection && $0.otherPaneFolder != nil }),
             "moveToTrash": files({ $0.trashSelection() }, when: { $0.hasSelection }),
