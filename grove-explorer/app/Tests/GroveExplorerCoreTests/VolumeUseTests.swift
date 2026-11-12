@@ -81,6 +81,53 @@ import Testing
                 == "Backup can't be ejected during a redo: wait for it")
     }
 
+    // MARK: A command while a disk is being ejected
+
+    /// The other way round: the eject is already on its way, and a command
+    /// onto that disk would be the one holding it, or fail item by item.
+    @Test func aCommandOntoADiskBeingEjectedIsRefused() {
+        let ejecting = [VolumeUse.Ejecting(name: "Backup", root: backup)]
+        let onto = Operation.copy(items: [url("/Users/me/a.txt")], to: url("/Volumes/Backup/in"))
+        let from = Operation.trash(items: [url("/Volumes/Backup/a.txt")])
+        let elsewhere = Operation.copy(items: [url("/Users/me/a.txt")], to: url("/Volumes/Backup 2"))
+        #expect(
+            VolumeUse.commandRefusal(for: .operation(onto), ejecting: ejecting)
+                == "Backup is being ejected: wait for it, then try again")
+        #expect(
+            VolumeUse.commandRefusal(for: .operation(from), ejecting: ejecting)
+                == "Backup is being ejected: wait for it, then try again")
+        #expect(VolumeUse.commandRefusal(for: .operation(elsewhere), ejecting: ejecting) == nil)
+    }
+
+    @Test func noCommandIsRefusedWhileNothingIsBeingEjected() {
+        let onto = Operation.copy(items: [url("/Users/me/a.txt")], to: url("/Volumes/Backup/in"))
+        #expect(VolumeUse.commandRefusal(for: .operation(onto), ejecting: []) == nil)
+        #expect(VolumeUse.commandRefusal(for: .undo, ejecting: []) == nil)
+        #expect(VolumeUse.commandRefusal(for: .redo, ejecting: []) == nil)
+    }
+
+    /// What an undo or a redo will touch is the undo stack's to know: none
+    /// begins while any disk is being ejected.
+    @Test func anUndoOrARedoWaitsForAnyEject() {
+        let ejecting = [VolumeUse.Ejecting(name: "Backup", root: backup)]
+        #expect(
+            VolumeUse.commandRefusal(for: .undo, ejecting: ejecting)
+                == "Backup is being ejected: undo when that is done")
+        #expect(
+            VolumeUse.commandRefusal(for: .redo, ejecting: ejecting)
+                == "Backup is being ejected: redo when that is done")
+    }
+
+    @Test func theDiskTheCommandTouchesIsTheOneNamed() {
+        let ejecting = [
+            VolumeUse.Ejecting(name: "Photos", root: url("/Volumes/Photos")), VolumeUse.Ejecting(name: "Backup", root: backup),
+        ]
+        let onto = Operation.move(items: [url("/Volumes/Backup/a.txt")], to: url("/Users/me"))
+        #expect(
+            VolumeUse.commandRefusal(for: .operation(onto), ejecting: ejecting)
+                == "Backup is being ejected: wait for it, then try again")
+    }
+
     @Test(arguments: [
         (Operation.copy(items: [], to: URL(fileURLWithPath: "/Volumes/Backup")), "a copy"),
         (.move(items: [], to: URL(fileURLWithPath: "/Volumes/Backup")), "a move"),

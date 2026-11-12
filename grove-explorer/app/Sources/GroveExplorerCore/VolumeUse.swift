@@ -52,6 +52,32 @@ public enum VolumeUse {
         return nil
     }
 
+    /// A volume whose eject is on its way: what it is called and its root.
+    public struct Ejecting: Equatable, Sendable {
+        public let name: String
+        public let root: URL
+
+        public init(name: String, root: URL) {
+            self.name = name
+            self.root = root
+        }
+    }
+
+    /// The other way round: why `command` is not begun while the volumes
+    /// in `ejecting` are being ejected, as a sentence for the status bar;
+    /// nil when it may be. An operation is refused when it touches one of
+    /// them (it would hold the disk, or fail item by item as it goes); an
+    /// undo or a redo while any is, since what it touches is not known here.
+    public static func commandRefusal(for command: Command, ejecting: [Ejecting]) -> String? {
+        switch command {
+        case .undo: return ejecting.first.map { "\($0.name) is being ejected: undo when that is done" }
+        case .redo: return ejecting.first.map { "\($0.name) is being ejected: redo when that is done" }
+        case let .operation(operation):
+            return ejecting.first { touches(operation, volume: $0.root) }
+                .map { "\($0.name) is being ejected: wait for it, then try again" }
+        }
+    }
+
     private static func noun(_ operation: Operation) -> String {
         switch operation {
         case .copy: "a copy"

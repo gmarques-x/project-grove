@@ -24,7 +24,24 @@ extension AppModel {
     /// Takes `job` in: started now when nothing is in hand, else it waits
     /// for the ones before it. Nothing is ever done in a render.
     func enqueue(_ job: FileJob) {
-        guard live, !work.quitting, let first = work.pending.add(job) else { return }
+        guard live, !work.quitting else { return }
+        // Not onto a disk whose eject is already on its way (the eject
+        // itself is refused while a command uses the disk: `ejectRefusal`).
+        if let refusal = ejectingRefusal(for: job) {
+            switch job {
+            case let .operation(job):
+                // A rename field waiting for it says so itself.
+                if job.field != nil, work.rename?.id == job.field {
+                    renameRefused(refusal)
+                } else {
+                    say(refusal, in: job.side)
+                }
+            case let .undo(side), let .redo(side):
+                say(refusal, in: side)
+            }
+            return
+        }
+        guard let first = work.pending.add(job) else { return }
         work.busy = true
         Task { await drain(from: first) }
     }

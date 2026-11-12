@@ -141,6 +141,24 @@ extension AppModel {
         return VolumeUse.ejectRefusal(of: volume.name, at: volume.url, commands: commands)
     }
 
+    /// Why `job` is not taken in now (`VolumeUse.commandRefusal`): a disk
+    /// it touches is being ejected. Nil when it may be.
+    func ejectingRefusal(for job: FileJob) -> String? {
+        guard !ejecting.isEmpty else { return nil }
+        let command: VolumeUse.Command
+        switch job {
+        case let .operation(job): command = .operation(job.operation)
+        case .undo: command = .undo
+        case .redo: command = .redo
+        }
+        // By path, so the same disk is named each time.
+        let disks = ejecting.sorted().map { id in
+            let root = URL(fileURLWithPath: id, isDirectory: true)
+            return VolumeUse.Ejecting(name: volumes.first { $0.id == id }?.name ?? root.lastPathComponent, root: root)
+        }
+        return VolumeUse.commandRefusal(for: command, ejecting: disks)
+    }
+
     func ejectByKey() {
         if let volume = ejectTarget { eject(volume) }
     }
