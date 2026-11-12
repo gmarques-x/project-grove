@@ -3,8 +3,8 @@ import Foundation
 import Testing
 
 /// Sizes of real trees: each test gets its own temporary folder, removed
-/// when the test ends, passed or failed. Files are written in whole blocks
-/// (multiples of 4,096 bytes), so the space they take is their length.
+/// when the test ends, passed or failed. Most files are written in blocks
+/// of 4,096 bytes, which keeps the sums easy to read.
 @Suite final class SizeCalculatorTests {
     private let root: URL
     private let files = FileManager.default
@@ -87,16 +87,24 @@ import Testing
         #expect(await calculator.size(of: path("Tree/empty")) == 0)
     }
 
-    /// A folder's size is the space it takes on the disk, which for a small
-    /// file is more than its length.
-    @Test func aSmallFileCountsTheSpaceItTakes() async throws {
+    /// A folder's size is the lengths of its files, as the list shows each
+    /// file's own, not the space they take on the disk (4,096 for the first).
+    @Test func aSmallFileCountsItsLength() async throws {
+        try makeFolder("Tree/Sub")
+        try Data("hello".utf8).write(to: path("Tree/five-bytes.txt"))
+        try Data(repeating: 0x61, count: 10_000).write(to: path("Tree/Sub/ten-thousand.bin"))
+        let calculator = SizeCalculator()
+        #expect(await calculator.size(of: path("Tree")) == 10_005)
+        #expect(await calculator.size(of: path("Tree/Sub")) == 10_000)
+    }
+
+    /// A link's own length (the path written in it) is not counted either.
+    @Test func aSymlinkCountsNothing() async throws {
         try makeFolder("Tree")
         try Data("hello".utf8).write(to: path("Tree/five-bytes.txt"))
-        let onDisk = try #require(
-            try path("Tree/five-bytes.txt").resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize
-        )
-        try #require(onDisk > 5)
-        #expect(await SizeCalculator().size(of: path("Tree")) == Int64(onDisk))
+        try files.createSymbolicLink(atPath: path("Tree/link").path, withDestinationPath: "five-bytes.txt")
+        try files.createSymbolicLink(atPath: path("Tree/dangling").path, withDestinationPath: "a/long/path/to/nowhere")
+        #expect(await SizeCalculator().size(of: path("Tree")) == 5)
     }
 
     /// Review Focus 3: a link to a folder counts as a link, not as what it
@@ -320,15 +328,15 @@ private func until(_ condition: @Sendable () async -> Bool) async {
     }
 
     /// A folder that changed while it was being walked: the walk's number
-    /// may be the old one, so it is not kept.
-    @Test func aWalkInvalidatedOnTheWayIsNotCached() async {
+    /// would be an old one, so who asked gets nil and nothing is kept.
+    @Test func aWalkInvalidatedOnTheWayAnswersNilAndIsNotCached() async {
         let walks = Walks()
         let proceed = DispatchSemaphore(value: 0)
         let calculator = SizeCalculator { path in
             walks.begin(path)
             defer { walks.end() }
             if walks.count == 1 {
-                proceed.wait()
+                _ = proceed.wait(timeout: .now() + 10)
                 return 1
             }
             return 2
@@ -337,32 +345,101 @@ private func until(_ condition: @Sendable () async -> Bool) async {
         let first = Task { await calculator.size(of: folder) }
         await until { walks.count == 1 }
         await calculator.invalidate(folder)
+        #expect(await calculator.unanswered == 0)
         proceed.signal()
-        #expect(await first.value == 1)
+        #expect(await first.value == nil)
         #expect(await calculator.size(of: folder) == 2)
         #expect(await calculator.size(of: folder) == 2)
         #expect(walks.count == 2)
     }
 
-    /// Those waiting for their turn are cancelled too, and never walked.
-    @Test func cancelAllAnswersTheWaitingWithNil() async {
+    /// An invalidated walk is cancelled, not left running out of reach: it
+    /// ends at once and gives its turn back. `cancelAll` after it changes
+    /// nothing.
+    @Test func anInvalidatedWalkStopsAndGivesItsTurnBack() async {
+        let walks = Walks()
+        let calculator = SizeCalculator { path in
+            walks.begin(path)
+            defer { walks.end() }
+            guard path.hasPrefix("/slow") else { return 3 }
+            // As the real walk: goes on until it is cancelled (ten seconds at most).
+            let deadline = ContinuousClock.now + .seconds(10)
+            while !Task.isCancelled, ContinuousClock.now < deadline { Thread.sleep(forTimeInterval: 0.002) }
+            return Task.isCancelled ? nil : 1
+        }
+        let slow = [URL(fileURLWithPath: "/slow/a"), URL(fileURLWithPath: "/slow/b")]
+        let asked = slow.map { folder in Task { await calculator.size(of: folder) } }
+        await until { walks.count == 2 }
+
+        let clock = ContinuousClock()
+        let invalidated = clock.now
+        await calculator.invalidate(slow[0])
+        await calculator.cancelAll()
+        for task in asked { #expect(await task.value == nil) }
+        // Both turns are free again.
+        #expect(await calculator.size(of: URL(fileURLWithPath: "/quick")) == 3)
+        let elapsed = clock.now - invalidated
+        #expect(elapsed < .seconds(1), "it took \(elapsed)")
+        #expect(await calculator.unanswered == 0)
+    }
+
+    /// Those waiting for their turn are answered at once, while both turns
+    /// are still taken, and never walked.
+    @Test func cancelAllAnswersTheWaitingWithNilAtOnce() async {
+        let walks = Walks()
+        let answered = Walks()
+        let proceed = DispatchSemaphore(value: 0)
+        let calculator = SizeCalculator { path in
+            walks.begin(path)
+            defer { walks.end() }
+            _ = proceed.wait(timeout: .now() + 10)
+            return 7
+        }
+        let asked = (0..<5).map { index in
+            Task {
+                let answer = await calculator.size(of: URL(fileURLWithPath: "/folder-\(index)"))
+                answered.begin("\(index)")
+                return answer
+            }
+        }
+        await until { await calculator.unanswered == 5 && walks.count == 2 }
+        await calculator.cancelAll()
+        #expect(await calculator.unanswered == 0)
+        // The two walking are still held; the three waiting have their answer.
+        await until { answered.count == 3 }
+        #expect(answered.count == 3)
+        // One for each asked: were more than two let in, none stays stuck.
+        for _ in asked { proceed.signal() }
+        for task in asked { #expect(await task.value == nil) }
+        #expect(walks.count == 2)
+    }
+
+    /// The same for one folder invalidated while it waits; the others keep
+    /// their places.
+    @Test func aWaitingWalkInvalidatedLeavesTheQueue() async {
         let walks = Walks()
         let proceed = DispatchSemaphore(value: 0)
         let calculator = SizeCalculator { path in
             walks.begin(path)
             defer { walks.end() }
-            proceed.wait()
-            return Task.isCancelled ? nil : 7
+            _ = proceed.wait(timeout: .now() + 10)
+            return 7
         }
-        let asked = (0..<5).map { index in
-            Task { await calculator.size(of: URL(fileURLWithPath: "/folder-\(index)")) }
+        func ask(_ name: String) -> Task<Int64?, Never> {
+            Task { await calculator.size(of: URL(fileURLWithPath: "/\(name)")) }
         }
-        await until { await calculator.unanswered == 5 && walks.count == 2 }
-        await calculator.cancelAll()
-        // One for each asked: were more than two let in, none stays stuck.
-        for _ in asked { proceed.signal() }
-        for task in asked { #expect(await task.value == nil) }
-        #expect(walks.count == 2)
-        #expect(await calculator.unanswered == 0)
+        let walking = [ask("a"), ask("b")]
+        await until { walks.count == 2 }
+        let waiting = ask("c")
+        let patient = ask("d")
+        await until { await calculator.unanswered == 4 }
+
+        await calculator.invalidate(URL(fileURLWithPath: "/c"))
+        #expect(await waiting.value == nil)
+        #expect(await calculator.unanswered == 3)
+        for _ in 0..<4 { proceed.signal() }
+        for task in walking { #expect(await task.value == 7) }
+        #expect(await patient.value == 7)
+        #expect(walks.paths.sorted() == ["/a", "/b", "/d"])
     }
 }

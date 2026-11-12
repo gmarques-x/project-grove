@@ -1,8 +1,9 @@
 import Foundation
 
-/// A folder's total size: the space on the disk of everything in it, at any
-/// depth. A package is summed like any folder. A link is counted as the link
-/// it is and never followed, so a loop of links can't keep a walk going.
+/// A folder's total size: the lengths of all the files in it, at any depth,
+/// as the list shows a file's own. A package is summed like any folder. A
+/// link counts nothing and is never followed, so a loop of links can't keep
+/// a walk going.
 ///
 /// A size is kept until `invalidate` says the folder changed. At most two
 /// folders are walked at once; the others wait their turn, in the order asked.
@@ -21,7 +22,9 @@ public actor SizeCalculator {
     private var walks: [String: Walk] = [:]
     private var lastNumber = 0
     private var running = 0
-    private var waiting: [CheckedContinuation<Void, Never>] = []
+    /// Walks waiting for a turn, oldest first. Each is resumed with whether
+    /// it got one: a walk cancelled while waiting is told no at once.
+    private var waiting: [(number: Int, resume: CheckedContinuation<Bool, Never>)] = []
     private let total: @Sendable (String) -> Int64?
 
     public init() {
@@ -48,13 +51,13 @@ public actor SizeCalculator {
     }
 
     /// The folder changed: its size is forgotten, and that of every folder
-    /// it is in. A walk of one of them on its way still answers who asked,
-    /// but its number is not kept.
+    /// it is in. A walk of one of them on its way is cancelled (its number
+    /// would be an old one): who asked gets nil and asks again.
     public func invalidate(_ folder: URL) {
         var path = Self.key(folder)
         while true {
             cache[path] = nil
-            walks[path] = nil
+            if let walk = walks.removeValue(forKey: path) { cancel(walk) }
             let parent = (path as NSString).deletingLastPathComponent
             if parent == path || parent.isEmpty { return }
             path = parent
@@ -64,8 +67,17 @@ public actor SizeCalculator {
     /// Every size being waited for is answered with nil. Sizes already
     /// known are kept.
     public func cancelAll() {
-        for walk in walks.values { walk.task.cancel() }
+        for walk in walks.values { cancel(walk) }
         walks.removeAll()
+    }
+
+    /// A running walk stops at its next item; a waiting one leaves the
+    /// queue now rather than when a turn comes free.
+    private func cancel(_ walk: Walk) {
+        walk.task.cancel()
+        if let place = waiting.firstIndex(where: { $0.number == walk.number }) {
+            waiting.remove(at: place).resume.resume(returning: false)
+        }
     }
 
     /// How many folders were asked for and not yet answered.
@@ -74,16 +86,15 @@ public actor SizeCalculator {
     private static func key(_ folder: URL) -> String { folder.standardizedFileURL.path }
 
     private func walk(_ path: String, number: Int) async -> Int64? {
-        await takeTurn()
-        let size = Task.isCancelled ? nil : await measure(path)
+        guard await takeTurn(number) else { return nil }
+        let measured = await measure(path)
         giveTurn()
-        // Invalidated or cancelled meanwhile, the walk is no longer the
-        // folder's: its number may be an old one.
-        if walks[path]?.number == number {
-            walks[path] = nil
-            if let size { cache[path] = size }
-        }
-        return size
+        // Cancelled (also by `invalidate`), the walk is no longer in the
+        // books and its number, if it got to one, is not given.
+        guard !Task.isCancelled, walks[path]?.number == number else { return nil }
+        walks[path] = nil
+        if let measured { cache[path] = measured }
+        return measured
     }
 
     /// Off the actor, so sizes already known are answered during a walk.
@@ -91,12 +102,14 @@ public actor SizeCalculator {
         total(path)
     }
 
-    private func takeTurn() async {
+    /// False when the walk was cancelled before its turn came.
+    private func takeTurn(_ number: Int) async -> Bool {
+        if Task.isCancelled { return false }
         if running < Self.limit {
             running += 1
-        } else {
-            await withCheckedContinuation { waiting.append($0) }
+            return true
         }
+        return await withCheckedContinuation { waiting.append((number, $0)) }
     }
 
     /// The turn goes straight to the one waiting longest, if any.
@@ -104,11 +117,11 @@ public actor SizeCalculator {
         if waiting.isEmpty {
             running -= 1
         } else {
-            waiting.removeFirst().resume()
+            waiting.removeFirst().resume.resume(returning: true)
         }
     }
 
-    private static let keys: [URLResourceKey] = [.totalFileAllocatedSizeKey, .fileSizeKey]
+    private static let keys: [URLResourceKey] = [.isRegularFileKey, .totalFileSizeKey, .fileSizeKey]
     private static let keySet = Set(keys)
 
     /// The walk. Nil when cancelled, or when `path` is not a readable folder.
@@ -133,9 +146,10 @@ public actor SizeCalculator {
             // every URL until its end.
             more = autoreleasepool {
                 guard let item = items.nextObject() as? URL else { return false }
-                // A folder has neither value: it counts through its items.
-                if let values = try? item.resourceValues(forKeys: keySet) {
-                    total += Int64(values.totalFileAllocatedSize ?? values.fileSize ?? 0)
+                // Files only: a folder counts through its items, and a
+                // link's own length is that of the path written in it.
+                if let values = try? item.resourceValues(forKeys: keySet), values.isRegularFile == true {
+                    total += Int64(values.totalFileSize ?? values.fileSize ?? 0)
                 }
                 return true
             }

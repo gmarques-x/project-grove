@@ -106,7 +106,9 @@ public final class FolderWatcher: @unchecked Sendable {
     deinit { stop() }
 
     /// No call is made once this has returned. Safe to call twice, and from
-    /// inside `onChange`.
+    /// inside `onChange`. It waits for a call in progress to end, so
+    /// `onChange` must not block on the thread that calls `stop()` (a
+    /// `DispatchQueue.main.sync` in it, with `stop()` called on main).
     public func stop() {
         if DispatchQueue.getSpecific(key: onQueue) == true {
             close()
