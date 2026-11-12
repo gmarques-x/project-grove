@@ -303,7 +303,10 @@ extension FileList.Coordinator {
         operation: NSDragOperation
     ) {
         model.drags.ownDrag = nil
-        dragLeft()
+        // Over: whatever place it last marked, here or in the sidebar or the tabs.
+        model.drags.spring?.cancel()
+        if model.dropMark != nil { model.dropMark = nil }
+        putDropMark()
     }
 
     // MARK: Destination
