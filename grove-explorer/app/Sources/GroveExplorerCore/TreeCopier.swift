@@ -146,18 +146,23 @@ final class TreeCopier {
         }
     }
 
-    /// The names in a folder, nil (with `errno` set) when it can't be read.
+    /// The names in a folder, nil (with `errno` set) when it can't be read,
+    /// or not to its end: a list cut short must not pass for the whole.
     static func names(in folder: String) -> [String]? {
         guard let directory = opendir(folder) else { return nil }
-        defer { closedir(directory) }
         var names: [String] = []
-        while let entry = readdir(directory) {
+        while true {
+            errno = 0
+            guard let entry = readdir(directory) else { break }
             let name = withUnsafePointer(to: &entry.pointee.d_name) {
                 String(cString: UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self))
             }
             if name != ".", name != ".." { names.append(name) }
         }
-        return names
+        let code = errno
+        closedir(directory)
+        errno = code
+        return code == 0 ? names : nil
     }
 
     // MARK: The source of a move to another volume
