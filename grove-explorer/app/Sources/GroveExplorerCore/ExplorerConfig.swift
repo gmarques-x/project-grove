@@ -89,9 +89,17 @@ public struct ExplorerConfig: Equatable, Sendable {
     /// table each, in order, with folders under `home` written from `~`. No
     /// favourites at all is a bare `[favourites]` table, which still replaces
     /// the tracked list.
-    public static func localText(favourites: [Favourite], home: URL) -> String {
+    ///
+    /// `existing` is the local file as it is now (nil: there is none). Its
+    /// other tables and keys, and their comments, are kept as they are; only
+    /// its `[favourites…]` tables are replaced, where the first of them
+    /// stood (at the end when it had none). A file the config can't read is
+    /// never written over: that throws, and nothing should be written.
+    public static func localText(
+        favourites: [Favourite], home: URL, keeping existing: String?
+    ) throws(ConfigWriteRefused) -> String {
         let homePath = home.path
-        let sections = favourites.map { favourite in
+        var tables = favourites.map { favourite in
             let path = favourite.url.path
             let text = path == homePath ? "~"
                 : path.hasPrefix(homePath + "/") ? "~" + path.dropFirst(homePath.count)
@@ -101,11 +109,47 @@ public struct ExplorerConfig: Equatable, Sendable {
                 TomlEntry(key: "title", value: .string(favourite.title)),
             ])
         }
-        return TomlDocument(sections: sections.isEmpty ? [TomlSection(path: [favouritesTable])] : sections)
-            .serialized()
+        if tables.isEmpty { tables = [TomlSection(path: [favouritesTable])] }
+
+        var document = TomlDocument()
+        if let existing {
+            do {
+                // Read as the config reads it: what it would refuse is not
+                // understood well enough to be rewritten.
+                _ = try Layer(existing, home: home)
+                document = try TomlDocument.parse(existing)
+            } catch let error as ConfigError {
+                throw ConfigWriteRefused(line: error.line)
+            } catch {
+                throw ConfigWriteRefused(line: (error as? TomlError)?.line ?? 0)
+            }
+        }
+        func isFavourites(_ section: TomlSection) -> Bool { section.path.first == favouritesTable }
+        let place = document.sections.firstIndex(where: isFavourites)
+            .map { index in document.sections[..<index].filter { !isFavourites($0) }.count }
+        document.sections.removeAll(where: isFavourites)
+        // A file of comments alone parses as one table without a name.
+        document.sections.removeAll { $0.path.isEmpty && $0.entries.isEmpty && $0.leadingComments.isEmpty }
+        document.sections.insert(contentsOf: tables, at: place ?? document.sections.count)
+        return document.serialized()
     }
 
     fileprivate static let favouritesTable = "favourites"
+}
+
+/// Why `explorer.local.toml` was not written: it can't be read as it is.
+public struct ConfigWriteRefused: Error, Equatable, Sendable {
+    /// For the window's banner.
+    public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
+
+    init(line: Int) {
+        let place = line > 0 ? "explorer.local.toml line \(line)" : "explorer.local.toml"
+        description = "\(place) can't be read, so it was left as it is and the favourites were not saved"
+    }
 }
 
 /// What is wrong with a config file. `line` is 0 when no line is at fault

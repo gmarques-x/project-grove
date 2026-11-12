@@ -381,6 +381,88 @@ import Testing
         browser.repair(exists: { _ in false }, home: home)
         #expect(browser.activeTab.folder == home)
     }
+
+    // MARK: History's length
+
+    @Test func theHistoryKeepsTheLatestHundredFolders() {
+        var browser = browser("/start")
+        for n in 1...150 { browser.go(to: folder("/f/\(n)")) }
+        #expect(browser.activeTab.back.count == 100)
+        // The oldest went: what is left is the hundred before /f/150.
+        #expect(browser.activeTab.back.first?.path == "/f/50")
+        #expect(browser.activeTab.back.last?.path == "/f/149")
+    }
+
+    @Test func goingBackAndForwardKeepsBothHistoriesWithinTheHundred() {
+        var browser = browser("/start")
+        for n in 1...150 { browser.go(to: folder("/f/\(n)")) }
+        for _ in 1...100 { #expect(browser.goBack() == true) }
+        #expect(browser.goBack() == false)
+        #expect(browser.activeTab.forward.count == 100)
+        #expect(browser.activeTab.folder.path == "/f/50")
+        for _ in 1...100 { #expect(browser.goForward() == true) }
+        #expect(browser.activeTab.folder.path == "/f/150")
+        #expect(browser.activeTab.back.count == 100)
+        #expect(browser.activeTab.forward.isEmpty)
+    }
+
+    @Test func aHistoryLongerThanTheLimitFromAnOldFileIsCutOnTheNextStep() {
+        var browser = browser("/start")
+        browser.panes[0].tabs[0].back = (1...300).map { folder("/old/\($0)") }
+        browser.go(to: folder("/next"))
+        #expect(browser.activeTab.back.count == 100)
+        #expect(browser.activeTab.back.last?.path == "/start")
+    }
+
+    // MARK: Closing a tab that isn't showing
+
+    @Test func closingATabBeforeTheCurrentOneKeepsTheCurrentOneShowing() {
+        var browser = browser("/a")
+        browser.newTab(folder: folder("/b"))
+        browser.newTab(folder: folder("/c"))
+        #expect(browser.closeTab(0, in: .left) == true)
+        #expect(tabPaths(browser) == ["/b", "/c"])
+        #expect(browser.activeTab.folder.path == "/c")
+    }
+
+    @Test func closingATabAfterTheCurrentOneLeavesItWhereItIs() {
+        var browser = browser("/a")
+        browser.newTab(folder: folder("/b"))
+        browser.newTab(folder: folder("/c"))
+        browser.selectTab(0)
+        #expect(browser.closeTab(2, in: .left) == true)
+        #expect(tabPaths(browser) == ["/a", "/b"])
+        #expect(browser.activeTab.folder.path == "/a")
+    }
+
+    @Test func closingTheCurrentTabByItsPlaceIsClosingTheCurrentTab() {
+        var browser = browser("/a")
+        browser.newTab(folder: folder("/b"))
+        browser.newTab(folder: folder("/c"))
+        #expect(browser.closeTab(2, in: .left) == true)
+        #expect(browser.activeTab.folder.path == "/b")
+    }
+
+    @Test func aTabOfTheOtherPaneClosesWithoutThatPaneBecomingActive() {
+        var browser = browser("/a", twoPanes: true)
+        browser.switchPane()
+        browser.newTab(folder: folder("/b"))
+        browser.switchPane()
+        #expect(browser.closeTab(0, in: .right) == true)
+        #expect(browser.active == .left)
+        #expect(browser.tab(.right)?.folder.path == "/b")
+        #expect(browser.panes[1].tabs.count == 1)
+    }
+
+    @Test func theOnlyTabATabThatIsNotThereAndAPaneThatIsNotThereDoNotClose() {
+        var browser = browser("/a")
+        #expect(browser.closeTab(0, in: .left) == false)
+        browser.newTab(folder: folder("/b"))
+        #expect(browser.closeTab(5, in: .left) == false)
+        #expect(browser.closeTab(-1, in: .left) == false)
+        #expect(browser.closeTab(0, in: .right) == false)
+        #expect(tabPaths(browser) == ["/a", "/b"])
+    }
 }
 
 private extension Browser {

@@ -46,6 +46,16 @@ public enum Side: Int, Codable, Sendable {
     public var other: Side { self == .left ? .right : .left }
 }
 
+private extension Array where Element == URL {
+    /// Adds a folder to a history, which keeps the latest
+    /// `Browser.historyLimit`: the histories are saved with the session, and
+    /// a tab used for weeks would otherwise carry every folder it ever showed.
+    mutating func push(_ folder: URL) {
+        append(folder)
+        if count > Browser.historyLimit { removeFirst(count - Browser.historyLimit) }
+    }
+}
+
 /// The window's state: one pane or two, their tabs, and which pane is active.
 /// Every change is made to the active pane's current tab unless it says
 /// otherwise. Nothing here reads the disk.
@@ -54,6 +64,9 @@ public struct Browser: Equatable, Codable, Sendable {
     public var panes: [Pane]
     public var active: Side
     public var showHidden: Bool
+
+    /// How many folders a tab's `back` and `forward` each keep.
+    public static let historyLimit = 100
 
     public init(start: URL, twoPanes: Bool, showHidden: Bool) {
         panes = (twoPanes ? [Side.left, .right] : [.left]).map { _ in
@@ -80,7 +93,7 @@ public struct Browser: Equatable, Codable, Sendable {
     public mutating func go(to folder: URL) {
         guard !folder.isSameFolder(as: activeTab.folder) else { return }
         var tab = activeTab
-        tab.back.append(tab.folder)
+        tab.back.push(tab.folder)
         tab.forward = []
         tab.folder = folder
         pane.tabs[pane.current] = tab
@@ -91,7 +104,7 @@ public struct Browser: Equatable, Codable, Sendable {
     public mutating func goBack() -> Bool {
         var tab = activeTab
         guard let folder = tab.back.popLast() else { return false }
-        tab.forward.append(tab.folder)
+        tab.forward.push(tab.folder)
         tab.folder = folder
         pane.tabs[pane.current] = tab
         return true
@@ -102,7 +115,7 @@ public struct Browser: Equatable, Codable, Sendable {
     public mutating func goForward() -> Bool {
         var tab = activeTab
         guard let folder = tab.forward.popLast() else { return false }
-        tab.back.append(tab.folder)
+        tab.back.push(tab.folder)
         tab.folder = folder
         pane.tabs[pane.current] = tab
         return true
@@ -137,6 +150,23 @@ public struct Browser: Equatable, Codable, Sendable {
         guard pane.tabs.count > 1 else { return false }
         pane.tabs.remove(at: pane.current)
         pane.current = min(pane.current, pane.tabs.count - 1)
+        return true
+    }
+
+    /// Closes the tab at `index` of the pane on `side`, whichever pane is
+    /// active and whichever tab shows there (a tab's own close button). The
+    /// tab showing stays the one showing, unless it is the one closed: then
+    /// as `closeTab()`. False for a pane's only tab, and for a tab or a pane
+    /// that isn't there.
+    @discardableResult
+    public mutating func closeTab(_ index: Int, in side: Side) -> Bool {
+        guard panes.indices.contains(side.rawValue) else { return false }
+        var pane = panes[side.rawValue]
+        guard pane.tabs.count > 1, pane.tabs.indices.contains(index) else { return false }
+        pane.tabs.remove(at: index)
+        if index < pane.current { pane.current -= 1 }
+        pane.current = min(pane.current, pane.tabs.count - 1)
+        panes[side.rawValue] = pane
         return true
     }
 

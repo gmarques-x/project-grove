@@ -138,4 +138,81 @@ import Testing
         #expect(url.hasDirectoryPath)
         #expect(url.isFileURL)
     }
+
+    // MARK: A folder as text
+
+    @Test func aFolderIsWrittenFromHomeWhenItIsUnderIt() {
+        #expect(PathBar.text(for: home, home: home) == "~")
+        #expect(PathBar.text(for: folder("/Users/someone/Developer/project-grove"), home: home) == "~/Developer/project-grove")
+        #expect(PathBar.text(for: folder("/Applications"), home: home) == "/Applications")
+        #expect(PathBar.text(for: folder("/Users/someone else/x"), home: home) == "/Users/someone else/x")
+        #expect(PathBar.text(for: root, home: home) == "/")
+    }
+
+    @Test func theTextOfAFolderResolvesBackToIt() {
+        for path in ["/Users/someone", "/Users/someone/a b/c", "/Volumes/Backup", "/"] {
+            let text = PathBar.text(for: folder(path), home: home)
+            #expect(PathBar.resolve(text, relativeTo: folder("/elsewhere"), home: home).path == path)
+        }
+    }
+
+    // MARK: Where a path leads
+
+    private func kind(_ url: URL) -> PathBar.ItemKind? {
+        ["/a": .folder, "/a/b": .folder, "/a/b/notes.md": .file][url.path]
+    }
+
+    @Test func aFolderThatExistsIsWhereToGo() {
+        #expect(PathBar.destination(of: folder("/a/b"), kind: kind) == .folder(folder("/a/b")))
+    }
+
+    @Test func aFileLeadsToItsFolderWithTheFileToSelect() {
+        let file = URL(fileURLWithPath: "/a/b/notes.md")
+        #expect(PathBar.destination(of: file, kind: kind) == .item(file, in: folder("/a/b")))
+        // Typed in the path bar it comes as a folder's URL: the same answer.
+        #expect(PathBar.destination(of: folder("/a/b/notes.md"), kind: kind) == .item(file, in: folder("/a/b")))
+    }
+
+    @Test func aPathThatIsNotThereLeadsNowhere() {
+        #expect(PathBar.destination(of: folder("/a/x"), kind: kind) == .missing)
+        #expect(PathBar.destination(of: folder("/nowhere/at/all"), kind: kind) == .missing)
+    }
+
+    // MARK: Completing what is typed
+
+    private func names(_ url: URL) -> [String] {
+        ["/Users/someone/Developer": ["project-grove", "project-pine", "Playground", "other"],
+         "/Users/someone": ["Developer", "Desktop", "Documents", "Downloads"],
+         "/": ["Applications", "Users"]][url.path] ?? []
+    }
+
+    private func completed(_ typed: String, from: String = "/Users/someone") -> String? {
+        PathBar.completed(typed, relativeTo: folder(from), home: home, folders: names)
+    }
+
+    @Test func theOnlyFolderThatStartsSoIsCompletedWithItsSlash() {
+        #expect(completed("~/Developer/o") == "~/Developer/other/")
+        #expect(completed("/App") == "/Applications/")
+        #expect(completed("Dev") == "Developer/")
+    }
+
+    @Test func severalCandidatesAreCompletedAsFarAsTheyAgree() {
+        #expect(completed("~/Developer/pro") == "~/Developer/project-")
+        #expect(completed("~/Do") == nil)
+        #expect(completed("~/D") == nil)
+    }
+
+    @Test func caseIsIgnoredAndTheFoldersOwnSpellingIsWritten() {
+        #expect(completed("~/Developer/OTH") == "~/Developer/other/")
+        // "project-grove", "project-pine" and "Playground" agree on "p" only.
+        #expect(completed("~/Developer/P") == nil)
+        #expect(completed("~/Developer/pl") == "~/Developer/Playground/")
+    }
+
+    @Test func nothingToCompleteIsNil() {
+        #expect(completed("~/Developer/zzz") == nil)
+        #expect(completed("~/Nowhere/x") == nil)
+        #expect(completed("~/Developer/") == nil)
+        #expect(completed("") == nil)
+    }
 }

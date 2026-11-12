@@ -57,6 +57,69 @@ public enum PathBar {
         return url(names(in: path)[...])
     }
 
+    /// A folder as the path field writes it: from `~` when it is `home` or
+    /// under it, else whole. `resolve` reads it back to the same folder.
+    public static func text(for folder: URL, home: URL) -> String {
+        let path = folder.path, homePath = home.path
+        if path == homePath { return "~" }
+        if path.hasPrefix(homePath + "/") { return "~" + path.dropFirst(homePath.count) }
+        return path
+    }
+
+    // MARK: Where a path leads
+
+    public enum ItemKind: Equatable, Sendable {
+        case folder, file
+    }
+
+    public enum Destination: Equatable, Sendable {
+        /// A folder to show.
+        case folder(URL)
+        /// A file: its folder to show, and the file to select there.
+        case item(URL, in: URL)
+        /// Nothing is there.
+        case missing
+    }
+
+    /// Where a typed path or a link's path leads. `kind` says what is at a
+    /// URL (nil: nothing); it is the caller's look at the disk.
+    public static func destination(of url: URL, kind: (URL) -> ItemKind?) -> Destination {
+        switch kind(url) {
+        case .folder: return .folder(url)
+        case .file:
+            let file = URL(fileURLWithPath: url.path)
+            return .item(file, in: file.deletingLastPathComponent())
+        case nil: return .missing
+        }
+    }
+
+    // MARK: Completing
+
+    /// What Tab makes of `typed`: the last name completed to the one folder
+    /// that starts with it (then a "/" follows), or as far as the several
+    /// that do agree. Case is ignored; the folder's own spelling is written.
+    /// Nil when there is nothing to add. `folders` names the folders inside
+    /// a folder (the caller's look at the disk).
+    public static func completed(
+        _ typed: String, relativeTo: URL, home: URL, folders: (URL) -> [String]
+    ) -> String? {
+        let slash = typed.lastIndex(of: "/")
+        let head = slash.map { String(typed[...$0]) } ?? ""
+        let start = slash.map { String(typed[typed.index(after: $0)...]) } ?? typed
+        guard !start.isEmpty else { return nil }
+        let within = resolve(head, relativeTo: relativeTo, home: home)
+        let candidates = folders(within).filter {
+            $0.range(of: start, options: [.caseInsensitive, .anchored]) != nil
+        }
+        guard let first = candidates.first else { return nil }
+        if candidates.count == 1 { return head + first + "/" }
+        var common = first
+        for candidate in candidates.dropFirst() {
+            common = String(zip(common, candidate).prefix { String($0).lowercased() == String($1).lowercased() }.map(\.0))
+        }
+        return common.count > start.count ? head + common : nil
+    }
+
     // MARK: Paths
 
     /// The names along an absolute path, with `.` dropped and `..` taking

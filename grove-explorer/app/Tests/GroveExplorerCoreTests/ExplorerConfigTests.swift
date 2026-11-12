@@ -196,14 +196,14 @@ import Testing
 
     // MARK: The local file's text
 
-    @Test func theLocalTextRoundTripsThroughLoad() {
+    @Test func theLocalTextRoundTripsThroughLoad() throws {
         let favourites = [
             Favourite(id: "home", url: home, title: "Home"),
             Favourite(id: "work", url: folder("/Users/someone/Developer/project grove"), title: "Work \"now\""),
             Favourite(id: "disk 2", url: folder("/Volumes/Disk 2"), title: "Disk 2"),
             Favourite(id: "namesake", url: folder("/Users/someone else/Music"), title: "Music"),
         ]
-        let text = ExplorerConfig.localText(favourites: favourites, home: home)
+        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: nil)
         #expect(text == """
             [favourites.home]
             path = "~"
@@ -227,11 +227,110 @@ import Testing
         #expect(config.problem == nil)
     }
 
-    @Test func theLocalTextOfNoFavouritesStillReplacesTheTrackedList() {
-        let text = ExplorerConfig.localText(favourites: [], home: home)
+    @Test func theLocalTextOfNoFavouritesStillReplacesTheTrackedList() throws {
+        let text = try ExplorerConfig.localText(favourites: [], home: home, keeping: nil)
         #expect(text == "[favourites]\n")
         let config = load(local: text)
         #expect(config.favourites.isEmpty)
         #expect(config.problem == nil)
+    }
+
+    // MARK: Keeping what else the local file holds
+
+    @Test func addingAFavouriteKeepsTheLocalFilesGeneralSettings() throws {
+        let existing = """
+            # mine
+            [general]
+            show_hidden = true # always
+
+            """
+        let favourites = [Favourite(id: "music", url: folder("/Users/someone/Music"), title: "Music")]
+        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: existing)
+        #expect(text == """
+            # mine
+            [general]
+            show_hidden = true # always
+
+            [favourites.music]
+            path = "~/Music"
+            title = "Music"
+
+            """)
+        let config = load(local: text)
+        #expect(config.showHidden == true)
+        #expect(config.favourites == favourites)
+        #expect(config.problem == nil)
+    }
+
+    @Test func theFavouritesTablesAreReplacedWhereTheyStoodAndTheRestStays() throws {
+        let existing = """
+            [favourites.old]
+            path = "/old"
+
+            [general]
+            two_panes = true
+            start = "~/Developer"
+
+            [favourites.older]
+            path = "/older"
+
+            """
+        let favourites = [
+            Favourite(id: "a", url: folder("/a"), title: "a"),
+            Favourite(id: "b", url: folder("/b"), title: "B"),
+        ]
+        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: existing)
+        #expect(text == """
+            [favourites.a]
+            path = "/a"
+            title = "a"
+
+            [favourites.b]
+            path = "/b"
+            title = "B"
+
+            [general]
+            two_panes = true
+            start = "~/Developer"
+
+            """)
+        let config = load(local: text)
+        #expect(config.twoPanes == true)
+        #expect(config.start == folder("/Users/someone/Developer"))
+        #expect(config.favourites.map(\.id) == ["a", "b"])
+    }
+
+    @Test func noFavouritesBesideOtherSettingsIsTheBareTable() throws {
+        let text = try ExplorerConfig.localText(
+            favourites: [], home: home, keeping: "[general]\nshow_hidden = true\n\n[favourites.x]\npath = \"/x\"\n")
+        #expect(text == "[general]\nshow_hidden = true\n\n[favourites]\n")
+        let config = load(local: text)
+        #expect(config.favourites.isEmpty)
+        #expect(config.showHidden == true)
+    }
+
+    @Test func anEmptyOrMissingLocalFileGivesTheFavouritesAlone() throws {
+        let favourites = [Favourite(id: "a", url: folder("/a"), title: "a")]
+        let alone = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: nil)
+        #expect(try ExplorerConfig.localText(favourites: favourites, home: home, keeping: "") == alone)
+        #expect(alone == "[favourites.a]\npath = \"/a\"\ntitle = \"a\"\n")
+    }
+
+    @Test func aBrokenLocalFileIsNotWrittenOver() {
+        let favourites = [Favourite(id: "a", url: folder("/a"), title: "a")]
+        let broken = "[general]\nshow_hidden = tru\n"
+        #expect(throws: ConfigWriteRefused(
+            description: "explorer.local.toml line 2 can't be read, so it was left as it is and the favourites were not saved"
+        )) {
+            try ExplorerConfig.localText(favourites: favourites, home: home, keeping: broken)
+        }
+    }
+
+    @Test func aLocalFileTheAppWouldNotReadIsNotWrittenOverEither() {
+        // It parses as TOML, but the config refuses it (an unknown table):
+        // rewriting it would be rewriting something not understood.
+        #expect(throws: ConfigWriteRefused.self) {
+            try ExplorerConfig.localText(favourites: [], home: home, keeping: "[colours]\nred = true\n")
+        }
     }
 }
