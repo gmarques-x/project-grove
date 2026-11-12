@@ -27,13 +27,17 @@ enum AccessibilityAudit {
     private static let stops: Set<String> = ["AXCell", "AXColumn", "AXBusyIndicator", "AXUnknown"]
     /// Deeper than any window's tree goes.
     private static let deepest = 60
-    /// The whole audit, in seconds: it ends by then, done or not.
+    /// The audit ends by then, done or not: this many seconds for a
+    /// state, three times that for all of them (they take about one each;
+    /// a loaded machine is slower, a walk that is stuck never ends).
     private static let limit = 60
 
     private struct Count {
         var elements = 0
         var controls = 0
         var unlabelled: [String] = []
+        /// How many rows were asked for twice, and again after a reload, and compared.
+        var identityChecked = 0
         /// The nodes met: one that comes round again is not walked twice,
         /// whether or not it is an element (a loop through things that are
         /// none never gets deeper by the count of elements).
@@ -48,7 +52,7 @@ enum AccessibilityAudit {
         }
         let states = names[0] == "all" ? Render.stateNames.components(separatedBy: ", ") : [names[0]]
         // Off the main thread, which may be the one that is stuck.
-        let limit = limit
+        let limit = states.count == 1 ? limit : 3 * limit
         DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(limit)) {
             FileHandle.standardError.write(Data("the audit has not ended after \(limit) seconds: given up\n".utf8))
             exit(2)
@@ -60,7 +64,9 @@ enum AccessibilityAudit {
             var count = Count()
             if tree { print("\(state):") }
             walk(view, depth: 1, path: [], tree: tree, into: &count)
-            print("\(state): \(count.elements) elements, \(count.controls) controls, \(count.unlabelled.count) unlabelled")
+            print(
+                "\(state): \(count.elements) elements, \(count.controls) controls, \(count.unlabelled.count) unlabelled"
+                    + (count.identityChecked > 0 ? ", \(count.identityChecked) rows equal across answers and a reload" : ""))
             for line in count.unlabelled { print("  UNLABELLED \(line)") }
             // The header alone has more: SwiftUI's part of the tree was not there to walk.
             if count.elements < 10 {
@@ -139,11 +145,31 @@ enum AccessibilityAudit {
         ] {
             let old = table.perform(older, with: attribute as NSString)?.takeUnretainedValue() as? [NSObject] ?? []
             let new = table.value(forKey: getter) as? [NSObject] ?? []
-            if old.count != new.count || zip(old, new).contains(where: { $0 !== $1 }) {
+            if old.count != new.count || zip(old, new).contains(where: { !$0.isEqual($1) }) {
                 count.unlabelled.append(
                     (path + ["\(attribute) asked the older way gives other elements"]).joined(separator: " › "))
             }
         }
+    }
+
+    /// VoiceOver keeps its place on a row by asking whether the row it has
+    /// is one of those it is given next: a table's rows must be equal
+    /// (and hash alike) from one answer to the next, and after the list
+    /// is loaded again, as a folder that changes does to it.
+    private static func checkRowsKeepTheirIdentity(in table: NSObject, path: [String], into count: inout Count) {
+        func rows() -> [NSObject] { table.value(forKey: "accessibilityRows") as? [NSObject] ?? [] }
+        func same(_ a: [NSObject], _ b: [NSObject]) -> Bool {
+            a.count == b.count && zip(a, b).allSatisfy { $0.isEqual($1) && $0.hash == $1.hash }
+        }
+        let first = rows(), second = rows()
+        (table as? NSTableView)?.reloadData()
+        let afterReload = rows()
+        var problems: [String] = []
+        if !same(first, second) { problems.append("two answers in a row give rows that are not equal") }
+        if !same(first, afterReload) { problems.append("the rows after a reload are not equal to those before") }
+        if first.count > 1, first[0].isEqual(first[1]) { problems.append("two different rows are equal") }
+        for problem in problems { count.unlabelled.append((path + [problem]).joined(separator: " › ")) }
+        count.identityChecked += first.count
     }
 
     private static func walk(_ element: Any, depth: Int, path: [String], tree: Bool, into count: inout Count) {
@@ -173,13 +199,17 @@ enum AccessibilityAudit {
             } else if stops.contains(role), name.isEmpty, said.isEmpty, children.isEmpty {
                 count.unlabelled.append((path + [words]).joined(separator: " › ") + " (says nothing, holds nothing)")
             }
-            if role == "AXTable" { checkOlderAnswers(of: node, path: path + [words], into: &count) }
             path.append(words)
             // A scroll bar is the system's own, parts and all.
             if role == "AXScrollBar" { return }
         }
         for child in children {
             walk(child, depth: depth + (isElement ? 1 : 0), path: path, tree: tree, into: &count)
+        }
+        // After its rows were walked: the second check loads the list again.
+        if isElement, role == "AXTable" {
+            checkOlderAnswers(of: node, path: path, into: &count)
+            checkRowsKeepTheirIdentity(in: node, path: path, into: &count)
         }
     }
 }
