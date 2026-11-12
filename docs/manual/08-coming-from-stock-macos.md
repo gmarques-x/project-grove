@@ -18,9 +18,9 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 | Caps Lock | It is the Hyper key now: tap for Escape, hold for shortcuts. See [Hotkeys](05-hotkeys.md) |
 | ⌥ plus a letter or digit for a special character | Use the **right ⌥**: it types the character in every app (right ⌥2 is `@` on a Portuguese keyboard). The left ⌥ is for shortcuts: ⌥H J K L, ⌥1 … 9, ⌥- = / , move windows. See [Hotkeys](05-hotkeys.md) |
 | The clock and calendar | The clock at the right of the bar; click it for this month |
-| The battery menu | The `bat` figure in the bar. It is a read-out only; settings are in System Settings › Battery |
-| The Wi-Fi menu | The bar shows `wifi`, `eth`, `vpn` or `off`, not the network's name. To choose a network, open System Settings › Wi-Fi |
-| The volume menu | The `vol` figure in the bar; change it with the keyboard's volume keys. Choose an output in System Settings › Sound |
+| The battery menu | The bolt in the bar; click it for charge, health, Keep Awake and Ignore Lid. See [The desktop](02-the-desktop.md#the-panels) |
+| The Wi-Fi menu | The Wi-Fi icon in the bar; click it for the network's name, a switch for Wi-Fi, your addresses and a speed test. To choose another network, use Wi-Fi Settings… at the bottom of that panel |
+| The volume menu | The speaker in the bar; click it for a volume slider, Mute and the list of outputs |
 | Force Quit | ⌥⌘Esc, as before, or Apple menu › Force Quit |
 | Screenshots | ⌘⇧3, ⌘⇧4, ⌘⇧5, as before |
 | Terminal | Ghostty; ⌃` from anywhere. See [The terminal](06-the-terminal.md) |
@@ -31,8 +31,7 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 Said plainly:
 
 - **Third-party menu-bar icons are hidden.** Apps that live in the menu bar (password managers, VPN clients, cloud-storage clients, chat apps' status icons) still run, but their icons are behind the Grove bar and cannot be clicked. Open the app's own window or settings instead, where it has one. A "tray" in the bar that shows these icons is planned and not built.
-- **Control Centre and the system status icons are hidden** for the same reason: Wi-Fi, Bluetooth, Focus, AirDrop, screen mirroring and the rest. Use System Settings for each.
-- **The bar's status figures are read-outs.** Battery, Wi-Fi, volume, memory and processor show a value and do nothing on click. Only the network speeds and the clock open a popup.
+- **Control Centre and the system status icons are hidden** for the same reason: Bluetooth, Focus, AirDrop, screen mirroring and the rest. Use System Settings for each. Wi-Fi, sound and the battery have panels in the Grove bar.
 - **Notification Centre has no button.** Notifications still arrive as banners.
 
 If you need the real menu bar for a moment, macOS's own shortcut ⌃F2 (⌃fn F2 on a laptop keyboard) moves the keyboard focus to it; then use the arrow keys.

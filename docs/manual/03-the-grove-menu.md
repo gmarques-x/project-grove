@@ -4,7 +4,7 @@
 
 One menu reaches everything Grove can do. Open it two ways:
 
-- **With the mouse:** click the pine at the left of the bar.
+- **With the mouse:** click the pine at the left of the bar. The menu opens under it; a row with an arrow opens its submenu beside it when the pointer rests there. The arrow keys, Return and Esc work too, and typing a letter jumps to the next row that starts with it.
 - **With the keyboard:** press ⌘Space for the Grove Launcher.
 
 ## The tree
