@@ -34,6 +34,13 @@ import Testing
         #expect(sentence("/Volumes/Share", network: true).contains("the Network Volumes permission to open Share"))
     }
 
+    @Test func aCloudPlaceIsNamedAsTheWindowNamesIt() {
+        #expect(
+            sentence("/Users/someone/Library/Mobile Documents/com~apple~CloudDocs")
+                .contains("the iCloud Drive permission to open iCloud Drive"))
+        #expect(sentence("/Users/someone/Library/CloudStorage/OneDrive-Personal").contains("to open OneDrive "))
+    }
+
     @Test func anythingElseMacOSRefusesNeedsFullDiskAccess() {
         #expect(
             sentence("/Users/someone/Library/Mail")

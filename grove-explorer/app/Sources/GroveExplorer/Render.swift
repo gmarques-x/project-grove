@@ -132,6 +132,15 @@ enum Render {
             size: CGSize(width: 1672, height: 668),
             panes: [Sample.grove(selected: ["CHANGELOG.md", "LICENSE", "README.md"]), Sample.downloads(selected: [])],
             extras: Sample.Extras(dropRow: "invoices-2026"))),
+        // Cloud places: OneDrive's accounts under their own header below
+        // iCloud. Inside iCloud Drive at the left (its row lit, the path bar
+        // from "iCloud Drive", a tab on it), OneDrive's Documents at the
+        // right; and OneDrive's own folder active, its row lit.
+        ("cloud", Scene(
+            size: CGSize(width: 1672, height: 668), panes: [Sample.iCloudNotes(), Sample.oneDriveDocuments()],
+            extras: Sample.Extras(clouds: true))),
+        ("cloud-onedrive", Scene(
+            size: CGSize(width: 948, height: 560), panes: [Sample.oneDriveTop()], extras: Sample.Extras(clouds: true))),
         // The folder with each of its marks, at list size.
         ("folder-marks", Scene(size: CGSize(width: 474, height: 300), panes: [Sample.knownFolders()])),
         // Folders open in place (spec §16), as the mock-ups have them. Two

@@ -21,6 +21,17 @@ enum Disk {
 
     static func isFolder(_ url: URL) -> Bool { kind(url) == .folder }
 
+    /// The cloud providers' folders in `~/Library/CloudStorage`, as the
+    /// sidebar lists them; nil while that folder isn't there. Only the
+    /// names are read, not what is in a provider's folder: one not yet
+    /// readable still has its row.
+    static func cloudProviders(home: URL) -> [FolderName.CloudPlace]? {
+        let storage = home.appendingPathComponent(FolderName.cloudStorage, isDirectory: true)
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: storage.path) else { return nil }
+        let folders = names.filter { isFolder(storage.appendingPathComponent($0, isDirectory: true)) }
+        return FolderName.providers(in: folders, home: home)
+    }
+
     /// For each of `folders` and, where it is gone, each folder above it up
     /// to the first that is there: whether it exists, by path. What
     /// `Browser.repair` asks, answered in one go off the main thread.
@@ -261,7 +272,7 @@ extension AppModel {
         switch PathBar.destination(of: target, kind: Disk.kind) {
         case .folder(let folder): show(folder, selecting: nil, in: browser.active, newTab: true)
         case .item(let file, in: let folder): show(folder, selecting: file.lastPathComponent, in: browser.active, newTab: true)
-        case .missing: say("\(target.lastPathComponent) is not there", in: browser.active)
+        case .missing: say("\(FolderName.title(of: target, home: home)) is not there", in: browser.active)
         }
         focusList()
     }
@@ -286,7 +297,7 @@ extension AppModel {
                 guard let old = before.tab(side), let new = browser.tab(side), old.id == new.id,
                     old.folder != new.folder
                 else { continue }
-                say("\(old.folder.lastPathComponent) is no longer there: showing \(new.title)", in: side)
+                say("\(FolderName.title(of: old.folder, home: home)) is no longer there: showing \(new.title)", in: side)
             }
         }
     }

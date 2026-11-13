@@ -4,8 +4,9 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// The sidebar (spec §5): Favourites, iCloud and Locations under fine-print
-/// captions, the Trash at the bottom. The row lit is the active pane's
+/// The sidebar (spec §5): Favourites, iCloud, a section for each cloud
+/// provider (OneDrive…) and Locations under fine-print captions, the Trash
+/// at the bottom. The row lit is the active pane's
 /// place. As a rail (a narrow window) it is the icons alone, the sections
 /// divided by lines and the names in tooltips.
 struct Sidebar: View {
@@ -28,11 +29,11 @@ struct Sidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             Line()
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(Place.Section.allCases.enumerated()), id: \.element) { number, section in
+                ForEach(Array(sections(of: places).enumerated()), id: \.element) { number, section in
                     let rows = places.indices.filter { places[$0].section == section }
                     if section == .trash {
                         Spacer(minLength: GroveSpace.s8)
-                    } else if !rows.isEmpty {
+                    } else {
                         caption(section, first: number == 0)
                     }
                     ForEach(rows, id: \.self) { index in
@@ -53,12 +54,20 @@ struct Sidebar: View {
         .accessibilityLabel("Sidebar")
     }
 
+    /// The sections that have rows, in the order of the rows (the places
+    /// are listed section by section).
+    private func sections(of places: [Place]) -> [Place.Section] {
+        var seen: [Place.Section] = []
+        for place in places where !seen.contains(place.section) { seen.append(place.section) }
+        return seen
+    }
+
     /// A section's name in small capitals; in the rail a line stands for it.
     @ViewBuilder private func caption(_ section: Place.Section, first: Bool) -> some View {
         if rail {
             if !first { Line().padding(.vertical, GroveSpace.s8) }
         } else {
-            Text(verbatim: section.rawValue.uppercased())
+            Text(verbatim: section.caption.uppercased())
                 .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
                 .foregroundStyle(theme.quiet)
                 .padding(.leading, GroveSpace.s8)
@@ -140,7 +149,7 @@ struct Sidebar: View {
         case .favourite:
             FolderIcon(mark: IconMap.mark(for: place.url, home: model.home))
         case .cloud:
-            symbol(.cloud)
+            symbol(place.section == .cloud ? .cloud : .cloudStorage)
         case .trash:
             symbol(.trash)
         case .volume(let volume):

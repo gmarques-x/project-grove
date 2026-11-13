@@ -122,6 +122,8 @@ public struct GroveIcon: View {
         case trash = "trash"
         /// iCloud Drive.
         case cloud = "icloud"
+        /// A cloud provider's folder (OneDrive, Google Drive…): the plain cloud.
+        case cloudStorage = "cloud"
         /// The window shows one pane.
         case onePane = "rectangle"
         /// The window shows two panes side by side.

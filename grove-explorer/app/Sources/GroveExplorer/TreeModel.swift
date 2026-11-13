@@ -253,7 +253,7 @@ extension AppModel {
     /// An open folder's read landed, and is the pane's.
     private func openFolderLanded(_ folder: URL, _ read: FolderListing.Read, begunAt: Int, in side: Side) {
         guard let listing = listings[side] else { return }
-        let name = folder.lastPathComponent
+        let name = FolderName.title(of: folder, home: home)
         // Read again past the watchers' limit: answered now, however.
         let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
         if let problem = read.problem {

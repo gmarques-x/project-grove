@@ -53,6 +53,8 @@ final class AppModel: ObservableObject {
     @Published var ejectFailures: [String: String] = [:]
     /// Whether iCloud Drive's folder exists.
     @Published var hasCloud = false
+    /// The cloud providers' folders in `~/Library/CloudStorage` (OneDrive…).
+    @Published var cloudProviders: [FolderName.CloudPlace] = []
     /// What a pane's status bar says for a few seconds ("x is no longer there").
     @Published var notices: [Side: String] = [:]
     /// A problem the whole window is about, beside the config's own: the
@@ -88,6 +90,9 @@ final class AppModel: ObservableObject {
     let live: Bool
     var store: SessionStore?
     var mounts: MountObserver?
+    /// `~/Library` (for CloudStorage appearing) and CloudStorage itself.
+    var libraryWatcher: FolderWatcher?
+    var cloudStorageWatcher: FolderWatcher?
     /// Counts the reads of the mounted volumes: the latest one answers.
     var volumeReads = 0
     var typeJump = TypeJump()

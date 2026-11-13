@@ -12,7 +12,7 @@ public enum ReadProblem {
     public static func sentence(
         for error: FolderReadError, folder: URL, home: URL, refusedByMode: Bool, onNetworkVolume: Bool
     ) -> String {
-        let name = folder.lastPathComponent
+        let name = FolderName.title(of: folder, home: home)
         switch error {
         case .missing: return "\(name) is no longer there"
         case .notAFolder: return "\(name) is not a folder"

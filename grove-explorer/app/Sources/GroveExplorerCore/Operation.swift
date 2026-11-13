@@ -136,9 +136,9 @@ enum Wording {
         items.count == 1 ? items[0].lastPathComponent : "\(grouped(items.count)) items"
     }
 
-    /// A folder as a place: its name.
+    /// A folder as a place: what the window calls it (`FolderName`).
     static func place(_ folder: URL) -> String {
-        folder.lastPathComponent
+        FolderName.title(of: folder, home: FileManager.default.homeDirectoryForCurrentUser)
     }
 
     /// 1204 as "1,204": the app's text is English whatever the locale.

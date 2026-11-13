@@ -86,6 +86,40 @@ import Testing
             == ["Home", "Developer", "x"])
     }
 
+    // MARK: Cloud places
+
+    private let iCloud = "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs"
+
+    @Test func iCloudDriveStartsTheBarWithItsName() {
+        let parts = parts(iCloud)
+        #expect(parts.map(\.title) == ["iCloud Drive"])
+        #expect(parts.map(\.url.path) == [iCloud])
+        #expect(parts.map(\.mark) == [.cloud])
+    }
+
+    @Test func aFolderInICloudDriveGoesOnFromIt() {
+        let parts = parts(iCloud + "/Notes/2026")
+        #expect(parts.map(\.title) == ["iCloud Drive", "Notes", "2026"])
+        #expect(parts.map(\.url.path) == [iCloud, iCloud + "/Notes", iCloud + "/Notes/2026"])
+        #expect(parts.map(\.mark) == [.cloud, .none, .none])
+    }
+
+    @Test func aProvidersFolderStartsTheBarWithItsName() {
+        let storage = "/Users/someone/Library/CloudStorage"
+        let parts = parts(storage + "/OneDrive-Personal/Documents")
+        #expect(parts.map(\.title) == ["OneDrive", "Documents"])
+        #expect(parts.first?.url.path == storage + "/OneDrive-Personal")
+        #expect(parts.first?.mark == .cloud)
+        #expect(self.parts(storage + "/OneDrive-Contoso").map(\.title) == ["OneDrive - Contoso"])
+    }
+
+    @Test func homeAndVolumesCarryTheirMarks() {
+        #expect(parts("/Users/someone/Library/Mobile Documents").map(\.title)
+            == ["Home", "Library", "Mobile Documents"])
+        #expect(parts("/Users/someone/Library").map(\.mark) == [.home, .none])
+        #expect(parts("/Volumes/Backup/x").map(\.mark) == [.none, .none])
+    }
+
     // MARK: Resolve
 
     private func resolve(_ typed: String, relativeTo path: String = "/a/b") -> String {

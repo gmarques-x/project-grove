@@ -89,10 +89,10 @@ public struct Tab: Equatable, Codable, Sendable, Identifiable {
         }
     }
 
-    /// The folder's name; "Home" for the user's home folder.
+    /// What the window calls the folder (`FolderName`): its name; "Home"
+    /// for the user's home folder, "iCloud Drive" for iCloud Drive's.
     public var title: String {
-        folder.isSameFolder(as: FileManager.default.homeDirectoryForCurrentUser)
-            ? "Home" : folder.lastPathComponent
+        FolderName.title(of: folder, home: FileManager.default.homeDirectoryForCurrentUser)
     }
 }
 

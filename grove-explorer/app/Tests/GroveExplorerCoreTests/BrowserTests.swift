@@ -70,6 +70,14 @@ import Testing
         #expect(Tab(folder: home.appendingPathComponent("Developer")).title == "Developer")
     }
 
+    @Test func iCloudDrivesTabIsTitledICloudDrive() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let drive = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        #expect(Tab(folder: drive).title == "iCloud Drive")
+        #expect(Tab(folder: drive.appendingPathComponent("Notes")).title == "Notes")
+        #expect(Tab(folder: home.appendingPathComponent("Library/CloudStorage/OneDrive-Personal")).title == "OneDrive")
+    }
+
     // MARK: History
 
     @Test func goingToAFolderPushesHistoryAndClearsForward() {

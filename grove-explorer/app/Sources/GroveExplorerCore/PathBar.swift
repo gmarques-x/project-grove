@@ -3,19 +3,29 @@ import Foundation
 /// The path bar: a folder as the parts to click, and typed text as a folder.
 public enum PathBar {
     public struct Part: Equatable, Sendable {
+        /// The icon before the first part: Home's, a cloud's, or a plain folder's.
+        public enum Mark: Equatable, Sendable {
+            case none, home, cloud
+        }
+
         public let title: String
         public let url: URL
+        /// Only the first part has one.
+        public let mark: Mark
 
-        public init(title: String, url: URL) {
+        public init(title: String, url: URL, mark: Mark = .none) {
             self.title = title
             self.url = url
+            self.mark = mark
         }
     }
 
-    /// The folders from the top down to `folder`. The top is `home`, titled
-    /// "Home", when the folder is it or under it; otherwise the volume it is
-    /// on (the deepest of `volumes` above it), titled with the volume's name.
-    /// With no such volume the parts start at `/`.
+    /// The folders from the top down to `folder`. The top is the cloud place
+    /// the folder is in (iCloud Drive, a provider's folder: `FolderName`),
+    /// titled as the sidebar titles it; else `home`, titled "Home", when the
+    /// folder is it or under it; otherwise the volume it is on (the deepest
+    /// of `volumes` above it), titled with the volume's name. With no such
+    /// volume the parts start at `/`.
     ///
     /// The path is taken as given (`/private/tmp` is not shortened to
     /// `/tmp`), with `.` and `..` worked out.
@@ -26,9 +36,17 @@ public enum PathBar {
 
         var top = 0
         var title = "/"
-        if let index = folders.lastIndex(where: { $0.isSameFolder(as: home) }) {
+        var mark = Part.Mark.none
+        if let cloud = FolderName.cloudPlace(containing: folders[names.count], home: home),
+            let index = folders.lastIndex(where: { $0.isSameFolder(as: cloud.url) })
+        {
+            top = index
+            title = cloud.title
+            mark = .cloud
+        } else if let index = folders.lastIndex(where: { $0.isSameFolder(as: home) }) {
             top = index
             title = "Home"
+            mark = .home
         } else if let index = folders.lastIndex(where: { folder in
             volumes.contains { $0.isSameFolder(as: folder) }
         }), let volume = volumes.first(where: { $0.isSameFolder(as: folders[index]) }) {
@@ -36,7 +54,7 @@ public enum PathBar {
             title = name(ofVolume: volume)
         }
 
-        return [Part(title: title, url: folders[top])]
+        return [Part(title: title, url: folders[top], mark: mark)]
             + folders.indices.dropFirst(top + 1).map { Part(title: names[$0 - 1], url: folders[$0]) }
     }
 

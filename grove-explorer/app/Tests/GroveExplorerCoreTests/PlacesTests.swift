@@ -42,6 +42,14 @@ import Testing
         #expect(Places.nearest(above: folder("/Users/me/x"), among: places) == 0)
     }
 
+    @Test func aCloudPlaceInsideHomeIsLitOverHome() {
+        let drive = "/Users/me/Library/Mobile Documents/com~apple~CloudDocs"
+        let places = [folder("/Users/me"), folder(drive), folder("/")]
+        #expect(Places.nearest(above: folder(drive), among: places) == 1)
+        #expect(Places.nearest(above: folder(drive + "/Notes"), among: places) == 1)
+        #expect(Places.nearest(above: folder("/Users/me/Library"), among: places) == 0)
+    }
+
     // MARK: The sidebar's width
 
     @Test func theSidebarIsFullWhileEachPaneKeeps430Points() {

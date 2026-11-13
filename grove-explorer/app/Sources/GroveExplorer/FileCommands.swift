@@ -236,11 +236,12 @@ extension AppModel {
             say("Ghostty is not installed", in: side)
             return
         }
+        let name = FolderName.title(of: folder, home: home)
         NSWorkspace.shared.open([folder], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) {
             [weak self] _, error in
             guard let error else { return }
             let why = error.localizedDescription
-            Task { @MainActor in self?.say("Ghostty couldn't open \(folder.lastPathComponent): \(why)", in: side) }
+            Task { @MainActor in self?.say("Ghostty couldn't open \(name): \(why)", in: side) }
         }
     }
 

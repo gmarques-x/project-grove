@@ -67,6 +67,8 @@ enum Sample {
         var dropSide = Side.right
         /// The left pane's filter field is open, has the keyboard and says this.
         var filter: String?
+        /// The sidebar lists OneDrive's two accounts under their header.
+        var clouds = false
     }
 
     static let backup = Volume(url: URL(fileURLWithPath: "/Volumes/Backup", isDirectory: true), name: "Backup", ejectable: true)
@@ -120,6 +122,9 @@ enum Sample {
         // with macOS's icons for them (nothing is mounted or read).
         let disk = Volume(url: URL(fileURLWithPath: "/", isDirectory: true), name: "Macintosh HD", ejectable: false)
         model.hasCloud = true
+        if extras.clouds {
+            model.cloudProviders = FolderName.providers(in: ["OneDrive-Personal", "OneDrive-Contoso"], home: home)
+        }
         model.volumes = [disk, backup]
         model.volumeIconStandIn = [
             disk.id: NSWorkspace.shared.icon(forFile: "/"),
@@ -268,6 +273,40 @@ enum Sample {
                 incomingSize: 3_000, incomingDate: date(2026, 11, 12, 9, 41),
                 existingSize: 2_000, existingDate: date(2026, 11, 9, 2, 4)),
             comingLabel: "Being copied")
+    }
+
+    static let iCloudDrive = home.appendingPathComponent(FolderName.iCloudDrive, isDirectory: true)
+    static let oneDrive = home.appendingPathComponent(FolderName.cloudStorage + "/OneDrive-Personal", isDirectory: true)
+
+    /// iCloud Drive's Notes, with a tab on iCloud Drive itself.
+    static func iCloudNotes() -> Pane {
+        pane(iCloudDrive.appendingPathComponent("Notes", isDirectory: true), folders: [
+            ("2025", 3_400_000, date(2026, 1, 4, 10, 12)),
+            ("recipes", 820_000, date(2026, 10, 18, 19, 40)),
+        ], files: [
+            ("groceries.md", 1_000, date(2026, 11, 12, 8, 3)),
+            ("ideas.md", 6_000, date(2026, 11, 10, 22, 15)),
+            ("reading-list.md", 2_000, date(2026, 11, 7, 13, 30)),
+        ], selected: ["ideas.md"], pointer: nil, otherTabs: [iCloudDrive])
+    }
+
+    /// OneDrive's Documents.
+    static func oneDriveDocuments() -> Pane {
+        pane(oneDrive.appendingPathComponent("Documents", isDirectory: true), folders: [
+            ("Taxes", 12_800_000, date(2026, 4, 21, 9, 2)),
+        ], files: [
+            ("budget-2026.xlsx", 48_000, date(2026, 11, 9, 18, 44)),
+            ("cv.pdf", 210_000, date(2026, 10, 2, 11, 5)),
+        ], selected: [], pointer: nil)
+    }
+
+    /// OneDrive's own folder, with a tab on its Documents.
+    static func oneDriveTop() -> Pane {
+        pane(oneDrive, folders: [
+            ("Desktop", 1_200_000, date(2026, 11, 13, 13, 22)),
+            ("Documents", 13_058_000, date(2026, 11, 9, 18, 44)),
+            ("Pictures", 640_000_000, date(2026, 11, 1, 16, 10)),
+        ], files: [], selected: [], pointer: nil, otherTabs: [oneDrive.appendingPathComponent("Documents", isDirectory: true)])
     }
 
     /// The folders that carry a mark, each at the path that gives it one, and a plain one.

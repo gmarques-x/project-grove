@@ -21,7 +21,14 @@ struct PathBarView: View {
     var body: some View {
         let parts = model.pathParts(for: side)
         HStack(spacing: GroveSpace.s4) {
-            FolderIcon(mark: parts.first?.title == "Home" ? .home : .none)
+            // The first part's icon, as the sidebar draws its place.
+            if parts.first?.mark == .cloud {
+                GroveIcon(model.cloudIcon(for: parts.first?.url), size: GroveType.label)
+                    .foregroundStyle(Color(theme.fg))
+                    .frame(width: IconMetrics.cell, height: IconMetrics.cell)
+            } else {
+                FolderIcon(mark: parts.first?.mark == .home ? .home : .none)
+            }
             ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
                 let last = index == parts.count - 1
                 self.part(part, last: last)

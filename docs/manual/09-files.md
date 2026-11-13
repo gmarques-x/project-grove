@@ -23,9 +23,9 @@ From left to right: the sidebar, then one pane or two.
 | Part | What it is | Click |
 | --- | --- | --- |
 | Header | The app's name, back and forward arrows for the active pane, and the one-pane / two-pane switch at the right | The arrows go back and forward; the switch shows or hides the second pane |
-| Sidebar | **Favourites** (your folders), **iCloud Drive** when you use it, **Locations** (every disk, with an eject button where it can be ejected), and **Trash** at the bottom | Opens the place in the current tab; ⌘-click opens it in a new tab. Trash opens Finder's Trash |
+| Sidebar | **Favourites** (your folders), **iCloud Drive** when you use it, then each cloud service in its own section (OneDrive, Google Drive, Dropbox: whatever keeps its files in `~/Library/CloudStorage`; one installed while the app is open appears by itself), **Locations** (every disk, with an eject button where it can be ejected), and **Trash** at the bottom | Opens the place in the current tab; ⌘-click opens it in a new tab. Trash opens Finder's Trash |
 | Tab strip | One tab for each folder you have open in the pane; the active pane's strip has a green line | A tab shows it; "+" adds a tab on the same folder; the mark that appears under the pointer closes it |
-| Path bar | The folders from the disk (or Home) down to the one you are in | A part goes to that folder |
+| Path bar | The folders from the disk (or Home, or the cloud: "iCloud Drive › Notes", "OneDrive › Documents") down to the one you are in | A part goes to that folder |
 | The list | Name, Size, Date Modified and Kind. Folders stay on top. A folder shows `···` until its total size is known, and `--` if it can't be read. A folder with something in it has an arrow before its icon | A column's title sorts by it; again reverses. A double-click opens. The arrow opens the folder in place (see below) |
 | Status bar | "212 items" ("212 items · 3 folders open" with folders open in place), or "3 of 212 selected · 48.2 MB", and the disk's free space at the right. While a copy runs: its words, a meter and Cancel | Cancel stops the copy after the file it is on |
 

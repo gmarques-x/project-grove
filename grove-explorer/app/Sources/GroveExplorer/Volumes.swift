@@ -1,5 +1,6 @@
 import AppKit
 import GroveExplorerCore
+import GroveUI
 
 /// A mounted volume, as the sidebar's Locations lists it.
 struct Volume: Equatable, Identifiable, Sendable {
@@ -62,10 +63,26 @@ final class MountObserver {
 
 /// A row of the sidebar.
 struct Place: Identifiable, Equatable {
-    enum Section: String, CaseIterable {
-        case favourites = "Favourites", cloud = "iCloud", locations = "Locations"
+    /// The sidebar's sections, in its order: Favourites, iCloud, one for
+    /// each cloud provider in `~/Library/CloudStorage` (by its name),
+    /// Locations, and the Trash.
+    enum Section: Hashable {
+        case favourites, cloud
+        case provider(String)
+        case locations
         /// The Trash, at the bottom, without a caption.
-        case trash = ""
+        case trash
+
+        /// Its caption, before it is set in capitals.
+        var caption: String {
+            switch self {
+            case .favourites: "Favourites"
+            case .cloud: "iCloud"
+            case .provider(let name): name
+            case .locations: "Locations"
+            case .trash: ""
+            }
+        }
     }
 
     enum Kind: Equatable {
@@ -82,8 +99,6 @@ struct Place: Identifiable, Equatable {
 
 /// The sidebar: its rows, which one is lit, the keyboard in it, ejecting, favourites.
 extension AppModel {
-    static let cloudFolder = "Library/Mobile Documents/com~apple~CloudDocs"
-
     /// The sidebar's rows, top to bottom.
     var places: [Place] {
         var places = config.favourites.map {
@@ -92,7 +107,14 @@ extension AppModel {
         if hasCloud {
             places.append(Place(
                 id: "cloud", kind: .cloud, section: .cloud, title: "iCloud Drive",
-                url: home.appendingPathComponent(Self.cloudFolder, isDirectory: true)))
+                url: home.appendingPathComponent(FolderName.iCloudDrive, isDirectory: true)))
+        }
+        // Each provider under a header of its own, a row for each of its accounts.
+        places += cloudProviders.map { place in
+            let name: String = if case .provider(let name) = place.kind { name } else { place.title }
+            return Place(
+                id: "cloud." + place.url.lastPathComponent, kind: .cloud, section: .provider(name), title: place.title,
+                url: place.url)
         }
         places += volumes.map {
             Place(id: "volume." + $0.id, kind: .volume($0), section: .locations, title: $0.name, url: $0.url)
@@ -103,16 +125,14 @@ extension AppModel {
         return places
     }
 
-    /// The row lit for the active pane's folder: the nearest favourite
-    /// above it; under no favourite, the nearest of iCloud Drive and the
-    /// volumes (the startup disk is above everything). Never the Trash.
+    /// The row lit for the active pane's folder: the deepest place above it
+    /// (or the folder itself), so iCloud Drive and a provider's folder win
+    /// over Home, and the startup disk is lit only under nothing nearer; of
+    /// two on one folder, the first (a favourite before the rest). Never
+    /// the Trash.
     func litPlace(among places: [Place]) -> Int? {
-        let folder = browser.activeTab.folder
-        func nearest(_ wanted: (Place) -> Bool) -> Int? {
-            let rows = places.indices.filter { wanted(places[$0]) }
-            return Places.nearest(above: folder, among: rows.map { places[$0].url }).map { rows[$0] }
-        }
-        return nearest { $0.kind == .favourite } ?? nearest { $0.kind != .favourite && $0.kind != .trash }
+        let rows = places.indices.filter { places[$0].kind != .trash }
+        return Places.nearest(above: browser.activeTab.folder, among: rows.map { places[$0].url }).map { rows[$0] }
     }
 
     /// A click on a row, or Return on it: the place opens in the active
@@ -126,6 +146,13 @@ extension AppModel {
             if inNewTab { change { $0.newTab(folder: place.url) } } else { go(to: place.url) }
         }
         focusList()
+    }
+
+    /// The icon of the cloud place at `url`, as its sidebar row has it:
+    /// iCloud Drive's own, the plain cloud for a provider's folder.
+    func cloudIcon(for url: URL?) -> GroveIcon.Name {
+        guard let url, let place = FolderName.cloudPlace(containing: url, home: home) else { return .cloudStorage }
+        return place.kind == .iCloudDrive ? .cloud : .cloudStorage
     }
 
     // MARK: The keyboard in the sidebar
@@ -166,21 +193,48 @@ extension AppModel {
 
     // MARK: Volumes
 
-    /// The volumes now, and again whenever one comes or goes.
+    /// The volumes and the cloud places now, and again whenever a volume
+    /// comes or goes or a provider's folder appears in or leaves
+    /// `~/Library/CloudStorage` (watched, with `~/Library` for the folder
+    /// itself appearing: a provider installed while the app runs).
     func followVolumes() {
         mounts = MountObserver { [weak self] in self?.readVolumes() }
+        let library = home.appendingPathComponent("Library", isDirectory: true)
+        libraryWatcher = FolderWatcher(folder: library) { [weak self] in
+            Task { @MainActor in self?.readVolumes() }
+        }
         readVolumes()
+    }
+
+    /// Watches CloudStorage while it is there.
+    private func watchCloudStorage(_ there: Bool) {
+        guard there != (cloudStorageWatcher != nil) else { return }
+        cloudStorageWatcher?.stop()
+        cloudStorageWatcher = nil
+        guard there else { return }
+        let storage = home.appendingPathComponent(FolderName.cloudStorage, isDirectory: true)
+        cloudStorageWatcher = FolderWatcher(folder: storage) { [weak self] in
+            Task { @MainActor in self?.readVolumes() }
+        }
     }
 
     private func readVolumes() {
         // Numbered like a pane's reads: of two on their way the later one answers.
         volumeReads += 1
         let number = volumeReads
-        let cloud = home.appendingPathComponent(Self.cloudFolder, isDirectory: true)
+        let home = home
         Task {
-            let (mounted, hasCloud) = await Task.detached { (Volume.mounted(), Disk.isFolder(cloud)) }.value
+            let (mounted, hasCloud, providers) = await Task.detached {
+                (Volume.mounted(), Disk.isFolder(home.appendingPathComponent(FolderName.iCloudDrive, isDirectory: true)),
+                 Disk.cloudProviders(home: home))
+            }.value
             guard number == volumeReads else { return }
             if hasCloud != self.hasCloud { self.hasCloud = hasCloud }
+            watchCloudStorage(providers != nil)
+            if (providers ?? []) != cloudProviders {
+                cloudProviders = providers ?? []
+                keepSidebarCursorOnARow()
+            }
             guard mounted != volumes else { return }
             let gone = Set(volumes.map(\.id)).subtracting(mounted.map(\.id))
             // The icons are asked for here, not while a row is drawn (on

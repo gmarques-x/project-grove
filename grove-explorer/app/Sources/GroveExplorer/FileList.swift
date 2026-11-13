@@ -188,7 +188,7 @@ struct FileList: NSViewRepresentable {
                     folder = path
                 }
                 // The table is called by its folder's name.
-                table.setAccessibilityLabel(model.browser.tab(side)?.title ?? listing.folder.lastPathComponent)
+                table.setAccessibilityLabel(model.browser.tab(side)?.title ?? FolderName.title(of: listing.folder, home: model.home))
                 reportVisible()
             } else if listing == nil, !items.isEmpty {
                 // The pane has nothing of its tab's folder: no row of
