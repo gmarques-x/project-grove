@@ -19,6 +19,8 @@ export LC_NUMERIC=C LC_TIME=C
 # names the pill of the open one in this file (missing: none open), so the
 # hover leaves that pill filled and a workspace change costs one file test.
 SB_PANEL="${GROVE_STATE:-$HOME/.local/state/grove}/bar-panel"
+# Bluetooth, as Grove Keys reads it: off, on or connected (missing: off).
+SB_BLUETOOTH="${GROVE_STATE:-$HOME/.local/state/grove}/bluetooth"
 
 # sb_cpu < `iostat -n 0 -c 2 -w 1`: used percentage (100 − idle) from the last
 # sample, which covers a whole second (top's single sample includes its own
@@ -90,6 +92,15 @@ sb_wifi_level() {
   if [ "$1" -ge -60 ]; then echo 3; elif [ "$1" -ge -72 ]; then echo 2; else echo 1; fi
 }
 
+# sb_bluetooth: the Bluetooth icon for the word Grove Keys keeps in
+# $SB_BLUETOOTH (its first line): bt-on, bt-connected, or bt-off for "off",
+# no file (Grove Keys isn't running) or anything else.
+sb_bluetooth() {
+  local word=""
+  [ -f "$SB_BLUETOOTH" ] && read -r word < "$SB_BLUETOOTH"
+  case "$word" in on | connected) echo "bt-$word" ;; *) echo bt-off ;; esac
+}
+
 # sb_vol_level PERCENT: the speaker icon's fill in tenths, 0 to 10; anything
 # above silence shows at least 1.
 sb_vol_level() {
@@ -115,6 +126,7 @@ sb_pill() {
   local n
   case "$1" in
     grove | battery | wifi | volume | clock) echo "pill.$1" ;;
+    bt) echo pill.wifi ;;
     cpu | mem) echo pill.sys ;;
     ws.[1-9] | ws.[1-9].*) n="${1#ws.}"; echo "pill.ws.${n%%.*}" ;;
   esac

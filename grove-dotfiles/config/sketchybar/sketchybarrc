@@ -99,10 +99,11 @@ sketchybar --add item front_app left \
     "${HOVER[@]}" script="$P/front_app.sh" click_script="open grovekeys://app-menu" \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
-# Right (the first added is the rightmost): clock, volume, Wi-Fi, battery,
-# memory and CPU, each group in its own pill with a gap between. Volume and
-# Wi-Fi are an icon alone that changes with the level and the signal; CPU and
-# memory are an icon and a value.
+# Right (the first added is the rightmost): clock, power, volume, Bluetooth
+# and Wi-Fi, memory and CPU, each group in its own pill with a gap between.
+# Volume, Wi-Fi, Bluetooth and power are an icon alone that changes with the
+# level, the signal, the state and the charge; CPU and memory are an icon and
+# a value.
 # A click on any of them sends its panel's link to Grove Keys, which draws
 # the dropdown under the pill and fills the pill while it is open.
 gap gap.r0 right "$EDGE"
@@ -114,27 +115,37 @@ sketchybar --add item clock right \
 
 gap gap.r1 right 6
 
+sketchybar --add item battery right \
+  --set battery label.drawing=off padding_left=8 padding_right=8 script="$P/battery.sh" update_freq=60 \
+    click_script="$(panel battery)" \
+  --subscribe battery power_source_change system_woke mouse.entered mouse.exited
+symbol battery bolt-10
+
+gap gap.r2 right 6
+
 sketchybar --add item volume right \
   --set volume label.drawing=off padding_left=8 padding_right=8 script="$P/volume.sh" \
     click_script="$(panel sound)" \
   --subscribe volume volume_change mouse.entered mouse.exited
 symbol volume vol-2
 
-gap gap.r2 right 6
+gap gap.r3 right 6
+
+# Wi-Fi and Bluetooth share one pill and one panel (Bluetooth under the
+# network): a click on either opens it. Grove Keys reads Bluetooth and sends
+# bluetooth_change when its icon changes; the bar never polls it.
+sketchybar --add event bluetooth_change
+sketchybar --add item bt right \
+  --set bt label.drawing=off padding_right=8 script="$P/bluetooth.sh" \
+    click_script="$(panel wifi)" \
+  --subscribe bt bluetooth_change mouse.entered mouse.exited
+symbol bt bt-off
 
 sketchybar --add item wifi right \
-  --set wifi label.drawing=off padding_left=8 padding_right=8 script="$P/wifi.sh" update_freq=30 \
+  --set wifi label.drawing=off padding_left=8 script="$P/wifi.sh" update_freq=30 \
     click_script="$(panel wifi)" \
   --subscribe wifi wifi_change system_woke mouse.entered mouse.exited
 symbol wifi wifi-3
-
-gap gap.r3 right 6
-
-sketchybar --add item battery right \
-  --set battery label.drawing=off padding_left=8 padding_right=8 script="$P/battery.sh" update_freq=60 \
-    click_script="$(panel battery)" \
-  --subscribe battery power_source_change system_woke mouse.entered mouse.exited
-symbol battery bolt-10
 
 gap gap.r4 right 6
 
@@ -163,9 +174,9 @@ for n in 1 2 3 4 5 6 7 8 9; do
   pill "pill.ws.$n" "ws.$n" "ws.$n.1" "ws.$n.2" "ws.$n.3" "ws.$n.4" "ws.$n.5" "ws.$n.6" "ws.$n.end"
 done
 pill pill.sys cpu mem
-pill pill.battery battery
-pill pill.wifi wifi
+pill pill.wifi wifi bt
 pill pill.volume volume
+pill pill.battery battery
 pill pill.clock clock
 # A reload redraws every pill empty: the one whose panel is open is filled again.
 open="$(sb_panel_open)"

@@ -167,6 +167,8 @@ final class AppModel: ObservableObject {
         writeState()
         // The Wi-Fi name for the Grove bar; optional, apart from the rest.
         WifiNameWriter.shared.start()
+        // Bluetooth for the bar's icon and the Wi-Fi dropdown, read every 30 s.
+        BluetoothWriter.shared.start()
         // The apps for the Grove Launcher, so its first opening has them.
         LauncherPanel.shared.refreshApps()
         // The window borders, hidden while Mission Control is up.
@@ -184,6 +186,7 @@ final class AppModel: ObservableObject {
         baseWatcher?.stop()
         writeState()
         WifiNameWriter.shared.stop()
+        BluetoothWriter.shared.stop()
         // Borders hidden for an overview come back before the app goes.
         BordersWatcher.shared.shutdown()
     }

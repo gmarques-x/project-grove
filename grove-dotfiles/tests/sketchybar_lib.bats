@@ -112,6 +112,7 @@ setup() {
   [ "$(sb_pill mem)" = pill.sys ]
   [ "$(sb_pill battery)" = pill.battery ]
   [ "$(sb_pill wifi)" = pill.wifi ]
+  [ "$(sb_pill bt)" = pill.wifi ]
   [ "$(sb_pill volume)" = pill.volume ]
   [ "$(sb_pill clock)" = pill.clock ]
   [ "$(sb_pill ws.3)" = pill.ws.3 ]
@@ -184,6 +185,31 @@ setup() {
   local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
   [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_PANEL"' _ "$lib")" = /Users/someone/.local/state/grove/bar-panel ]
   [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_PANEL"' _ "$lib")" = /tmp/state/bar-panel ]
+}
+
+@test "sb_bluetooth: the icon Grove Keys names (off, on, connected); off without the file or with anything else" {
+  SB_BLUETOOTH="$BATS_TEST_TMPDIR/bluetooth"
+  [ "$(sb_bluetooth)" = bt-off ]
+  local word
+  for word in off on connected; do
+    echo "$word" > "$SB_BLUETOOTH"
+    [ "$(sb_bluetooth)" = "bt-$word" ] || { echo "$word"; false; }
+  done
+  : > "$SB_BLUETOOTH"
+  [ "$(sb_bluetooth)" = bt-off ]
+  echo 'on; rm -rf y' > "$SB_BLUETOOTH"
+  [ "$(sb_bluetooth)" = bt-off ]
+  echo ON > "$SB_BLUETOOTH"
+  [ "$(sb_bluetooth)" = bt-off ]
+  # Only the first line counts.
+  printf 'connected\non\n' > "$SB_BLUETOOTH"
+  [ "$(sb_bluetooth)" = bt-connected ]
+}
+
+@test "sb_bluetooth: the file is Grove Keys', beside the theme state" {
+  local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
+  [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /Users/someone/.local/state/grove/bluetooth ]
+  [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /tmp/state/bluetooth ]
 }
 
 @test "sb_panel_close: sends Grove Keys the close link, in the background; nothing is run when none is open" {
