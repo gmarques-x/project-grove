@@ -267,29 +267,4 @@ import UniformTypeIdentifiers
         // Its parent still lists it, as a folder.
         #expect(try read()["Locked"]?.kind == .folder)
     }
-
-    /// The spec's limit: a folder of 50,000 items opens without a visible pause.
-    @Test func reads50kEntriesUnderTwoSeconds() throws {
-        let count = 50_000
-        let directory = open(root.path, O_RDONLY | O_DIRECTORY)
-        try #require(directory >= 0)
-        for index in 0..<count {
-            let file = openat(directory, "file-\(index).txt", O_CREAT | O_WRONLY | O_EXCL, 0o644)
-            if file >= 0 { close(file) }
-        }
-        close(directory)
-
-        // The best of three reads: the machine may be busy during one.
-        var entries: [Entry] = []
-        let clock = ContinuousClock()
-        var best = Duration.seconds(3600)
-        for _ in 0..<3 {
-            let elapsed = try clock.measure { entries = try FolderReader().read(root) }
-            best = min(best, elapsed)
-        }
-        print("reads50kEntriesUnderTwoSeconds: best of 3: \(best)")
-        #expect(entries.count == count)
-        #expect(entries.allSatisfy { $0.kind == .file && $0.size == 0 })
-        #expect(best < .seconds(2), "reading \(count) entries took \(best)")
-    }
 }

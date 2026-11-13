@@ -13,7 +13,7 @@ public struct CommandInfo: Equatable, Sendable {
     public let title: String
     /// The key as spec §7 writes it: a letter in upper case ("T"), a mark
     /// (".", "\\", "["), or one of "Return", "Space", "Tab", "⌫", "↑", "↓",
-    /// "←", "F5", "F6", "F10". Nil for a command without a key.
+    /// "←", "→", "F5", "F6", "F10". Nil for a command without a key.
     public let key: String?
     public let modifiers: Set<Modifier>
     /// The menu-bar menu it sits in: one of `CommandList.menus`.
@@ -138,6 +138,12 @@ public enum CommandList {
         row("sortByKind", "Sort by Kind", "2", [.control, .option, .command], in: "View"),
         row("sortByDate", "Sort by Date Modified", "5", [.control, .option, .command], in: "View"),
         row("sortBySize", "Sort by Size", "6", [.control, .option, .command], in: "View"),
+        // Folders that open in place (spec §16). Plain → and ← are free in
+        // the list: its own arrows are ↑ and ↓ (`listKeys`).
+        row("openFolderInPlace", "Open Folder in Place", "→", in: "View"),
+        row("closeFolderInPlace", "Close Folder, or Go to Its Parent Row", "←", in: "View"),
+        row("openFolderAndEverythingInside", "Open Folder and Everything Inside", "→", [.option], in: "View"),
+        row("closeFolderAndEverythingInside", "Close Folder and Everything Inside", "←", [.option], in: "View"),
         row("nextTab", "Show Next Tab", "Tab", [.control], in: "View"),
         row("previousTab", "Show Previous Tab", "Tab", [.control, .shift], in: "View"),
     ] + (1...9).map { row("tab\($0)", "Show Tab \($0)", String($0), [.command], in: "View") }

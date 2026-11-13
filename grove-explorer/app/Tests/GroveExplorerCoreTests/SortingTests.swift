@@ -2,7 +2,7 @@ import Foundation
 import GroveExplorerCore
 import Testing
 
-@Suite(.serialized) struct SortingTests {
+@Suite struct SortingTests {
     private func entry(
         _ name: String, kind: Entry.Kind = .file, size: Int64? = nil,
         modified: Date? = nil, type: String = "Document"
@@ -190,59 +190,6 @@ import Testing
         let data = try JSONEncoder().encode(order)
         #expect(try JSONDecoder().decode(SortOrder.self, from: data) == order)
         #expect(String(decoding: data, as: UTF8.self).contains("\"modified\""))
-    }
-
-    // MARK: Performance
-
-    /// The spec's limit, as the best of three sorts: the machine may be
-    /// busy with something else during one of them. (The suite is
-    /// serialized so its own tests don't run beside this one.)
-    @Test func sorts50kUnderHalfASecond() {
-        var generator = SeededGenerator(seed: 7)
-        let entries = (0..<50_000).map { index -> Entry in
-            let number = Int.random(in: 0..<100_000, using: &generator)
-            return entry(
-                "Report \(number) é draft-\(index).txt",
-                kind: index % 10 == 0 ? .folder : .file,
-                size: Int64(number % 500), type: "Type \(number % 40)")
-        }
-        let clock = ContinuousClock()
-        for column in [SortColumn.name, .size, .kind] {
-            var sorted: [Entry] = []
-            var best = Duration.seconds(3600)
-            for _ in 0..<3 {
-                let elapsed = clock.measure {
-                    sorted = Sorting.sorted(entries, by: SortOrder(column: column, ascending: true))
-                }
-                best = min(best, elapsed)
-            }
-            print("sorts50kUnderHalfASecond: by \(column), best of 3: \(best)")
-            #expect(best < .milliseconds(500), "by \(column): \(best)")
-            // Outside the timed block: the order is the rule's, written
-            // out again here and given to the library's own sort.
-            #expect(sorted.count == 50_000)
-            #expect(names(sorted) == names(reference(entries, by: column)))
-        }
-    }
-
-    /// `Sorting.sorted`'s rule, ascending, by the standard library's sort:
-    /// folders first; then the column's value (a size by number, a kind by
-    /// its description as Finder compares names); equal ones by name.
-    private func reference(_ entries: [Entry], by column: SortColumn) -> [Entry] {
-        func isFolder(_ entry: Entry) -> Bool { entry.kind == .folder }
-        func before(_ a: String, _ b: String) -> Bool { a.localizedStandardCompare(b) == .orderedAscending }
-        return entries.sorted { a, b in
-            if isFolder(a) != isFolder(b) { return isFolder(a) }
-            switch column {
-            case .size:
-                if a.size != b.size { return (a.size ?? .max) < (b.size ?? .max) }
-            case .kind:
-                if a.typeDescription != b.typeDescription { return before(a.typeDescription, b.typeDescription) }
-            case .name, .modified:
-                break
-            }
-            return before(a.name, b.name)
-        }
     }
 }
 

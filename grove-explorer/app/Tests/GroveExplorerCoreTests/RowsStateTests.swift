@@ -7,8 +7,10 @@ import Testing
     private static let folder = URL(fileURLWithPath: "/Users/me/Downloads", isDirectory: true)
     private static let big = 50_000, small = 212
 
-    private static func arrangement(sort: Order = .byName, filter: String = "", showHidden: Bool = false) -> Arrangement {
-        Arrangement(folder: folder, sort: sort, filter: filter, showHidden: showHidden)
+    private static func arrangement(
+        sort: Order = .byName, filter: String = "", showHidden: Bool = false, open: Set<URL> = []
+    ) -> Arrangement {
+        Arrangement(folder: folder, sort: sort, filter: filter, showHidden: showHidden, open: open)
     }
 
     /// Tab A filters by "s", tab B shows the whole folder, tab C is B sorted by size.
@@ -72,6 +74,19 @@ import Testing
         #expect(state.after(.oldOrder, for: byDate) == .oldOrder(of: b, awaiting: byDate))
         // A filter: another set.
         #expect(state.reuse(for: a, entries: Self.big) == .blank)
+    }
+
+    /// Another set of open folders is other rows, as another filter is:
+    /// never "as it is" and never "the same items in another order".
+    @Test func anotherSetOfOpenFoldersIsArrangedAgainOrBlank() {
+        let opened = Self.arrangement(open: [Self.folder.appendingPathComponent("Sources", isDirectory: true)])
+        #expect(RowsState.arranged(by: b).reuse(for: opened, entries: Self.small) == .arrangeNow)
+        #expect(RowsState.arranged(by: b).reuse(for: opened, entries: Self.big) == .blank)
+        #expect(RowsState.arranged(by: opened).reuse(for: b, entries: Self.big) == .blank)
+        let openedBySize = Self.arrangement(
+            sort: Order(column: .size, ascending: true), open: opened.open)
+        #expect(RowsState.arranged(by: opened).reuse(for: openedBySize, entries: Self.big) == .oldOrder)
+        #expect(RowsState.arranged(by: opened).reuse(for: opened, entries: Self.big) == .asItIs)
     }
 
     @Test func theBestListingOfAFolderIsTheOneThatNeedsLeast() {
@@ -237,6 +252,39 @@ import Testing
         pane.show(c)
         pane.readCompletes()
         #expect(pane.state == .arranged(by: c) && pane.hasRows)
+    }
+
+    /// Tab A has a folder open, tab B of the same folder has none: each
+    /// shows its own tree, all the way there and back.
+    @Test func twoTabsOfOneFolderWithDifferentFoldersOpenEachShowTheirOwn() {
+        let tabA = Self.arrangement(open: [Self.folder.appendingPathComponent("Sources", isDirectory: true)])
+        let tabB = b
+        var pane = Pane(showing: tabB)
+        pane.show(tabA)  // A folder opened in place: other rows.
+        #expect(pane.state == .awaiting(tabA) && pane.isRight)
+        pane.arrangeReturns()
+        #expect(pane.state == .arranged(by: tabA) && pane.isRight)
+        pane.show(tabB)  // To tab B, nothing open there.
+        #expect(pane.state == .awaiting(tabB) && pane.isRight)
+        pane.arrangeReturns()
+        #expect(pane.state == .arranged(by: tabB) && pane.isRight)
+        pane.show(tabA)  // And back: A's tree, not B's rows.
+        #expect(pane.state == .awaiting(tabA) && pane.isRight)
+        pane.readCompletes()
+        #expect(pane.state == .arranged(by: tabA) && pane.isRight)
+        // A's arrange, begun before the read landed, arrives: still A's.
+        pane.arrangeReturns()
+        #expect(pane.state == .arranged(by: tabA) && pane.isRight)
+
+        // Back to B before A's rows arrived: B's are awaited afresh, and A's late arrange is dropped.
+        var quick = Pane(showing: tabA)
+        quick.show(tabB)
+        quick.show(tabA)
+        quick.show(tabB)
+        #expect(quick.state == .awaiting(tabB) && quick.isRight)
+        #expect(quick.state.arrival(of: tabA, tabWants: tabB) == nil)
+        quick.arrangeReturns()
+        #expect(quick.state == .arranged(by: tabB) && quick.isRight)
     }
 
     @Test func aLateArrangeOfTheTabBeforeIsDropped() {

@@ -327,9 +327,12 @@ final class AppModel: ObservableObject {
     }
 
     /// What the tab's rows are to be arranged by: its folder and sort, its
-    /// own filter, and the window's hidden-items switch.
+    /// own filter, the window's hidden-items switch and the folders it has
+    /// open in place.
     func arrangement(for tab: GroveExplorerCore.Tab) -> Arrangement {
-        Arrangement(folder: tab.folder, sort: tab.sort, filter: filter.texts[tab.id] ?? "", showHidden: browser.showHidden)
+        Arrangement(
+            folder: tab.folder, sort: tab.sort, filter: filter.texts[tab.id] ?? "", showHidden: browser.showHidden,
+            open: tab.open)
     }
 
     /// The rows changed under a filter: what it hides is selected no more.

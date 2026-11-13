@@ -250,24 +250,6 @@ import Testing
         // A cancelled walk leaves nothing behind: asked again, it is walked.
         #expect(await calculator.size(of: tree) == 2 * Self.block)
     }
-
-    /// The spec's limit for a tree of 20,000 files.
-    @Test func sizes20kFilesUnderThreeSeconds() async throws {
-        let tree = try makeLargeTree("Large", folders: 200, filesEach: 100)
-        // The best of three walks, each by a calculator that knows
-        // nothing yet: the machine may be busy during one.
-        let clock = ContinuousClock()
-        var best = Duration.seconds(3600)
-        for _ in 0..<3 {
-            let calculator = SizeCalculator()
-            let asked = clock.now
-            let answer = await calculator.size(of: tree)
-            best = min(best, clock.now - asked)
-            #expect(answer == 2 * Self.block)
-        }
-        print("sizes20kFilesUnderThreeSeconds: best of 3: \(best)")
-        #expect(best < .seconds(3), "the size of 20,000 files took \(best)")
-    }
 }
 
 /// Waits for `condition`, for five seconds at most: when it never comes

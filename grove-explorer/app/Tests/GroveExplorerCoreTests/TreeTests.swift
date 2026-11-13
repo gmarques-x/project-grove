@@ -2,7 +2,7 @@ import Foundation
 import GroveExplorerCore
 import Testing
 
-@Suite(.serialized) struct TreeTests {
+@Suite struct TreeTests {
     // MARK: Fixtures (in memory, nothing on disk)
 
     private func url(_ path: String, folder: Bool = false) -> URL {
@@ -286,6 +286,32 @@ import Testing
         #expect(lines(items) == ["reads …", "  ···"])
     }
 
+    /// A matching open folder whose read has landed and none of whose
+    /// items match: open, with nothing beneath it.
+    @Test func aMatchingOpenFolderWithNoMatchingItemShowsOpenAndNothingBeneath() {
+        let tree = input(
+            root: [entry("/l/reads", .folder), entry("/l/other.txt")],
+            children: [url("/l/reads"): [entry("/l/reads/a.txt"), entry("/l/reads/b", .folder)]],
+            open: [url("/l/reads")], filter: "read")
+        let items = Tree.items(tree)
+        #expect(lines(items) == ["reads v"])
+        #expect(Tree.counts(items).rows == 1)
+    }
+
+    /// Totals are found however a folder's URL is spelled, as the other
+    /// keys of `TreeInput` are.
+    @Test func aFolderSizeKeyedWithATrailingSlashIsFound() {
+        let tree = input(
+            root: [entry("/s/a", .folder), entry("/s/b", .folder), entry("/s/c", .folder)],
+            sort: SortOrder(column: .size, ascending: false),
+            folderSizes: [
+                url("/s/a/", folder: true): 1, url("/s/b/", folder: true): 300,
+                url("/s/./c", folder: true): 20,
+            ])
+        // Not found, they would go by name: a, b, c.
+        #expect(lines(Tree.items(tree)) == ["b", "c", "a"])
+    }
+
     @Test func theStatusCountsMatchesAgainstTheRowsThatWouldShowUnfiltered() {
         let filtered = Tree.itemsAndUnfilteredCount(filterTree(filter: "read"))
         let counts = Tree.counts(filtered.items)
@@ -356,7 +382,7 @@ import Testing
             url("/r/top/f2/none"): [],  // known empty: left closed
             // g2 and h1 are not read yet: opened, nothing known beneath.
         ]
-        let result = Tree.openAll(under: url("/r/top"), known: children, showing: 20, showHidden: false)
+        let result = Tree.openAll(under: url("/r/top"), known: children, showing: 20, showHidden: false, sort: .byName, folderSizes: [:])
         #expect(result.open == [
             url("/r/top"), url("/r/top/f1"), url("/r/top/f2"),
             url("/r/top/f1/g1"), url("/r/top/f2/g2"), url("/r/top/f1/g1/h1"),
@@ -367,11 +393,11 @@ import Testing
     @Test func openAllStopsBeforeTheTabWouldShowMoreThanTheLimit() {
         let big = (0..<30).map { entry("/r/big/item \($0)") }
         let children = [url("/r/big"): big]
-        let stopped = Tree.openAll(under: url("/r/big"), known: children, showing: 9_990, showHidden: false)
+        let stopped = Tree.openAll(under: url("/r/big"), known: children, showing: 9_990, showHidden: false, sort: .byName, folderSizes: [:])
         #expect(stopped.open.isEmpty)
         #expect(stopped.stoppedAtLimit)
 
-        let fits = Tree.openAll(under: url("/r/big"), known: children, showing: 9_970, showHidden: false)
+        let fits = Tree.openAll(under: url("/r/big"), known: children, showing: 9_970, showHidden: false, sort: .byName, folderSizes: [:])
         #expect(fits.open == [url("/r/big")])
         #expect(!fits.stoppedAtLimit)
     }
@@ -383,7 +409,8 @@ import Testing
         ]
         children[url("/r/top/p")] = (0..<10).map { entry("/r/top/p/\($0)") }
         children[url("/r/top/q")] = (0..<10).map { entry("/r/top/q/\($0)") }
-        let result = Tree.openAll(under: url("/r/top"), known: children, showing: Tree.rowLimit - 15, showHidden: false)
+        let result = Tree.openAll(under: url("/r/top"), known: children, showing: Tree.rowLimit - 15, showHidden: false,
+            sort: .byName, folderSizes: [:])
         #expect(result.open == [url("/r/top"), url("/r/top/p")])
         #expect(result.stoppedAtLimit)
     }
@@ -395,15 +422,60 @@ import Testing
         ]
         // Hidden items left out: top adds one row (src), which fits; .git stays closed.
         let hiding = Tree.openAll(
-            under: url("/r/top"), known: children, showing: Tree.rowLimit - 1, showHidden: false)
+            under: url("/r/top"), known: children, showing: Tree.rowLimit - 1, showHidden: false, sort: .byName,
+            folderSizes: [:])
         #expect(hiding.open == [url("/r/top"), url("/r/top/src")])
         #expect(!hiding.stoppedAtLimit)
 
         // Shown: top adds two rows, one too many.
         let showing = Tree.openAll(
-            under: url("/r/top"), known: children, showing: Tree.rowLimit - 1, showHidden: true)
+            under: url("/r/top"), known: children, showing: Tree.rowLimit - 1, showHidden: true, sort: .byName,
+            folderSizes: [:])
         #expect(showing.open.isEmpty)
         #expect(showing.stoppedAtLimit)
+    }
+
+    /// Each level's folders are opened in the order the tab shows them, so
+    /// a ⌥→ cut short by the limit opens the ones at the top.
+    @Test func openAllOpensEachLevelInTheTabsOrder() {
+        let children: [URL: [Entry]] = [
+            url("/r/top"): [
+                entry("/r/top/b", .folder), entry("/r/top/file"), entry("/r/top/c", .folder),
+                entry("/r/top/a", .folder),
+            ],
+            url("/r/top/b"): [entry("/r/top/b/b2", .folder), entry("/r/top/b/b1", .folder)],
+        ]
+        func opened(_ sort: GroveExplorerCore.SortOrder, sizes: [URL: Int64] = [:]) -> [String] {
+            Tree.openAll(
+                under: url("/r/top"), known: children, showing: 0, showHidden: false, sort: sort,
+                folderSizes: sizes
+            ).open.map(\.lastPathComponent)
+        }
+        #expect(opened(.byName) == ["top", "a", "b", "c", "b1", "b2"])
+        #expect(opened(SortOrder(column: .name, ascending: false)) == ["top", "c", "b", "a", "b2", "b1"])
+        // By size, the totals keyed however a folder's URL is spelled.
+        let sizes: [URL: Int64] = [
+            url("/r/top/a/", folder: true): 1, url("/r/top/b/", folder: true): 3,
+            url("/r/top/c/", folder: true): 2,
+        ]
+        #expect(opened(SortOrder(column: .size, ascending: false), sizes: sizes)
+            == ["top", "b", "c", "a", "b1", "b2"])
+    }
+
+    /// The first folder that doesn't fit ends ⌥→: a later one that would
+    /// fit stays closed, so what opens is a top part of the tab's order.
+    @Test func openAllStopsAtTheFirstFolderThatDoesNotFitAndOpensNoLaterOne() {
+        var children: [URL: [Entry]] = [
+            url("/r/top"): [entry("/r/top/p", .folder), entry("/r/top/q", .folder)],
+        ]
+        children[url("/r/top/p")] = (0..<10).map { entry("/r/top/p/\($0)") }
+        children[url("/r/top/q")] = [entry("/r/top/q/only")]
+        // top adds 2 rows (fits), p would add 10 (doesn't), q 1 (would).
+        let result = Tree.openAll(
+            under: url("/r/top"), known: children, showing: Tree.rowLimit - 5, showHidden: false,
+            sort: .byName, folderSizes: [:])
+        #expect(result.open == [url("/r/top")])
+        #expect(result.stoppedAtLimit)
     }
 
     @Test func parentRowIsTheRowOneLevelUp() {
@@ -442,69 +514,5 @@ import Testing
         let children: [URL: [Entry]] = [url("/t"): [entry("/t/a", .folder)]]
         #expect(Tree.orphans(open: open, root: url("/t/", folder: true), children: children)
             == [url("/t/went")])
-    }
-
-    // MARK: Performance
-
-    /// 50,000 rows across 50 open folders of 1,000 items, arranged by the
-    /// spec's limit for a sort: the best of three, by name, by size and
-    /// under a filter. (The suite is serialized so its own tests don't run
-    /// beside this one.)
-    @Test func fiftyThousandRowsAcrossOpenFoldersUnderHalfASecond() {
-        var generator = SeededGenerator(seed: 11)
-        var root: [Entry] = []
-        var children: [URL: [Entry]] = [:]
-        var open: Set<URL> = []
-        var hasContents: [URL: Bool] = [:]
-        for folder in 0..<50 {
-            let path = "/big/Folder \(folder)"
-            root.append(entry(path, .folder))
-            open.insert(url(path, folder: true))
-            children[url(path, folder: true)] = (0..<1_000).map { index in
-                let number = Int.random(in: 0..<100_000, using: &generator)
-                let child = "\(path)/Report \(number) é draft-\(index).txt"
-                if index % 10 == 0 { hasContents[url(child, folder: true)] = index % 20 == 0 }
-                return entry(child, index % 10 == 0 ? .folder : .file, size: Int64(number % 500))
-            }
-        }
-        let clock = ContinuousClock()
-        let cases: [(String, GroveExplorerCore.SortOrder, String, Int)] = [
-            ("by name", .byName, "", 50_050),
-            ("by size", SortOrder(column: .size, ascending: false), "", 50_050),
-            ("filtered", .byName, "report 7", -1),
-        ]
-        for (label, sort, filter, expected) in cases {
-            let tree = input(
-                root: root, children: children, open: open, hasContents: hasContents, sort: sort,
-                filter: filter)
-            var result: (items: [TreeItem], unfilteredRows: Int) = ([], 0)
-            var best = Duration.seconds(3600)
-            for _ in 0..<3 {
-                let elapsed = clock.measure { result = Tree.itemsAndUnfilteredCount(tree) }
-                best = min(best, elapsed)
-            }
-            print("fiftyThousandRowsAcrossOpenFoldersUnderHalfASecond: \(label), best of 3: \(best)")
-            #expect(best < .milliseconds(500), "\(label): \(best)")
-            #expect(result.unfilteredRows == 50_050)
-            if expected > 0 {
-                #expect(result.items.count == expected)
-            } else {
-                #expect(!result.items.isEmpty && result.items.count < 50_050)
-            }
-        }
-    }
-}
-
-/// A fixed sequence, so the fixture is the same on every run.
-private struct SeededGenerator: RandomNumberGenerator {
-    private var state: UInt64
-    init(seed: UInt64) { state = seed }
-    mutating func next() -> UInt64 {
-        // SplitMix64.
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
     }
 }

@@ -1,20 +1,25 @@
 import Foundation
 
 /// What a pane's rows were arranged by: the folder they are of, the sort,
-/// the ⌘F filter's text and whether hidden items show. A listing is shown
-/// for a tab only when it was arranged by that tab's own.
+/// the ⌘F filter's text, whether hidden items show and which folders are
+/// open in place. A listing is shown for a tab only when it was arranged by
+/// that tab's own.
 public struct Arrangement: Equatable, Sendable {
     public var folder: URL
     public var sort: SortOrder
     /// The filter field's text as typed.
     public var filter: String
     public var showHidden: Bool
+    /// The folders open in place (spec §16), as the tab has them: rows
+    /// arranged with one set open are other rows than with another.
+    public var open: Set<URL>
 
-    public init(folder: URL, sort: SortOrder, filter: String, showHidden: Bool) {
+    public init(folder: URL, sort: SortOrder, filter: String, showHidden: Bool, open: Set<URL>) {
         self.folder = folder
         self.sort = sort
         self.filter = filter
         self.showHidden = showHidden
+        self.open = open
     }
 
     /// The filter's words; none for a field that is empty or all spaces.
@@ -23,14 +28,17 @@ public struct Arrangement: Equatable, Sendable {
     /// Whether the filter leaves anything out: it has a word.
     public var isFiltered: Bool { !words.isEmpty }
 
+    /// The open folders by path, however each is spelled.
+    private var openPaths: Set<String> { Set(open.map(\.standardizedPath)) }
+
     /// Whether rows arranged by this may be shown as they are for a tab
     /// that asks for `wanted`: the same folder (however its path is
-    /// spelled), sort, hidden flag and filter words. Anything else is
-    /// arranged again first: another tab's filter would hide files, and
-    /// its field isn't there to say so.
+    /// spelled), sort, hidden flag, filter words and open folders. Anything
+    /// else is arranged again first: another tab's filter would hide files,
+    /// and its field isn't there to say so; another tab's open folders
+    /// would show rows this one doesn't have.
     public func serves(_ wanted: Arrangement) -> Bool {
-        folder.standardizedFileURL.path == wanted.folder.standardizedFileURL.path
-            && sort == wanted.sort && showHidden == wanted.showHidden && words == wanted.words
+        sort == wanted.sort && hasSameItems(as: wanted)
     }
 
     /// Whether rows that were being arranged off the main thread may be
@@ -46,10 +54,11 @@ public struct Arrangement: Equatable, Sendable {
     }
 
     /// Whether this and `other` show the same items (the same folder,
-    /// filter words and hidden flag), whatever their order.
+    /// filter words, hidden flag and open folders), whatever their order.
     func hasSameItems(as other: Arrangement) -> Bool {
-        folder.standardizedFileURL.path == other.folder.standardizedFileURL.path
+        folder.standardizedPath == other.folder.standardizedPath
             && showHidden == other.showHidden && words == other.words
+            && (open.isEmpty && other.open.isEmpty || openPaths == other.openPaths)
     }
 }
 

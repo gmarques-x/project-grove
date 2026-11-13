@@ -1,6 +1,7 @@
 import Foundation
 
-/// One tab: a folder, how it is sorted, and where it has been.
+/// One tab: a folder, how it is sorted, where it has been, and which
+/// folders it has open in place.
 public struct Tab: Equatable, Codable, Sendable, Identifiable {
     public let id: UUID
     /// As it was navigated to: a link stays a link, `/var/x` stays `/var/x`.
@@ -10,6 +11,24 @@ public struct Tab: Equatable, Codable, Sendable, Identifiable {
     public var back: [URL]
     /// The folders gone back from, the next one last.
     public var forward: [URL]
+    /// What is open in place in each folder the tab has shown with
+    /// something open, the one touched longest ago first; at most
+    /// `Browser.openFoldersLimit` folders, none with nothing open. One
+    /// value, in order, so what is remembered and which is oldest can't
+    /// disagree. Changed through `setOpen`.
+    private var remembered: [Remembered]
+
+    /// The folders open in one folder of the tab's.
+    private struct Remembered: Equatable, Codable, Sendable {
+        /// As the tab showed it.
+        var folder: URL
+        var open: Set<URL>
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, folder, sort, back, forward
+        case remembered = "openFolders"
+    }
 
     public init(
         id: UUID = UUID(), folder: URL, sort: SortOrder = .byName,
@@ -20,6 +39,54 @@ public struct Tab: Equatable, Codable, Sendable, Identifiable {
         self.sort = sort
         self.back = back
         self.forward = forward
+        remembered = []
+    }
+
+    /// A session file written before folders opened in place has no
+    /// `openFolders`: nothing is open.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        folder = try container.decode(URL.self, forKey: .folder)
+        sort = try container.decode(SortOrder.self, forKey: .sort)
+        back = try container.decode([URL].self, forKey: .back)
+        forward = try container.decode([URL].self, forKey: .forward)
+        remembered = try container.decodeIfPresent([Remembered].self, forKey: .remembered) ?? []
+    }
+
+    /// The folders open in place, keyed by the tab folder they are open in
+    /// (as the tab showed it). Spec §16: kept per folder visited, bounded.
+    public var openFolders: [URL: Set<URL>] {
+        Dictionary(remembered.map { ($0.folder, $0.open) }, uniquingKeysWith: { _, latest in latest })
+    }
+
+    /// The folders open in place in the folder the tab shows now, however
+    /// that folder is spelled.
+    public var open: Set<URL> {
+        remembered.last { $0.folder.isSameFolder(as: folder) }?.open ?? []
+    }
+
+    /// Records `open` as what is open in the folder the tab shows now: it
+    /// becomes the folder touched latest, and the one touched longest ago
+    /// goes past `Browser.openFoldersLimit`. Nothing open is nothing to
+    /// remember.
+    public mutating func setOpen(_ open: Set<URL>) {
+        remembered.removeAll { $0.folder.isSameFolder(as: folder) }
+        guard !open.isEmpty else { return }
+        remembered.append(Remembered(folder: folder, open: open))
+        if remembered.count > Browser.openFoldersLimit {
+            remembered.removeFirst(remembered.count - Browser.openFoldersLimit)
+        }
+    }
+
+    /// Leaves out the open folders, and the folders they were open in,
+    /// that `exists` says are gone.
+    mutating func dropGoneOpenFolders(exists: (URL) -> Bool) {
+        remembered = remembered.compactMap { entry in
+            guard exists(entry.folder) else { return nil }
+            let open = entry.open.filter(exists)
+            return open.isEmpty ? nil : Remembered(folder: entry.folder, open: open)
+        }
     }
 
     /// The folder's name; "Home" for the user's home folder.
@@ -67,6 +134,10 @@ public struct Browser: Equatable, Codable, Sendable {
 
     /// How many folders a tab's `back` and `forward` each keep.
     public static let historyLimit = 100
+
+    /// Of how many folders a tab remembers what was open in place (spec
+    /// §16: "per folder visited, bounded"), as the histories are bounded.
+    public static let openFoldersLimit = 20
 
     public init(start: URL, twoPanes: Bool, showHidden: Bool) {
         panes = (twoPanes ? [Side.left, .right] : [.left]).map { _ in
@@ -217,15 +288,28 @@ public struct Browser: Equatable, Codable, Sendable {
             column: column, ascending: sort.column == column ? !sort.ascending : true)
     }
 
+    // MARK: Folders open in place
+
+    /// Records `open` as what the tab showing on `side` has open in its
+    /// folder (`Tab.setOpen`), whichever pane is active. Nothing when there
+    /// is no pane there.
+    public mutating func setOpen(_ open: Set<URL>, in side: Side) {
+        guard panes.indices.contains(side.rawValue) else { return }
+        let current = panes[side.rawValue].current
+        panes[side.rawValue].tabs[current].setOpen(open)
+    }
+
     // MARK: Repair
 
     /// Moves every tab whose folder is gone to its nearest parent that
     /// exists. A tab on a volume that is gone (ejected) moves to `home`
     /// rather than to `/Volumes`, and so does one with nothing left above it.
-    /// The histories are left as they are.
+    /// The histories are left as they are; the open folders that are gone,
+    /// and what was open in a folder that is gone, are forgotten.
     public mutating func repair(exists: (URL) -> Bool, home: URL) {
         for pane in panes.indices {
             for tab in panes[pane].tabs.indices {
+                panes[pane].tabs[tab].dropGoneOpenFolders(exists: exists)
                 let folder = panes[pane].tabs[tab].folder
                 guard !exists(folder) else { continue }
                 panes[pane].tabs[tab].folder = Self.nearest(to: folder, exists: exists) ?? home

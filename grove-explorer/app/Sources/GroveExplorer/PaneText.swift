@@ -30,8 +30,10 @@ extension AppModel {
             let entry = listing.shown[row]
             if let total = bytes, let size = entry.size ?? sizes[url] { bytes = total + size } else { bytes = nil }
         }
+        // The list's rows are its folder's only: no folder open in place among them.
         let text = GroveExplorerCore.StatusText.items(
-            total: listing.shown.count, selected: count, selectedBytes: bytes, filteredFrom: listing.filteredFrom)
+            total: listing.shown.count, foldersOpen: 0, selected: count, selectedBytes: bytes,
+            filteredFrom: listing.filteredFrom)
         statuses[side] = (tab, listing.revision, selectionVersion, sizesVersion, text)
         return text
     }

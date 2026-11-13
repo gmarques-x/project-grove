@@ -56,8 +56,8 @@ public struct TreeInput: Sendable {
     /// The tab folder's entries, unsorted.
     public var root: [Entry]
     /// The entries of each open folder whose read has landed. Keys of this,
-    /// `open` and `hasContents` are compared by standardized path, however
-    /// each URL is spelled (a trailing slash, `..`).
+    /// `open`, `hasContents` and `folderSizes` are compared by standardized
+    /// path, however each URL is spelled (a trailing slash, `..`).
     public var children: [URL: [Entry]]
     /// The folders the user opened. One that is no entry of its (showing,
     /// open) parent contributes nothing.
@@ -67,6 +67,8 @@ public struct TreeInput: Sendable {
     /// known yet", and gives no chevron.
     public var hasContents: [URL: Bool]
     public var sort: SortOrder
+    /// The totals of folders and packages known so far, which a sort by
+    /// size orders them by (`Sorting.sorted`).
     public var folderSizes: [URL: Int64]
     /// The ⌘F field's text; "" (or only spaces) is no filter.
     public var filter: String
@@ -162,13 +164,18 @@ public enum Tree {
     /// land counts nothing twice. Each folder opened adds its known items
     /// that would show; one not read yet is opened and adds none until it
     /// is; one known to have nothing that would show is left closed.
-    /// Hidden folders are opened only while hidden items show. At the first
-    /// folder that would pass the limit it stops: `stoppedAtLimit`, and
-    /// `open` holds the folders before it.
+    /// Hidden folders are opened only while hidden items show. Each
+    /// level's folders are taken in the order the tab shows them (`sort`,
+    /// with `folderSizes` as in `TreeInput`), so what opens is the top of
+    /// the tree. It stops at the first folder that would pass the limit:
+    /// `stoppedAtLimit`, and `open` holds the folders before it; a later
+    /// folder that would still fit stays closed.
     public static func openAll(
-        under folder: URL, known children: [URL: [Entry]], showing: Int, showHidden: Bool
+        under folder: URL, known children: [URL: [Entry]], showing: Int, showHidden: Bool,
+        sort: SortOrder, folderSizes: [URL: Int64]
     ) -> (open: [URL], stoppedAtLimit: Bool) {
         let listings = byPath(children)
+        let sizes = byPath(folderSizes)
         var opened: [URL] = []
         var total = showing
         var queue = [folder]
@@ -185,7 +192,8 @@ public enum Tree {
             if total + visible.count > rowLimit { return (opened, true) }
             total += visible.count
             opened.append(candidate)
-            queue += visible.lazy.filter { $0.kind == .folder }.map(\.url)
+            let folders = visible.filter { $0.kind == .folder }
+            queue += sorted(folders, by: sort, sizes: sizes).map(\.url)
         }
         return (opened, false)
     }
@@ -225,13 +233,25 @@ public enum Tree {
         Dictionary(dictionary.map { ($0.key.standardizedPath, $0.value) }, uniquingKeysWith: { first, _ in first })
     }
 
+    /// `Sorting.sorted`, with the totals keyed by standardized path (as
+    /// `byPath` gives them): only a sort by size reads them, and only for
+    /// the entries that have one.
+    private static func sorted(_ entries: [Entry], by sort: SortOrder, sizes: [String: Int64]) -> [Entry] {
+        guard sort.column == .size, !sizes.isEmpty else { return Sorting.sorted(entries, by: sort) }
+        var byURL: [URL: Int64] = [:]
+        for entry in entries where SizeWanted.isMeasured(entry) {
+            if let size = sizes[entry.url.standardizedPath] { byURL[entry.url] = size }
+        }
+        return Sorting.sorted(entries, by: sort, folderSizes: byURL)
+    }
+
     /// The depth-first pass of `items`.
     private struct Builder {
         let children: [String: [Entry]]
         let open: Set<String>
         let hasContents: [String: Bool]
         let sort: SortOrder
-        let folderSizes: [URL: Int64]
+        let folderSizes: [String: Int64]
         let filter: String
         let filtering: Bool
         let showHidden: Bool
@@ -241,7 +261,7 @@ public enum Tree {
             open = Set(input.open.map(\.standardizedPath))
             hasContents = Tree.byPath(input.hasContents)
             sort = input.sort
-            folderSizes = input.folderSizes
+            folderSizes = Tree.byPath(input.folderSizes)
             filter = input.filter
             filtering = input.filter.contains { !$0.isWhitespace }
             showHidden = input.showHidden
@@ -302,7 +322,7 @@ public enum Tree {
 
             var items: [TreeItem] = []
             items.reserveCapacity(kept.count)
-            for entry in Sorting.sorted(kept, by: sort, folderSizes: folderSizes) {
+            for entry in Tree.sorted(kept, by: sort, sizes: folderSizes) {
                 if entry.kind == .folder, !opened.isEmpty, let open = opened[entry.url] {
                     items.append(.row(TreeRow(entry: entry, depth: depth, fold: open.fold, isContext: open.isContext)))
                     items += open.items

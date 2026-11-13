@@ -98,12 +98,32 @@ import Testing
         ("eject", "E", [.command], "File"),
         ("cancelOperation", ".", [.command], "File"),
         ("showFailures", "F", [.command, .shift], "View"),
+        // Folders that open in place (spec §16).
+        ("openFolderInPlace", "→", [], "View"),
+        ("closeFolderInPlace", "←", [], "View"),
+        ("openFolderAndEverythingInside", "→", [.option], "View"),
+        ("closeFolderAndEverythingInside", "←", [.option], "View"),
     ] as [(String, String, [Modifier], String)])
     func grovesKeys(id: String, key: String, modifiers: [Modifier], menu: String) {
         let found = command(id)
         #expect(found?.key == key)
         #expect(found?.modifiers == Set(modifiers))
         #expect(found?.menu == menu)
+    }
+
+    /// → and ← open and close folders in place; ↑ and ↓ stay the list's,
+    /// and ⌥⌘← stays the sidebar's.
+    @Test func theArrowsThatOpenAndCloseFoldersAreTheirsAlone() {
+        #expect(command("openFolderInPlace")?.title == "Open Folder in Place")
+        #expect(command("closeFolderInPlace")?.title == "Close Folder, or Go to Its Parent Row")
+        #expect(command("openFolderAndEverythingInside")?.title == "Open Folder and Everything Inside")
+        #expect(command("closeFolderAndEverythingInside")?.title == "Close Folder and Everything Inside")
+        #expect(CommandList.command(key: "→", modifiers: [])?.id == "openFolderInPlace")
+        #expect(CommandList.command(key: "←", modifiers: [.option])?.id == "closeFolderAndEverythingInside")
+        #expect(CommandList.command(key: "←", modifiers: [.option, .command])?.id == "focusSidebar")
+        #expect(CommandList.command(key: "↑", modifiers: []) == nil)
+        #expect(CommandList.command(key: "↓", modifiers: [.shift]) == nil)
+        #expect(!CommandList.listKeys.contains { $0.key == "←" || $0.key == "→" })
     }
 
     @Test func thereIsATabCommandForEachOfTheFirstNine() {
@@ -189,10 +209,11 @@ import Testing
         let cells = section.split(separator: "\n").filter { $0.hasPrefix("| ") }
             .compactMap { $0.split(separator: "|").first.map { $0.trimmingCharacters(in: .whitespaces) } }
             .filter { $0 != "Key" && !$0.hasPrefix("---") }
-        // 19 rows of Finder's keys and 16 of Grove's. (The fix round after
+        // 19 rows of Finder's keys and 20 of Grove's. (The fix round after
         // Task 15's review reworded two of Grove's rows, ⌘E and ⌘., and
-        // added or took away none: the counts stand.)
-        #expect(cells.count == 35)
+        // added or took away none. Folders that open in place, spec §16,
+        // added four: →, ←, ⌥→ and ⌥←.)
+        #expect(cells.count == 39)
 
         var strokes: [String] = []
         for cell in cells {
@@ -209,8 +230,8 @@ import Testing
                 }
             }
         }
-        // 38 keys in Finder's rows and 28 in Grove's.
-        #expect(strokes.count == 66)
+        // 38 keys in Finder's rows and 32 in Grove's (→, ←, ⌥→ and ⌥←, one a row).
+        #expect(strokes.count == 70)
         let marks: [Character: GroveExplorerCore.Modifier] = ["⌘": .command, "⌥": .option, "⇧": .shift, "⌃": .control]
         for stroke in strokes {
             var modifiers: Set<GroveExplorerCore.Modifier> = []

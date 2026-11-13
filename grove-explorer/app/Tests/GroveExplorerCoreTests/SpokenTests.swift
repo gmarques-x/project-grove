@@ -90,6 +90,36 @@ import Testing
         #expect(Spoken.row(notes, total: nil, date: nil) == "notes.md, Markdown, 4 KB")
     }
 
+    // MARK: Rows of folders open in place
+
+    /// A row below the first level says its level, last; one at the first
+    /// level says none, as a flat list's rows don't.
+    @Test func aRowInsideAnOpenFolderSaysItsLevel() {
+        let package = entry("Package.swift", size: 2_048, modified: at(2026, 11, 11, 13, 5), type: "Swift Source")
+        #expect(
+            Spoken.row(package, total: nil, now: now, calendar: calendar, locale: Self.london, shortDate: false, level: 3)
+                == "Package.swift, Swift Source, 2 KB, Yesterday at 13:05, level 3")
+        #expect(Spoken.row(package, total: nil, date: nil, level: 2) == "Package.swift, Swift Source, 2 KB, level 2")
+        #expect(Spoken.row(package, total: nil, date: nil, level: 1) == "Package.swift, Swift Source, 2 KB")
+        let hidden = entry(".env", size: 10, hidden: true)
+        #expect(Spoken.row(hidden, total: nil, date: nil, level: 2) == ".env, Document, 10 bytes, hidden, level 2")
+    }
+
+    /// A folder with a chevron says whether it is open, after its kind;
+    /// one being read is open. A folder without one says neither.
+    @Test func aFolderWithAChevronSaysOpenOrClosed() {
+        let sources = entry("Sources", .folder, modified: at(2026, 11, 12, 9, 41), type: "Folder")
+        #expect(
+            Spoken.row(sources, total: 8_192, now: now, calendar: calendar, locale: Self.london, shortDate: false, fold: .open)
+                == "Sources, Folder, open, 8 KB, Today at 09:41")
+        #expect(Spoken.row(sources, total: 8_192, date: nil, fold: .closed) == "Sources, Folder, closed, 8 KB")
+        #expect(Spoken.row(sources, total: 8_192, date: nil, fold: .loading) == "Sources, Folder, open, 8 KB")
+        #expect(Spoken.row(sources, total: 8_192, date: nil, fold: .none) == "Sources, Folder, 8 KB")
+        #expect(
+            Spoken.row(sources, total: nil, date: nil, level: 2, fold: .closed)
+                == "Sources, Folder, closed, size not calculated yet, level 2")
+    }
+
     // MARK: Panes, columns, tabs
 
     @Test func aPaneSaysWhichItIsAndWhetherItHasTheKeys() {

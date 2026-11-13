@@ -109,6 +109,52 @@ import Testing
         #expect(Session.load(from: file) == session)
     }
 
+    /// The session of `session()` with folders open in place in two of its tabs' folders.
+    private func sessionWithOpenFolders() -> Session {
+        var session = session()
+        session.browser.setOpen([folder("/Volumes/Backup/é/photos"), folder("/Volumes/Backup/é/photos/2026")], in: .right)
+        session.browser.setOpen([folder("/var/x/inner")], in: .left)
+        return session
+    }
+
+    @Test func theFoldersOpenInPlaceAreSavedAndLoaded() throws {
+        let session = sessionWithOpenFolders()
+        #expect(session.browser.tab(.right)?.open.count == 2)
+        try session.save(to: file)
+        let loaded = try #require(Session.load(from: file))
+        #expect(loaded == session)
+        #expect(loaded.browser.tab(.right)?.openFolders == session.browser.tab(.right)?.openFolders)
+        #expect(loaded.browser.tab(.left)?.open == [folder("/var/x/inner")])
+    }
+
+    /// A file written before folders opened in place has no `openFolders`:
+    /// it loads, with nothing open.
+    @Test func aFileWithoutOpenFoldersLoadsWithNothingOpen() throws {
+        let saved = sessionWithOpenFolders()
+        try saved.save(to: file)
+        var top = try #require(
+            JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        var browser = try #require(top["browser"] as? [String: Any])
+        var panes = try #require(browser["panes"] as? [[String: Any]])
+        var removed = 0
+        for pane in panes.indices {
+            var tabs = try #require(panes[pane]["tabs"] as? [[String: Any]])
+            for tab in tabs.indices where tabs[tab].removeValue(forKey: "openFolders") != nil { removed += 1 }
+            panes[pane]["tabs"] = tabs
+        }
+        #expect(removed == 3)
+        browser["panes"] = panes
+        top["browser"] = browser
+        try JSONSerialization.data(withJSONObject: top).write(to: file)
+
+        var expected = saved
+        expected.browser.setOpen([], in: .left)
+        expected.browser.setOpen([], in: .right)
+        let loaded = try #require(Session.load(from: file))
+        #expect(loaded == expected)
+        #expect(loaded.browser.panes.allSatisfy { $0.tabs.allSatisfy { $0.openFolders.isEmpty } })
+    }
+
     /// A file that parses but describes a window that can't be: it would
     /// crash the first time the active tab is asked for.
     @Test(arguments: [

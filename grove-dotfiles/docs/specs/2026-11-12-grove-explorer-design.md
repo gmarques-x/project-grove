@@ -172,6 +172,10 @@ Grove's:
 | ⌘F | Filter this folder |
 | ⌘⌥S | Show or hide the sidebar |
 | ⌥⌘← | The keyboard to the sidebar: ↑ ↓ move, Return opens the place, → or Esc returns to the list |
+| → | Open the selected folder in place (§16; this key and the next three act with the keyboard in a list and no field up) |
+| ← | Close the selected folder in place, or, on a file or a closed folder, go to its parent row (§16) |
+| ⌥→ | Open the selected folder and everything inside it, up to 10,000 rows (§16) |
+| ⌥← | Close the selected folder and everything inside it (§16) |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 | ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
@@ -314,6 +318,6 @@ Asked for by the owner after the first live run, and chosen from options put to 
 
 **Safety rules that carry over unchanged.** Commands act only on rows the user can see; a pane or an opened folder whose contents have not arrived has no rows; operations are values captured at the keypress; every change to files goes through the single run path.
 
-**Keys to add to §7's Grove table when it is built** (the Core test that parses §7 pins its rows, so they are added together with the code): → open the selected folder in place · ← close it, or go to its parent row · ⌥→ open it and everything inside · ⌥← close it and everything inside.
+**Keys, in §7's Grove table** (the Core test that parses §7 pins its rows, so they were added together with the code): → open the selected folder in place · ← close it, or go to its parent row · ⌥→ open it and everything inside · ⌥← close it and everything inside.
 
 **In the code.** The rows a tab shows (which entries, at what depth, in what order, under which filter, with which ancestors kept) are one pure function in Core over the folders' listings and the set of open folders, with tests; the rows-state machine (§6, `Arrangement`) decides over that result as it does today over a flat list.

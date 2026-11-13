@@ -6,9 +6,10 @@ import Testing
     private let downloads = URL(fileURLWithPath: "/Users/me/Downloads", isDirectory: true)
 
     private func arrangement(
-        _ folder: URL? = nil, sort: GroveExplorerCore.SortOrder = .byName, filter: String = "", showHidden: Bool = false
+        _ folder: URL? = nil, sort: GroveExplorerCore.SortOrder = .byName, filter: String = "", showHidden: Bool = false,
+        open: Set<URL> = []
     ) -> Arrangement {
-        Arrangement(folder: folder ?? downloads, sort: sort, filter: filter, showHidden: showHidden)
+        Arrangement(folder: folder ?? downloads, sort: sort, filter: filter, showHidden: showHidden, open: open)
     }
 
     @Test func theSameFolderSortFilterAndHiddenFlagIsReusedAsItIs() {
@@ -51,6 +52,32 @@ import Testing
     @Test func aFolderUnderAnotherSpellingOfItsPathIsTheSameFolder() {
         let spelled = URL(fileURLWithPath: "/Users/me/Documents/../Downloads/", isDirectory: true)
         #expect(arrangement().serves(arrangement(spelled)))
+    }
+
+    // MARK: Folders open in place
+
+    private func inside(_ name: String, slash: Bool = false) -> URL {
+        URL(fileURLWithPath: downloads.path + "/" + name + (slash ? "/" : ""), isDirectory: true)
+    }
+
+    /// Rows arranged with one folder open are other rows than with two.
+    @Test func anotherSetOfOpenFoldersIsAnotherList() {
+        #expect(!arrangement(open: [inside("a")]).serves(arrangement(open: [inside("a"), inside("b")])))
+        #expect(!arrangement(open: [inside("a"), inside("b")]).serves(arrangement(open: [inside("a")])))
+        #expect(!arrangement(open: [inside("a")]).serves(arrangement()))
+        #expect(!arrangement().serves(arrangement(open: [inside("a")])))
+    }
+
+    @Test func theSameOpenFoldersHoweverSpelledAreReused() {
+        #expect(arrangement(open: [inside("a"), inside("b")]).serves(arrangement(open: [inside("b"), inside("a")])))
+        let spelled = URL(fileURLWithPath: downloads.path + "/x/../a/", isDirectory: true)
+        #expect(arrangement(open: [inside("a")]).serves(arrangement(open: [spelled])))
+        #expect(arrangement(open: [inside("a", slash: true)]).serves(arrangement(open: [inside("a")])))
+    }
+
+    @Test func anArrangementForAnotherSetOfOpenFoldersArrivingLateIsDropped() {
+        #expect(!Arrangement.mayShow(arrived: arrangement(open: [inside("a")]), for: arrangement()))
+        #expect(Arrangement.mayShow(arrived: arrangement(open: [inside("a")]), for: arrangement(open: [inside("a")])))
     }
 
     @Test func whetherAFilterFilters() {

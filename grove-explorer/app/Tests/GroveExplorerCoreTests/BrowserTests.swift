@@ -414,6 +414,100 @@ import Testing
         #expect(browser.activeTab.back.last?.path == "/start")
     }
 
+    // MARK: Folders open in place
+
+    @Test func aTabStartsWithNothingOpen() {
+        let browser = browser("/a")
+        #expect(browser.activeTab.open.isEmpty)
+        #expect(browser.activeTab.openFolders.isEmpty)
+    }
+
+    @Test func openingAndClosingFoldersIsRecordedForTheTabsFolder() {
+        var browser = browser("/a")
+        browser.setOpen([folder("/a/x"), folder("/a/x/y")], in: .left)
+        #expect(browser.activeTab.open == [folder("/a/x"), folder("/a/x/y")])
+        #expect(browser.activeTab.openFolders == [folder("/a"): [folder("/a/x"), folder("/a/x/y")]])
+        browser.setOpen([folder("/a/x")], in: .left)
+        #expect(browser.activeTab.open == [folder("/a/x")])
+        // All closed: nothing left to remember for the folder.
+        browser.setOpen([], in: .left)
+        #expect(browser.activeTab.open.isEmpty)
+        #expect(browser.activeTab.openFolders.isEmpty)
+    }
+
+    @Test func goingAwayAndBackGivesBackWhatWasOpen() {
+        var browser = browser("/a")
+        browser.setOpen([folder("/a/x")], in: .left)
+        browser.go(to: folder("/b"))
+        #expect(browser.activeTab.open.isEmpty)
+        browser.setOpen([folder("/b/y")], in: .left)
+        _ = browser.goBack()
+        #expect(browser.activeTab.open == [folder("/a/x")])
+        _ = browser.goForward()
+        #expect(browser.activeTab.open == [folder("/b/y")])
+        // However the folder is spelled when it is come back to.
+        browser.go(to: folder("/b/../a/"))
+        #expect(browser.activeTab.open == [folder("/a/x")])
+    }
+
+    @Test func eachTabAndEachPaneKeepsItsOwn() {
+        var browser = browser("/a", twoPanes: true)
+        browser.setOpen([folder("/a/x")], in: .left)
+        browser.newTab()
+        #expect(browser.activeTab.open.isEmpty)
+        browser.setOpen([folder("/a/y")], in: .left)
+        #expect(browser.tab(.right)?.open.isEmpty == true)
+        // The other pane's, without it becoming the active one.
+        browser.setOpen([folder("/a/z")], in: .right)
+        #expect(browser.active == .left)
+        #expect(browser.tab(.right)?.open == [folder("/a/z")])
+        browser.selectTab(0)
+        #expect(browser.activeTab.open == [folder("/a/x")])
+        // A side without a pane has nothing to record.
+        var one = self.browser("/a")
+        one.setOpen([folder("/a/x")], in: .right)
+        #expect(one.panes.count == 1 && one.activeTab.open.isEmpty)
+    }
+
+    @Test func theOpenFoldersOfTheLatestTwentyFoldersAreRemembered() {
+        var browser = browser("/f/0")
+        for n in 0...24 {
+            browser.go(to: folder("/f/\(n)"))
+            browser.setOpen([folder("/f/\(n)/inner")], in: .left)
+        }
+        #expect(Browser.openFoldersLimit == 20)
+        let remembered = browser.activeTab.openFolders
+        #expect(remembered.count == 20)
+        // The five touched longest ago went.
+        #expect(Set(remembered.keys.map(\.path)) == Set((5...24).map { "/f/\($0)" }))
+        // Opening again in an old folder makes it the latest: the oldest other goes instead.
+        _ = browser.goBack()
+        for _ in 0..<18 { _ = browser.goBack() }
+        #expect(browser.activeTab.folder.path == "/f/5")
+        browser.setOpen([folder("/f/5/inner"), folder("/f/5/more")], in: .left)
+        browser.go(to: folder("/f/25"))
+        browser.setOpen([folder("/f/25/inner")], in: .left)
+        let after = Set(browser.activeTab.openFolders.keys.map(\.path))
+        #expect(after.contains("/f/5") && after.contains("/f/25") && !after.contains("/f/6"))
+    }
+
+    @Test func repairDropsOpenFoldersThatAreGone() {
+        var browser = browser("/a", twoPanes: true)
+        browser.setOpen([folder("/a/x"), folder("/a/gone"), folder("/a/x/gone")], in: .left)
+        browser.go(to: folder("/b"))
+        browser.setOpen([folder("/b/gone")], in: .left)
+        browser.go(to: folder("/gone"))
+        browser.setOpen([folder("/gone/y")], in: .left)
+        browser.setOpen([folder("/a/x")], in: .right)
+
+        let existing: Set<String> = ["/", "/a", "/a/x", "/b"]
+        browser.repair(exists: { existing.contains($0.path) }, home: home)
+        // The tab on /gone moved to /; what it remembers of /a stays, of /b and /gone nothing.
+        #expect(browser.activeTab.folder.path == "/")
+        #expect(browser.activeTab.openFolders == [folder("/a"): [folder("/a/x")]])
+        #expect(browser.tab(.right)?.open == [folder("/a/x")])
+    }
+
     // MARK: Closing a tab that isn't showing
 
     @Test func closingATabBeforeTheCurrentOneKeepsTheCurrentOneShowing() {
