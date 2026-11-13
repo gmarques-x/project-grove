@@ -6,8 +6,10 @@ import SwiftUI
 
 /// The ⌘F filters of the window: each tab's own, while its field is open.
 struct FilterState: Equatable {
-    /// What each tab's field says, by the tab's id; "" when just opened.
-    var texts: [UUID: String] = [:]
+    /// Each tab's filter while its field is open, by the tab's id: what
+    /// the field says ("" when just opened) and the context folders closed
+    /// under it.
+    var tabs: [UUID: ListFilter] = [:]
     /// The pane whose filter field has the keyboard: the list's commands
     /// are not for it, as with the rename and path fields.
     var focused: Side?
@@ -68,7 +70,7 @@ struct FilterBar: View {
 extension AppModel {
     /// What the pane's filter field says; nil while it has none.
     func filterText(for side: Side) -> String? {
-        browser.tab(side).flatMap { filter.texts[$0.id] }
+        browser.tab(side).flatMap { filter.tabs[$0.id]?.text }
     }
 
     /// ⌘F: the active pane's tab gets its filter field, which takes the keyboard.
@@ -77,23 +79,23 @@ extension AppModel {
         guard let tab = browser.tab(side) else { return }
         sidebarCursor = nil
         if pathField != nil { pathField = nil }
-        if filter.texts[tab.id] == nil { filter.texts[tab.id] = "" }
+        if filter.tabs[tab.id] == nil { filter.tabs[tab.id] = ListFilter() }
         filter.asked = side
         filter.asks[side, default: 0] += 1
     }
 
     /// The field's text changed: the list shows the names that match.
     func setFilter(_ text: String, in side: Side) {
-        guard let tab = browser.tab(side), filter.texts[tab.id] != nil, filter.texts[tab.id] != text else { return }
-        filter.texts[tab.id] = text
+        guard let tab = browser.tab(side), let was = filter.tabs[tab.id], was.text != text else { return }
+        filter.tabs[tab.id]?.type(text)
         arrange(side)
     }
 
     /// Escape: the filter goes, the list shows the whole folder again and
     /// has the keyboard.
     func clearFilter(in side: Side) {
-        guard let tab = browser.tab(side), filter.texts[tab.id] != nil else { return }
-        filter.texts[tab.id] = nil
+        guard let tab = browser.tab(side), filter.tabs[tab.id] != nil else { return }
+        filter.tabs[tab.id] = nil
         filterFieldWent(in: side)
         arrange(side)
         if browser.active == side { focusList() }
@@ -143,14 +145,14 @@ extension AppModel {
     /// The browser changed: a tab that shows another folder now has no
     /// filter (it was for the folder it left), nor has a tab that closed.
     func filtersFollow(_ was: Browser, _ now: Browser) {
-        if !filter.texts.isEmpty {
+        if !filter.tabs.isEmpty {
             var folders: [UUID: URL] = [:]
             for tab in was.panes.flatMap(\.tabs) { folders[tab.id] = tab.folder }
-            var kept = filter.texts
+            var kept = filter.tabs
             let tabs = now.panes.flatMap(\.tabs)
             for tab in tabs where folders[tab.id] != tab.folder { kept[tab.id] = nil }
             kept = kept.filter { id, _ in tabs.contains { $0.id == id } }
-            if kept != filter.texts { filter.texts = kept }
+            if kept != filter.tabs { filter.tabs = kept }
         }
         // A field asked to take the keyboard that never appeared: the ask
         // doesn't outlive its tab showing, nor its pane having the keys.

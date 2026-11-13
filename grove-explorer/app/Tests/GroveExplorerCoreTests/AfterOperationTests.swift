@@ -125,6 +125,28 @@ import Testing
         #expect(!partly.complete)
     }
 
+    /// What a pane does with the arrivals it finds: selects them, and is
+    /// done with them only once all are there. An arrange that came while
+    /// the run's listing had only some selects those and is not done, so
+    /// the complete read after it still selects the rest (Task 3's review).
+    @Test func aPaneIsDoneWithTheArrivalsOnlyOnceAllAreThere() {
+        let folders = [URL(fileURLWithPath: "/t", isDirectory: true)]
+        let new = ["/t/x", "/t/y"].map { URL(fileURLWithPath: $0) }
+        let partly = AfterOperation.arrivalStep(new, in: folders, listed: [URL(fileURLWithPath: "/t/x")])
+        #expect(partly.select.map(\.path) == ["/t/x"])
+        #expect(!partly.done)
+        let all = AfterOperation.arrivalStep(new, in: folders, listed: new)
+        #expect(all.select == new)
+        #expect(all.done)
+        let none = AfterOperation.arrivalStep(new, in: folders, listed: [])
+        #expect(none.select.isEmpty)
+        #expect(!none.done)
+        // One that won't show is not awaited: the others are all.
+        let shown = AfterOperation.arrivalStep(
+            new, in: folders, listed: [URL(fileURLWithPath: "/t/x")], leavingOut: [URL(fileURLWithPath: "/t/y")])
+        #expect(shown.done)
+    }
+
     /// F5 into an open folder: its listing has the copy before its rows
     /// do (the rows are arranged off the main thread). Looked for among
     /// the rows, the copy is not there yet and the arrivals are not done;

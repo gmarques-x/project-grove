@@ -48,3 +48,31 @@ public enum Filter {
         return shown[min(max(next, 0), shown.count - 1)].url
     }
 }
+
+/// A tab's ⌘F filter while its field is open: what the field says, and the
+/// folders kept as context that the user closed under it (spec §16). One
+/// value, so the closed folders can't outlive the words they were closed
+/// under: other words, and they are open again as the filter has them.
+public struct ListFilter: Equatable, Sendable {
+    public private(set) var text: String
+    /// They stay as rows while the words last, closed or opened again
+    /// (`TreeInput.closedUnderFilter`): one opened again is never gone
+    /// while it is read.
+    public private(set) var closed: Set<URL> = []
+
+    public init(text: String = "") {
+        self.text = text
+    }
+
+    /// The field says `text` now. Other words drop the closed folders;
+    /// spaces alone don't.
+    public mutating func type(_ text: String) {
+        if text.split(whereSeparator: \.isWhitespace) != self.text.split(whereSeparator: \.isWhitespace) {
+            closed = []
+        }
+        self.text = text
+    }
+
+    /// The user closed `folder`, a row kept as context.
+    public mutating func close(_ folder: URL) { closed.insert(folder) }
+}

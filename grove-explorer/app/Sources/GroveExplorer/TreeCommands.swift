@@ -122,6 +122,8 @@ extension AppModel {
         {
             trees[side]?.openingAll = nil
         }
+        // A row kept as context under the filter stays, closed, while the filter lasts (spec §16).
+        if listing.row(of: url)?.isContext == true { filter.tabs[tab.id]?.close(url) }
         let chosen = selections[tab.id] ?? []
         let selection = Tree.selection(chosen, closing: url)
         if selection != chosen { selections[tab.id] = selection }

@@ -137,4 +137,20 @@ import Testing
     @Test func noRowsNoMove() {
         #expect(Filter.moved(from: [], by: 1, in: []) == nil)
     }
+
+    // MARK: A tab's filter and the folders closed under it
+
+    /// A folder closed under the filter is remembered with it, and only as
+    /// long as its words: other words drop it, spaces don't.
+    @Test func aTabsFilterForgetsTheFoldersClosedUnderItWhenItsWordsChange() {
+        let docs = URL(fileURLWithPath: "/f/docs", isDirectory: true)
+        var filter = ListFilter(text: "read")
+        filter.close(docs)
+        #expect(filter.closed == [docs])
+        filter.type(" read ")
+        #expect(filter.text == " read ")
+        #expect(filter.closed == [docs])
+        filter.type("rea")
+        #expect(filter.closed.isEmpty)
+    }
 }

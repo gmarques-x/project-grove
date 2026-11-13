@@ -434,7 +434,7 @@ extension AppModel {
         model.sizes = sizes
         for (side, all) in entries {
             guard let tab = browser.tab(side) else { continue }
-            if let text = filters[side] { model.filter.texts[tab.id] = text }
+            if let text = filters[side] { model.filter.tabs[tab.id] = ListFilter(text: text) }
             let wanted = model.arrangement(for: tab)
             // The folders open in the tab (the browser's) and their listings, as given.
             let opened = tree[side] ?? FolderListing.Tree()

@@ -21,11 +21,12 @@ import Testing
     private func input(
         root: [Entry], children: [URL: [Entry]] = [:], open: Set<URL> = [],
         hasContents: [URL: Bool] = [:], sort: GroveExplorerCore.SortOrder = .byName,
-        folderSizes: [URL: Int64] = [:], filter: String = "", showHidden: Bool = false
+        folderSizes: [URL: Int64] = [:], filter: String = "", showHidden: Bool = false,
+        closedUnderFilter: Set<URL> = []
     ) -> TreeInput {
         TreeInput(
             root: root, children: children, open: open, hasContents: hasContents, sort: sort,
-            folderSizes: folderSizes, filter: filter, showHidden: showHidden)
+            folderSizes: folderSizes, filter: filter, showHidden: showHidden, closedUnderFilter: closedUnderFilter)
     }
 
     /// One line per item: "  name fold" (two spaces per level), "  ···" for a loading line,
@@ -257,6 +258,73 @@ import Testing
             "Réadable.txt",
             "readme.md",
         ])
+    }
+
+    /// The fixture under "read" with `folder` closed as the app closes it:
+    /// out of `open` (what is open inside it stays there), its listing and
+    /// those beneath it gone; `closedUnderFilter` as given.
+    private func closedUnderRead(_ folder: String, remembered: Bool) -> TreeInput {
+        var tree = filterTree(filter: "read")
+        tree.open.remove(url(folder))
+        tree.children = tree.children.filter { !($0.key.path == folder || $0.key.path.hasPrefix(folder + "/")) }
+        tree.closedUnderFilter = remembered ? [url(folder, folder: true)] : []
+        return tree
+    }
+
+    /// The owner, 2026-11-13: under a filter, a folder kept only as context
+    /// that the user closes stays, closed, its name quiet, until the filter
+    /// changes; the matches inside are gone. (Before, it went with them.)
+    @Test func aContextFolderClosedUnderAFilterStaysAsAClosedRow() {
+        #expect(lines(Tree.items(closedUnderRead("/f/docs/deep", remembered: true))) == [
+            "docs~ v",
+            "  deep~ >",
+            "  reading v",
+            "    bread.txt",
+            "Réadable.txt",
+            "readme.md",
+        ])
+        // Deeper: its ancestors stay as context for it.
+        #expect(lines(Tree.items(closedUnderRead("/f/docs/deep/inner", remembered: true))) == [
+            "docs~ v",
+            "  deep~ v",
+            "    inner~ >",
+            "  reading v",
+            "    bread.txt",
+            "Réadable.txt",
+            "readme.md",
+        ])
+        // At the top: the folder alone.
+        #expect(lines(Tree.items(closedUnderRead("/f/docs", remembered: true))) == [
+            "docs~ >", "Réadable.txt", "readme.md",
+        ])
+        // Not remembered as closed under the filter, it goes, as a folder with no match.
+        #expect(lines(Tree.items(closedUnderRead("/f/docs/deep", remembered: false))) == [
+            "docs~ v", "  reading v", "    bread.txt", "Réadable.txt", "readme.md",
+        ])
+        // The status bar counts it as context, not as a match.
+        #expect(Tree.counts(Tree.items(closedUnderRead("/f/docs/deep", remembered: true))).rows == 4)
+    }
+
+    /// Opened again (its chevron), the matches inside it come back (the set
+    /// still names it: an open folder is open); while it is read it is not
+    /// gone, it shows its loading line, as context.
+    @Test func aContextFolderReopenedUnderTheFilterShowsItsMatchesAgain() {
+        var reopened = filterTree(filter: "read")
+        reopened.closedUnderFilter = [url("/f/docs/deep/", folder: true)]
+        #expect(Tree.items(reopened) == Tree.items(filterTree(filter: "read")))
+        var reading = closedUnderRead("/f/docs/deep", remembered: true)
+        reading.open.insert(url("/f/docs/deep"))
+        #expect(lines(Tree.items(reading)).prefix(3) == ["docs~ v", "  deep~ …", "    ···"])
+    }
+
+    /// Without a filter the set means nothing: the folder is closed as any.
+    @Test func withoutAFilterAFolderClosedUnderOneIsClosedAsUsual() {
+        var cleared = closedUnderRead("/f/docs/deep", remembered: true)
+        cleared.filter = ""
+        var plain = cleared
+        plain.closedUnderFilter = []
+        #expect(Tree.items(cleared) == Tree.items(plain))
+        #expect(lines(Tree.items(cleared)).contains("  deep"))
     }
 
     @Test func everyWordMustMatchCaseAndAccentsIgnored() {

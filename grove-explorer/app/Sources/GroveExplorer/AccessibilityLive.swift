@@ -126,10 +126,8 @@ enum AccessibilityLive {
             _ table: AXUIElement, rows: [AXUIElement], shown: [TreeRow], model: AppModel, side: Side,
             problem: (String) -> Void
         ) {
-            // Under a filter a folder kept for the matches inside it is no
-            // row once closed (nothing inside it shows): there is no row to open again.
-            guard model.listing(for: side)?.filteredFrom == nil,
-                let child = shown.firstIndex(where: { $0.depth > 0 }),
+            // Under a filter too: a folder kept as context stays a row once closed (spec §16).
+            guard let child = shown.firstIndex(where: { $0.depth > 0 }),
                 let parent = shown[..<child].lastIndex(where: { $0.depth == shown[child].depth - 1 })
             else { return }
             let folder = shown[parent].entry.url.pathKey

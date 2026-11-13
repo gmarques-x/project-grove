@@ -353,10 +353,10 @@ extension AppModel {
     /// The pane has new rows (its folder or an open folder was read and
     /// arranged, or a run just ended): the items the last run left among
     /// them are selected, and a new folder is renamed in place.
-    /// `fromRows`: rows just arranged (`show`): what they had of the
-    /// arrivals is selected once, and the pane is done with them, so a
-    /// selection the user makes meanwhile isn't taken over again.
-    func arrived(in side: Side, fromRows: Bool = false) {
+    /// The pane is done with them once all are there (`arrivalStep`):
+    /// rows arranged while the run's listing had only some select those,
+    /// and the complete read that follows selects the rest.
+    func arrived(in side: Side) {
         guard let arrivals = work.arrivals, !arrivals.done.contains(side) else { return }
         guard arrivals.until > Date() else {
             work.arrivals = nil
@@ -373,17 +373,16 @@ extension AppModel {
         let folders = [tab.folder] + Array(listing.children.keys)
         let entries = listing.all + listing.children.values.flatMap { $0 }
         let unshown = AfterOperation.unshown(
-            arrivals.items, among: entries, showHidden: browser.showHidden, filter: filter.texts[tab.id] ?? "")
-        let here = AfterOperation.arrivals(
+            arrivals.items, among: entries, showHidden: browser.showHidden, filter: filter.tabs[tab.id]?.text ?? "")
+        let step = AfterOperation.arrivalStep(
             arrivals.items, in: folders, listed: Array(listing.rows.keys), leavingOut: unshown)
-        guard !here.found.isEmpty else { return }
-        select(Set(here.found), in: side)
-        reveal(here.found[0], in: side)
-        // A listing read while the run was going has only some: the next
-        // has all (but rows just arranged select only once).
-        guard here.complete || fromRows else { return }
+        guard let first = step.select.first else { return }
+        select(Set(step.select), in: side)
+        reveal(first, in: side)
+        // A listing read while the run was going has only some: the next has all.
+        guard step.done else { return }
         // Done for this pane: a later read leaves the selection to the user.
         work.arrivals?.done.insert(side)
-        if arrivals.renameIn == side, let made = here.found.first { beginRename(of: made, in: side) }
+        if arrivals.renameIn == side { beginRename(of: first, in: side) }
     }
 }

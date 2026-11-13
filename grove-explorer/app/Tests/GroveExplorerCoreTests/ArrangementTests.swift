@@ -31,6 +31,20 @@ import Testing
         #expect(arrangement(filter: " ").serves(arrangement()))
     }
 
+    /// Under a filter, a context folder closed by the user stays as a row
+    /// (spec §16): rows arranged without that are other rows.
+    @Test func theFoldersClosedUnderTheFilterAreOtherItems() {
+        let docs = downloads.appendingPathComponent("docs", isDirectory: true)
+        let closed = Arrangement(
+            folder: downloads, sort: .byName, filter: "read", showHidden: false, open: [], closedUnderFilter: [docs])
+        #expect(!closed.serves(arrangement(filter: "read")))
+        #expect(!arrangement(filter: "read").serves(closed))
+        let spelled = Arrangement(
+            folder: downloads, sort: .byName, filter: "read", showHidden: false, open: [],
+            closedUnderFilter: [URL(fileURLWithPath: downloads.path + "/docs/")])
+        #expect(closed.serves(spelled))
+    }
+
     @Test func spacesAroundTheWordsDoNotCount() {
         #expect(arrangement(filter: "shot  png ").serves(arrangement(filter: " shot png")))
     }

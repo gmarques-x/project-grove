@@ -22,8 +22,9 @@ import GroveExplorerCore
 // it has been asked about, for as long as the item is listed: the same
 // file is the same element from one answer to the next and after the
 // list is loaded again, and a row held by VoiceOver follows its file when
-// rows above it come or go. A row inside a folder that is closed is kept
-// too, while the folder is a row: opened again, it is the same row.
+// rows above it come or go. A row inside a folder that is closed (or
+// being read) is kept too, while the folder is a row: opened again, it is
+// the same row.
 
 /// One row of the list, as VoiceOver meets it: the item it shows, in its
 /// table. An `NSAccessibilityElement`, and it has to be: the token an
@@ -88,7 +89,8 @@ final class ListRowElement: NSAccessibilityElement {
     /// VoiceOver opens or closes the folder: as a click on its chevron
     /// (the row's pane gets the keys; closing remembers what was open inside).
     override func setAccessibilityDisclosed(_ disclosed: Bool) {
-        guard let row, folds else { return }
+        // Already so: nothing, not even the click.
+        guard let row, folds, disclosed != isAccessibilityDisclosed() else { return }
         onMain { [me] in
             guard let table = me.value.table else { return }
             table.clickedByAccessibility()
@@ -203,24 +205,28 @@ extension FileTableView {
         rows.compactMap { $0 >= 0 && $0 < numberOfRows ? element($0) : nil }
     }
 
-    /// The rows changed: the elements of items no longer listed, nor
-    /// inside a folder that is, are let go of (a token held for one then
-    /// says the element is gone, as for anything that went). What
-    /// VoiceOver never asked about costs nothing.
+    /// The rows changed: the elements of items no longer listed are let
+    /// go of (a token held for one then says the element is gone, as for
+    /// anything that went), unless the nearest folder above it that is a
+    /// row is closed or being read: opened again, the item is the same row.
+    /// One under an open folder went for good. What VoiceOver never asked
+    /// about costs nothing.
     func rowsReloadedForAccessibility() {
         spoken.listed = nil
         guard !spoken.rows.isEmpty else { return }
-        let folders = Set(
-            (0..<numberOfRows).compactMap { onRowTree?($0) }.filter { $0.fold != TreeRow.Fold.none }.map(\.entry.url.pathKey))
-        func isInsideAFolderRow(_ item: URL) -> Bool {
+        var folds: [String: TreeRow.Fold] = [:]
+        for row in 0..<numberOfRows {
+            if let shown = onRowTree?(row), shown.entry.kind == .folder { folds[shown.entry.url.pathKey] = shown.fold }
+        }
+        func isUnderAClosedFolder(_ item: URL) -> Bool {
             var path = item.pathKey
             while path.count > 1 {
                 path = (path as NSString).deletingLastPathComponent
-                if folders.contains(path) { return true }
+                if let fold = folds[path] { return fold == .closed || fold == .loading }
             }
             return false
         }
-        spoken.rows = spoken.rows.filter { item, _ in onRowOf?(item) != nil || isInsideAFolderRow(item) }
+        spoken.rows = spoken.rows.filter { item, _ in onRowOf?(item) != nil || isUnderAClosedFolder(item) }
     }
 
     /// The table's rows that are VoiceOver's (all but loading lines), in

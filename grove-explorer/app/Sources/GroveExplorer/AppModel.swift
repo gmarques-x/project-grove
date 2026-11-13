@@ -349,8 +349,8 @@ final class AppModel: ObservableObject {
     /// open in place.
     func arrangement(for tab: GroveExplorerCore.Tab) -> Arrangement {
         Arrangement(
-            folder: tab.folder, sort: tab.sort, filter: filter.texts[tab.id] ?? "", showHidden: browser.showHidden,
-            open: tab.open)
+            folder: tab.folder, sort: tab.sort, filter: filter.tabs[tab.id]?.text ?? "", showHidden: browser.showHidden,
+            open: tab.open, closedUnderFilter: filter.tabs[tab.id]?.closed ?? [])
     }
 
     /// The rows changed: what is no row now (a filter hides it, its folder

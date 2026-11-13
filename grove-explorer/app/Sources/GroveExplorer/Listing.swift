@@ -170,7 +170,8 @@ enum FolderListing {
     static func arranged(_ all: [Entry], tree: Tree, by arrangement: Arrangement, sizes: [URL: Int64]) -> Arranged {
         let input = TreeInput(
             root: all, children: tree.children, open: arrangement.open, hasContents: tree.peeks,
-            sort: arrangement.sort, folderSizes: sizes, filter: arrangement.filter, showHidden: arrangement.showHidden)
+            sort: arrangement.sort, folderSizes: sizes, filter: arrangement.filter, showHidden: arrangement.showHidden,
+            closedUnderFilter: arrangement.closedUnderFilter)
         let built = GroveExplorerCore.Tree.itemsAndUnfilteredCount(input)
         var rows: [URL: Int] = [:]
         rows.reserveCapacity(built.items.count)

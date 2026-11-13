@@ -13,13 +13,20 @@ public struct Arrangement: Equatable, Sendable {
     /// The folders open in place (spec §16), as the tab has them: rows
     /// arranged with one set open are other rows than with another.
     public var open: Set<URL>
+    /// The context folders closed under the filter (`ListFilter.closed`),
+    /// which stay as rows.
+    public var closedUnderFilter: Set<URL>
 
-    public init(folder: URL, sort: SortOrder, filter: String, showHidden: Bool, open: Set<URL>) {
+    public init(
+        folder: URL, sort: SortOrder, filter: String, showHidden: Bool, open: Set<URL>,
+        closedUnderFilter: Set<URL> = []
+    ) {
         self.folder = folder
         self.sort = sort
         self.filter = filter
         self.showHidden = showHidden
         self.open = open
+        self.closedUnderFilter = closedUnderFilter
     }
 
     /// The filter's words; none for a field that is empty or all spaces.
@@ -54,11 +61,13 @@ public struct Arrangement: Equatable, Sendable {
     }
 
     /// Whether this and `other` show the same items (the same folder,
-    /// filter words, hidden flag and open folders), whatever their order.
+    /// filter words, hidden flag, open folders and folders closed under
+    /// the filter), whatever their order.
     func hasSameItems(as other: Arrangement) -> Bool {
         folder.standardizedPath == other.folder.standardizedPath
             && showHidden == other.showHidden && words == other.words
             && (open.isEmpty && other.open.isEmpty || openPaths == other.openPaths)
+            && Set(closedUnderFilter.map(\.standardizedPath)) == Set(other.closedUnderFilter.map(\.standardizedPath))
     }
 }
 

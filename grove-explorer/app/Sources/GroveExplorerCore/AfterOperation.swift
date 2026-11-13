@@ -41,6 +41,17 @@ public enum AfterOperation {
         return (found, found.count == expected.count)
     }
 
+    /// What a pane does with `arrivals`' answer: it selects what was found,
+    /// and is done with the run's items (a later read leaves the selection
+    /// to the user) only once all of them are there. Rows arranged while
+    /// the listing had only some select those and wait for the rest.
+    public static func arrivalStep(
+        _ new: [URL], in folders: [URL], listed: [URL], leavingOut: Set<URL> = []
+    ) -> (select: [URL], done: Bool) {
+        let here = arrivals(new, in: folders, listed: listed, leavingOut: leavingOut)
+        return (here.found, !here.found.isEmpty && here.complete)
+    }
+
     /// Of `new`, those listed among `entries` that the list won't show:
     /// hidden while hidden items are hidden, or without every word of the
     /// ⌘F `filter`. (One not listed yet is not known not to show.)

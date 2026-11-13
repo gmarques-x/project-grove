@@ -73,10 +73,15 @@ public struct TreeInput: Sendable {
     /// The ⌘F field's text; "" (or only spaces) is no filter.
     public var filter: String
     public var showHidden: Bool
+    /// Folders kept as context under the filter that the user closed
+    /// (`ListFilter.closed`): each stays a row while the filter is on,
+    /// closed or opened again. Without a filter it means nothing.
+    public var closedUnderFilter: Set<URL>
 
     public init(
         root: [Entry], children: [URL: [Entry]], open: Set<URL>, hasContents: [URL: Bool],
-        sort: SortOrder, folderSizes: [URL: Int64], filter: String, showHidden: Bool
+        sort: SortOrder, folderSizes: [URL: Int64], filter: String, showHidden: Bool,
+        closedUnderFilter: Set<URL> = []
     ) {
         self.root = root
         self.children = children
@@ -86,6 +91,7 @@ public struct TreeInput: Sendable {
         self.folderSizes = folderSizes
         self.filter = filter
         self.showHidden = showHidden
+        self.closedUnderFilter = closedUnderFilter
     }
 }
 
@@ -108,7 +114,10 @@ public enum Tree {
     /// `Filter.matches`' rule), or as context (`isContext`) when something
     /// beneath it does; a matching open folder keeps only its matching
     /// descendants. A folder being read shows (with its loading line) only
-    /// if it matches itself. Nothing beneath a closed folder ever shows.
+    /// if it matches itself. Nothing beneath a closed folder ever shows; a
+    /// folder of `closedUnderFilter` stays as a row whatever is beneath it,
+    /// as context unless it matches: closed, or opened again and being read
+    /// (the user closed it under this filter: spec §16).
     public static func items(_ input: TreeInput) -> [TreeItem] {
         itemsAndUnfilteredCount(input).items
     }
@@ -255,6 +264,8 @@ public enum Tree {
         let filter: String
         let filtering: Bool
         let showHidden: Bool
+        /// By path; empty without a filter.
+        let closedUnderFilter: Set<String>
 
         init(_ input: TreeInput) {
             children = Tree.byPath(input.children)
@@ -265,6 +276,7 @@ public enum Tree {
             filter = input.filter
             filtering = input.filter.contains { !$0.isWhitespace }
             showHidden = input.showHidden
+            closedUnderFilter = filtering ? Set(input.closedUnderFilter.map(\.standardizedPath)) : []
         }
 
         /// What an open folder puts beneath it, and how its own row is drawn.
@@ -299,7 +311,12 @@ public enum Tree {
                 }
                 let path = entry.url.standardizedPath
                 guard open.contains(path) else {
-                    if matches { kept.append(entry) }
+                    if matches {
+                        kept.append(entry)
+                    } else if closedUnderFilter.contains(path) {
+                        kept.append(entry)
+                        opened[entry.url] = Opened(fold: .closed, items: [], isContext: true)
+                    }
                     continue
                 }
                 let fold: TreeRow.Fold
@@ -315,7 +332,8 @@ public enum Tree {
                     below = [.loading(under: entry.url, depth: depth + 1)]
                 }
                 let keepsMatch = !matches && below.contains { if case .row = $0 { true } else { false } }
-                guard matches || keepsMatch else { continue }
+                // Closed under the filter and opened again: a row still, being read or not.
+                guard matches || keepsMatch || closedUnderFilter.contains(path) else { continue }
                 kept.append(entry)
                 opened[entry.url] = Opened(fold: fold, items: below, isContext: !matches)
             }

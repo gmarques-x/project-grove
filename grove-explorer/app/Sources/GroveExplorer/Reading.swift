@@ -139,7 +139,7 @@ extension AppModel {
         listings[side]?.revision = revision
         keepVisibleSelection(in: side)
         // What the last run made inside an open folder is a row only now.
-        arrived(in: side, fromRows: true)
+        arrived(in: side)
         // Other rows: other folders whose sizes, chevrons and watchers count.
         rowsChanged(in: side)
     }

@@ -104,7 +104,7 @@ An empty folder has no arrow and gets one when something arrives in it; files, a
 
 The open folders are watched like the one you are in: what another app adds, renames or deletes inside them shows within a second, and an open folder that is deleted closes. One you rename in Grove Explorer stays open. Each tab remembers which folders are open, also when you go elsewhere and come back, and after you quit.
 
-**The filter** (⌘F) looks through every row that shows, open folders' contents included. A folder that holds a match stays as a row, its name in the quiet colour; it is there for context and is not counted ("5 of 33" counts the matches). The filter never opens a folder by itself.
+**The filter** (⌘F) looks through every row that shows, open folders' contents included. A folder that holds a match stays as a row, its name in the quiet colour; it is there for context and is not counted ("5 of 33" counts the matches). Close it and it stays, closed, until you change or clear the filter; open it again and the matches inside come back. The filter never opens a folder by itself.
 
 **Commands** act on the rows you can see, at any depth: ⌘A selects them all, and a folder selected together with something inside it is copied, moved or trashed once. **Where things go:** paste, ⌘⇧N, F5 and F6 and a drop on a pane's empty space go to the tab's folder, as in Finder; a drop on a folder's row, open or closed, goes into that folder. A new folder or a renamed item appears where it belongs in the tree.
 

@@ -358,11 +358,14 @@ private func until(_ condition: @Sendable () async -> Bool) async {
         proceed.signal()
         #expect(await first.value == nil)
         #expect(await calculator.size(of: folder) == 2)
+        #expect(await calculator.size(of: folder) == 2)
         #expect(walks.count == 2)
     }
 
     /// A walk cancelled by a change (or by `cancelAll`) says so: it is no
-    /// folder that can't be read. One whose stand-in finds nothing is.
+    /// folder that can't be read, even when the walk itself came back with
+    /// nothing, as a real one does once cancelled. One whose walk finds
+    /// nothing uncancelled is.
     @Test func aCancelledWalkIsNotAnUnreadableFolder() async {
         let walks = Walks()
         let proceed = DispatchSemaphore(value: 0)
@@ -371,7 +374,8 @@ private func until(_ condition: @Sendable () async -> Bool) async {
             defer { walks.end() }
             if path == "/closed" { return nil }
             _ = proceed.wait(timeout: .now() + 10)
-            return 1
+            // The two walks cancelled below come back with nothing; the last one with a total.
+            return walks.count <= 3 ? nil : 1
         }
         #expect(await calculator.answer(for: URL(fileURLWithPath: "/closed")) == .unreadable)
         let busy = URL(fileURLWithPath: "/busy/inside")
