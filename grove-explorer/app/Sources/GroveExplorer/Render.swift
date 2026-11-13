@@ -161,9 +161,11 @@ enum Render {
     }
 
     /// The window of the state named `state`, on its sample data, laid out
-    /// in a window that is never shown; the app is never started
-    /// (activation policy `.prohibited`). For a render and for the
-    /// accessibility audit.
+    /// in a window far off every screen; the app's delegate and scene never
+    /// start (activation policy `.prohibited`). For a render, which never
+    /// orders the window in, and for the accessibility audit, whose second
+    /// half does (there, fully clear, for the length of its check:
+    /// `AccessibilityLive`).
     static func window(showing state: String, colors: ThemeColors) -> (view: NSView, size: CGSize, model: AppModel) {
         guard let scene = scenes.first(where: { $0.name == state })?.scene else {
             fail("no state named \(state); there are: \(stateNames)")
@@ -184,10 +186,11 @@ enum Render {
         return (offscreen(view, size: size, colors: colors), size, model)
     }
 
-    /// `view` laid out and drawn in a window that is never shown.
+    /// `view` laid out and drawn in a window nobody sees.
     static func offscreen(_ view: some View, size: CGSize, colors: ThemeColors) -> NSView {
         let hosting = NSHostingView(rootView: view)
-        // Far off every screen, and never ordered in.
+        // Far off every screen, and not ordered in here (only the audit's
+        // second half orders it in, where it is, clear).
         let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: size.width, height: size.height),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

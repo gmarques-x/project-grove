@@ -12,7 +12,10 @@ if let flag = CommandLine.arguments.firstIndex(of: "--render") {
     Render.run(Array(CommandLine.arguments[(flag + 1)...]))
 }
 // `--audit-accessibility <state>|all [--tree]`: the same windows, walked
-// for controls that say nothing of themselves. Offscreen like a render.
+// for controls that say nothing of themselves, then their lists asked
+// through the accessibility server. Far off every screen like a render's;
+// for the second half the window is ordered in there, fully clear, and
+// the application finishes launching (no delegate or scene starts).
 if let flag = CommandLine.arguments.firstIndex(of: "--audit-accessibility") {
     AccessibilityAudit.run(Array(CommandLine.arguments[(flag + 1)...]))
 }

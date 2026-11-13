@@ -75,7 +75,13 @@ enum AccessibilityLive {
 
         let windows = list(app, "AXWindows")
         guard let window = windows.first else {
-            result.problems.append("the accessibility server gives no window: nothing was asked through it")
+            // The usual reason: the program that runs this (the terminal)
+            // is not allowed to use the accessibility server.
+            let why = AXIsProcessTrusted()
+                ? ""
+                : " (this process is not trusted for accessibility: allow the terminal that runs it under"
+                    + " Privacy & Security › Accessibility)"
+            result.problems.append("the accessibility server gives no window: nothing was asked through it" + why)
             return result
         }
         let found = tables(under: window)
@@ -172,10 +178,14 @@ enum AccessibilityLive {
             if after.error == .success, let words = after.value as? String, !words.isEmpty {
                 problem("a row whose file went still says “\(words)”")
             }
-            _ = AXUIElementPerformAction(rows[0], "AXShowMenu" as CFString)
-            _ = AXUIElementSetAttributeValue(rows[0], "AXSelected" as CFString, kCFBooleanTrue)
-            _ = AXUIElementSetAttributeValue(table, "AXSelectedRows" as CFString, [rows[0]] as CFArray)
-            if !list(table, "AXSelectedRows").isEmpty { problem("a row whose file went could still be selected") }
+            // Only of a row whose file did go: with rows left, the first
+            // may be a live one, and its menu would really open.
+            if left.isEmpty {
+                _ = AXUIElementPerformAction(rows[0], "AXShowMenu" as CFString)
+                _ = AXUIElementSetAttributeValue(rows[0], "AXSelected" as CFString, kCFBooleanTrue)
+                _ = AXUIElementSetAttributeValue(table, "AXSelectedRows" as CFString, [rows[0]] as CFArray)
+                if !list(table, "AXSelectedRows").isEmpty { problem("a row whose file went could still be selected") }
+            }
         }
         return result
     }
