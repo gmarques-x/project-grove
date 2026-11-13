@@ -100,6 +100,8 @@ public enum CommandList {
         row("openWithArrow", "Open", "↓", [.command], in: "File"),
         row("openInGhostty", "Open in Ghostty", "T", [.command, .option], in: "File"),
         row("closeTab", "Close Tab", "W", [.command], in: "File"),
+        // Finder's key; it works before any share is saved (shared-folders spec).
+        row("connectToServer", "Connect to Server…", "K", [.command], in: "File"),
         row("getInfo", "Get Info", "I", [.command], in: "File"),
         row("rename", "Rename", "Return", in: "File"),
         row("duplicate", "Duplicate", "D", [.command], in: "File"),

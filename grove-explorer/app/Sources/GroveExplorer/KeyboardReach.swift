@@ -9,7 +9,10 @@ import SwiftUI
 //
 //   the right-click menu of the selection ......... ⌃Return, ⇧F10
 //   a sidebar row's menu (Open in New Tab,
-//     Remove from Sidebar, Eject) ................. the same, after ⌥⌘←
+//     Remove from Sidebar, Keep in Sidebar,
+//     Eject) ...................................... the same, after ⌥⌘←
+//   a connecting share's spinner (cancel) ......... Esc, after ⌥⌘← (on that row)
+//   the SHARED header's + ......................... ⌘K
 //   a disk's eject button ......................... ⌘E, after ⌥⌘← (on that row only)
 //   the status bar's Cancel ....................... ⌘. (in a text field ⌘. is the field's Escape)
 //   the conflict prompt's Cancel .................. Esc, ⌘.
@@ -70,15 +73,22 @@ extension AppModel {
     /// What can be done with a sidebar row beside opening it. None for the Trash.
     func menuRows(for place: Place) -> [PlaceMenuRow] {
         var rows: [PlaceMenuRow] = []
-        if place.kind != .trash {
+        if place.kind != .trash, place.url != nil {
             rows.append(PlaceMenuRow(title: "Open in New Tab") { [weak self] in self?.open(place, inNewTab: true) })
         }
         if place.kind == .favourite {
             let id = String(place.id.dropFirst("favourite.".count))
             rows.append(PlaceMenuRow(title: "Remove from Sidebar") { [weak self] in self?.removeFavourite(id: id) })
         }
+        if case .share(let server) = place.kind {
+            rows.append(PlaceMenuRow(title: "Remove from Sidebar") { [weak self] in self?.removeShare(server.id) })
+        }
+        // A network share of Locations (none of them saved: those are in SHARED).
+        if case .volume(let volume) = place.kind, volume.remountURL != nil {
+            rows.append(PlaceMenuRow(title: "Keep in Sidebar") { [weak self] in self?.keepInSidebar(volume) })
+        }
         // Offered while the disk is in use too: the row then says why not.
-        if case .volume(let volume) = place.kind, volume.ejectable, !ejecting.contains(volume.id) {
+        if let volume = ejectable(place), !ejecting.contains(volume.id) {
             rows.append(PlaceMenuRow(title: "Eject") { [weak self] in self?.eject(volume) })
         }
         return rows
@@ -119,8 +129,19 @@ extension AppModel {
     var ejectTarget: Volume? {
         guard let cursor = sidebarCursor else { return nil }
         let places = places
-        guard places.indices.contains(cursor), case .volume(let volume) = places[cursor].kind else { return nil }
-        return volume.ejectable ? volume : nil
+        guard places.indices.contains(cursor) else { return nil }
+        return ejectable(places[cursor])
+    }
+
+    /// The disk a row's eject ejects: a volume's own, a connected share's
+    /// volume. Nil for one that can't be ejected (the startup disk).
+    private func ejectable(_ place: Place) -> Volume? {
+        let volume: Volume? = switch place.kind {
+        case .volume(let volume): volume
+        case .share(let server): place.url == nil ? nil : shareVolumes()[server.id]
+        default: nil
+        }
+        return volume?.ejectable == true ? volume : nil
     }
 
     /// Offered while the disk is in use too: the row then says why not.

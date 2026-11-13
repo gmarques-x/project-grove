@@ -157,6 +157,7 @@ Finder's, unchanged:
 | ⌘A | Select all |
 | ⌘⇧G, ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
+| ⌘K | Connect to Server…: a share's address (`smb://grove-lab/media`), mounted, kept in the sidebar's SHARED section and opened (spec 2026-11-13-grove-explorer-shared-folders) |
 | ⌘I | Finder's Get Info for the selection, or for the folder itself when nothing is selected; ten items at most at a time, more is refused with a sentence (macOS asks once to let Grove Explorer control Finder) |
 | ⌃⌥⌘1, ⌃⌥⌘2, ⌃⌥⌘5, ⌃⌥⌘6 | Sort by Name, Kind, Date Modified, Size, as a click on the column's title (again: the other way round) |
 | Letters | Jump to a name |
@@ -180,7 +181,7 @@ Grove's:
 | ⌥← | Close the selected folder and everything inside it (§16) |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
-| ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
+| ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Keep in Sidebar, Eject) |
 | ⌘E | Eject the disk the keyboard is on, with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why. The other way round, while a disk is being ejected no command onto it is begun (nor an undo or a redo): the status bar says so |
 | ⌘. | Cancel the operation that is running, with the keyboard in a list or the sidebar; in the path or the filter field it does what Esc does there; in the conflict prompt it is Cancel |
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |

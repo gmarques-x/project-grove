@@ -34,6 +34,11 @@ struct WindowView: View {
             .preferredColorScheme(model.colors.colorScheme)
             // The red button asks the model: a quit that waits keeps the window.
             .background(WindowAccessor { [model] window in model.takeCloseButton(of: window) })
+            .sheet(isPresented: Binding(get: { model.showsConnectSheet }, set: { model.showsConnectSheet = $0 })) {
+                ConnectSheet(model: model)
+                    .environment(\.theme, model.colors)
+                    .preferredColorScheme(model.colors.colorScheme)
+            }
     }
 
     /// The window's inside, without what ties it to a real window (a render

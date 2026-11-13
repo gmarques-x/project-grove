@@ -133,6 +133,8 @@ public struct GroveIcon: View {
         /// A warning, in the orange accent: the mark that carries the colour
         /// where orange words would be too faint (a broken link's target).
         case warning = "exclamationmark.triangle.fill"
+        /// A shared folder on a server (the sidebar's SHARED rows).
+        case server = "server.rack"
 
         /// The SF Symbol's name.
         public var symbol: String { rawValue }

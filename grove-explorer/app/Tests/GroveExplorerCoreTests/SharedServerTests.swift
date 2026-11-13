@@ -34,15 +34,28 @@ import Testing
         #expect(SharedAddress.parse("http://x/y") == .failure(.unsupportedScheme("http")))
         #expect(SharedAddress.parse("") == .failure(.empty))
         #expect(SharedAddress.parse("   ") == .failure(.empty))
-        #expect(SharedAddress.parse("smb://grove-lab") == .failure(.noShare(host: "grove-lab")))
-        #expect(SharedAddress.parse("smb://grove-lab/") == .failure(.noShare(host: "grove-lab")))
+        #expect(SharedAddress.parse("smb://grove-lab") == .failure(.noShare(scheme: "smb", host: "grove-lab")))
+        #expect(SharedAddress.parse("smb://grove-lab/") == .failure(.noShare(scheme: "smb", host: "grove-lab")))
+        #expect(SharedAddress.parse("AFP://grove-lab") == .failure(.noShare(scheme: "afp", host: "grove-lab")))
         #expect(SharedAddress.parse("smb:///media") == .failure(.empty))
+    }
+
+    /// What `URLComponents` can't read is no address at all, not an empty one.
+    @Test func malformed() {
+        #expect(SharedAddress.parse("smb://grove lab/media") == .failure(.malformed))
+        #expect(SharedAddress.parse("grove lab/media") == .failure(.malformed))
+        #expect(SharedAddress.parse("smb://[grove-lab/media") == .failure(.malformed))
+        #expect(SharedAddressProblem.malformed.sentence == "That isn't a server address")
     }
 
     @Test func sentences() {
         #expect(SharedAddressProblem.unsupportedScheme("http").sentence == "Use an smb://, afp:// or nfs:// address")
         #expect(SharedAddressProblem.empty.sentence == "Type the server's address")
-        #expect(SharedAddressProblem.noShare(host: "grove-lab").sentence == "Add the share's name: smb://grove-lab/share")
+        #expect(SharedAddressProblem.noShare(scheme: "smb", host: "grove-lab").sentence
+            == "Add the share's name: smb://grove-lab/share")
+        // The scheme that was typed.
+        #expect(SharedAddressProblem.noShare(scheme: "afp", host: "grove-lab").sentence
+            == "Add the share's name: afp://grove-lab/share")
     }
 
     @Test func nameAndHost() {
@@ -74,6 +87,15 @@ import Testing
         #expect(added.last?.url == url("smb://grove-lab/media"))
         // A user name makes another share: it logs in as someone else.
         #expect(SharedServers.adding(url("smb://gm@grove-lab/media"), to: [server("smb://grove-lab/media")]).count == 2)
+    }
+
+    /// "The same share" is said as a mounted volume is matched: the share's
+    /// name in any capitals and either Unicode form, 445 on smb as no port.
+    @Test func savingTheSameShareSpelledAnotherWayKeepsOne() {
+        let saved = [server("smb://gm@grove-lab/M%C3%BAsica")]
+        #expect(SharedServers.adding(url("smb://GM@grove-lab:445/m%c3%basica/"), to: saved) == saved)
+        #expect(SharedServers.adding(url("smb://gm@grove-lab/Mu%CC%81sica"), to: saved) == saved)
+        #expect(SharedServers.adding(url("smb://gm@grove-lab:139/M%C3%BAsica"), to: saved).count == 2)
     }
 
     @Test func removingForgetsOne() {
@@ -108,6 +130,28 @@ import Testing
         let mine = server("smb://gm@grove-lab/media")
         #expect(SharedServers.match(mountedRemountURL: url("smb://gm@grove-lab/media"), volumeName: "media", among: [mine]) == mine)
         #expect(SharedServers.match(mountedRemountURL: url("smb://guest@grove-lab/media"), volumeName: "media", among: [mine]) == nil)
+    }
+
+    /// SMB share names know no capitals; macOS writes the address its own
+    /// way: escapes in either case, the name decomposed, the port, the user.
+    @Test func matchesTheShareSpelledAnotherWay() {
+        func matches(_ saved: String, _ mounted: String) -> Bool {
+            let share = server(saved)
+            return SharedServers.match(mountedRemountURL: url(mounted), volumeName: "x", among: [share]) == share
+        }
+        #expect(matches("smb://grove-lab/Media", "smb://grove-lab/media"))
+        #expect(matches("smb://grove-lab/M%c3%basica", "smb://grove-lab/M%C3%BAsica"))
+        // NFD (u and a combining acute) against NFC (ú).
+        #expect(matches("smb://grove-lab/M%C3%BAsica", "smb://grove-lab/Mu%CC%81sica"))
+        #expect(matches("smb://grove-lab/media", "smb://grove-lab:445/media"))
+        #expect(matches("smb://grove-lab:445/media", "smb://grove-lab/media"))
+        #expect(!matches("smb://grove-lab/media", "smb://grove-lab:139/media"))
+        // 445 is smb's alone.
+        #expect(!matches("afp://grove-lab/media", "afp://grove-lab:445/media"))
+        #expect(matches("smb://GM@grove-lab/media", "smb://gm@grove-lab/media"))
+        #expect(matches("smb://gm@grove-lab/media", "SMB://GM@GROVE-LAB/MEDIA"))
+        #expect(!matches("smb://grove-lab/media", "smb://grove-lab/media2"))
+        #expect(!matches("smb://grove-lab/media", "afp://grove-lab/media"))
     }
 
     @Test func rowState() {

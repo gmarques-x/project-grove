@@ -10,6 +10,11 @@ struct Volume: Equatable, Identifiable, Sendable {
     /// Whether it has an eject button: any volume but the startup disk's
     /// own that macOS says can be ejected or taken out.
     let ejectable: Bool
+    /// The address macOS would mount it again by (`volumeURLForRemountingKey`):
+    /// a network share's, with the user it logged in as. Nil for a disk.
+    var remountURL: URL? = nil
+    /// On a server rather than a disk of this Mac (`volumeIsLocalKey` false).
+    var isNetwork = false
 
     var id: String { url.path }
 
@@ -18,17 +23,20 @@ struct Volume: Equatable, Identifiable, Sendable {
     static func mounted() -> [Volume] {
         let keys: [URLResourceKey] = [
             .volumeLocalizedNameKey, .volumeNameKey, .volumeIsEjectableKey, .volumeIsRemovableKey,
-            .volumeIsInternalKey, .volumeIsRootFileSystemKey,
+            .volumeIsInternalKey, .volumeIsRootFileSystemKey, .volumeURLForRemountingKey, .volumeIsLocalKey,
         ]
         let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
         return urls.map { url in
             let values = try? url.resourceValues(forKeys: Set(keys))
             let isRoot = values?.volumeIsRootFileSystem ?? (url.path == "/")
+            let isNetwork = values?.volumeIsLocal == false
+            // A server's share is "ejected" by unmounting it, as Finder's button does.
             let ejectable = !isRoot
-                && (values?.volumeIsEjectable == true || values?.volumeIsRemovable == true || values?.volumeIsInternal == false)
+                && (values?.volumeIsEjectable == true || values?.volumeIsRemovable == true || values?.volumeIsInternal == false
+                    || isNetwork)
             return Volume(
                 url: url, name: values?.volumeLocalizedName ?? values?.volumeName ?? url.lastPathComponent,
-                ejectable: ejectable)
+                ejectable: ejectable, remountURL: values?.volumeURLForRemounting, isNetwork: isNetwork)
         }
     }
 
@@ -64,11 +72,13 @@ final class MountObserver {
 /// A row of the sidebar.
 struct Place: Identifiable, Equatable {
     /// The sidebar's sections, in its order: Favourites, iCloud, one for
-    /// each cloud provider in `~/Library/CloudStorage` (by its name),
-    /// Locations, and the Trash.
+    /// each cloud provider in `~/Library/CloudStorage` (by its name), the
+    /// saved shares, Locations, and the Trash.
     enum Section: Hashable {
         case favourites, cloud
         case provider(String)
+        /// The shares saved in `explorer.local.toml`, while there is one.
+        case shared
         case locations
         /// The Trash, at the bottom, without a caption.
         case trash
@@ -79,6 +89,7 @@ struct Place: Identifiable, Equatable {
             case .favourites: "Favourites"
             case .cloud: "iCloud"
             case .provider(let name): name
+            case .shared: "Shared"
             case .locations: "Locations"
             case .trash: ""
             }
@@ -88,13 +99,17 @@ struct Place: Identifiable, Equatable {
     enum Kind: Equatable {
         case favourite, cloud, trash
         case volume(Volume)
+        /// A saved share: connected, its row is its mount point's.
+        case share(SharedServer)
     }
 
     let id: String
     let kind: Kind
     let section: Section
     let title: String
-    let url: URL
+    /// The folder it opens. Nil for a share that is not connected: it has
+    /// no folder yet (a click connects it). Every place but a share has one.
+    let url: URL?
 }
 
 /// The sidebar: its rows, which one is lit, the keyboard in it, ejecting, favourites.
@@ -116,7 +131,16 @@ extension AppModel {
                 id: "cloud." + place.url.lastPathComponent, kind: .cloud, section: .provider(name), title: place.title,
                 url: place.url)
         }
-        places += volumes.map {
+        // The saved shares, each at its mount point while connected. A
+        // volume that is one of them is its row's, not listed again.
+        let mountedShares = shareVolumes()
+        places += config.servers.map { server in
+            Place(
+                id: "share." + server.id, kind: .share(server), section: .shared, title: server.name,
+                url: mountedShares[server.id]?.url ?? pendingMounts[server.id]?.point)
+        }
+        let shown = Set(mountedShares.values.map(\.id))
+        places += volumes.filter { !shown.contains($0.id) }.map {
             Place(id: "volume." + $0.id, kind: .volume($0), section: .locations, title: $0.name, url: $0.url)
         }
         places.append(Place(
@@ -129,21 +153,27 @@ extension AppModel {
     /// (or the folder itself), so iCloud Drive and a provider's folder win
     /// over Home, and the startup disk is lit only under nothing nearer; of
     /// two on one folder, the first (a favourite before the rest). Never
-    /// the Trash.
+    /// the Trash, nor a share that is not connected (it has no folder).
     func litPlace(among places: [Place]) -> Int? {
-        let rows = places.indices.filter { places[$0].kind != .trash }
-        return Places.nearest(above: browser.activeTab.folder, among: rows.map { places[$0].url }).map { rows[$0] }
+        let rows = places.indices.filter { places[$0].kind != .trash && places[$0].url != nil }
+        return Places.nearest(above: browser.activeTab.folder, among: rows.compactMap { places[$0].url }).map { rows[$0] }
     }
 
     /// A click on a row, or Return on it: the place opens in the active
-    /// pane's tab (in a new tab with ⌘); the Trash opens in Finder.
+    /// pane's tab (in a new tab with ⌘); the Trash opens in Finder; a share
+    /// that is not connected connects (and opens when it has).
     func open(_ place: Place, inNewTab: Bool = false) {
+        guard let url = place.url else {
+            if case .share(let server) = place.kind { connect(server) }
+            focusList()
+            return
+        }
         switch place.kind {
         case .trash:
             guard live else { return }
-            NSWorkspace.shared.open(place.url)
-        case .favourite, .cloud, .volume:
-            if inNewTab { change { $0.newTab(folder: place.url) } } else { go(to: place.url) }
+            NSWorkspace.shared.open(url)
+        case .favourite, .cloud, .volume, .share:
+            if inNewTab { change { $0.newTab(folder: url) } } else { go(to: url) }
         }
         focusList()
     }
@@ -181,6 +211,9 @@ extension AppModel {
         case "Return":
             sidebarCursor = nil
             if places.indices.contains(cursor) { open(places[cursor]) }
+        case "Escape" where places.indices.contains(cursor) && isConnecting(places[cursor]):
+            // Esc on a share that is connecting cancels it, quietly.
+            if case .share(let server) = places[cursor].kind { cancelConnect(server) }
         case "→", "Escape": sidebarCursor = nil
         default: break
         }
@@ -218,7 +251,7 @@ extension AppModel {
         }
     }
 
-    private func readVolumes() {
+    func readVolumes() {
         // Numbered like a pane's reads: of two on their way the later one answers.
         volumeReads += 1
         let number = volumeReads
@@ -229,6 +262,9 @@ extension AppModel {
                  Disk.cloudProviders(home: home))
             }.value
             guard number == volumeReads else { return }
+            // A share mounted before this read began is in it, or went.
+            let landed = pendingMounts.filter { $0.value.read >= number }
+            if landed.count != pendingMounts.count { pendingMounts = landed }
             if hasCloud != self.hasCloud { self.hasCloud = hasCloud }
             watchCloudStorage(providers != nil)
             if (providers ?? []) != cloudProviders {
@@ -244,7 +280,10 @@ extension AppModel {
             volumes = mounted
             keepSidebarCursorOnARow()
             ejecting.subtract(gone)
-            for id in gone { ejectFailures[id] = nil }
+            for id in gone {
+                ejectFailures[id] = nil
+                sharesMountedHere[id] = nil
+            }
             forgetPathParts()
             // The tabs of a disk that went move to Home (spec §13).
             if !gone.isEmpty { repairGoneFolders() }

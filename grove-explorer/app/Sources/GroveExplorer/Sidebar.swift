@@ -5,7 +5,8 @@ import GroveUI
 import SwiftUI
 
 /// The sidebar (spec §5): Favourites, iCloud, a section for each cloud
-/// provider (OneDrive…) and Locations under fine-print captions, the Trash
+/// provider (OneDrive…), the saved shares (Shared) and Locations under
+/// fine-print captions, the Trash
 /// at the bottom. The row lit is the active pane's
 /// place. As a rail (a narrow window) it is the icons alone, the sections
 /// divided by lines and the names in tooltips.
@@ -67,18 +68,54 @@ struct Sidebar: View {
         if rail {
             if !first { Line().padding(.vertical, GroveSpace.s8) }
         } else {
-            Text(verbatim: section.caption.uppercased())
-                .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
-                .foregroundStyle(theme.quiet)
-                .padding(.leading, GroveSpace.s8)
-                .padding(.top, first ? GroveSpace.s4 : GroveSpace.s16).padding(.bottom, GroveSpace.s4)
-                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: GroveSpace.s8) {
+                Text(verbatim: section.caption.uppercased())
+                    .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
+                    .foregroundStyle(theme.quiet)
+                    .accessibilityAddTraits(.isHeader)
+                if section == .shared {
+                    Spacer(minLength: 0)
+                    connectButton
+                }
+            }
+            .padding(.leading, GroveSpace.s8)
+            .padding(.trailing, section == .shared ? GroveSpace.s8 : 0)
+            .padding(.top, first ? GroveSpace.s4 : GroveSpace.s16).padding(.bottom, GroveSpace.s4)
         }
     }
 
+    /// The SHARED header's +: Connect to Server… (⌘K). Quiet, the text's
+    /// colour under the pointer. Its own line height: the caption's row
+    /// keeps the fine-print size.
+    private var connectButton: some View {
+        let pointed = hovered.wrappedValue == Self.connectID
+        return Button { model.showConnectSheet() } label: {
+            GroveIcon(.add, size: GroveType.finePrint)
+                .foregroundStyle(pointed ? Color(theme.fg) : theme.quiet)
+                .frame(width: IconMetrics.cell, height: GroveType.finePrint)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { inside in
+            if inside { hovered.wrappedValue = Self.connectID } else if hovered.wrappedValue == Self.connectID { hovered.wrappedValue = nil }
+        }
+        .accessibilityLabel("Connect to Server")
+        .help("Connect to Server…")
+    }
+
+    private static let connectID = "connect"
+
     private func row(_ place: Place, lit: Bool, cursor: Bool) -> some View {
-        let volume: Volume? = if case .volume(let volume) = place.kind { volume } else { nil }
+        let share = model.shareState(place)
+        // A share's own volume, while it is connected: its eject is the row's.
+        let volume: Volume? = switch place.kind {
+        case .volume(let volume): volume
+        case .share(let server) where place.url != nil: model.shareVolumes()[server.id]
+        default: nil
+        }
         let busy = volume.map { model.ejecting.contains($0.id) } ?? false
+        // A share not connected is said in quiet text, its host after its name.
+        let quiet = busy || (share != nil && place.url == nil)
         let pointed = hovered.wrappedValue == place.id
         // A drag of files is over the row: it would drop into this place.
         let marked = model.dropMark == .place(place.id)
@@ -88,10 +125,21 @@ struct Sidebar: View {
                 if !rail {
                     Text(verbatim: place.title)
                         .font(GroveFont.mono(GroveType.label))
-                        .foregroundStyle(busy ? theme.quiet : Color(theme.fg))
+                        .foregroundStyle(quiet ? theme.quiet : Color(theme.fg))
                         .lineLimit(1).truncationMode(.middle)
+                        .layoutPriority(1)
+                    if case .share(let server) = place.kind, !server.host.isEmpty {
+                        Text(verbatim: server.host)
+                            .font(GroveFont.mono(GroveType.body))
+                            .foregroundStyle(theme.quiet)
+                            .lineLimit(1).truncationMode(.tail)
+                    }
                     Spacer(minLength: 0)
-                    if let volume, volume.ejectable { eject(volume, busy: busy) }
+                    if share == .connecting, case .share(let server) = place.kind {
+                        connecting(server)
+                    } else if let volume, volume.ejectable {
+                        eject(volume, busy: busy)
+                    }
                 }
             }
             .padding(.horizontal, GroveSpace.s8)
@@ -109,7 +157,7 @@ struct Sidebar: View {
             .onHover { inside in
                 if inside { hovered.wrappedValue = place.id } else if hovered.wrappedValue == place.id { hovered.wrappedValue = nil }
             }
-            .help(rail ? place.title : place.url.path)
+            .help(rail ? place.title : place.url?.path ?? shareAddress(place))
             .accessibilityElement(children: .contain)
             .accessibilityLabel(place.title)
             .accessibilityAddTraits(lit ? [.isButton, .isSelected] : .isButton)
@@ -133,6 +181,12 @@ struct Sidebar: View {
         }
     }
 
+    /// A share's address, for the tooltip of its row while it has no folder.
+    private func shareAddress(_ place: Place) -> String {
+        if case .share(let server) = place.kind { return server.url.absoluteString }
+        return place.title
+    }
+
     /// The favourite's id in the config, for a favourite's row.
     private func favourite(_ place: Place) -> String? {
         place.kind == .favourite ? String(place.id.dropFirst("favourite.".count)) : nil
@@ -141,13 +195,20 @@ struct Sidebar: View {
     /// Files dropped on a row go into its place; the Trash takes none
     /// (⌘⌫ is the way there).
     private func dropTarget(_ place: Place) -> FileDropDelegate.Target {
-        place.kind == .trash ? .nothing : .folder(place.url, mark: .place(place.id), side: nil, tab: nil)
+        // A share not connected has no folder to drop into.
+        guard place.kind != .trash, let url = place.url else { return .nothing }
+        return .folder(url, mark: .place(place.id), side: nil, tab: nil)
     }
 
     @ViewBuilder private func icon(_ place: Place) -> some View {
         switch place.kind {
         case .favourite:
-            FolderIcon(mark: IconMap.mark(for: place.url, home: model.home))
+            if let url = place.url { FolderIcon(mark: IconMap.mark(for: url, home: model.home)) }
+        case .share:
+            // Quiet unless connected.
+            GroveIcon(.server, size: GroveType.label)
+                .foregroundStyle(place.url == nil ? theme.quiet : Color(theme.fg))
+                .frame(width: IconMetrics.cell, height: IconMetrics.cell)
         case .cloud:
             symbol(place.section == .cloud ? .cloud : .cloudStorage)
         case .trash:
@@ -193,8 +254,25 @@ struct Sidebar: View {
         }
     }
 
-    /// The row an eject button is in: the pointer is still over that row when it leaves the button.
-    private func place(_ volume: Volume) -> String { "volume." + volume.id }
+    /// The system's small spinner where a connected share's eject goes;
+    /// a click on it gives the mount up.
+    private func connecting(_ server: SharedServer) -> some View {
+        Button { model.cancelConnect(server) } label: {
+            ProgressView().controlSize(.mini)
+                .frame(width: IconMetrics.cell, height: IconMetrics.cell)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Cancel connecting to \(server.name)")
+        .help("Cancel connecting to \(server.name)")
+    }
+
+    /// The row an eject button is in: the pointer is still over that row
+    /// when it leaves the button (a share's row, for a share's volume).
+    private func place(_ volume: Volume) -> String {
+        if let id = model.shareVolumes().first(where: { $0.value.id == volume.id })?.key { return "share." + id }
+        return "volume." + volume.id
+    }
 }
 
 extension View {

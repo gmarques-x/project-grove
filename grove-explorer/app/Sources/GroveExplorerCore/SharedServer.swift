@@ -29,8 +29,10 @@ public enum SharedAddressProblem: Error, Equatable, Sendable {
     case password
     case unsupportedScheme(String)
     case empty
-    /// The address names a server but no share on it.
-    case noShare(host: String)
+    /// Not an address `URLComponents` can read ("smb://grove lab/media").
+    case malformed
+    /// The address names a server but no share on it; the scheme as typed.
+    case noShare(scheme: String, host: String)
 
     /// For the Connect to Server sheet, under the field.
     public var sentence: String {
@@ -38,7 +40,8 @@ public enum SharedAddressProblem: Error, Equatable, Sendable {
         case .password: "Leave the password out — macOS will ask for it"
         case .unsupportedScheme: "Use an smb://, afp:// or nfs:// address"
         case .empty: "Type the server's address"
-        case .noShare(let host): "Add the share's name: smb://\(host)/share"
+        case .malformed: "That isn't a server address"
+        case .noShare(let scheme, let host): "Add the share's name: \(scheme)://\(host)/share"
         }
     }
 }
@@ -54,20 +57,28 @@ public enum SharedAddress {
         var text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return .failure(.empty) }
         if !text.contains("://") { text = "smb://" + text }
-        guard var parts = URLComponents(string: text) else { return .failure(.empty) }
+        guard var parts = URLComponents(string: text) else { return .failure(.malformed) }
         if parts.password != nil { return .failure(.password) }
         let scheme = parts.scheme?.lowercased() ?? ""
         guard schemes.contains(scheme) else { return .failure(.unsupportedScheme(scheme)) }
         guard let host = parts.host, !host.isEmpty else { return .failure(.empty) }
         var path = parts.percentEncodedPath
         while path.hasSuffix("/") { path.removeLast() }
-        guard !path.isEmpty else { return .failure(.noShare(host: host)) }
+        guard !path.isEmpty else { return .failure(.noShare(scheme: scheme, host: host)) }
         parts.scheme = scheme
         parts.percentEncodedPath = path
         parts.query = nil
         parts.fragment = nil
-        guard let url = parts.url else { return .failure(.empty) }
+        guard let url = parts.url else { return .failure(.malformed) }
         return .success(url)
+    }
+
+    /// `url` with no password in it: none is ever written or kept (the
+    /// address macOS mounted a share by, kept from Locations, can carry one).
+    public static func withoutPassword(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.password != nil else { return url }
+        parts.password = nil
+        return parts.url ?? url
     }
 }
 
@@ -96,8 +107,8 @@ public enum SharedServers {
         return Favourites.id(forName: server.host + " " + url.path(percentEncoded: false), taken: taken)
     }
 
-    /// `servers` with `url` at the end, unless it is saved already (in any
-    /// capitals of its scheme and host, with or without a slash at the end).
+    /// `servers` with `url` at the end, unless it is saved already (the same
+    /// share as `key` compares them, its user included).
     public static func adding(_ url: URL, to servers: [SharedServer]) -> [SharedServer] {
         let key = key(url)
         guard !servers.contains(where: { Self.key($0.url) == key }) else { return servers }
@@ -119,7 +130,7 @@ public enum SharedServers {
                 server.url.user == nil ? key(server.url, user: false) == withoutUser : key(server.url) == withUser
             }
         }
-        let named = servers.filter { $0.name.lowercased() == volumeName.lowercased() }
+        let named = servers.filter { folded($0.name) == folded(volumeName) }
         return named.count == 1 ? named[0] : nil
     }
 
@@ -158,14 +169,23 @@ public enum SharedServers {
     /// kNetAuthErrorNoSharesAvailable (NetAuth/NetAuthErrors.h).
     static let netAuthNoSharesAvailable: Int32 = -6003
 
-    /// A share's address as compared: scheme and host in lower case, no
-    /// slash at the end; the user kept unless `user` is false.
-    static func key(_ url: URL, user: Bool = true) -> String {
+    /// A share's address as compared, so that two spellings of one share
+    /// are one: the scheme, host and user in any capitals; the path decoded
+    /// (`%c3%ba` is `%C3%BA`), in one Unicode form (NFD is NFC) and in any
+    /// capitals, as SMB share names are; no slash at the end; port 445 on
+    /// smb (its own) as no port. The user is left out when `user` is false.
+    public static func key(_ url: URL, user: Bool = true) -> String {
         guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url.absoluteString }
-        var path = parts.percentEncodedPath
+        let scheme = (parts.scheme ?? "").lowercased()
+        var path = folded(url.path(percentEncoded: false))
         while path.hasSuffix("/") { path.removeLast() }
-        let login = user ? parts.percentEncodedUser.map { $0 + "@" } ?? "" : ""
-        let port = parts.port.map { ":\($0)" } ?? ""
-        return (parts.scheme ?? "").lowercased() + "://" + login + (parts.percentEncodedHost ?? "").lowercased() + port + path
+        let login = user ? parts.user.map { folded($0) + "@" } ?? "" : ""
+        let port = parts.port.flatMap { scheme == "smb" && $0 == 445 ? nil : ":\($0)" } ?? ""
+        return scheme + "://" + login + folded(parts.host ?? "") + port + path
+    }
+
+    /// Text as names are compared: precomposed (NFC), in lower case.
+    static func folded(_ text: String) -> String {
+        text.precomposedStringWithCanonicalMapping.lowercased()
     }
 }

@@ -55,6 +55,20 @@ final class AppModel: ObservableObject {
     @Published var hasCloud = false
     /// The cloud providers' folders in `~/Library/CloudStorage` (OneDrive…).
     @Published var cloudProviders: [FolderName.CloudPlace] = []
+    /// The saved shares being connected, by `SharedServer.id` (`Mounter.swift`).
+    @Published var connectingShares: Set<String> = []
+    /// Shares this window just mounted, by id: their rows are connected
+    /// until a read of the volumes begun after the mount has landed.
+    @Published var pendingMounts: [String: PendingMount] = [:]
+    /// ⌘K, File ▸ Connect to Server…, the SHARED header's +.
+    @Published var showsConnectSheet = false
+    /// The mounts this window made, by mount point (`Volume.id`): the share
+    /// each is, whatever address macOS gives it back by.
+    var sharesMountedHere: [String: String] = [:]
+    /// The address the Connect to Server sheet is mounting.
+    var sheetMount: URL?
+    /// Made on the first connect: never in a render or a test.
+    lazy var mounter = Mounter()
     /// What a pane's status bar says for a few seconds ("x is no longer there").
     @Published var notices: [Side: String] = [:]
     /// A problem the whole window is about, beside the config's own: the

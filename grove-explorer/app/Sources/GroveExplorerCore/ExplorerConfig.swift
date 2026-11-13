@@ -107,7 +107,7 @@ public struct ExplorerConfig: Equatable, Sendable {
     /// written from `~`. No favourites at all is a bare `[favourites]`
     /// table, which still replaces the tracked list. Servers are a
     /// `[servers.<id>]` table each with its `url` and its `order` (from 1);
-    /// no servers is no table.
+    /// no servers is no table. A password in a url is left out.
     ///
     /// `existing` is the local file as it is now (nil: there is none). Its
     /// other tables and keys, and their comments, are kept as they are; only
@@ -153,7 +153,7 @@ public struct ExplorerConfig: Equatable, Sendable {
         if let servers {
             let tables = servers.enumerated().map { index, server in
                 TomlSection(path: [serversTable, server.id], entries: [
-                    TomlEntry(key: "url", value: .string(server.url.absoluteString)),
+                    TomlEntry(key: "url", value: .string(SharedAddress.withoutPassword(server.url).absoluteString)),
                     TomlEntry(key: "order", value: .int(index + 1)),
                 ])
             }

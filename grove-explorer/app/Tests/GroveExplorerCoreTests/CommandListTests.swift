@@ -62,6 +62,7 @@ import Testing
         ("goDownloads", "L", [.command, .option], "Go"),
         ("goApplications", "A", [.command, .shift], "Go"),
         ("getInfo", "I", [.command], "File"),
+        ("connectToServer", "K", [.command], "File"),
         // Finder's View › Sort By: the column headers, by key.
         ("sortByName", "1", [.control, .option, .command], "View"),
         ("sortByKind", "2", [.control, .option, .command], "View"),
@@ -209,11 +210,11 @@ import Testing
         let cells = section.split(separator: "\n").filter { $0.hasPrefix("| ") }
             .compactMap { $0.split(separator: "|").first.map { $0.trimmingCharacters(in: .whitespaces) } }
             .filter { $0 != "Key" && !$0.hasPrefix("---") }
-        // 19 rows of Finder's keys and 20 of Grove's. (The fix round after
+        // 20 rows of Finder's keys and 20 of Grove's. (The fix round after
         // Task 15's review reworded two of Grove's rows, ⌘E and ⌘., and
         // added or took away none. Folders that open in place, spec §16,
-        // added four: →, ←, ⌥→ and ⌥←.)
-        #expect(cells.count == 39)
+        // added four: →, ←, ⌥→ and ⌥←. Shared folders added Finder's ⌘K.)
+        #expect(cells.count == 40)
 
         var strokes: [String] = []
         for cell in cells {
@@ -230,8 +231,8 @@ import Testing
                 }
             }
         }
-        // 38 keys in Finder's rows and 32 in Grove's (→, ←, ⌥→ and ⌥←, one a row).
-        #expect(strokes.count == 70)
+        // 39 keys in Finder's rows and 32 in Grove's (→, ←, ⌥→ and ⌥←, one a row).
+        #expect(strokes.count == 71)
         let marks: [Character: GroveExplorerCore.Modifier] = ["⌘": .command, "⌥": .option, "⇧": .shift, "⌃": .control]
         for stroke in strokes {
             var modifiers: Set<GroveExplorerCore.Modifier> = []

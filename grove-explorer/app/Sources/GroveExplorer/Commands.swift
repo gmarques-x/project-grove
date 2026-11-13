@@ -35,6 +35,7 @@ enum CommandTable {
             "open": ({ $0.openSelection() }, { $0.hasSelection }),
             "openWithArrow": ({ $0.openSelection() }, { $0.hasSelection }),
             "openInGhostty": files { $0.openInGhostty() },
+            "connectToServer": ({ $0.showConnectSheet() }, { $0.live }),
             "closeTab": ({ $0.closeTab() }, { $0.browser.panes[$0.browser.active.rawValue].tabs.count > 1 }),
             "getInfo": files { $0.getInfo() },
             "rename": files({ $0.beginRename() }, when: { $0.hasOneSelected }),
@@ -107,10 +108,14 @@ enum CommandTable {
     static let all: [Command] = CommandList.all.compactMap { info in
         guard let action = actions[info.id] else { return nil }
         // Under the conflict prompt the window does nothing but answer it;
-        // while a name is being typed in a row, every key is the field's.
+        // while a name is being typed in a row, every key is the field's;
+        // under the Connect to Server sheet every key is the sheet's (⌘⌫
+        // there is its field's, not Move to Trash).
         return Command(
             info: info, run: action.run,
-            isEnabled: { $0.work.prompt == nil && $0.work.rename == nil && action.isEnabled($0) })
+            isEnabled: {
+                $0.work.prompt == nil && $0.work.rename == nil && !$0.showsConnectSheet && action.isEnabled($0)
+            })
     }
 
     /// The commands of `CommandList` that have no action here, and the

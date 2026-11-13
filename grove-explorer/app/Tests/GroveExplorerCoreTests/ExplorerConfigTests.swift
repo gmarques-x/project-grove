@@ -516,6 +516,16 @@ import Testing
         #expect(load(local: text).favourites.count == 5)
     }
 
+    /// "Keep in Sidebar" saves the address macOS mounted the share by,
+    /// which can carry a password: never written.
+    @Test func aPasswordIsNeverWritten() throws {
+        let kept = SharedServer(id: "grove-lab-media", url: URL(string: "smb://gm:secret@grove-lab/media")!)
+        let text = try ExplorerConfig.localText(favourites: nil, servers: [kept], home: home, keeping: nil)
+        #expect(text == "[servers.\"grove-lab-media\"]\nurl = \"smb://gm@grove-lab/media\"\norder = 1\n")
+        #expect(!text.contains("secret"))
+        #expect(load(local: text).servers == [share("grove-lab-media", "smb://gm@grove-lab/media")])
+    }
+
     @Test func unreadableLocalFileIsNotWrittenOver() {
         let media = share("grove-lab-media", "smb://grove-lab/media")
         #expect(throws: ConfigWriteRefused(
