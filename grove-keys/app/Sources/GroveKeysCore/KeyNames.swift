@@ -1,8 +1,9 @@
-/// AeroSpace key names and the matching US ANSI virtual key codes.
+/// AeroSpace key names and the matching macOS virtual key codes (US ANSI,
+/// plus `section`, the key ISO boards have top left).
 public enum KeyNames {
     private static let table: [(String, UInt16)] = [
         ("a", 0), ("s", 1), ("d", 2), ("f", 3), ("h", 4), ("g", 5), ("z", 6), ("x", 7),
-        ("c", 8), ("v", 9), ("b", 11), ("q", 12), ("w", 13), ("e", 14), ("r", 15),
+        ("c", 8), ("v", 9), ("section", 10), ("b", 11), ("q", 12), ("w", 13), ("e", 14), ("r", 15),
         ("y", 16), ("t", 17), ("1", 18), ("2", 19), ("3", 20), ("4", 21), ("6", 22),
         ("5", 23), ("equal", 24), ("9", 25), ("7", 26), ("minus", 27), ("8", 28),
         ("0", 29), ("rightSquareBracket", 30), ("o", 31), ("u", 32),
@@ -16,5 +17,6 @@ public enum KeyNames {
     private static let byCode = Dictionary(uniqueKeysWithValues: table.map { ($0.1, $0.0) })
 
     public static func keyCode(_ name: String) -> UInt16? { byName[name] }
+    public static func code(for name: String) -> UInt16? { byName[name] }
     public static func name(_ keyCode: UInt16) -> String? { byCode[keyCode] }
 }

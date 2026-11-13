@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import GroveKeysCore
 import GroveThemesCore
@@ -126,5 +127,82 @@ import GroveThemesCore
         #expect(line("[hyper]\nlauncher = 1\n") == 2)
         #expect(line("[launch]\nt = 3\n") == 2)
         #expect(line("[aerospace.main]\na = 3\n") == 2)
+    }
+
+    // MARK: [keyboard] shape
+
+    @Test func keyboardShapeAbsentIsAuto() throws {
+        #expect(try KeysFile(text: "").keyboardShape == .auto)
+        #expect(try KeysFile(text: fixture("keys.toml")).keyboardShape == .auto)
+        #expect(try KeysFile(text: "[keyboard]\n").keyboardShape == .auto)
+    }
+
+    @Test func keyboardShapeParses() throws {
+        #expect(try KeysFile(text: "[keyboard]\nshape = \"iso\"\n").keyboardShape == .iso)
+        #expect(try KeysFile(text: "[keyboard]\nshape = \"ansi\"\n").keyboardShape == .ansi)
+        #expect(try KeysFile(text: "[keyboard]\nshape = \"auto\"\n").keyboardShape == .auto)
+    }
+
+    /// An unknown value is reported like any other bad value in keys.toml
+    /// (the file is refused with the line), and the reader takes it as auto.
+    @Test func keyboardShapeUnknownIsAutoAndReported() throws {
+        func error(_ text: String) -> TomlError? {
+            do { _ = try KeysFile(text: text); return nil } catch { return error }
+        }
+        let e = error("[keyboard]\nshape = \"jis\"\n")
+        #expect(e?.line == 2)
+        #expect(e?.message == "shape must be \"auto\", \"iso\" or \"ansi\"")
+        #expect(error("[keyboard]\nshape = 1\n")?.line == 2)
+        #expect(error("\n[keyboard]\nsize = \"big\"\n")?.line == 3)
+        #expect(KeysFile.keyboardShape(in: try TomlDocument.parse("[keyboard]\nshape = \"jis\"\n")) == .auto)
+        #expect(KeysFile.keyboardShape(in: try TomlDocument.parse("[keyboard]\nshape = 1\n")) == .auto)
+    }
+
+    @Test func settingAutoRemovesTheKey() throws {
+        var f = try KeysFile(text: "[hyper]\ntap_ms = 200\n\n[keyboard]\nshape = \"iso\"\n")
+        f.setKeyboardShape(.auto)
+        #expect(f.keyboardShape == .auto)
+        #expect(f.document.serialized() == "[hyper]\ntap_ms = 200\n")
+        // Already auto: nothing written.
+        var g = try KeysFile(text: "[hyper]\ntap_ms = 200\n")
+        g.setKeyboardShape(.auto)
+        #expect(g.document.serialized() == "[hyper]\ntap_ms = 200\n")
+        // Another key in [keyboard] would keep the section; a comment on it too.
+        var h = try KeysFile(text: "# my board\n[keyboard]\nshape = \"ansi\"\n")
+        h.setKeyboardShape(.auto)
+        #expect(h.keyboardShape == .auto)
+        #expect(!h.document.serialized().contains("shape"))
+        #expect(h.document.serialized().contains("# my board"))
+    }
+
+    @Test func settingIsoWritesTheSection() throws {
+        let text = try fixture("keys.toml")
+        var f = try KeysFile(text: text)
+        f.setKeyboardShape(.iso)
+        #expect(f.keyboardShape == .iso)
+        #expect(f.document.sections.map(\.path)
+            == [[], ["hyper"], ["keyboard"], ["launch"], ["aerospace", "main"], ["aerospace", "service"]])
+        let written = f.document.serialized()
+        #expect(written.contains("[keyboard]\nshape = \"iso\"\n"))
+        let back = try KeysFile(text: written)
+        #expect(back.keyboardShape == .iso)
+        #expect(back.hyper == f.hyper && back.modes.map(\.name) == f.modes.map(\.name))
+        // Every comment of the shipped file is still there.
+        let comments = text.split(separator: "\n").filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+        #expect(!comments.isEmpty)
+        for c in comments { #expect(written.contains(c), "\(c)") }
+        // Changing it keeps the entry's own comment; back to auto restores the file.
+        var g = try KeysFile(text: "[keyboard]\nshape = \"iso\" # my Mac\n")
+        g.setKeyboardShape(.ansi)
+        #expect(g.document.serialized() == "[keyboard]\nshape = \"ansi\" # my Mac\n")
+        f.setKeyboardShape(.auto)
+        #expect(f.document.serialized() == text)
+    }
+
+    @Test func resolvedUsesDetectedOnlyForAuto() {
+        #expect(KeyboardShapeSetting.auto.resolved(detected: .iso) == .iso)
+        #expect(KeyboardShapeSetting.auto.resolved(detected: .ansi) == .ansi)
+        #expect(KeyboardShapeSetting.iso.resolved(detected: .ansi) == .iso)
+        #expect(KeyboardShapeSetting.ansi.resolved(detected: .iso) == .ansi)
     }
 }

@@ -48,6 +48,16 @@ public struct KeysFile: Equatable, Sendable {
         return h
     }
 
+    /// `[keyboard] shape`; absent, or a value it doesn't know, is auto.
+    public var keyboardShape: KeyboardShapeSetting { KeysFile.keyboardShape(in: document) }
+
+    static func keyboardShape(in document: TomlDocument) -> KeyboardShapeSetting {
+        for e in document.section(["keyboard"])?.entries ?? [] {
+            if e.key == "shape", case .string(let s) = e.value { return KeyboardShapeSetting(rawValue: s) ?? .auto }
+        }
+        return .auto
+    }
+
     public var launch: [(key: String, bundleID: String)] {
         (document.section(["launch"])?.entries ?? []).compactMap { e in
             if case .string(let s) = e.value { return (key: e.key, bundleID: s) }
@@ -71,6 +81,21 @@ public struct KeysFile: Equatable, Sendable {
         set(["hyper"], "enabled", .bool(h.enabled))
         set(["hyper"], "right_option", .string(h.rightOption.rawValue))
         set(["hyper"], "launcher", .string(h.launcher.rawValue))
+    }
+
+    /// Auto is the default and isn't written: it removes the key, and the
+    /// `[keyboard]` section when nothing else (no entry, no comment) is in it.
+    public mutating func setKeyboardShape(_ shape: KeyboardShapeSetting) {
+        guard shape != .auto else {
+            remove(["keyboard"], "shape")
+            if let s = document.sections.firstIndex(where: { $0.path == ["keyboard"] }),
+               document.sections[s].entries.isEmpty, document.sections[s].leadingComments.isEmpty,
+               document.sections[s].trailingComment == nil {
+                document.sections.remove(at: s)
+            }
+            return
+        }
+        set(["keyboard"], "shape", .string(shape.rawValue))
     }
 
     public mutating func setLaunch(key: String, bundleID: String) {
@@ -111,15 +136,16 @@ public struct KeysFile: Equatable, Sendable {
     }
 
     /// The section's index, creating it in the file's fixed order
-    /// (hyper, launch, aerospace modes, then anything else).
+    /// (hyper, keyboard, launch, aerospace modes, then anything else).
     private mutating func sectionIndex(_ path: [String]) -> Int {
         if let i = document.sections.firstIndex(where: { $0.path == path }) { return i }
         func rank(_ p: [String]) -> Int {
             switch p.first {
             case "hyper": return 0
-            case "launch": return 1
-            case "aerospace": return 2
-            default: return 3
+            case "keyboard": return 1
+            case "launch": return 2
+            case "aerospace": return 3
+            default: return 4
             }
         }
         let after = document.sections.lastIndex { !$0.path.isEmpty && rank($0.path) <= rank(path) }
@@ -140,6 +166,8 @@ public struct KeysFile: Equatable, Sendable {
             switch section.path.first {
             case "hyper" where section.path.count == 1:
                 for e in section.entries { try validateHyper(e) }
+            case "keyboard" where section.path.count == 1:
+                for e in section.entries { try validateKeyboard(e) }
             case "launch" where section.path.count == 1:
                 for e in section.entries {
                     guard case .string = e.value else {
@@ -157,6 +185,19 @@ public struct KeysFile: Equatable, Sendable {
             default:
                 break
             }
+        }
+    }
+
+    private static func validateKeyboard(_ e: TomlEntry) throws(TomlError) {
+        switch (e.key, e.value) {
+        case ("shape", .string(let s)):
+            guard KeyboardShapeSetting(rawValue: s) != nil else {
+                throw TomlError(line: e.line, message: "shape must be \"auto\", \"iso\" or \"ansi\"")
+            }
+        case ("shape", _):
+            throw TomlError(line: e.line, message: "shape in [keyboard] has the wrong kind of value")
+        default:
+            throw TomlError(line: e.line, message: "unknown setting \"\(e.key)\" in [keyboard]")
         }
     }
 
