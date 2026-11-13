@@ -369,6 +369,7 @@ extension AppModel {
             // The window's own list: without what went, with what is new.
             let kept = Set(after.map(\.id)), old = Set(before.map(\.id))
             config.favourites = config.favourites.filter { kept.contains($0.id) } + after.filter { !old.contains($0.id) }
+            keepSidebarCursorOnARow()
             writeProblem = nil
         } catch let refused as ConfigWriteRefused {
             writeProblem = refused.description

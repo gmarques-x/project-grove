@@ -116,12 +116,15 @@ extension AppModel {
         }
     }
 
-    /// A row went (a favourite removed, a disk ejected): the keyboard is
-    /// on the last row rather than on none.
-    func keepSidebarCursorOnARow() {
+    /// The rows changed (a favourite or a share removed or kept, a disk
+    /// come or gone): the keyboard stays on its row, by its id (or the id it
+    /// became, `renamed`), else on the nearest one (`Places.keptCursor`).
+    func keepSidebarCursorOnARow(renamed: [String: String] = [:]) {
         guard let cursor = sidebarCursor else { return }
-        let last = places.count - 1
-        if cursor > last { sidebarCursor = max(last, 0) }
+        let ids = places.map(\.id)
+        let kept = Places.keptCursor(on: sidebarCursorID, at: cursor, among: ids, renamed: renamed)
+        // The same place, maybe another row there now: only the id is new.
+        if kept != cursor { sidebarCursor = kept } else { sidebarCursorID = kept.map { ids[$0] } }
     }
 
     // MARK: Eject

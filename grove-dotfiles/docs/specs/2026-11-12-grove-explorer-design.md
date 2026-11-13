@@ -187,7 +187,7 @@ Grove's:
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
 | Return | In a folder macOS won't let the app read (nothing to rename there): Open Privacy Settings |
 
-Everything in the window but dragging the line between the panes has a key: the tabs' "+" and close marks are ⌘T and ⌘W, the path bar's parts ⌘↑ and ⌘L, the header's arrows ⌘[ and ⌘], its pane switch ⌘\, the columns' titles ⌃⌥⌘1, 2, 5 and 6. Tab and ⇧Tab stay the lists' ("the other pane") and never walk the window's controls.
+Everything in the window but dragging the line between the panes and the one after the sidebar (VoiceOver can move both) has a key: the tabs' "+" and close marks are ⌘T and ⌘W, the path bar's parts ⌘↑ and ⌘L, the header's arrows ⌘[ and ⌘], its pane switch ⌘\, the columns' titles ⌃⌥⌘1, 2, 5 and 6. Tab and ⇧Tab stay the lists' ("the other pane") and never walk the window's controls.
 
 The right-click menu is the system's (`.contextMenu`): its own font and the Mac's accent colour, as every native menu in Grove. Rows: Open, Open With ▸, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder, Open in Ghostty; on empty space: New Folder, Paste, Show Hidden Items. The app's menu bar menus (reached through Grove's Global Menu) carry the same commands with their keys.
 

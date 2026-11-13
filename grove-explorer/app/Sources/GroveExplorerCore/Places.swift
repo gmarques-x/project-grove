@@ -15,6 +15,17 @@ public enum Places {
         }
         return best?.index
     }
+
+    /// Where the keyboard's row is after the sidebar's rows changed (a
+    /// favourite or a share removed or kept, a disk come or gone): on the
+    /// row it was on, found by its id (or by the id it became, `renamed`:
+    /// Keep in Sidebar makes a volume's row its share's); when that row
+    /// went, on the one now at its place, or the last. Nil with no rows.
+    public static func keptCursor(on id: String?, at index: Int, among ids: [String], renamed: [String: String] = [:]) -> Int? {
+        guard !ids.isEmpty else { return nil }
+        if let id, let found = ids.firstIndex(of: renamed[id] ?? id) { return found }
+        return min(max(index, 0), ids.count - 1)
+    }
 }
 
 /// The sidebar's sections, in its order: Favourites, iCloud, one for each
@@ -133,9 +144,23 @@ public enum SidebarLayout {
     /// no wider than leaves each pane 430 (it would turn into the rail
     /// under the pointer).
     public static func dragged(to x: Double, windowWidth: Double, panes: Int) -> Double {
+        min(max(x.rounded(), narrowest), widestFitting(windowWidth: windowWidth, panes: panes))
+    }
+
+    /// A drag that began with the sidebar `start` wide and has moved the
+    /// pointer `translation` since: the width moves by as much (where in the
+    /// line's catch area it was caught makes no jump), within `dragged(to:)`'s limits.
+    public static func dragged(from start: Double, by translation: Double, windowWidth: Double, panes: Int) -> Double {
+        dragged(to: start + translation, windowWidth: windowWidth, panes: panes)
+    }
+
+    /// The widest the sidebar can be dragged in this window: 360, or less
+    /// where that leaves each pane 430; never under 160 (the window shows
+    /// the rail then, and nothing is dragged).
+    public static func widestFitting(windowWidth: Double, panes: Int) -> Double {
         let count = Double(max(1, panes))
         let room = (windowWidth - count * line - count * paneFloor).rounded(.down)
-        return min(max(x.rounded(), narrowest), max(narrowest, min(widest, room)))
+        return max(narrowest, min(widest, room))
     }
 
     /// The left of two panes: its share of what the line between them leaves, in whole points.

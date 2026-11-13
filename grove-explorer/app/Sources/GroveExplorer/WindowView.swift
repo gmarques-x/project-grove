@@ -164,21 +164,13 @@ private struct PaneDivider: View {
     var body: some View {
         Line(vertical: true)
             .overlay {
-                // Wider than the line it moves, so it can be caught.
-                Color.clear
-                    .frame(width: GroveSpace.s8)
-                    .contentShape(Rectangle())
-                    .onHover { inside in
-                        // Set, not pushed: nothing is left on the cursor
-                        // stack should the divider go while the pointer is on it.
-                        (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.space)).onChanged { drag in
-                            model.split = SidebarLayout.split(leftWidth: drag.location.x, panesWidth: panesWidth)
-                        }
-                    )
-                    .onTapGesture(count: 2) { model.split = 0.5 }
+                DividerHandle(
+                    space: Self.space,
+                    start: { SidebarLayout.leftPaneWidth(panesWidth: panesWidth, split: model.split) },
+                    drag: { start, moved in
+                        model.split = SidebarLayout.split(leftWidth: start + moved, panesWidth: panesWidth)
+                    },
+                    reset: { model.split = 0.5 })
             }
             .zIndex(1)
             .accessibilityElement()
@@ -194,8 +186,8 @@ private struct PaneDivider: View {
 /// The line after the full sidebar (2026-11-13 sidebar spec, B): dragged,
 /// the sidebar is 160–360 pt wide (the panes take the rest and keep their
 /// split); a double-click makes it 200 again. Caught and dragged as the
-/// line between the panes is; VoiceOver meets it as a splitter whose value
-/// is the width (`SplitterElement`).
+/// line between the panes is (`DividerHandle`); VoiceOver meets it as a
+/// splitter whose value is the width (`SplitterElement`).
 private struct SidebarDivider: View {
     static let space = "window parts"
     /// How far one VoiceOver step moves the line, in points.
@@ -205,56 +197,116 @@ private struct SidebarDivider: View {
     let windowWidth: CGFloat
 
     var body: some View {
-        Line(vertical: true)
+        let widest = SidebarLayout.widestFitting(windowWidth: windowWidth, panes: model.sides.count)
+        return Line(vertical: true)
             .overlay {
-                // Wider than the line it moves, so it can be caught.
-                Color.clear
-                    .frame(width: GroveSpace.s8)
-                    .contentShape(Rectangle())
-                    .onHover { inside in
-                        // Set, not pushed, as the panes' divider does.
-                        (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.space)).onChanged { drag in
-                            resize(to: drag.location.x)
-                        }
-                    )
-                    .onTapGesture(count: 2) { model.sidebarWidth = SidebarLayout.reset }
+                DividerHandle(
+                    space: Self.space,
+                    start: { SidebarLayout.width(of: .full, chosen: model.sidebarWidth) },
+                    drag: { start, moved in
+                        resize(SidebarLayout.dragged(from: start, by: moved, windowWidth: windowWidth, panes: model.sides.count))
+                    },
+                    reset: { model.sidebarWidth = SidebarLayout.reset })
             }
             .background {
-                SplitterElement(label: "Sidebar width", value: model.sidebarWidth) { wider in
-                    resize(to: model.sidebarWidth + (wider ? Self.step : -Self.step))
+                SplitterElement(
+                    label: "Sidebar width", value: model.sidebarWidth, range: SidebarLayout.narrowest...widest
+                ) { wider in
+                    resize(SidebarLayout.dragged(
+                        to: model.sidebarWidth + (wider ? Self.step : -Self.step), windowWidth: windowWidth,
+                        panes: model.sides.count))
                 }
             }
             .zIndex(1)
     }
 
-    private func resize(to x: Double) {
-        let width = SidebarLayout.dragged(to: x, windowWidth: windowWidth, panes: model.sides.count)
-        if width != model.sidebarWidth { model.sidebarWidth = width }
+    /// Whether the width changed (at a limit it doesn't).
+    @discardableResult private func resize(_ width: Double) -> Bool {
+        guard width != model.sidebarWidth else { return false }
+        model.sidebarWidth = width
+        return true
     }
 }
 
-/// A splitter for VoiceOver, with its value (the role SwiftUI has no
-/// modifier for): an AppKit view behind a line that takes no clicks, the
-/// pointer's drag staying SwiftUI's. Increment and decrement move it.
+/// The catch area of a line that can be dragged (the panes' and the
+/// sidebar's): 8 pt over the 1 pt line. The resize-left-right pointer over
+/// it, and for the whole of a drag (also once the line has stopped at a
+/// limit and the pointer has gone past it). A drag moves the line by as
+/// much as the pointer moved since it began, measured in `space` (which
+/// stays put while the line moves), so where in the area it was caught
+/// makes no jump. A double-click is `reset`.
+private struct DividerHandle: View {
+    let space: String
+    /// Where the line is as a drag begins, in points.
+    let start: () -> Double
+    /// A drag: where it began, and how far the pointer has moved since.
+    let drag: (_ start: Double, _ moved: Double) -> Void
+    let reset: () -> Void
+    /// The line's place when the drag under way began; nil between drags.
+    /// `State` used directly: no SwiftUI macros here.
+    private var began = State<Double?>(initialValue: nil)
+    /// The pointer is over the area.
+    private var inside = State(initialValue: false)
+
+    init(space: String, start: @escaping () -> Double, drag: @escaping (Double, Double) -> Void, reset: @escaping () -> Void) {
+        self.space = space
+        self.start = start
+        self.drag = drag
+        self.reset = reset
+    }
+
+    var body: some View {
+        Color.clear
+            .frame(width: GroveSpace.s8)
+            .contentShape(Rectangle())
+            .onHover { now in
+                inside.wrappedValue = now
+                // Set, not pushed: nothing is left on the cursor stack should
+                // the line go while the pointer is on it. Not while dragging.
+                if began.wrappedValue == nil { (now ? NSCursor.resizeLeftRight : NSCursor.arrow).set() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .named(space))
+                    .onChanged { moving in
+                        let from = began.wrappedValue ?? start()
+                        if began.wrappedValue == nil { began.wrappedValue = from }
+                        // Over whatever the pointer is above now, until the drag ends.
+                        NSCursor.resizeLeftRight.set()
+                        drag(from, moving.translation.width)
+                    }
+                    .onEnded { _ in
+                        began.wrappedValue = nil
+                        if !inside.wrappedValue { NSCursor.arrow.set() }
+                    }
+            )
+            .onTapGesture(count: 2, perform: reset)
+    }
+}
+
+/// A splitter for VoiceOver, with its value and its limits (the role
+/// SwiftUI has no modifier for): an AppKit view behind a line that takes
+/// no clicks, the pointer's drag staying SwiftUI's. Increment and
+/// decrement move it; at a limit they say they did nothing.
 private struct SplitterElement: NSViewRepresentable {
     let label: String
     let value: Double
-    let step: (_ wider: Bool) -> Void
+    let range: ClosedRange<Double>
+    /// A step wider or narrower; whether the value changed.
+    let step: (_ wider: Bool) -> Bool
 
     func makeNSView(context: Context) -> SplitterView { SplitterView() }
 
     func updateNSView(_ view: SplitterView, context: Context) {
         view.label = label
         view.step = step
+        view.range = range
         view.value = value
     }
 
     final class SplitterView: NSView {
         var label = ""
-        var step: (Bool) -> Void = { _ in }
+        var step: (Bool) -> Bool = { _ in false }
+        var range: ClosedRange<Double> = 0...0
         var value = 0.0 {
             didSet { if value != oldValue { NSAccessibility.post(element: self, notification: .valueChanged) } }
         }
@@ -265,14 +317,10 @@ private struct SplitterElement: NSViewRepresentable {
         override func accessibilityLabel() -> String? { label }
         override func accessibilityValue() -> Any? { NSNumber(value: value) }
         override func accessibilityValueDescription() -> String? { "\(Int(value)) points" }
+        override func accessibilityMinValue() -> Any? { NSNumber(value: range.lowerBound) }
+        override func accessibilityMaxValue() -> Any? { NSNumber(value: range.upperBound) }
         override func accessibilityOrientation() -> NSAccessibilityOrientation { .vertical }
-        override func accessibilityPerformIncrement() -> Bool {
-            step(true)
-            return true
-        }
-        override func accessibilityPerformDecrement() -> Bool {
-            step(false)
-            return true
-        }
+        override func accessibilityPerformIncrement() -> Bool { step(true) }
+        override func accessibilityPerformDecrement() -> Bool { step(false) }
     }
 }

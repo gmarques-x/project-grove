@@ -51,7 +51,15 @@ final class AppModel: ObservableObject {
     /// ⌘L: the pane whose path bar is a text field, and what it says.
     @Published var pathField: PathFieldState?
     /// The sidebar row the keyboard is on (⌥⌘←); nil while the keys are the list's.
-    @Published var sidebarCursor: Int?
+    @Published var sidebarCursor: Int? {
+        didSet {
+            guard let index = sidebarCursor else { return sidebarCursorID = nil }
+            let places = places
+            sidebarCursorID = places.indices.contains(index) ? places[index].id : nil
+        }
+    }
+    /// The id of the row the keyboard is on: it stays on that row when rows move (`keepSidebarCursorOnARow`).
+    var sidebarCursorID: String?
     /// The mounted volumes, and the ones being ejected or that couldn't be.
     @Published var volumes: [Volume] = []
     @Published var ejecting: Set<String> = []

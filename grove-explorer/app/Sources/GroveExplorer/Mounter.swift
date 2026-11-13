@@ -247,10 +247,12 @@ extension AppModel {
     /// it is listed in Locations again.
     func removeShare(_ id: String) {
         if let server = config.servers.first(where: { $0.id == id }) { cancelConnect(server) }
+        // Mounted, its row becomes its volume's: the keyboard goes with it.
+        let mounted = shareVolumes()[id]
         guard changeServers({ SharedServers.removing(id: id, from: $0) }) != nil else { return }
         pendingMounts[id] = nil
         sharesMountedHere = sharesMountedHere.filter { $0.value != id }
-        keepSidebarCursorOnARow()
+        keepSidebarCursorOnARow(renamed: mounted.map { ["share." + id: "volume." + $0.id] } ?? [:])
     }
 
     /// "Keep in Sidebar" on a mounted network volume of Locations: its
@@ -261,7 +263,7 @@ extension AppModel {
             let saved = keepShare(url)
         else { return }
         sharesMountedHere[volume.id] = saved.id
-        keepSidebarCursorOnARow()
+        keepSidebarCursorOnARow(renamed: ["volume." + volume.id: "share." + saved.id])
     }
 
     /// Saves `url` (unless it is saved already); the share saved, or nil

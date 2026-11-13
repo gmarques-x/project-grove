@@ -155,8 +155,55 @@ import Testing
         #expect(SidebarLayout.dragged(to: 300, windowWidth: 900, panes: 2) == 160)
     }
 
-    @Test func aDoubleClickGivesTheDefaultWidth() {
-        #expect(SidebarLayout.reset == 200)
+    @Test func aDraggedSidebarBesideOnePaneLeavesItsPane430() {
+        // 1100 with one pane: 1100 − a line − 430 leaves 669, more than the widest.
+        #expect(SidebarLayout.widestFitting(windowWidth: 1100, panes: 1) == 360)
+        #expect(SidebarLayout.dragged(to: 500, windowWidth: 1100, panes: 1) == 360)
+        // 700 with one pane: 700 − 1 − 430 leaves 269.
+        #expect(SidebarLayout.widestFitting(windowWidth: 700, panes: 1) == 269)
+        #expect(SidebarLayout.dragged(to: 300, windowWidth: 700, panes: 1) == 269)
+        #expect(SidebarLayout.mode(windowWidth: 700, panes: 1, hidden: false, chosen: 269) == .full)
+        #expect(SidebarLayout.mode(windowWidth: 700, panes: 1, hidden: false, chosen: 270) == .rail)
+    }
+
+    @Test func aDragMovesTheWidthByWhatThePointerMovedNotToWhereItIs() {
+        // Caught 3 pt right of the line's middle, moved 10 pt: 210, not 213.
+        #expect(SidebarLayout.dragged(from: 200, by: 10, windowWidth: 1904, panes: 2) == 210)
+        #expect(SidebarLayout.dragged(from: 200, by: 0, windowWidth: 1904, panes: 2) == 200)
+        #expect(SidebarLayout.dragged(from: 200, by: -80, windowWidth: 1904, panes: 2) == 160)
+        #expect(SidebarLayout.dragged(from: 300, by: 200, windowWidth: 1904, panes: 2) == 360)
+    }
+
+    @Test func aDoubleClickGivesBack200AndItsLayout() {
+        #expect(SidebarLayout.reset == SidebarLayout.defaultWidth)
+        // 1100 with two panes: a rail beside a 360 sidebar, full again at 200.
+        #expect(SidebarLayout.mode(windowWidth: 1100, panes: 2, hidden: false, chosen: 360) == .rail)
+        #expect(SidebarLayout.mode(windowWidth: 1100, panes: 2, hidden: false, chosen: SidebarLayout.reset) == .full)
+        #expect(SidebarLayout.panesWidth(windowWidth: 1100, mode: .full, chosen: SidebarLayout.reset) == 899)
+    }
+
+    // MARK: The keyboard's row in the sidebar
+
+    @Test func theKeyboardStaysOnItsRowWhenRowsMove() {
+        // A favourite above it went: the row is one up, and the keyboard with it.
+        #expect(Places.keptCursor(on: "volume./", at: 5, among: ["fav.b", "cloud", "volume./", "trash"]) == 2)
+        // A row added above it.
+        #expect(Places.keptCursor(on: "trash", at: 1, among: ["volume./", "share.a", "trash"]) == 2)
+    }
+
+    @Test func aRowThatBecameAnotherTakesTheKeyboardWithIt() {
+        // Keep in Sidebar: the volume's row is now its share's, higher up.
+        let ids = ["volume./", "share.scratch", "volume./Volumes/Backup", "trash"]
+        #expect(Places.keptCursor(
+            on: "volume./Volumes/scratch", at: 3, among: ids,
+            renamed: ["volume./Volumes/scratch": "share.scratch"]) == 1)
+    }
+
+    @Test func whenItsRowWentTheKeyboardIsOnTheNearestOne() {
+        #expect(Places.keptCursor(on: "volume./Volumes/Backup", at: 2, among: ["volume./", "share.a", "trash"]) == 2)
+        #expect(Places.keptCursor(on: "volume./Volumes/Backup", at: 7, among: ["volume./", "trash"]) == 1)
+        #expect(Places.keptCursor(on: nil, at: 1, among: ["volume./", "trash"]) == 1)
+        #expect(Places.keptCursor(on: "x", at: 0, among: []) == nil)
     }
 
     // MARK: The divider
