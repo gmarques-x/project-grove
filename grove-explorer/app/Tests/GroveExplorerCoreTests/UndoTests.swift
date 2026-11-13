@@ -527,6 +527,54 @@ private func refusal(_ body: () async throws -> String) async -> String? {
         #expect(box.inTrash == [])
     }
 
+    /// A folder's size and date say nothing, so it is told by what the
+    /// volume says it is: another folder at the path, of the same name,
+    /// is not the copy and does not go to the Trash.
+    @Test func aCopiedFolderThatIsNowAnotherFolderOfThatNameIsNotUndone() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        await perform(.copy(items: [box.path("src/Tree")], to: dest))
+        // The copy is put aside and an unrelated folder takes its name.
+        try box.files.moveItem(at: box.path("dest/Tree"), to: box.path("dest/Tree aside"))
+        try box.makeFile("dest/Tree/theirs.txt", "not the copy")
+
+        let said = await refusal { try await stack.undo() }
+
+        #expect(said == "Can't undo: Tree has changed. It can no longer be undone.")
+        #expect(box.text(box.path("dest/Tree/theirs.txt")) == "not the copy")
+        #expect(box.text(box.path("dest/Tree aside/one.txt")) == "one")
+        #expect(box.inTrash == [])
+    }
+
+    /// The same for a move: an unrelated folder where the moved one was
+    /// put is not moved "back".
+    @Test func aMovedFolderThatIsNowAnotherFolderOfThatNameIsNotMovedBack() async throws {
+        try box.makeFile("src/Tree/one.txt", "one")
+        await perform(.move(items: [box.path("src/Tree")], to: dest))
+        try box.files.moveItem(at: box.path("dest/Tree"), to: box.path("dest/Tree aside"))
+        try box.makeFile("dest/Tree/theirs.txt", "not the moved one")
+
+        let said = await refusal { try await stack.undo() }
+
+        #expect(said == "Can't undo: Tree has changed. It can no longer be undone.")
+        #expect(box.text(box.path("dest/Tree/theirs.txt")) == "not the moved one")
+        #expect(!box.files.fileExists(atPath: box.path("src/Tree").path))
+        #expect(box.inTrash == [])
+    }
+
+    /// And for a new folder: an empty folder of its name made by someone
+    /// else since is not the one the operation made.
+    @Test func aNewFolderThatIsNowAnotherFolderOfThatNameIsNotUndone() async throws {
+        await perform(.newFolder(in: dest, name: "made"))
+        try box.files.moveItem(at: box.path("dest/made"), to: box.path("dest/made aside"))
+        try box.files.createDirectory(at: box.path("dest/made"), withIntermediateDirectories: false)
+
+        let said = await refusal { try await stack.undo() }
+
+        #expect(said == "Can't undo: made has changed. It can no longer be undone.")
+        #expect(box.files.fileExists(atPath: box.path("dest/made").path))
+        #expect(box.inTrash == [])
+    }
+
     // MARK: Operations that depend on each other
 
     @Test func aNewFolderAndAMoveIntoItAreUndoneOneAfterTheOther() async throws {

@@ -37,7 +37,12 @@ public struct UndoRefusal: Error, Equatable {
 /// - a file or a link has the size and the modification date, to the
 ///   nanosecond, that it had when the outcome was recorded. A folder's are
 ///   not compared: its date changes whenever anything is added to it or
-///   taken out, by this stack's own later operations too;
+///   taken out, by this stack's own later operations too. A folder is the
+///   same folder instead: the volume and the file number (`st_dev`,
+///   `st_ino`) it had then, so an unrelated folder that has since taken
+///   its name at the path is never trashed or moved in its place. (FAT and
+///   ExFAT make their file numbers up, and one may differ after the disk
+///   was attached again: that can only refuse an undo.)
 /// - a folder that a new-folder operation made is empty;
 /// - where it goes back to: that disk is attached, the folder is there, and
 ///   nothing has the name (but the newcomer of a replace, which leaves first).
@@ -450,18 +455,25 @@ private struct Step: Sendable {
 }
 
 /// What tells that an item is still as an operation left it: its kind
-/// and, but for a folder, its size and its modification date. Of the item
-/// itself: a link is not followed.
+/// and, for a file or a link, its size and its modification date; for a
+/// folder, which volume's which folder it is. Of the item itself: a link
+/// is not followed.
 private struct Stamp: Equatable, Sendable {
     var kind: mode_t
     var size: Int64
     var seconds: Int
     var nanoseconds: Int
+    /// The volume and the item's number on it.
+    var device: dev_t
+    var inode: ino_t
 
-    /// A folder is the same while it is a folder: its date changes with
-    /// everything put in it or taken out.
+    /// A folder's size and date change with everything put in it or taken
+    /// out: it is the same while it is the same folder to its volume. A
+    /// file or a link is the same by its size and date, as before.
     func isSameItem(as other: Stamp) -> Bool {
-        kind == S_IFDIR ? other.kind == S_IFDIR : self == other
+        if kind == S_IFDIR { return other.kind == S_IFDIR && device == other.device && inode == other.inode }
+        return kind == other.kind && size == other.size && seconds == other.seconds
+            && nanoseconds == other.nanoseconds
     }
 
     static func of(_ url: URL) -> Stamp? {
@@ -469,7 +481,8 @@ private struct Stamp: Equatable, Sendable {
         guard lstat(url.path, &info) == 0 else { return nil }
         return Stamp(
             kind: info.st_mode & S_IFMT, size: Int64(info.st_size),
-            seconds: info.st_mtimespec.tv_sec, nanoseconds: info.st_mtimespec.tv_nsec)
+            seconds: info.st_mtimespec.tv_sec, nanoseconds: info.st_mtimespec.tv_nsec,
+            device: info.st_dev, inode: info.st_ino)
     }
 }
 
