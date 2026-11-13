@@ -257,8 +257,12 @@ extension URL {
     /// (a trailing slash, `..`). Folders are kept as they were navigated to
     /// and only compared this way.
     func isSameFolder(as other: URL) -> Bool {
-        standardizedFileURL.path == other.standardizedFileURL.path
+        standardizedPath == other.standardizedPath
     }
+
+    /// The path `isSameFolder` compares: the same for a folder however it
+    /// was written, so it can key a dictionary where the URL can't.
+    var standardizedPath: String { standardizedFileURL.path }
 
     /// `/`, or a disk's folder in `/Volumes`: told from the path alone.
     var isVolumeRoot: Bool {
