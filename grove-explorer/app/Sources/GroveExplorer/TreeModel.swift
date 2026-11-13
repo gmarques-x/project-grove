@@ -8,14 +8,9 @@ import GroveExplorerCore
 struct PaneTree {
     /// The tab's id and the folder's path this is for.
     var key: String?
-    /// One read of each open folder at a time (`ReadGate`), by its path.
-    var reads: [String: OpenRead] = [:]
-
-    /// The read of one open folder: a later one answers instead (`number`).
-    struct OpenRead {
-        var gate = ReadGate()
-        var number = 0
-    }
+    /// The open folders' reads: one at a time each, eight folders at
+    /// once, numbered from `AppModel.readCount` (`OpenReads`).
+    var reads = OpenReads()
 
     /// When each folder was opened in the app (or renamed into), by
     /// `AppModel.readCount`: a read of its parent begun before then can't
@@ -91,7 +86,11 @@ extension AppModel {
     func keepOpenFolders(_ side: Side) {
         guard live, let tab = browser.tab(side), let listing = listing(for: side) else { return }
         let key = tab.id.uuidString + tab.folder.pathKey
-        if trees[side]?.key != key { trees[side] = PaneTree(key: key) }
+        if trees[side]?.key != key {
+            // Another tab's or folder's watchers are not left running.
+            forgetOpenFolders(side)
+            trees[side] = PaneTree(key: key)
+        }
         let reachable = Tree.reachable(open: tab.open, root: tab.folder, children: listing.knownListings)
         let paths = Set(reachable.map(\.pathKey))
         // A listing nobody shows is not watched: it would only go stale.
@@ -102,11 +101,12 @@ extension AppModel {
         }
         let open = Set(tab.open.map(\.pathKey))
         if var tree = trees[side] {
-            tree.reads = tree.reads.filter { paths.contains($0.key) }
+            tree.reads.keep(paths)
             tree.openedAt = tree.openedAt.filter { open.contains($0.key) }
+            tree.refreshing.formIntersection(paths)
             trees[side] = tree
         }
-        for folder in reachable where !listed.contains(folder.pathKey) && trees[side]?.reads[folder.pathKey] == nil {
+        for folder in reachable where !listed.contains(folder.pathKey) && trees[side]?.reads.isWanted(folder) == false {
             loadOpenFolder(folder, in: side)
         }
         watchOpenFolders(reachable, in: side)
@@ -141,11 +141,7 @@ extension AppModel {
     /// worked out again (they are rows of the list).
     private func openFolderChanged(_ folder: URL, key: String, in side: Side) {
         guard trees[side]?.key == key, trees[side]?.watchers[folder.pathKey] != nil else { return }
-        let path = folder.pathKey
-        var gate = trees[side]?.reads[path]?.gate ?? ReadGate()
-        let readNow = gate.changed(folder)
-        if trees[side]?.reads[path] != nil { trees[side]?.reads[path]?.gate = gate }
-        if readNow { loadOpenFolder(folder, in: side) }
+        if trees[side]?.reads.changed(folder) == true { loadOpenFolder(folder, in: side) }
         forgetPeeks(of: [folder], in: side)
         sizeQueue.changed(folder)
         let stale = AfterOperation.staleTotals(among: Array(sizes.keys), touched: [folder])
@@ -182,9 +178,22 @@ extension AppModel {
         if !new.isEmpty { refresh(new, in: side) }
     }
 
-    private func refresh(_ paths: Set<String>, in side: Side) {
+    /// A run of this window changed `folders`: those open in a pane, showing
+    /// and past the watchers' limit, are read again (a watched one is told
+    /// by its watcher).
+    func readUnwatchedOpenFolders(_ folders: [URL]) {
+        let paths = Set(folders.map(\.pathKey))
+        for side in sides {
+            guard let beyond = trees[side]?.beyond, !beyond.isEmpty else { continue }
+            let touched = paths.intersection(beyond)
+            if !touched.isEmpty { refresh(touched, in: side, saying: false) }
+        }
+    }
+
+    private func refresh(_ paths: Set<String>, in side: Side, saying: Bool = true) {
         for folder in reachableOpenFolders(in: side) where paths.contains(folder.pathKey) {
-            trees[side]?.refreshing.insert(folder.pathKey)
+            // Told when it had changed, unless the change was this window's own.
+            if saying { trees[side]?.refreshing.insert(folder.pathKey) }
             loadOpenFolder(folder, in: side)
         }
     }
@@ -197,36 +206,48 @@ extension AppModel {
     func loadOpenFolder(_ folder: URL, in side: Side) {
         // Nothing is read on a disk being ejected: the read would hold it.
         // (`eject` asks again for what shows if the disk stays.)
-        guard live, let tab = browser.tab(side), trees[side] != nil, !isBeingEjected(folder) else { return }
-        let path = folder.pathKey
+        guard live, let tab = browser.tab(side), let key = trees[side]?.key, !isBeingEjected(folder) else { return }
+        // Eight at once: the rest wait their turn (`readNextOpenFolder`).
+        guard trees[side]?.reads.want(folder) == true else { return }
+        // Numbered for every tab and folder alike: a read begun for
+        // another tab, or before the folder closed and opened again, is
+        // never this one.
         readCount += 1
-        let begunAt = readCount
-        var read = trees[side]?.reads[path] ?? PaneTree.OpenRead()
-        read.number += 1
-        read.gate.begin(folder)
-        trees[side]?.reads[path] = read
-        let number = read.number
+        let number = readCount, begunAt = readCount
+        trees[side]?.reads.begun(folder, number: number)
         let asked = PaneRows.ChildRead(tab: tab.id, tabFolder: tab.folder, folder: folder)
         Task {
             let read = await Task.detached { FolderListing.entries(of: folder) }.value
-            // A later read of it answers instead; or the pane let it go.
-            guard trees[side]?.reads[path]?.number == number else { return }
+            // The pane let it go (another tab or folder), or a later read
+            // of it answers instead: nothing of this one is taken or cleared.
+            guard trees[side]?.key == key, trees[side]?.reads.isLatest(folder, number: number) == true else { return }
             guard PaneRows.isCurrent(
                 asked, tab: browser.tab(side), listed: listings[side]?.folder, open: reachableOpenFolders(in: side))
             else {
-                trees[side]?.reads[path] = nil
+                trees[side]?.reads.dropped(folder, number: number)
+                trees[side]?.refreshing.remove(folder.pathKey)
+                readNextOpenFolder(in: side)
                 return
             }
+            let again = trees[side]?.reads.landed(folder, number: number) == true
             openFolderLanded(folder, read, begunAt: begunAt, in: side)
             // It changed while it was read: once more, now.
-            if trees[side]?.reads[path]?.gate.landed(folder) == true { loadOpenFolder(folder, in: side) }
+            if again { loadOpenFolder(folder, in: side) }
+            readNextOpenFolder(in: side)
         }
+    }
+
+    /// A read ended: the next open folder waiting for one is read.
+    private func readNextOpenFolder(in side: Side) {
+        while let folder = trees[side]?.reads.next() { loadOpenFolder(folder, in: side) }
     }
 
     /// An open folder's read landed, and is the pane's.
     private func openFolderLanded(_ folder: URL, _ read: FolderListing.Read, begunAt: Int, in side: Side) {
         guard let listing = listings[side] else { return }
         let name = folder.lastPathComponent
+        // Read again past the watchers' limit: answered now, however.
+        let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
         if let problem = read.problem {
             // Not "being read" for ever: it closes, without a chevron, and
             // the status bar says why (a folder that went says nothing:
@@ -243,9 +264,12 @@ extension AppModel {
             continueOpenAll(in: side)
             return
         }
-        let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
         let before = listing.childEntries(of: folder)
-        guard before != read.all else { return }
+        guard before != read.all else {
+            // Nothing new; ⌥→ may have been waiting on it, and ends.
+            continueOpenAll(in: side)
+            return
+        }
         // Past the watchers' limit and changed meanwhile: what showed of it
         // was out of date, and the user is told why.
         if wasRefresh, listing.childEntries(of: folder) != nil {
@@ -261,9 +285,9 @@ extension AppModel {
         listings[side]?.treeVersion += 1
         openFolderWasRead(folder, entries: read.all, begunAt: begunAt, in: side)
         arrangeTree(side)
-        // What is open inside it shows now, and is read in turn.
+        // What is open inside it shows now, and is read in turn. (What a
+        // run made in it is selected once its rows land: `show`.)
         keepOpenFolders(side)
-        arrived(in: side)
         // ⌥→ goes on into what it found.
         continueOpenAll(in: side)
     }

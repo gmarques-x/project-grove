@@ -94,25 +94,18 @@ extension AppModel {
             under: folder, known: listing.knownListings,
             showing: Tree.rowsOutside(folder, in: listing.items, index: listing.rows), showHidden: browser.showHidden,
             sort: tab.sort, folderSizes: sizes)
-        let open = Set(tab.open.map(\.pathKey))
         // A folder found unreadable (or empty) on the way has a "no" for its
-        // chevron and left the open set: it is not opened again, for ever.
-        let refused = Set(listing.peeks.filter { !$0.value }.keys.map(\.pathKey))
-        let wanted = result.open.filter { !refused.contains($0.pathKey) }
-        let new = wanted.filter { !open.contains($0.pathKey) }
-        let unread = wanted.contains { listing.childEntries(of: $0) == nil }
-        if result.stoppedAtLimit {
-            trees[side]?.openingAll = nil
-            say(Tree.stoppedAtLimit, in: side)
-        } else if !unread && new.isEmpty {
-            trees[side]?.openingAll = nil
-        }
+        // chevron and left the open set: it is not opened again.
+        let refused = Set(listing.peeks.filter { !$0.value }.keys)
+        let reading = Set(result.open.filter { trees[side]?.reads.isWanted($0) == true })
+        let step = Tree.openAllStep(
+            found: result.open, stoppedAtLimit: result.stoppedAtLimit, open: tab.open, refused: refused, reading: reading)
+        if step.stoppedAtLimit { say(Tree.stoppedAtLimit, in: side) }
         // The first step is the key's, seen at once; the next ones come with reads.
-        if !new.isEmpty {
-            setOpenFolders(tab.open.union(new), opened: new, in: side, now: trees[side]?.openAllStarted != true)
-        }
-        let goesOn = trees[side]?.openingAll != nil
-        trees[side]?.openAllStarted = goesOn
+        let first = trees[side]?.openAllStarted != true
+        trees[side]?.openAllStarted = true
+        if !step.goesOn { trees[side]?.openingAll = nil }
+        if !step.open.isEmpty { setOpenFolders(tab.open.union(step.open), opened: step.open, in: side, now: first) }
     }
 
     /// ←, or a click on an open chevron: the folder closes; what was

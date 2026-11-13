@@ -68,19 +68,30 @@ extension Tree {
         guard nested else {
             return places.compactMap { if case .row(let row) = items[$0] { row.entry.url } else { nil } }
         }
+        return operandPlaces(places, in: items).compactMap {
+            if case .row(let row) = items[$0] { row.entry.url } else { nil }
+        }
+    }
+
+    /// `operands`, by place: of the selected rows at `places` (in order)
+    /// of `items`, those no other of them is above (as a folder holding
+    /// it). One walk from the first to the last, no path compared.
+    public static func operandPlaces(_ places: [Int], in items: [TreeItem]) -> [Int] {
+        guard let first = places.first, let last = places.last, first <= last, items.indices.contains(last)
+        else { return [] }
         let chosen = Set(places)
-        var operands: [URL] = []
+        var taken: [Int] = []
         var takenDepth: Int?
-        for place in (places.first ?? 0)...(places.last ?? 0) {
+        for place in first...last {
             guard case .row(let row) = items[place] else { continue }
             if let depth = takenDepth, row.depth > depth { continue }
             takenDepth = nil
             if chosen.contains(place) {
-                operands.append(row.entry.url)
+                taken.append(place)
                 takenDepth = row.depth
             }
         }
-        return operands
+        return taken
     }
 
     // MARK: The fold keys (→ ← ⌥→ ⌥←)
@@ -199,4 +210,24 @@ extension Tree {
 
     /// What the status bar says when ⌥→ stopped at `rowLimit`.
     public static let stoppedAtLimit = "Stopped at 10,000 rows"
+
+    /// One step of ⌥→ as `openAll` found it (`found`, `stoppedAtLimit`):
+    /// `open` the folders to add to the tab's open set (never one already
+    /// open, nor one found `refused`: unreadable or empty, it closed again
+    /// and would be opened for ever); whether ⌥→ `goesOn` (a later read
+    /// can open more: something was added, or a folder it found is still
+    /// being read, `reading`); and whether it stopped at the limit, which
+    /// the status bar says. It ends once a step adds nothing and none of
+    /// its folders is on its way, whatever was left unread (a disk being
+    /// ejected reads nothing).
+    public static func openAllStep(
+        found: [URL], stoppedAtLimit: Bool, open: Set<URL>, refused: Set<URL>, reading: Set<URL>
+    ) -> (open: [URL], goesOn: Bool, stoppedAtLimit: Bool) {
+        let isOpen = Set(open.map(\.standardizedPath)), isRefused = Set(refused.map(\.standardizedPath))
+        let isReading = Set(reading.map(\.standardizedPath))
+        let wanted = found.filter { !isRefused.contains($0.standardizedPath) }
+        let new = wanted.filter { !isOpen.contains($0.standardizedPath) }
+        let pending = wanted.contains { isReading.contains($0.standardizedPath) }
+        return (new, !stoppedAtLimit && (!new.isEmpty || pending), stoppedAtLimit)
+    }
 }

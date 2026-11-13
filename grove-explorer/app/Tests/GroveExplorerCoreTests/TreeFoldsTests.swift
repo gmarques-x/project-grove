@@ -216,4 +216,48 @@ import Testing
         #expect(Tree.stoppedAtLimit == "Stopped at 10,000 rows")
         #expect(Tree.rowLimit == 10_000)
     }
+
+    @Test func operandPlacesAreTheOperandsByPlace() {
+        let items = tree
+        let rows = index(items)
+        let selections: [Set<URL>] = [
+            [url("/t/a"), url("/t/a/b/y", folder: false), url("/t/c")], [url("/t/a/b"), url("/t/a/b/y", folder: false)],
+            [url("/t/a/x", folder: false), url("/t/f.txt", folder: false)], [],
+        ]
+        for selection in selections {
+            let places = selection.compactMap { rows[$0] }.sorted()
+            let byPlace = Tree.operandPlaces(places, in: items).compactMap { place -> URL? in
+                if case .row(let row) = items[place] { row.entry.url } else { nil }
+            }
+            #expect(byPlace == Tree.operands(of: selection, in: items))
+        }
+    }
+
+    // MARK: ⌥→, step by step
+
+    @Test func optionRightAddsWhatItFoundAndGoesOnWhileReadsCanOpenMore() {
+        let found = [url("/t/a"), url("/t/a/b"), url("/t/a/c")]
+        let first = Tree.openAllStep(found: found, stoppedAtLimit: false, open: [url("/t/a")], refused: [], reading: [])
+        #expect(first.open.map(\.path) == ["/t/a/b", "/t/a/c"])
+        #expect(first.goesOn && !first.stoppedAtLimit)
+        // b and c are being read: nothing new yet, it waits for them.
+        let waiting = Tree.openAllStep(
+            found: found, stoppedAtLimit: false, open: Set(found), refused: [], reading: [url("/t/a/b")])
+        #expect(waiting.open.isEmpty && waiting.goesOn)
+    }
+
+    @Test func optionRightEndsWhenAStepAddsNothingAndNothingIsOnItsWay() {
+        let found = [url("/t/a"), url("/t/a/b")]
+        // Everything read: done.
+        let done = Tree.openAllStep(found: found, stoppedAtLimit: false, open: Set(found), refused: [], reading: [])
+        #expect(done.open.isEmpty && !done.goesOn)
+        // b was unreadable (it closed, its chevron a no): not opened again, and it ends.
+        let refused = Tree.openAllStep(
+            found: found, stoppedAtLimit: false, open: [url("/t/a")], refused: [url("/t/a/b/")], reading: [])
+        #expect(refused.open.isEmpty && !refused.goesOn)
+        // At the limit: what fits is added, and it stops, saying so.
+        let limit = Tree.openAllStep(found: found, stoppedAtLimit: true, open: [url("/t/a")], refused: [], reading: [])
+        #expect(limit.open.map(\.path) == ["/t/a/b"])
+        #expect(!limit.goesOn && limit.stoppedAtLimit)
+    }
 }
