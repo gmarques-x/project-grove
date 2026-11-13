@@ -107,6 +107,121 @@ load_agent() {
   [ -f "$HOME/.ssh/id_ed25519.pub" ]
 }
 
+# ---- 40-ssh: where ~/.ssh lives
+
+onedrive() { mkdir -p "$HOME/Library/CloudStorage/$1"; echo "$HOME/Library/CloudStorage/$1"; }
+
+@test "ssh asks nothing when there is no OneDrive" {
+  load_module 40-ssh
+  make_key; load_agent
+  ln -s "$GROVE_CONFIG/ssh/config" "$HOME/.ssh/config"
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh needs you when a OneDrive is there and nobody chose where ~/.ssh lives" {
+  load_module 40-ssh
+  make_key; load_agent
+  ln -s "$GROVE_CONFIG/ssh/config" "$HOME/.ssh/config"
+  onedrive OneDrive-Personal >/dev/null
+  run check
+  [ "$status" -eq 4 ]
+}
+
+@test "ssh apply moves ~/.ssh into the chosen OneDrive as dot-ssh and links it" {
+  load_module 40-ssh
+  make_key
+  echo hosts > "$HOME/.ssh/known_hosts"
+  before="$(cksum < "$HOME/.ssh/id_ed25519")"
+  od="$(onedrive OneDrive-Personal)"
+  printf '1\n' > "$GROVE_TTY"
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$HOME/.ssh")" = "$od/dot-ssh" ]
+  [ "$(stat -f %Lp "$od/dot-ssh")" = "700" ]
+  [ "$(cksum < "$od/dot-ssh/id_ed25519")" = "$before" ]
+  [ "$(stat -f %Lp "$od/dot-ssh/id_ed25519")" = "600" ]
+  [ "$(cat "$od/dot-ssh/known_hosts")" = "hosts" ]
+  [ "$(readlink "$od/dot-ssh/config")" = "$GROVE_CONFIG/ssh/config" ]
+  [ -f "$GROVE_STATE/backup/test/.ssh/id_ed25519" ]
+  load_agent
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh apply on another Mac picks that Mac's OneDrive by number, keeping dot-ssh's own files" {
+  load_module 40-ssh
+  onedrive OneDrive-Personal >/dev/null
+  od="$(onedrive "OneDrive-Contoso Ltd")"
+  mkdir -m 700 "$od/dot-ssh"
+  /usr/bin/ssh-keygen -q -t ed25519 -N '' -f "$od/dot-ssh/id_ed25519"
+  cloud="$(cksum < "$od/dot-ssh/id_ed25519")"
+  mkdir -m 700 "$HOME/.ssh"; echo local-only > "$HOME/.ssh/extra"; echo other > "$HOME/.ssh/id_ed25519"
+  printf '1\n' > "$GROVE_TTY"   # sorted: "OneDrive-Contoso Ltd" comes first
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$HOME/.ssh")" = "$od/dot-ssh" ]
+  [ "$(cksum < "$od/dot-ssh/id_ed25519")" = "$cloud" ]
+  [ "$(cat "$od/dot-ssh/extra")" = "local-only" ]
+}
+
+@test "ssh apply takes a typed folder path" {
+  load_module 40-ssh
+  onedrive OneDrive-Personal >/dev/null
+  mkdir -p "$BATS_TEST_TMPDIR/elsewhere"
+  printf '%s\n' "$BATS_TEST_TMPDIR/elsewhere/" > "$GROVE_TTY"
+  stub ssh-keygen '/usr/bin/ssh-keygen "$@" -q -N ""'
+  run apply
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$HOME/.ssh")" = "$BATS_TEST_TMPDIR/elsewhere/dot-ssh" ]
+}
+
+@test "ssh apply keeps ~/.ssh on this Mac when 0 is chosen, and doesn't ask again" {
+  load_module 40-ssh
+  make_key
+  onedrive OneDrive-Personal >/dev/null
+  printf '0\n' > "$GROVE_TTY"
+  run apply
+  [ "$status" -eq 0 ]
+  [ ! -L "$HOME/.ssh" ]
+  [ "$(cat "$GROVE_STATE/ssh-place")" = "local" ]
+  load_agent
+  run check
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh apply refuses a choice that isn't on the list and changes nothing" {
+  load_module 40-ssh
+  make_key
+  onedrive OneDrive-Personal >/dev/null
+  printf '7\n' > "$GROVE_TTY"
+  run apply
+  [ "$status" -eq 1 ]
+  [ ! -L "$HOME/.ssh" ]
+  [ ! -e "$HOME/Library/CloudStorage/OneDrive-Personal/dot-ssh" ]
+}
+
+@test "ssh apply under --yes asks nothing and moves nothing" {
+  load_module 40-ssh
+  make_key
+  onedrive OneDrive-Personal >/dev/null
+  export GROVE_YES=1
+  run apply
+  [ "$status" -eq 1 ]
+  [ ! -L "$HOME/.ssh" ]
+}
+
+@test "ssh is settled when ~/.ssh already links to a dot-ssh folder" {
+  load_module 40-ssh
+  od="$(onedrive OneDrive-Personal)"
+  mkdir -m 700 "$od/dot-ssh"
+  ln -s "$od/dot-ssh" "$HOME/.ssh"
+  make_key; load_agent
+  ln -s "$GROVE_CONFIG/ssh/config" "$HOME/.ssh/config"
+  run check
+  [ "$status" -eq 0 ]
+}
+
 # ---- 50-git
 
 @test "git config parses" {
