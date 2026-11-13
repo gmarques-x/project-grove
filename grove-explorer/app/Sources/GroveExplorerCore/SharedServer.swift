@@ -88,6 +88,18 @@ public enum SharedRowState: Equatable, Sendable {
     case connecting
     /// Mounted, at this folder.
     case connected(URL)
+
+    /// What VoiceOver says of `server`'s row in this state: "media on
+    /// grove-lab, shared folder, connected". No user, no password.
+    public func spoken(_ server: SharedServer) -> String {
+        let state = switch self {
+        case .notConnected: "not connected"
+        case .connecting: "connecting"
+        case .connected: "connected"
+        }
+        let host = server.host.isEmpty ? "" : " on \(server.host)"
+        return "\(server.name)\(host), shared folder, \(state)"
+    }
 }
 
 /// What a mount ended in: the folder, nothing to say (the password sheet
@@ -132,6 +144,20 @@ public enum SharedServers {
         }
         let named = servers.filter { folded($0.name) == folded(volumeName) }
         return named.count == 1 ? named[0] : nil
+    }
+
+    /// What "Keep in Sidebar" saves for a mounted volume of Locations: the
+    /// address macOS keeps to mount it again, any password left out, when
+    /// it is one the Connect to Server sheet would take (smb, afp or nfs,
+    /// naming a share) and no saved share is it already (a second mount,
+    /// `media-1`). Nil: the volume isn't offered Keep in Sidebar (WebDAV,
+    /// FTP, a share saved), which would otherwise do nothing.
+    public static func keepable(remountURL: URL?, among servers: [SharedServer]) -> URL? {
+        guard let remountURL,
+            case .success(let url) = SharedAddress.parse(SharedAddress.withoutPassword(remountURL).absoluteString),
+            match(mountedRemountURL: url, volumeName: "", among: servers) == nil
+        else { return nil }
+        return url
     }
 
     /// A row's state: mounted wins, then a mount on its way.

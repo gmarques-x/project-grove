@@ -137,3 +137,22 @@ existing rows.
 
 Also: the exact sheet layout within Grove's window style; the spinner's look;
 where the address parser lives in Core; how the matching is cached.
+
+## As built (2026-11-13)
+
+Where the build differs from the design above:
+
+- The sheet's spinner sits beside Connect (which is disabled), not inside it.
+  Cancel while connecting gives the mount up and keeps the sheet and its
+  address; a second Cancel (or Esc) closes it.
+- A mounted volume is matched to a saved share by its remount address; the
+  volume-name fallback is used only for a network volume macOS gives no
+  remount address for, and never by Connect to Server's "already mounted"
+  shortcut (`smb://other/media` must not open another server's `media`).
+  One volume per share: a second mount of it (`media-1`) stays in LOCATIONS.
+- "Keep in Sidebar" is offered only for a LOCATIONS volume whose remount
+  address the sheet would take (smb, afp, nfs, naming a share) and that is
+  not saved yet (`SharedServers.keepable`); WebDAV and FTP volumes get none.
+- The row's state is (saved, mounted, connecting); a failure is not kept on
+  the row: it is said once in the active pane's notice line.
+- Network volumes in LOCATIONS have an eject button (unmount), as Finder's.

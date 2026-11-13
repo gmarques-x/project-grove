@@ -159,7 +159,8 @@ struct Sidebar: View {
             }
             .help(rail ? place.title : place.url?.path ?? shareAddress(place))
             .accessibilityElement(children: .contain)
-            .accessibilityLabel(place.title)
+            // A share says where it is and its state: "media on grove-lab, shared folder, connected".
+            .accessibilityLabel(spoken(place, share))
             .accessibilityAddTraits(lit ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.open(place) }
             // The same rows a key opens (⌃Return with the keyboard here).
@@ -179,6 +180,12 @@ struct Sidebar: View {
                     .padding(.top, GroveSpace.s2).padding(.bottom, GroveSpace.s4)
             }
         }
+    }
+
+    /// What VoiceOver says of a row: its name; a share's with its host and state.
+    private func spoken(_ place: Place, _ share: SharedRowState?) -> String {
+        if case .share(let server) = place.kind, let share { return share.spoken(server) }
+        return place.title
     }
 
     /// A share's address, for the tooltip of its row while it has no folder.
@@ -261,6 +268,8 @@ struct Sidebar: View {
             ProgressView().controlSize(.mini)
                 .frame(width: IconMetrics.cell, height: IconMetrics.cell)
                 .contentShape(Rectangle())
+                // The button is what VoiceOver meets and presses, not a busy indicator.
+                .accessibilityHidden(true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Cancel connecting to \(server.name)")

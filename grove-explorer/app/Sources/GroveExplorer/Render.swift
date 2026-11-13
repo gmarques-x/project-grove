@@ -216,6 +216,14 @@ enum Render {
             showHidden: true)),
         ("links-narrow", Scene(size: half, panes: [Sample.homeLinks(selected: [".ssh"]), Sample.homeLinks()],
             showHidden: true)),
+        // Shared folders: SHARED's three rows, media connected (and open,
+        // its row lit), backup not connected, photos connecting; then
+        // Connect to Server with the sentence a wrong share name gets.
+        ("shared", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
+            extras: Sample.Extras(shares: true))),
+        ("connect-sheet", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
+            extras: Sample.Extras(shares: true, connectSheet: (
+                "smb://grove-lab/films", Sample.noShare("smb://grove-lab/films"))))),
         ("links-rename", Scene(
             size: CGSize(width: 948, height: 420), panes: [Sample.homeLinks(selected: [".ssh"])], showHidden: true,
             extras: Sample.Extras(rename: ".ssh"))),
@@ -265,6 +273,11 @@ enum Render {
         let view = WindowView(model: model).content
             .frame(width: size.width, height: size.height)
             .overlay(alignment: .topLeading) { WindowButtonsStandIn() }
+            .overlay(alignment: .top) {
+                if let sheet = scene.extras.connectSheet {
+                    SheetStandIn { ConnectSheet(model: model, text: sheet.text, problem: sheet.problem) }
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: GroveRadius.window))
             .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(colors.line, lineWidth: 1))
             .environment(\.theme, colors)
@@ -329,6 +342,22 @@ enum Render {
             fail("no scheme named \(scheme); there are: " + list.schemes.joined(separator: ", "))
         }
         return theme
+    }
+}
+
+/// Where macOS puts a sheet: down from under the window's header, in the
+/// middle, on a window's corners and shadow (the system draws that frame
+/// on a real window; this stands in for it in a render).
+private struct SheetStandIn<Content: View>: View {
+    @Environment(\.theme) private var theme
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .clipShape(RoundedRectangle(cornerRadius: GroveRadius.window))
+            .overlay(RoundedRectangle(cornerRadius: GroveRadius.window).strokeBorder(theme.line, lineWidth: 1))
+            .shadow(color: theme.cardShadow, radius: 30, y: 15)
+            .padding(.top, GroveSpace.s24 + GroveSpace.s16)
     }
 }
 

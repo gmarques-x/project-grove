@@ -83,8 +83,11 @@ extension AppModel {
         if case .share(let server) = place.kind {
             rows.append(PlaceMenuRow(title: "Remove from Sidebar") { [weak self] in self?.removeShare(server.id) })
         }
-        // A network share of Locations (none of them saved: those are in SHARED).
-        if case .volume(let volume) = place.kind, volume.remountURL != nil {
+        // A share of Locations the sheet would take, not saved yet (WebDAV,
+        // FTP and a second mount of a saved share are offered nothing).
+        if case .volume(let volume) = place.kind,
+            SharedServers.keepable(remountURL: volume.remountURL, among: config.servers) != nil
+        {
             rows.append(PlaceMenuRow(title: "Keep in Sidebar") { [weak self] in self?.keepInSidebar(volume) })
         }
         // Offered while the disk is in use too: the row then says why not.

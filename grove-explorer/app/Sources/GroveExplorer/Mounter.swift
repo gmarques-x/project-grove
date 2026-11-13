@@ -161,11 +161,13 @@ extension AppModel {
         case .failure(let problem): return problem.sentence
         }
         guard live else { return "" }
-        // Mounted already (by Finder, the command line): kept, and opened as it is.
+        // Mounted already (by Finder, the command line): kept, and opened as
+        // it is. Only by the address macOS mounted it by, never by its name
+        // alone: smb://other/media is not another server's "media".
         let share = SharedServer(url: url)
         if let volume = volumes.first(where: { volume in
-            (volume.isNetwork || volume.remountURL != nil)
-                && SharedServers.match(mountedRemountURL: volume.remountURL, volumeName: volume.name, among: [share]) != nil
+            guard let remount = volume.remountURL else { return false }
+            return SharedServers.match(mountedRemountURL: remount, volumeName: volume.name, among: [share]) != nil
         }) {
             if let saved = keepShare(url) { sharesMountedHere[volume.id] = saved.id }
             opened(volume.url)
@@ -232,8 +234,7 @@ extension AppModel {
     /// address (any password left out) is saved, and the volume moves to
     /// its row in SHARED.
     func keepInSidebar(_ volume: Volume) {
-        guard let remount = volume.remountURL,
-            case .success(let url) = SharedAddress.parse(SharedAddress.withoutPassword(remount).absoluteString),
+        guard let url = SharedServers.keepable(remountURL: volume.remountURL, among: config.servers),
             let saved = keepShare(url)
         else { return }
         sharesMountedHere[volume.id] = saved.id

@@ -23,7 +23,7 @@ From left to right: the sidebar, then one pane or two.
 | Part | What it is | Click |
 | --- | --- | --- |
 | Header | The app's name, back and forward arrows for the active pane, and the one-pane / two-pane switch at the right | The arrows go back and forward; the switch shows or hides the second pane |
-| Sidebar | **Favourites** (your folders), **iCloud Drive** when you use it, then each cloud service in its own section (OneDrive, Google Drive, Dropbox: whatever keeps its files in `~/Library/CloudStorage`; one installed while the app is open appears by itself), **Locations** (every disk, with an eject button where it can be ejected), and **Trash** at the bottom | Opens the place in the current tab; ⌘-click opens it in a new tab. Trash opens Finder's Trash |
+| Sidebar | **Favourites** (your folders), **iCloud Drive** when you use it, then each cloud service in its own section (OneDrive, Google Drive, Dropbox: whatever keeps its files in `~/Library/CloudStorage`; one installed while the app is open appears by itself), **Shared** (the shared folders you keep, see [Shared folders](#shared-folders)), **Locations** (every disk and network volume, with an eject button where it can be ejected: network volumes have one too), and **Trash** at the bottom | Opens the place in the current tab; ⌘-click opens it in a new tab. A shared folder that isn't connected connects first. Trash opens Finder's Trash |
 | Tab strip | One tab for each folder you have open in the pane; the active pane's strip has a green line | A tab shows it; "+" adds a tab on the same folder; the mark that appears under the pointer closes it |
 | Path bar | The folders from the disk (or Home, or the cloud: "iCloud Drive › Notes", "OneDrive › Documents") down to the one you are in | A part goes to that folder; the copy button after the last part copies the folder's full path (a green checkmark says it did) |
 | The list | Name, Size, Date Modified and Kind. Folders stay on top. A folder shows `···` until its total size is known, and `--` if it can't be read. A folder with something in it has an arrow before its icon | A column's title sorts by it; again reverses. A double-click opens. The arrow opens the folder in place (see below) |
@@ -57,6 +57,7 @@ These do what they do in Finder.
 | ⌘⇧G or ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
 | ⌘I | Finder's Get Info for the selection (macOS asks once to let Grove Explorer control Finder) |
+| ⌘K | Connect to Server: a shared folder's address (see [Shared folders](#shared-folders)) |
 | ⌃⌥⌘1, ⌃⌥⌘2, ⌃⌥⌘5, ⌃⌥⌘6 | Sort by Name, Kind, Date Modified, Size, like a click on the column's title (again: the other way round) |
 | Letters | Jump to the first name that starts with them |
 
@@ -79,8 +80,8 @@ These do what they do in Finder.
 | ⌥← | Close the selected folder and everything inside it |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
-| ⌃↩ or ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
-| ⌘E | Eject the disk the keyboard is on, with the keyboard in the sidebar (⌥⌘←). With the keyboard in a list it does nothing |
+| ⌃↩ or ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Keep in Sidebar, Eject) |
+| ⌘E | Eject the disk or connected shared folder the keyboard is on, with the keyboard in the sidebar (⌥⌘←). With the keyboard in a list it does nothing |
 | ⌘. | Cancel the copy or move that is running. In the path or the filter field it does what Esc does there; in the "name is taken" prompt it is Cancel |
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
 | ↩ | In a folder macOS won't let the app read: Open Privacy Settings |
@@ -196,6 +197,26 @@ path = "~/Developer"
 
 If the local file has any `[favourites.…]` table, its list replaces the default one. A favourite whose folder does not exist is left out. If a file has a mistake, an orange line at the top of the window says where.
 
+## Shared folders
+
+A folder shared by another computer or a server (SMB, AFP or NFS) can be kept in the sidebar under **Shared**, so getting back to it is one click, without Finder.
+
+**Connect to one.** Press ⌘K (or File › Connect to Server…, or the + on the Shared caption) and type the share's address: `smb://server/share`, or just `server/share` (`smb://` is added). Press ↩ to connect, Esc to cancel. macOS asks for the password in its own window, where "Remember this password in my keychain" keeps it; Grove Explorer never sees or stores it. Once the share is mounted it is saved in the sidebar and opens in the active pane. A user name may be part of the address (`smb://you@server/share`); a password may not: "Leave the password out — macOS will ask for it". What can't be connected to is said under the field, the address kept so you can correct it ("There is no share called share on server", "The password was refused", "server didn't answer"), and nothing is saved. While it connects, Cancel gives up the mount and leaves the address; Cancel again closes the window. Cancelling macOS's password window says nothing.
+
+**Its row.** The share's name, then the server's in quiet text.
+
+| The row | Means | Click |
+| --- | --- | --- |
+| Quiet name and icon | Not connected | Connects and opens it. If the password is in the Keychain, nothing is asked; a failure is said in the pane's status bar |
+| A small spinner at the right | Connecting | The spinner gives up (or Esc with the keyboard on the row) |
+| Normal text, an eject button | Connected | Opens it; the eject button unmounts it, and the row goes back to not connected |
+
+A saved share mounted some other way (by Finder, from a terminal) shows as connected on its row, not again under Locations. VoiceOver reads a row as "share on server, shared folder, connected" (or "not connected", "connecting").
+
+**Remove or eject.** Eject unmounts the share and keeps its row. Right-click the row (or ⌥⌘←, then ⌃↩) and choose **Remove from Sidebar** to forget it: that does not unmount it, so a connected share moves to Locations, where it can be ejected. A network volume under Locations that isn't saved has **Keep in Sidebar** in the same menu, which saves it.
+
+The shares are kept in `~/.config/grove-explorer/explorer.local.toml` as `[servers.…]` tables, each with its `url`; never with a password.
+
 ## What macOS will ask
 
 The first time you open each of these, macOS asks whether Grove Explorer may read it: **Desktop**, **Documents**, **Downloads**, **iCloud Drive**, **a disk you plugged in**, and **a network disk**. Allow each one you want to browse; each is asked once. The first ⌘I asks whether Grove Explorer may control Finder, which is how Get Info is shown.
@@ -223,5 +244,6 @@ Said plainly, these are not built:
 - **A preview pane.** Space (Quick Look) is the preview.
 - **Icon, column and gallery views.** There is the list.
 - **Tags.** Copies keep a file's tags, but they are not shown and cannot be set.
-- **Remote folders over SSH.** Network disks that macOS has mounted work; connecting to a server is Finder's job (⌘K there).
+- **Remote folders over SSH.** Shared folders over SMB, AFP and NFS connect with ⌘K ([Shared folders](#shared-folders)); SSH and SFTP servers don't.
+- **Browsing a server's shares.** You type the share's address; the list of what a server offers, and the computers on the network, are Finder's.
 - **Being the default file viewer.** "Show in Finder" in other apps, and folders opened from them, still open Finder.

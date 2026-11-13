@@ -72,6 +72,41 @@ enum Sample {
         var filter: String?
         /// The sidebar lists OneDrive's two accounts under their header.
         var clouds = false
+        /// The sidebar has SHARED's three rows: media connected, backup
+        /// not, photos connecting (`Sample.shares`).
+        var shares = false
+        /// The Connect to Server sheet is up, saying this, with this sentence under the field.
+        var connectSheet: (text: String, problem: String?)?
+    }
+
+    /// The saved shares of a render (the spec's grove-lab, no real address).
+    static let shares = [
+        SharedServer(url: URL(string: "smb://grove-lab/media")!),
+        SharedServer(url: URL(string: "smb://grove-lab/backup")!),
+        SharedServer(url: URL(string: "smb://grove-lab/photos")!),
+    ]
+    /// media, mounted (by the address macOS keeps, with the user it logged in as).
+    static let mediaVolume = Volume(
+        url: URL(fileURLWithPath: "/Volumes/media", isDirectory: true), name: "media", ejectable: true,
+        remountURL: URL(string: "smb://gm@grove-lab/media"), isNetwork: true)
+
+    /// The sentence a mount of `address` gets when the server has no such share (as NetFS answers, ENOENT).
+    static func noShare(_ address: String) -> String? {
+        guard let url = URL(string: address),
+            case .failed(let sentence) = SharedServers.outcome(status: ENOENT, mountPoint: nil, server: url)
+        else { return nil }
+        return sentence
+    }
+
+    /// Inside the connected share: its row lit.
+    static func media() -> Pane {
+        pane(mediaVolume.url, folders: [
+            ("films", 412_000_000_000, date(2026, 11, 8, 21, 14)),
+            ("music", 96_400_000_000, date(2026, 11, 10, 18, 2)),
+            ("series", 1_210_000_000_000, date(2026, 11, 12, 7, 30)),
+        ], files: [
+            ("README.md", 2_000, date(2026, 10, 2, 11, 5)),
+        ], selected: [], pointer: nil)
     }
 
     static let backup = Volume(url: URL(fileURLWithPath: "/Volumes/Backup", isDirectory: true), name: "Backup", ejectable: true)
@@ -129,6 +164,11 @@ enum Sample {
             model.cloudProviders = FolderName.providers(in: ["OneDrive-Personal", "OneDrive-Contoso"], home: home)
         }
         model.volumes = [disk, backup]
+        if extras.shares {
+            model.config.servers = shares
+            model.volumes = [disk, mediaVolume, backup]
+            model.connectingShares = [shares[2].id]
+        }
         model.volumeIconStandIn = [
             disk.id: NSWorkspace.shared.icon(forFile: "/"),
             backup.id: NSWorkspace.shared.icon(for: UTType("com.apple.storage-external") ?? .volume),

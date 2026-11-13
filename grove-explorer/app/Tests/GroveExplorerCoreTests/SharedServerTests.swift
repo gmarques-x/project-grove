@@ -154,6 +154,30 @@ import Testing
         #expect(!matches("smb://grove-lab/media", "afp://grove-lab/media"))
     }
 
+    /// "Keep in Sidebar" on a volume of Locations: only for a share the
+    /// sheet would take that isn't saved yet; anything else would do nothing.
+    @Test func whatLocationsCanKeep() {
+        let media = server("smb://grove-lab/media")
+        func keepable(_ remount: String?, _ saved: [SharedServer] = []) -> URL? {
+            SharedServers.keepable(remountURL: remount.map(url), among: saved)
+        }
+        #expect(keepable("smb://grove-lab/media") == url("smb://grove-lab/media"))
+        #expect(keepable("smb://gm@grove-lab/media") == url("smb://gm@grove-lab/media"))
+        // The password macOS may keep in it is never saved.
+        #expect(keepable("smb://gm:secret@grove-lab/media") == url("smb://gm@grove-lab/media"))
+        #expect(keepable("afp://grove-lab/media") == url("afp://grove-lab/media"))
+        // WebDAV, FTP, no share, no address: nothing the sheet would connect to.
+        #expect(keepable("https://dav.example.com/files") == nil)
+        #expect(keepable("ftp://grove-lab/pub") == nil)
+        #expect(keepable("smb://grove-lab") == nil)
+        #expect(keepable(nil) == nil)
+        // Saved already (a second mount, media-1, spelled macOS's way): nothing to keep.
+        #expect(keepable("smb://grove-lab/media", [media]) == nil)
+        #expect(keepable("smb://GM@Grove-Lab/Media/", [media]) == nil)
+        // Another server's share of that name is not saved.
+        #expect(keepable("smb://nas/media", [media]) == url("smb://nas/media"))
+    }
+
     @Test func rowState() {
         let media = server("smb://grove-lab/media")
         let mount = URL(fileURLWithPath: "/Volumes/media", isDirectory: true)
@@ -161,6 +185,19 @@ import Testing
         #expect(SharedServers.state(saved: media, mounted: nil, connecting: true) == .connecting)
         #expect(SharedServers.state(saved: media, mounted: mount, connecting: true) == .connected(mount))
         #expect(SharedServers.state(saved: media, mounted: mount, connecting: false) == .connected(mount))
+    }
+
+    /// What VoiceOver says of a row (spec: "<name> on <host>, shared folder, <state>").
+    @Test func whatARowSays() {
+        let media = server("smb://grove-lab/media")
+        let mount = URL(fileURLWithPath: "/Volumes/media", isDirectory: true)
+        #expect(SharedRowState.connected(mount).spoken(media) == "media on grove-lab, shared folder, connected")
+        #expect(SharedRowState.notConnected.spoken(media) == "media on grove-lab, shared folder, not connected")
+        #expect(SharedRowState.connecting.spoken(media) == "media on grove-lab, shared folder, connecting")
+        // The user it logs in as is not said; nor, ever, a password.
+        #expect(SharedRowState.notConnected.spoken(server("smb://gm@grove-lab/media")) == "media on grove-lab, shared folder, not connected")
+        // A name decoded, as the row shows it.
+        #expect(SharedRowState.notConnected.spoken(server("smb://grove-lab/M%C3%BAsica")) == "Música on grove-lab, shared folder, not connected")
     }
 
     // MARK: What a mount's result says

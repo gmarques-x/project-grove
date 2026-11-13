@@ -40,6 +40,7 @@ struct ConnectSheet: View {
             Text(verbatim: "Connect to Server")
                 .font(GroveFont.mono(GroveType.heading, .semibold))
                 .foregroundStyle(Color(theme.fg))
+                .accessibilityAddTraits(.isHeader)
             VStack(alignment: .leading, spacing: GroveSpace.s4) {
                 Text(verbatim: "Server address")
                     .font(GroveFont.mono(GroveType.body))
