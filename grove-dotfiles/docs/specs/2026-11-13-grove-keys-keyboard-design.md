@@ -46,9 +46,10 @@ AeroSpace name (nil for modifiers, fn, caps).
   - row 5 as ANSI.
   - Return is drawn as one tall cap spanning rows 2–3, as on the keyboard.
 - The ISO key codes above (10 top left, 50 beside left Shift, 42 beside
-  Return) are Apple's documented ISO behaviour; the build confirms them on the
-  owner's Mac with a one-off probe he runs (press § and < once each), before
-  the renders.
+  Return) are Apple's documented ISO behaviour; the build confirms them with
+  the Portuguese layout's own table (code 10 types §, code 50 types <) before
+  the renders, and the owner confirms the drawn board against his keys before
+  install.
 - Row widths add up as today, so the board's outer size doesn't change.
 - Keyboard navigation (arrows, ⌃H/J/K/L) works on both shapes: the tall Return
   is one stop reachable from both rows.

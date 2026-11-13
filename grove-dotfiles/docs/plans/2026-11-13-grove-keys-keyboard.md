@@ -54,7 +54,7 @@
   - `ansiRowsAreToday`: `rows(for: .ansi) == rows` (names, legends, widths).
   - `namesPerShape`: `names(for: .iso).contains("section")`, `!names(for: .ansi).contains("section")`, both contain `"backtick"`.
   - `everyNamedCapHasItsKeyCode`: for each named cap, `cap.keyCode == KeyNames.code(for: cap.name!)`.
-  - `tallReturnNavigation` (ISO): `neighbor(of: "rightSquareBracket", .right, shape: .iso) == "enter"`, `neighbor(of: "backslash", .right, shape: .iso) == "enter"`, `neighbor(of: "enter", .left, shape: .iso)` is `"rightSquareBracket"` (top row first), `neighbor(of: "enter", .down, shape: .iso)` is the row-4 cap under it (right Shift is a modifier → the nearest named cap, `"slash"`), `neighbor(of: "delete"… )` — use `"backspace"`, `.down` → `"enter"`.
+  - `tallReturnNavigation` (ISO): `neighbor(of: "rightSquareBracket", .right, shape: .iso) == "enter"`, `neighbor(of: "backslash", .right, shape: .iso) == "enter"`, `neighbor(of: "enter", .left, shape: .iso)` is `"rightSquareBracket"` (top row first), `neighbor(of: "enter", .down, shape: .iso)` is the row-4 cap under it (right Shift is a modifier → the nearest named cap, `"slash"`), `neighbor(of: "backspace", .down, shape: .iso) == "enter"`.
   - `shapeFromLayoutType`: `from(layoutType: 1) == .iso`, `0` and `2` → `.ansi`.
   In `KeysFileTests.swift`: `keyboardShapeAbsentIsAuto`, `keyboardShapeParses` (iso/ansi/auto), `keyboardShapeUnknownIsAutoAndReported` (`"jis"`), `settingAutoRemovesTheKey`, `settingIsoWritesTheSection` (round-trip keeps comments), `resolvedUsesDetectedOnlyForAuto`.
 
