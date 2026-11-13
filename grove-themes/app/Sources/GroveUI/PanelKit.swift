@@ -177,11 +177,18 @@ public struct PanelValue: View {
     }
 }
 
-/// The 1 pt line between a panel's sections.
+/// The 1 pt line between a panel's sections: `theme.line`, or an accent
+/// where the owner chose one (orange between a panel's two halves: CPU over
+/// memory, Wi-Fi over Bluetooth; spec 2026-11-13-bar-wifi-bluetooth-design).
 public struct PanelRule: View {
+    let accent: RGB?
     @Environment(\.theme) private var theme
-    public init() {}
-    public var body: some View { Rectangle().fill(theme.line).frame(height: 1).accessibilityHidden(true) }
+
+    public init(accent: RGB? = nil) { self.accent = accent }
+
+    public var body: some View {
+        Rectangle().fill(accent.map { Color($0) } ?? theme.line).frame(height: 1).accessibilityHidden(true)
+    }
 }
 
 /// A quiet caption over or under a group ("Output", "Performance", "last 60 s").

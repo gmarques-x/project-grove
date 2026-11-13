@@ -85,7 +85,9 @@ import Testing
                 "arrow.triangle.2.circlepath", "book", "info.circle", "power", "menubar.rectangle", "folder",
                 // Grove Explorer.
                 "chevron.up", "xmark", "eject.fill", "trash", "icloud", "cloud", "rectangle", "rectangle.split.2x1",
-                "magnifyingglass", "exclamationmark.triangle.fill", "server.rack"])
+                "magnifyingglass", "exclamationmark.triangle.fill", "server.rack",
+                // Bluetooth devices.
+                "computermouse", "rectangle.and.hand.point.up.left", "dot.radiowaves.left.and.right"])
     }
 
     /// The bar panels' outline is the palette's orange, in every scheme.

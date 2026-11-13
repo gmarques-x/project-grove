@@ -6,14 +6,17 @@ import os
 /// The one Bluetooth reader in Grove Keys (spec 2026-11-13-bar-wifi-bluetooth):
 /// `system_profiler SPBluetoothDataType -json` every 30 s while the app
 /// runs, after a wake, and whenever `refresh()` is called (the Wi-Fi
-/// dropdown, as it opens). `state` is the latest reading, for the dropdown's
+/// dropdown, as it opens, and right after its switch). A reading asked for
+/// under 5 s after the last one finished is skipped unless forced
+/// (`BluetoothPace`). `state` is the latest reading, for the dropdown's
 /// Bluetooth section; `$GROVE_STATE/bluetooth` is the bar's icon (`off`,
 /// `on`, `connected`), rewritten only when the icon changes, and then the
 /// bar is sent `bluetooth_change`.
 ///
 /// `system_profiler` takes about a second, so it runs on a queue of its own,
 /// one reading at a time, and never on the main thread. A reading that fails
-/// (the tool stops with an error or hangs) keeps the last one.
+/// (the tool stops with an error or hangs) keeps the last one, and is logged
+/// once until a reading succeeds.
 @MainActor
 final class BluetoothWriter: ObservableObject {
     static let shared = BluetoothWriter()
@@ -35,6 +38,9 @@ final class BluetoothWriter: ObservableObject {
     /// A reading is on the queue; a `refresh()` meanwhile asks for one more.
     private var reading = false
     private var again = false
+    /// A forced reading was asked for while one was under way.
+    private var againForced = false
+    private var pace = BluetoothPace()
     /// Shared with the queue: the file is written only between `start` and
     /// `stop`, so a reading still on the queue can't put it back after
     /// `stop` removed it (and a render run, never started, writes nothing).
@@ -64,15 +70,19 @@ final class BluetoothWriter: ObservableObject {
 
     /// A fresh reading, off the main thread; `state` changes when it's in.
     /// Calls while one is under way are folded into one more after it.
-    func refresh() {
+    /// Skipped when the last reading finished under 5 s ago, unless `force`
+    /// (after the switch changed the power: the old reading is wrong).
+    func refresh(force: Bool = false) {
         guard !reading else {
             again = true
+            againForced = againForced || force
             return
         }
+        guard pace.due(at: Date(), force: force) else { return }
         reading = true
         queue.async { [self] in
             let fresh = Self.read()
-            if let fresh { write(BluetoothIcon.icon(for: fresh)) }
+            if case .success(let state) = fresh { write(BluetoothIcon.icon(for: state)) }
             DispatchQueue.main.async { MainActor.assumeIsolated { self.finish(fresh) } }
         }
     }
@@ -91,12 +101,22 @@ final class BluetoothWriter: ObservableObject {
         if removed { Self.trigger(timeout: 0.5) }
     }
 
-    private func finish(_ fresh: BluetoothState?) {
+    private func finish(_ fresh: Result<BluetoothState, Failure>) {
         reading = false
-        if let fresh, fresh != state { state = fresh }
+        switch fresh {
+        case .success(let fresh):
+            _ = pace.finished(at: Date(), failure: false)
+            if fresh != state { state = fresh }
+        case .failure(let failure):
+            if pace.finished(at: Date(), failure: true) {
+                Self.log.error("system_profiler SPBluetoothDataType: \(failure.description, privacy: .public)")
+            }
+        }
         if again {
+            let force = againForced
             again = false
-            refresh()
+            againForced = false
+            refresh(force: force)
         }
     }
 
@@ -114,15 +134,19 @@ final class BluetoothWriter: ObservableObject {
         if changed { Self.trigger(timeout: 2) }
     }
 
+    /// Why a reading failed, logged by `finish` (once until one succeeds).
+    struct Failure: Error {
+        let description: String
+    }
+
     /// Not on the main thread (it waits for the tool). Standard error is
     /// left out: a warning there would spoil the JSON.
-    private nonisolated static func read() -> BluetoothState? {
+    private nonisolated static func read() -> Result<BluetoothState, Failure> {
         let run = Subprocess.run(profiler, ["SPBluetoothDataType", "-json"], timeout: 20, includeErrors: false)
         guard run.status == 0, !run.timedOut else {
-            log.error("system_profiler SPBluetoothDataType: status \(run.status), timed out \(run.timedOut)")
-            return nil
+            return .failure(Failure(description: "status \(run.status), timed out \(run.timedOut)"))
         }
-        return BluetoothState.parse(systemProfilerJSON: Data(run.output.utf8))
+        return .success(BluetoothState.parse(systemProfilerJSON: Data(run.output.utf8)))
     }
 
     /// `sketchybar --trigger bluetooth_change`: the bar's `bt` item reads the

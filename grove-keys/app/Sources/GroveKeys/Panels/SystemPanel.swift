@@ -219,7 +219,9 @@ struct SystemPanel: View {
         let shown = model.shown
         BarPanel(width: Self.width) {
             cpu(shown)
-            PanelRule()
+            // The halves' line is orange (the owner's choice, spec
+            // 2026-11-13-bar-wifi-bluetooth-design); the others keep theme.line.
+            PanelRule(accent: theme.orange)
             memory(shown)
             PanelRule()
             PanelFooter("Activity Monitor…", note: shown.note, action: openMonitor)

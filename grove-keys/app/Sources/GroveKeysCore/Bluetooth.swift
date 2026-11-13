@@ -172,3 +172,97 @@ public enum BluetoothBarFile {
         return true
     }
 }
+
+extension BluetoothDevice {
+    /// The battery as the row shows it ("60%"); nil when none is reported.
+    public var batteryText: String? { battery.map { "\($0)%" } }
+}
+
+/// Whether Grove Keys may use Bluetooth: macOS's answer to its one prompt
+/// (CoreBluetooth's `CBManager.authorization`; restricted counts as refused).
+public enum BluetoothPermission: Sendable {
+    case undetermined, allowed, refused
+}
+
+/// What the Wi-Fi dropdown's Bluetooth section shows under its header.
+public enum BluetoothSectionContent: Equatable, Sendable {
+    /// No reading yet: the header alone.
+    case reading
+    /// The power is unknown (no controller, or the output can't be read):
+    /// the header alone, its switch disabled ("off" would be a guess).
+    case unknown
+    /// Permission refused: says so, with a button to the privacy setting;
+    /// no switch. Grove Keys never asks again (macOS wouldn't show it).
+    case refused
+    /// The controller says off.
+    case off
+    /// On: the connected devices, "No devices connected" when none.
+    case devices([BluetoothDevice])
+
+    public init(state: BluetoothState?, permission: BluetoothPermission) {
+        if permission == .refused {
+            self = .refused
+            return
+        }
+        guard let state else {
+            self = .reading
+            return
+        }
+        switch state.power {
+        case nil: self = .unknown
+        case false?: self = .off
+        case true?: self = .devices(state.connected)
+        }
+    }
+
+    /// The section's one line of text, when it has one.
+    public var line: String? {
+        switch self {
+        case .reading, .unknown: return nil
+        case .refused: return "Grove Keys needs Bluetooth permission"
+        case .off: return "Bluetooth is off"
+        case .devices(let devices): return devices.isEmpty ? "No devices connected" : nil
+        }
+    }
+
+    /// The header has its switch (not when permission is refused).
+    public var showsSwitch: Bool { self != .refused }
+
+    /// The switch can be used: only when the power is known.
+    public var switchEnabled: Bool {
+        switch self {
+        case .off, .devices: return true
+        case .reading, .unknown, .refused: return false
+        }
+    }
+
+    public var switchOn: Bool {
+        if case .devices = self { return true }
+        return false
+    }
+}
+
+/// When the Bluetooth reader reads, and when it logs. A reading under
+/// `gap` after the last one finished is skipped (a wake and an overdue
+/// timer would give two in a row), unless forced (after the switch); a
+/// failed reading is logged once until one succeeds.
+public struct BluetoothPace: Sendable {
+    public static let gap: TimeInterval = 5
+
+    private var lastFinished: Date?
+    private var failing = false
+
+    public init() {}
+
+    public func due(at now: Date, force: Bool) -> Bool {
+        guard !force, let lastFinished else { return true }
+        return now.timeIntervalSince(lastFinished) >= Self.gap
+    }
+
+    /// A reading finished. True when its failure should be logged.
+    public mutating func finished(at now: Date, failure: Bool) -> Bool {
+        lastFinished = now
+        defer { failing = failure }
+        return failure && !failing
+    }
+}

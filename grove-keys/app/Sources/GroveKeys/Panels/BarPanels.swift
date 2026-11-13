@@ -16,6 +16,31 @@ enum BarPanelData {
     case sample
 }
 
+/// Sample data more than one render draws from, invented for the public
+/// repo (no real device's name or address).
+@MainActor
+enum BarPanelSamples {
+    /// The Wi-Fi panel's Bluetooth section. GROVE_BLUETOOTH_SAMPLE picks the
+    /// state: `on` (the default: three devices), `none` (on, nothing
+    /// connected), `off`, `refused` (permission refused), `unknown` (no
+    /// controller), `reading` (no reading yet).
+    static func bluetooth(_ name: String) -> (state: BluetoothState?, permission: BluetoothPermission) {
+        let devices = [
+            BluetoothDevice(id: "00:00:00:00:00:01", name: "Headphones", kind: .headphones, battery: 60),
+            BluetoothDevice(id: "00:00:00:00:00:02", name: "Keyboard", kind: .keyboard, battery: 45),
+            BluetoothDevice(id: "00:00:00:00:00:03", name: "Mouse", kind: .mouse, battery: nil),
+        ]
+        switch name {
+        case "none": return (BluetoothState(power: true, connected: []), .allowed)
+        case "off": return (BluetoothState(power: false, connected: []), .allowed)
+        case "refused": return (BluetoothState(power: nil, connected: []), .refused)
+        case "unknown": return (BluetoothState(power: nil, connected: []), .allowed)
+        case "reading": return (nil, .undetermined)
+        default: return (BluetoothState(power: true, connected: devices), .allowed)
+        }
+    }
+}
+
 /// A panel's model. Made once, the first time its panel opens, and kept
 /// (a speed test's last result outlives a closing).
 ///

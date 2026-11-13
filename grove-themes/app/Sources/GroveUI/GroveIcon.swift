@@ -95,7 +95,7 @@ public struct GroveIcon: View {
         case microphone = "mic"
         /// The Grove menu's Appearance row.
         case appearance = "paintpalette"
-        /// The Grove menu's Grove Keys row.
+        /// A keyboard: the Grove menu's Grove Keys row, a Bluetooth keyboard.
         case keys = "keyboard"
         /// The Grove menu's Update row.
         case update = "arrow.triangle.2.circlepath"
@@ -135,6 +135,15 @@ public struct GroveIcon: View {
         case warning = "exclamationmark.triangle.fill"
         /// A shared folder on a server (the sidebar's SHARED rows).
         case server = "server.rack"
+
+        // The Wi-Fi dropdown's Bluetooth devices (spec 2026-11-13-bar-wifi-bluetooth);
+        // headphones, keyboards and speakers use the icons above.
+        /// A mouse.
+        case mouse = "computermouse"
+        /// A trackpad.
+        case trackpad = "rectangle.and.hand.point.up.left"
+        /// A Bluetooth device of no kind Grove knows.
+        case wireless = "dot.radiowaves.left.and.right"
 
         /// The SF Symbol's name.
         public var symbol: String { rawValue }

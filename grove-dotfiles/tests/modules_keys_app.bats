@@ -675,3 +675,10 @@ ka_defaults() {
   [ "$(plutil -extract NSLocationUsageDescription raw "$BATS_TEST_TMPDIR/Info.plist")" = "$why" ]
   [ "$(plutil -extract NSLocationWhenInUseUsageDescription raw "$BATS_TEST_TMPDIR/Info.plist")" = "$why" ]
 }
+
+@test "keys-app: the bundle says why it asks for Bluetooth (the devices under Wi-Fi)" {
+  load_module
+  _ka_info_plist > "$BATS_TEST_TMPDIR/Info.plist"
+  [ "$(plutil -extract NSBluetoothAlwaysUsageDescription raw "$BATS_TEST_TMPDIR/Info.plist")" \
+    = "Grove Keys shows your Bluetooth devices and their batteries in the Grove bar." ]
+}

@@ -7,7 +7,8 @@ import SwiftUI
 // Wi-Fi & network (spec 2026-11-12-bar-panels-design §6): "am I online, how
 // fast, what's my address?". The link's name and the Wi-Fi switch; the live
 // rates over one chart; IP, Router and DNS, which copy on a click; the speed
-// test; who is using the network, on request. What it reads and runs is in
+// test; who is using the network, on request. Under an orange line,
+// Bluetooth (BluetoothSection.swift; spec 2026-11-13-bar-wifi-bluetooth). What it reads and runs is in
 // WifiNetwork.swift; what it computes is in GroveKeysCore (Wifi*.swift).
 
 /// The Wi-Fi panel's state. Open, it follows the network (a dynamic-store
@@ -32,6 +33,7 @@ final class WifiModel: ObservableObject, BarPanelModel {
     let sampleHover: String?
 
     let speed: WifiSpeedController
+    let bluetooth: BluetoothSectionModel
     private let live: Bool
     private var read = false
     private let watcher = WifiWatcher()
@@ -39,6 +41,7 @@ final class WifiModel: ObservableObject, BarPanelModel {
     private let switching = DispatchQueue(label: "com.projectgrove.keys.wifi-switch", qos: .userInitiated)
 
     init(_ data: BarPanelData) {
+        bluetooth = BluetoothSectionModel(data)
         switch data {
         case .live:
             live = true
@@ -74,6 +77,7 @@ final class WifiModel: ObservableObject, BarPanelModel {
 
     func start() {
         guard live else { return }
+        bluetooth.start()
         now = Date()
         history = WifiHistory()
         rates = nil
@@ -92,6 +96,7 @@ final class WifiModel: ObservableObject, BarPanelModel {
     }
 
     func stop() {
+        bluetooth.stop()
         watcher.stop()
         appsSampler.stop()
         appsShown = false
@@ -257,6 +262,8 @@ struct WifiPanel: View {
             }
             PanelRule()
             PanelFooter(link.settings.title, action: openSettings)
+            PanelRule(accent: theme.orange)
+            BluetoothSection(model: model.bluetooth)
         }
     }
 
