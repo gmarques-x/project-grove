@@ -31,6 +31,8 @@ struct PaneTree {
     /// ⌥→ under way on this folder: each read that lands opens more
     /// (`continueOpenAll`) until it stops.
     var openingAll: URL?
+    /// Its first step was taken (with the key); the next come with reads.
+    var openAllStarted = false
 
     /// One watcher per open folder that shows, up to
     /// `WatchPlan.openFolderLimit`, by its path.
@@ -193,7 +195,9 @@ extension AppModel {
     /// (`PaneRows.isCurrent`); until then the folder shows its loading line
     /// and nothing beneath.
     func loadOpenFolder(_ folder: URL, in side: Side) {
-        guard live, let tab = browser.tab(side), trees[side] != nil else { return }
+        // Nothing is read on a disk being ejected: the read would hold it.
+        // (`eject` asks again for what shows if the disk stays.)
+        guard live, let tab = browser.tab(side), trees[side] != nil, !isBeingEjected(folder) else { return }
         let path = folder.pathKey
         readCount += 1
         let begunAt = readCount
@@ -306,13 +310,14 @@ extension AppModel {
 
     /// The tab showing on `side` has `open` open from now on; `opened` are
     /// those the app just opened (or renamed into). The rows are made
-    /// again, and the folders that show now are read.
-    func setOpenFolders(_ open: Set<URL>, opened: [URL] = [], in side: Side) {
+    /// again (at once; `now` false: with other reads landing, `arrangeTree`),
+    /// and the folders that show now are read.
+    func setOpenFolders(_ open: Set<URL>, opened: [URL] = [], in side: Side, now: Bool = true) {
         guard let tab = browser.tab(side), open != tab.open else { return }
         readCount += 1
         for folder in opened { trees[side]?.openedAt[folder.pathKey] = readCount }
         change { $0.setOpen(open, in: side) }
-        arrange(side)
+        if now { arrange(side) } else { arrangeTree(side) }
         keepOpenFolders(side)
     }
 

@@ -75,6 +75,7 @@ extension AppModel {
     func openAll(_ url: URL, in side: Side) {
         guard let row = listing(for: side)?.row(of: url), row.entry.kind == .folder, trees[side] != nil else { return }
         trees[side]?.openingAll = row.entry.url
+        trees[side]?.openAllStarted = false
         continueOpenAll(in: side)
     }
 
@@ -106,7 +107,12 @@ extension AppModel {
         } else if !unread && new.isEmpty {
             trees[side]?.openingAll = nil
         }
-        if !new.isEmpty { setOpenFolders(tab.open.union(new), opened: new, in: side) }
+        // The first step is the key's, seen at once; the next ones come with reads.
+        if !new.isEmpty {
+            setOpenFolders(tab.open.union(new), opened: new, in: side, now: trees[side]?.openAllStarted != true)
+        }
+        let goesOn = trees[side]?.openingAll != nil
+        trees[side]?.openAllStarted = goesOn
     }
 
     /// ←, or a click on an open chevron: the folder closes; what was
