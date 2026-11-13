@@ -79,8 +79,10 @@ extension AppModel {
             }
             // What the last operation left here is selected.
             arrived(in: side)
-            // The folders open in it are read.
+            // The folders open in it: read, watched, and those past the
+            // watchers' limit read again now that the folder changed.
             keepOpenFolders(side)
+            refreshUnwatchedOpenFolders(in: side)
             // The header was clicked, hidden items were switched, the filter
             // was typed in or a total arrived while this read was on its
             // way: what it sorted by is no longer what the pane asks for.
@@ -141,6 +143,8 @@ extension AppModel {
     /// (their folders' totals) follows.
     func rowsChanged(in side: Side) {
         wantSizes()
+        // The watchers go to the open folders nearest the top, as the rows now are.
+        watchOpenFolders(reachableOpenFolders(in: side), in: side)
     }
 
     // MARK: Watching

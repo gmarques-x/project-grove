@@ -64,5 +64,6 @@ extension FileList.Coordinator {
         let first = min(max(0, rows.location), items.count)
         let visible = (first..<min(items.count, first + rows.length)).compactMap { entry(onRow: $0) }
         model.wantSizesFirst(for: visible.filter(\.isMeasured).map(\.url))
+        model.openFoldersInView(visible.map(\.url), in: side)
     }
 }

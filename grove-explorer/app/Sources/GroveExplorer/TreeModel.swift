@@ -27,6 +27,24 @@ struct PaneTree {
     /// when `arrangeHeld` is over, if one is `arrangeOwed` by then.
     var arrangeHeld = false
     var arrangeOwed = false
+
+    /// One watcher per open folder that shows, up to
+    /// `WatchPlan.openFolderLimit`, by its path.
+    var watchers: [String: FolderWatcher] = [:]
+    /// The open folders past that limit: read again when the tab's own
+    /// folder changes or their rows come into view, and those of them in
+    /// view at the last look.
+    var beyond: Set<String> = []
+    var beyondInView: Set<String> = []
+    /// Folders past the limit being read again: if one changed, the status
+    /// bar says it wasn't watched.
+    var refreshing: Set<String> = []
+
+    /// Every watcher stops: the pane shows another tab or folder, or the
+    /// disk is being ejected.
+    func stopWatching() {
+        for watcher in watchers.values { watcher.stop() }
+    }
 }
 
 extension URL {
@@ -48,6 +66,7 @@ extension AppModel {
     /// read for: their reads' answers are dropped and nothing of them is
     /// looked at again.
     func forgetOpenFolders(_ side: Side) {
+        trees[side]?.stopWatching()
         trees[side] = nil
     }
 
@@ -73,6 +92,83 @@ extension AppModel {
             trees[side] = tree
         }
         for folder in reachable where !listed.contains(folder.pathKey) && trees[side]?.reads[folder.pathKey] == nil {
+            loadOpenFolder(folder, in: side)
+        }
+        watchOpenFolders(reachable, in: side)
+    }
+
+    // MARK: Watching them
+
+    /// One watcher per open folder that shows, the 64 nearest the top of
+    /// the list (`WatchPlan.openFolders`); none on a disk being ejected.
+    func watchOpenFolders(_ reachable: Set<URL>, in side: Side) {
+        guard live, let tree = trees[side], let key = tree.key, let listing = listing(for: side) else { return }
+        let plan = WatchPlan.openFolders(reachable.filter { !isBeingEjected($0) }, rows: listing.items)
+        let wanted = Dictionary(plan.watched.map { ($0.pathKey, $0) }, uniquingKeysWith: { first, _ in first })
+        var watchers = tree.watchers
+        for (path, watcher) in watchers where wanted[path] == nil {
+            watcher.stop()
+            watchers[path] = nil
+        }
+        for (path, folder) in wanted where watchers[path] == nil {
+            // The call comes on the watcher's queue: over to the main actor.
+            watchers[path] = FolderWatcher(folder: folder) { [weak self] in
+                Task { @MainActor in self?.openFolderChanged(folder, key: key, in: side) }
+            }
+        }
+        trees[side]?.watchers = watchers
+        trees[side]?.beyond = Set(plan.beyond.map(\.pathKey))
+    }
+
+    /// An open folder's watcher says it changed: it is read again (not
+    /// while a read of it is in flight: that one's landing reads again,
+    /// once), and its total and those of the open folders it is in are
+    /// worked out again (they are rows of the list).
+    private func openFolderChanged(_ folder: URL, key: String, in side: Side) {
+        guard trees[side]?.key == key, trees[side]?.watchers[folder.pathKey] != nil else { return }
+        let path = folder.pathKey
+        var gate = trees[side]?.reads[path]?.gate ?? ReadGate()
+        let readNow = gate.changed(folder)
+        if trees[side]?.reads[path] != nil { trees[side]?.reads[path]?.gate = gate }
+        if readNow { loadOpenFolder(folder, in: side) }
+        sizeQueue.changed(folder)
+        let stale = AfterOperation.staleTotals(among: Array(sizes.keys), touched: [folder])
+        if !stale.isEmpty {
+            var kept = sizes
+            for url in stale { kept[url] = nil }
+            sizes = kept
+            wantSizes()
+        }
+    }
+
+    /// The tab's own folder changed (it was read again): the open folders
+    /// past the watchers' limit are read again too, as nothing tells when
+    /// they change.
+    func refreshUnwatchedOpenFolders(in side: Side) {
+        guard let tree = trees[side], !tree.beyond.isEmpty else { return }
+        refresh(tree.beyond, in: side)
+    }
+
+    /// Rows came into view: an open folder past the watchers' limit whose
+    /// row (or a row inside it) is among them, and wasn't at the last look,
+    /// is read again.
+    func openFoldersInView(_ visible: [URL], in side: Side) {
+        guard let tree = trees[side], !tree.beyond.isEmpty || !tree.beyondInView.isEmpty else { return }
+        var inView: Set<String> = []
+        for url in visible {
+            let path = url.pathKey
+            if tree.beyond.contains(path) { inView.insert(path) }
+            let parent = (path as NSString).deletingLastPathComponent
+            if tree.beyond.contains(parent) { inView.insert(parent) }
+        }
+        trees[side]?.beyondInView = inView
+        let new = inView.subtracting(tree.beyondInView)
+        if !new.isEmpty { refresh(new, in: side) }
+    }
+
+    private func refresh(_ paths: Set<String>, in side: Side) {
+        for folder in reachableOpenFolders(in: side) where paths.contains(folder.pathKey) {
+            trees[side]?.refreshing.insert(folder.pathKey)
             loadOpenFolder(folder, in: side)
         }
     }
@@ -127,7 +223,14 @@ extension AppModel {
             closeOpenFolders([folder], in: side, inside: false, peek: false, now: false)
             return
         }
+        let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
         guard listing.childEntries(of: folder) != read.all else { return }
+        // Past the watchers' limit and changed meanwhile: what showed of it
+        // was out of date, and the user is told why.
+        if wasRefresh, listing.childEntries(of: folder) != nil {
+            say(
+                "\(name) had changed: only the first \(WatchPlan.openFolderLimit) open folders are watched", in: side)
+        }
         // One key per folder, however the open set spells it.
         var children = listing.children.filter { $0.key.pathKey != folder.pathKey }
         children[folder] = read.all

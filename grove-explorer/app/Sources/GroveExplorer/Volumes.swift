@@ -226,6 +226,9 @@ extension AppModel {
         for side in held {
             watchers[side]?.watcher.stop()
             watchers[side] = nil
+            // And those of the folders open in it.
+            trees[side]?.stopWatching()
+            trees[side]?.watchers = [:]
         }
         let url = volume.url
         Task {
@@ -243,6 +246,9 @@ extension AppModel {
                 watchers[side] = nil
                 load(side)  // Watches the folder too.
             }
+            // The folders open in place there are watched again (and,
+            // when the pane read its folder again, read again).
+            for side in sides { keepOpenFolders(side) }
             wantSizes()
         }
     }
