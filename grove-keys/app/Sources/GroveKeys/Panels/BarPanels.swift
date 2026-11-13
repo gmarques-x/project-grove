@@ -246,6 +246,7 @@ enum BarPanels {
         SystemPanel.registration,
         BatteryPanel.registration,
         WifiPanel.registration,
+        LabVPNPanel.registration,
         SoundPanel.registration,
         GroveMenuPanel.registration,
     ]

@@ -135,3 +135,53 @@ public enum LabVPNIcon: String, Sendable {
         }
     }
 }
+
+/// The dropdown's switch (spec 2026-11-13-bar-vpn-design): `scutil --nc
+/// start|stop "grove-lab"`.
+extension LabVPNStatus {
+    /// Not when there is no grove-lab service: the dropdown says how to
+    /// set it up instead.
+    public var showsSwitch: Bool { self != .notSetUp }
+
+    /// On while connected or connecting.
+    public var switchOn: Bool {
+        switch self {
+        case .connected, .connecting: return true
+        case .notSetUp, .disconnected, .disconnecting: return false
+        }
+    }
+
+    /// Usable only once the tunnel is up or down: while it is connecting or
+    /// disconnecting a second start or stop would race the first.
+    public var switchEnabled: Bool {
+        switch self {
+        case .connected, .disconnected: return true
+        case .notSetUp, .connecting, .disconnecting: return false
+        }
+    }
+}
+
+/// The switch while scutil starts or stops the tunnel: the dropdown shows
+/// `shown` (connecting or disconnecting, so the switch is held and disabled)
+/// until a reading that started after the command returned. A reading under
+/// way when the switch moved (the 2 s timer's) would flick it back.
+public struct LabVPNPendingSwitch: Equatable, Sendable {
+    public let on: Bool
+    /// The number of the last reading started when the command returned;
+    /// nil while it runs.
+    private var after: Int?
+
+    public init(on: Bool) { self.on = on }
+
+    /// What the dropdown shows meanwhile.
+    public var shown: LabVPNStatus { on ? .connecting : .disconnecting }
+
+    /// The command returned; `number` is the last reading started by then.
+    public mutating func changed(afterReading number: Int) { after = number }
+
+    /// True for a reading that started after the command returned.
+    public func settles(withReading number: Int) -> Bool {
+        guard let after else { return false }
+        return number > after
+    }
+}

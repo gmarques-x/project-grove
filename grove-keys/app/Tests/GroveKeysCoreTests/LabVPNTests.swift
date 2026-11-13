@@ -102,4 +102,30 @@ struct LabVPNTests {
         #expect(line(.disconnected) == "Not connected")
         #expect(line(.notSetUp) == "Import warden-air.conf into WireGuard as grove-lab")
     }
+
+    @Test func theSwitch() {
+        let connected = LabVPNStatus.connected(address: "10.0.0.2", since: nil)
+        // Shown unless there is no service; on while up or coming up.
+        #expect(!LabVPNStatus.notSetUp.showsSwitch)
+        for status in [connected, .connecting, .disconnecting, .disconnected] { #expect(status.showsSwitch) }
+        #expect(connected.switchOn && LabVPNStatus.connecting.switchOn)
+        #expect(!LabVPNStatus.disconnected.switchOn && !LabVPNStatus.disconnecting.switchOn)
+        #expect(!LabVPNStatus.notSetUp.switchOn)
+        // Disabled on the way: a second start or stop would race the first.
+        #expect(connected.switchEnabled && LabVPNStatus.disconnected.switchEnabled)
+        for status in [LabVPNStatus.connecting, .disconnecting, .notSetUp] { #expect(!status.switchEnabled) }
+    }
+
+    @Test func thePendingSwitchWaitsForAReadingAfterTheCommand() {
+        var starting = LabVPNPendingSwitch(on: true)
+        #expect(starting.shown == .connecting)
+        #expect(!starting.shown.switchEnabled)
+        // While scutil runs, no reading settles it.
+        #expect(!starting.settles(withReading: 7))
+        starting.changed(afterReading: 7)
+        // Reading 7 started before the command returned; 8 after.
+        #expect(!starting.settles(withReading: 7))
+        #expect(starting.settles(withReading: 8))
+        #expect(LabVPNPendingSwitch(on: false).shown == .disconnecting)
+    }
 }

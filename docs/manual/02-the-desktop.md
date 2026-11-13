@@ -52,6 +52,7 @@ The bar replaces the macOS menu bar. From left to right:
 | App icons after a number | The apps open on that workspace (up to six) | Goes to that window |
 | App name | The app in front | Opens that app's menus (File, Edit, View …) |
 | Processor and memory | Two icons with their use in percent | Opens the CPU and memory panel |
+| Shield | The grove-lab VPN: grey when off (or not set up yet), yellow while it connects or disconnects, purple when connected | Opens the VPN panel |
 | Wi-Fi and Bluetooth | The connection in use: signal strength on Wi-Fi, a cable on Ethernet, a shield on a VPN, a slashed fan when offline. Beside it, the Bluetooth rune: struck out in grey when Bluetooth is off, blue when on, with a dot on each side while a device is connected | Opens the network panel, with Bluetooth under it |
 | Speaker | Volume: the speaker fills with the level, and is slashed when muted | Opens the sound panel |
 | Bolt | Battery level: the bolt fills with the charge, and turns red when low | Opens the battery panel |
@@ -68,6 +69,7 @@ A click on a pill at the right opens its panel under it; the pine opens the Grov
 | CPU and memory | Use now and over the last minute, the load of each core, memory by kind with its pressure, the three busiest apps of each, and a link to Activity Monitor. An orange line divides the CPU half from the memory half |
 | Battery | Charge and time left, power, health, and three rows: **Keep Awake** stops the Mac and its display from sleeping, until you turn it off or for 1, 2 or 4 hours. **Ignore Lid** keeps the Mac running with the lid shut; macOS asks for your password or Touch ID each time it changes, and it is offered only while Keep Awake is on and not under 20% on battery. **Low Power Mode** opens Battery Settings |
 | Network | The network's name with a switch for Wi-Fi, download and upload speed over the last minute, and the IP, router and DNS addresses (a click copies one). **Run speed test** measures the connection in about 15 seconds. **Show apps** lists the three apps using the network most. Under an orange line, Bluetooth: a switch to turn it on and off, and the connected devices with their battery level |
+| VPN | A switch that starts and stops the grove-lab VPN, and one line: "Connected" with the tunnel's address and since when, "Connecting…", "Disconnecting…" or "Not connected". **WireGuard…** opens the WireGuard app |
 | Sound | A volume slider, Mute, the output devices (a click switches), and the input device |
 | Calendar | This month, Monday first, with week numbers; the arrows or ← → change the month, T returns to today |
 
@@ -78,6 +80,12 @@ If Ignore Lid was left on (by Grove after a dismissed password prompt, or by ano
 The network panel shows the network's name only if Grove Keys is allowed Location Services (System Settings > Privacy & Security > Location Services); macOS hides the name otherwise, and the panel says "Wi-Fi". Your position is not read.
 
 Bluetooth sits under Wi-Fi in the same panel. Its switch turns Bluetooth on and off; if macOS doesn't let Grove Keys do that, the switch opens Bluetooth Settings instead. Each connected device has a row with its kind (headphones, keyboard, mouse…), its name and its battery level when it reports one; for earphones with a case, the lowest of the two earphones. "No devices connected" and "Bluetooth is off" say the rest. The list is read when the panel opens and every 30 seconds, so a device that just connected can take a moment to show. The first time you open the network panel, macOS asks whether Grove Keys may use Bluetooth. If you say no, the panel says "Grove Keys needs Bluetooth permission" with a **Privacy Settings…** button (System Settings > Privacy & Security > Bluetooth) and has no switch, and Grove Keys doesn't ask again. To pair a new device, use **Bluetooth Settings…** at the bottom of the panel.
+
+### The grove-lab VPN
+
+The shield is the tunnel to the grove lab: a WireGuard connection that carries only the lab's addresses, so the rest of your traffic goes on as before. The switch in its panel starts and stops it with no password; macOS does the connecting. The switch can't be used while the tunnel is connecting or disconnecting. Starting it from the WireGuard app works too: the shield follows within ten seconds.
+
+It needs a one-time setup. Install WireGuard from the App Store; if the tunnel is up from Terminal, take it down with `sudo wg-quick down ~/Developer/grove-lab/wireguard/warden-air.conf`; then in WireGuard choose *Import tunnel(s) from file…*, pick `warden-air.conf`, name the tunnel `grove-lab`, and allow the VPN configuration when macOS asks. Until then the panel says "Import warden-air.conf into WireGuard as grove-lab" with an **Open WireGuard** button (the App Store page if WireGuard isn't installed). Grove never reads the tunnel's file: it holds the private key.
 
 The app name is how you reach an app's menus now that the menu bar is hidden. The same menus are in the Grove menu under Global Menu. For what is not reachable yet, see [Coming from stock macOS](08-coming-from-stock-macos.md).
 

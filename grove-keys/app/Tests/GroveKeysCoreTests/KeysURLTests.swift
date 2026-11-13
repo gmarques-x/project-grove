@@ -32,7 +32,7 @@ import Testing
     }
 
     @Test func aBarPanelIsNamedInThePath() throws {
-        for name in ["clock", "system", "battery", "wifi", "sound", "grove"] {
+        for name in ["clock", "system", "battery", "wifi", "sound", "vpn", "grove"] {
             #expect(KeysURL(try #require(URL(string: "grovekeys://panel/\(name)"))) == .panel(name: name))
         }
         #expect(KeysURL(try #require(URL(string: "grovekeys://PANEL/Clock"))) == .panel(name: "clock"))
