@@ -102,9 +102,9 @@ sketchybar --add item front_app left \
 # Right (the first added is the rightmost): clock, power, volume, Bluetooth
 # and Wi-Fi, the grove-lab VPN, memory and CPU, each group in its own pill
 # with a gap between.
-# Volume, Wi-Fi, Bluetooth, the VPN and power are an icon alone that changes with the
-# level, the signal, the state and the charge; CPU and memory are an icon and
-# a value.
+# Volume, Wi-Fi, Bluetooth, the VPN and power are an icon alone that changes
+# with the level, the signal, the state and the charge; CPU and memory are an
+# icon and a value.
 # A click on any of them sends its panel's link to Grove Keys, which draws
 # the dropdown under the pill and fills the pill while it is open.
 gap gap.r0 right "$EDGE"

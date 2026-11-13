@@ -225,6 +225,9 @@ setup() {
   [ "$(echo connected | sb_vpn_icon)" = vpn-off ]
   # Only the first line counts.
   [ "$(printf 'Disconnected\nConnected\n' | sb_vpn_icon)" = vpn-off ]
+  # Spaces and tabs around the word are trimmed, as LabVPNStatus.parse does.
+  [ "$(printf '  Connected\t \n' | sb_vpn_icon)" = vpn-on ]
+  [ "$(printf '\tConnecting \n' | sb_vpn_icon)" = vpn-connecting ]
 }
 
 @test "sb_panel_close: sends Grove Keys the close link, in the background; nothing is run when none is open" {

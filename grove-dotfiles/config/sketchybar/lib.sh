@@ -108,6 +108,9 @@ sb_bluetooth() {
 sb_vpn_icon() {
   local first=""
   IFS= read -r first || true
+  # Trimmed as Grove Keys' parser trims it (LabVPNStatus.parse).
+  first="${first#"${first%%[![:blank:]]*}"}"
+  first="${first%"${first##*[![:blank:]]}"}"
   case "$first" in
     Connected) echo vpn-on ;;
     Connecting | Disconnecting) echo vpn-connecting ;;

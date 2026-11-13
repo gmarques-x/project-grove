@@ -258,7 +258,8 @@ pills() {
   for item in cpu mem; do
     calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
   done
-  # The icons are images in a 22 pt slot, whatever the state; three items are an icon alone.
+  # The icons are images in a 22 pt slot, whatever the state; five items are an icon alone
+  # (battery, wifi, bt, vpn.lab, volume).
   for item in cpu mem battery wifi bt vpn.lab volume; do
     calls | grep -qE -- "--set $item icon.background.image=[^ ]+ icon.background.image.scale=0.5 icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0\$" || { echo "$item icon"; false; }
   done
