@@ -18,6 +18,13 @@ extension View {
     public func focusBox(_ shown: Bool, cornerRadius: CGFloat, outset: CGFloat) -> some View {
         modifier(FocusBox(shown: shown, cornerRadius: cornerRadius, outset: outset))
     }
+
+    /// `focusBox` round a view that isn't a rounded rectangle (Grove Keys'
+    /// ISO Return, an inverted L): `shape` grown by `outset`, which may
+    /// reach outside the view's frame.
+    public func focusBox(_ shown: Bool, shape: some InsettableShape, outset: CGFloat) -> some View {
+        modifier(ShapedFocusBox(shown: shown, shape: shape, outset: outset))
+    }
 }
 
 private struct LightOutline: ViewModifier {
@@ -49,6 +56,23 @@ private struct FocusBox: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius + outset)
                     .strokeBorder(Color(theme.green), lineWidth: 2)
                     .padding(-outset)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+private struct ShapedFocusBox<S: InsettableShape>: ViewModifier {
+    let shown: Bool
+    let shape: S
+    let outset: CGFloat
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if shown {
+                shape.inset(by: -outset)
+                    .strokeBorder(Color(theme.green), lineWidth: 2)
                     .allowsHitTesting(false)
             }
         }

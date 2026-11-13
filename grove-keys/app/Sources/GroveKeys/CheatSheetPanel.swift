@@ -71,9 +71,10 @@ struct CheatSheetView: View {
                         .font(GroveFont.mono(GroveType.label))
                         .foregroundStyle(theme.quiet)
                 }
-                KeyboardGrid(layer: layer, width: Self.cardWidth - 32, capHeight: 46) { _, name, legend, width, height in
+                KeyboardGrid(layer: layer, shape: model.shape, legends: model.legends,
+                             width: Self.cardWidth - 32, capHeight: 46) { _, name, legend, size in
                     KeyCapView(legend: legend, binding: layer.bindings[name], isModifier: false, held: false,
-                               focused: false, width: width, height: height)
+                               focused: false, width: size.width, height: size.height, lower: size.lower)
                 }
             }
             .padding(GroveSpace.s16)

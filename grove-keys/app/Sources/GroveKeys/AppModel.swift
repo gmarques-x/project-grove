@@ -26,6 +26,13 @@ final class AppModel: ObservableObject {
     var openMainWindow: (() -> Void)?
     @Published private(set) var permissions = PermissionStatus(accessibility: false, inputMonitoring: false)
     @Published private(set) var colors = ThemeColors.fallback
+    /// What each key types on the current input source (spec §4); the US
+    /// legends when it has no key table.
+    @Published private(set) var legends = Legends.us
+    /// The built-in keyboard's shape as macOS reports it.
+    @Published private(set) var detectedShape = KeyboardShape.ansi
+    /// The board drawn: `[keyboard] shape`, or the detected one for auto.
+    var shape: KeyboardShape { keys.keyboardShape.resolved(detected: detectedShape) }
     /// The Caps Lock → F18 mapping is set right now.
     @Published private(set) var mapping = false
     /// From the last save run (keys.toml, monitors.toml or AeroSpace).
@@ -117,6 +124,8 @@ final class AppModel: ObservableObject {
         engine = HyperEngine(
             onEffect: { effect in AppModel.shared.perform(effect) },
             onFailure: { AppModel.shared.tapKeptStopping() })
+        legends = KeyboardReader.legends()
+        detectedShape = KeyboardReader.detectedShape()
     }
 
     // MARK: Life cycle
@@ -130,6 +139,12 @@ final class AppModel: ObservableObject {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { AppModel.shared.reapplyMapping() }
+        }
+        // Another input source was chosen: the caps' legends, the board's
+        // shape and the right Option's characters follow it.
+        DistributedNotificationCenter.default().addObserver(
+            forName: TypingLayout.changed, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { AppModel.shared.inputSourceChanged() }
         }
 
         permissions = Permissions.current()
@@ -316,6 +331,30 @@ final class AppModel: ObservableObject {
     private func publish(_ new: KeysFile) {
         if new != keys { keys = new }
         layers = Layers.build(from: keys) { Launcher.appName(bundleID: $0) }
+    }
+
+    /// `[keyboard] shape` (spec §5): auto removes it from keys.toml.
+    func setKeyboardShape(_ setting: KeyboardShapeSetting) {
+        edit { $0.setKeyboardShape(setting) }
+    }
+
+    private func inputSourceChanged() {
+        let legends = KeyboardReader.legends(), shape = KeyboardReader.detectedShape()
+        if legends != self.legends { self.legends = legends }
+        if shape != detectedShape { detectedShape = shape }
+        engine.layoutChanged()
+    }
+
+    /// `--render-keys` only: shows `keys` as if the save path had accepted
+    /// it, with these legends and this detected shape. Nothing is started,
+    /// written or read back.
+    func showSample(keys: KeysFile, colors: ThemeColors, legends: Legends, detectedShape: KeyboardShape) {
+        self.colors = colors
+        self.legends = legends
+        self.detectedShape = detectedShape
+        loaded = true
+        keysKnown = true
+        publish(keys)
     }
 
     private func fileChanged() {

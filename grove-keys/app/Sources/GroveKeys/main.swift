@@ -78,4 +78,9 @@ if let flag = CommandLine.arguments.firstIndex(of: "--check-menu") {
 if let flag = CommandLine.arguments.firstIndex(of: "--render-panel") {
     BarPanelRender.run(Array(CommandLine.arguments[(flag + 1)...]))
 }
+// `--render-keys <keyboard|cheatsheet> <out.png> [scheme] [iso|ansi] [inputSourceID]`:
+// the Keyboard tab or the Hyper cheat sheet on the sample keys.toml, the same way.
+if let flag = CommandLine.arguments.firstIndex(of: "--render-keys") {
+    KeysRender.run(Array(CommandLine.arguments[(flag + 1)...]))
+}
 GroveKeysApp.main()

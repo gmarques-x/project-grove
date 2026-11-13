@@ -49,6 +49,14 @@ enum BarPanelRender {
             .environment(\.panelStandIns, true)
             .padding(margin)
             .background(Color(colors.bg0))
+        write(view, dark: colors.isDark, to: arguments[1])
+        exit(0)
+    }
+
+    /// Draws `view` at its fitting size, at 2x, into a PNG at `path`, in a
+    /// borderless window far off every screen that is never ordered in;
+    /// prints the path and the pixel size. `--render-keys` uses it too.
+    static func write(_ view: some View, dark: Bool, to path: String) {
         let hosting = NSHostingView(rootView: view)
         let fitting = hosting.fittingSize
         let size = NSSize(width: ceil(fitting.width), height: ceil(fitting.height))
@@ -56,7 +64,7 @@ enum BarPanelRender {
         let window = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: size.width, height: size.height),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: colors.isDark ? .darkAqua : .aqua)
+        window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
         window.contentView = hosting
         hosting.frame = NSRect(origin: .zero, size: size)
         window.layoutIfNeeded()
@@ -72,12 +80,11 @@ enum BarPanelRender {
         hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
         guard let png = bitmap.representation(using: .png, properties: [:]) else { fail("cannot encode the image") }
         do {
-            try png.write(to: URL(fileURLWithPath: arguments[1]))
+            try png.write(to: URL(fileURLWithPath: path))
         } catch {
-            fail("cannot write \(arguments[1]): \(error.localizedDescription)")
+            fail("cannot write \(path): \(error.localizedDescription)")
         }
-        print("\(arguments[1]) \(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
-        exit(0)
+        print("\(path) \(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
     }
 
     /// The panel with its side panels placed as the host places them
@@ -107,7 +114,7 @@ enum BarPanelRender {
 
     /// A scheme's colours: from a theme file when `scheme` is a path, else
     /// from `grove-themes list --json`.
-    private static func theme(_ scheme: String) -> ThemeColors {
+    static func theme(_ scheme: String) -> ThemeColors {
         if scheme.contains("/") {
             guard let text = try? String(contentsOfFile: scheme, encoding: .utf8) else { fail("\(scheme): can't be read") }
             var colors: [String: String] = [:]

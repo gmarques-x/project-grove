@@ -16,7 +16,6 @@ final class HyperEngine {
     private let onEffect: @MainActor @Sendable (HyperEffect) -> Void
     private let onFailure: @MainActor @Sendable () -> Void
     private var session: TapSession?
-    private var layoutObserver: NSObjectProtocol?
 
     /// `onFailure`: re-enabling the tap failed three times in a minute; it is off now.
     init(onEffect: @escaping @MainActor @Sendable (HyperEffect) -> Void,
@@ -35,14 +34,13 @@ final class HyperEngine {
         guard session.start() else { return false }
         self.session = session
         session.update(layout: TypingLayout.current())
-        if layoutObserver == nil {
-            // Another keyboard layout was chosen: the right Option types its characters now.
-            layoutObserver = DistributedNotificationCenter.default().addObserver(
-                forName: TypingLayout.changed, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.session?.update(layout: TypingLayout.current()) }
-            }
-        }
         return true
+    }
+
+    /// Another input source was chosen (`TypingLayout.changed`, observed by
+    /// the model): the right Option types its characters now.
+    func layoutChanged() {
+        session?.update(layout: TypingLayout.current())
     }
 
     /// Resets the machine (its effects still go out), removes the tap and ends

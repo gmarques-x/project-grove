@@ -15,9 +15,24 @@ struct TypingLayout: Sendable {
     /// Kotoeri) the layout it types through. Nil when it has no table.
     @MainActor
     static func current() -> TypingLayout? {
-        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
-        else { return nil }
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue() else { return nil }
+        return layout(of: source)
+    }
+
+    /// The layout of the installed input source with this ID
+    /// (`com.apple.keylayout.Portuguese`), read without choosing it. Nil when
+    /// there is none or it has no table.
+    @MainActor
+    static func installed(id: String) -> TypingLayout? {
+        let filter = [kTISPropertyInputSourceID: id as CFString] as CFDictionary
+        guard let list = TISCreateInputSourceList(filter, true)?.takeRetainedValue() as? [TISInputSource],
+              let source = list.first else { return nil }
+        return layout(of: source)
+    }
+
+    @MainActor
+    private static func layout(of source: TISInputSource) -> TypingLayout? {
+        guard let property = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
         let data = Unmanaged<CFData>.fromOpaque(property).takeUnretainedValue() as Data
         return data.isEmpty ? nil : TypingLayout(data: data)
     }
@@ -33,6 +48,15 @@ struct TypingLayout: Sendable {
         var modifiers = optionKey
         if shift { modifiers |= shiftKey }
         if capsLock { modifiers |= alphaLock }
+        return text(keyCode: keyCode, modifiers: modifiers, keyboardType: keyboardType)
+    }
+
+    /// What the key types with `modifiers` (Carbon's `shiftKey`,
+    /// `optionKey`, `alphaLock`… as an event record has them) held, a dead
+    /// key giving its accent alone (not composed); nil when it types
+    /// nothing or the call fails. The one `UCKeyTranslate` call, for the
+    /// right Option's characters and the caps' legends (`KeyboardReader`).
+    func text(keyCode: UInt16, modifiers: Int, keyboardType: UInt32) -> String? {
         var deadKeys: UInt32 = 0
         var units = [UniChar](repeating: 0, count: 8)
         var count = 0
