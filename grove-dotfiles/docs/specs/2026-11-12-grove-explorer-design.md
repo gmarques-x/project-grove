@@ -286,13 +286,15 @@ For the plan: (1) Core reading, sorting and the list in one pane, read-only; (2)
 
 Asked for by the owner after the first live run, and chosen from options put to him: folders expand in place in the list, as in Finder's list view, and the arrows are always there (no mode, no switch). Mock-ups: `artifacts/grove-explorer/mockups/tree-*.png`.
 
-**Look.** Every folder row has a small arrow before its icon (`GroveIcon`, quiet colour; pointing right when closed, down when open). A folder's contents are listed beneath it, the name indented one step (16 pt) per level; Size, Date Modified and Kind stay in their columns. No arrow on files, on packages (apps, bundles), on links to folders, or on a folder the app can't read. Rows stay 24 pt.
+**Look** (chosen by the owner from the mock-ups, 2026-11-13). A folder that has something in it has a chevron before its icon (`GroveIcon`: chevron.right closed, chevron.down open; 12 pt, quiet colour, the text colour while the pointer is on it). The chevron sits in a gutter of its own, 16 pt wide (a 12 pt box and 4 pt), which every row keeps, so all icons are in one column and all names in another; the header's "Name" stays at the pane's edge. The chevron's hit area is the whole gutter cell (16 × 24 pt). A folder's contents are listed beneath it, the name indented 16 pt per level (the gutter's width, so a child's chevron sits under its parent's icon); the indent is never capped: a deep name in a narrow pane is cut in the middle like any long name. Size, Date Modified and Kind stay in their columns. Rows stay 24 pt; fills and the drop line run the row's whole width at every level.
 
-**Opening and closing.** A click on the arrow; → on the selected folder opens it, ← closes it; ← on a file or a closed folder selects its parent row; ⌥→ or ⌥-click on the arrow opens a folder and everything inside it, ⌥← closes it and everything inside. ⌘↓, ⌘O and a double-click still go INTO the folder (the tab navigates), as before. An opened folder that is still being read shows one quiet "···" row beneath it.
+**Which folders have a chevron.** Only a folder with at least one item that would show (hidden items count only while hidden items are shown). An empty folder has none, and gains one when something arrives in it. No chevron on files, on packages (apps, bundles), on links to folders, or on a folder the app can't read (its size reads "--"). Whether a folder has something in it is found by looking into it, off the main thread, for the folders in view first; until that is known the row has no chevron. Looking into Desktop, Documents, Downloads and the like is what makes macOS ask its permission questions.
+
+**Opening and closing.** A click on the arrow; → on the selected folder opens it, ← closes it; ← on a file or a closed folder selects its parent row; ⌥→ or ⌥-click on the arrow opens a folder and everything inside it, ⌥← closes it and everything inside. ⌘↓, ⌘O and a double-click still go INTO the folder (the tab navigates), as before. An opened folder that is still being read shows one quiet "···" row beneath it, at the child's icon position, the other columns empty; it is not selectable, not counted in the status bar, and the arrow keys pass over it. A folder that turns out empty when opened closes again and loses its chevron.
 
 **Order.** Each folder's contents are sorted among themselves by the tab's column and direction, folders on top at every level; a child never leaves its parent.
 
-**Filter (⌘F).** It looks through every row that is showing, opened folders' contents included. A row that matches keeps its ancestors showing, drawn in the quiet colour (they are context, not matches); the status bar counts matches ("4 of 212"). The filter never opens a folder by itself.
+**Filter (⌘F).** It looks through every row that is showing, opened folders' contents included. A row that matches keeps its ancestors showing, their names in the quiet colour and their icons and chevrons unchanged (they are context, not matches; dimming the icon would make them look hidden). An ancestor kept as context can be selected and acted on like any row, and its chevron still closes it (which hides the matches inside). The status bar counts matches against the rows that would show without the filter ("5 of 33"). The filter never opens a folder by itself.
 
 **Selection and commands.** They act on the rows that are showing, at any depth; ⌘A selects all showing rows. When a folder and items inside it are both selected, an operation takes the folder once (items whose ancestor is also selected are left out, so nothing is copied twice or moved out from under itself). Type-to-jump looks through all showing rows.
 
@@ -306,7 +308,7 @@ Asked for by the owner after the first live run, and chosen from options put to 
 
 **Limits.** ⌥→ stops opening when the tab would show more than 10,000 rows and says so in the status bar. A link loop can't be opened (links to folders have no arrow).
 
-**Status bar.** "212 items" counts showing rows; with folders open: "212 items · 3 folders open".
+**Status bar.** "212 items" counts showing rows; with folders open: "212 items · 3 folders open" (a folder still being read counts as open). With a selection: "2 of 19 selected · 350 KB", without the folders-open count; a folder and items inside it selected together count the folder's size once.
 
 **VoiceOver.** A row says its level and, for a folder, "open" or "closed"; the arrow is the row's expand/collapse action (disclosure), not a separate element.
 
