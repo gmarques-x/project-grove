@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 // Bluetooth beside Wi-Fi in the bar (spec 2026-11-13-bar-wifi-bluetooth-design):
 // the controller's power and the connected devices, read from
@@ -79,11 +80,13 @@ public struct BluetoothState: Equatable, Sendable {
         default: return none
         }
         guard power else { return BluetoothState(power: false, connected: []) }
-        let entries = section["device_connected"] as? [[String: Any]] ?? []
+        // Each entry is cast on its own: one that isn't a device is skipped,
+        // not the whole list.
+        let entries = (section["device_connected"] as? [Any] ?? []).compactMap { $0 as? [String: Any] }
         let devices = entries.flatMap { entry in
             entry.compactMap { name, value in (value as? [String: Any]).map { device(named: name, $0) } }
         }
-        return BluetoothState(power: true, connected: devices)
+        return BluetoothState(power: true, connected: unique(devices))
     }
 
     private static func device(named rawName: String, _ fields: [String: Any]) -> BluetoothDevice {
@@ -98,12 +101,26 @@ public struct BluetoothState: Equatable, Sendable {
                                battery: battery)
     }
 
-    /// "80%" (or a bare number) as 0...100.
+    /// Devices without an address stand in by name, and two can share one:
+    /// the second and later get "#2", "#3"… (their place in the list), so
+    /// every row has its own id.
+    private static func unique(_ devices: [BluetoothDevice]) -> [BluetoothDevice] {
+        var seen = Set<String>()
+        return devices.enumerated().map { index, device in
+            var id = device.id
+            if seen.contains(id) { id = "\(device.id)#\(index + 1)" }
+            while seen.contains(id) { id += "'" }
+            seen.insert(id)
+            return BluetoothDevice(id: id, name: device.name, kind: device.kind, battery: device.battery)
+        }
+    }
+
+    /// "80%", "80 %" (or a bare number) as 0...100.
     private static func percent(_ value: Any?) -> Int? {
         let number: Int?
         switch value {
         case let text as String:
-            number = Int(text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "%", with: ""))
+            number = Int(text.replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespaces))
         case let int as Int: number = int
         default: number = nil
         }
@@ -120,5 +137,38 @@ public enum BluetoothIcon: String, Sendable {
     public static func icon(for state: BluetoothState) -> BluetoothIcon {
         guard state.power == true else { return .off }
         return state.connected.isEmpty ? .on : .connected
+    }
+}
+
+/// The bar's Bluetooth icon state: `$GROVE_STATE/bluetooth`, one line,
+/// `off`, `on` or `connected`. Grove Keys writes it, the bar's `bt` item
+/// reads it; no file shows `off`.
+public enum BluetoothBarFile {
+    /// Next to keys.json: `$GROVE_STATE/bluetooth`, default
+    /// `~/.local/state/grove/bluetooth`.
+    public static func url(environment: [String: String], home: URL) -> URL {
+        StatePath.url(environment: environment, home: home)
+            .deletingLastPathComponent().appendingPathComponent("bluetooth")
+    }
+
+    /// Writes the icon's word and a newline atomically, readable by the owner
+    /// only, unless the file already holds it (a 30 s read that changes
+    /// nothing writes nothing); nil removes the file. True when the file
+    /// changed, so the bar is told only then.
+    @discardableResult
+    public static func update(_ icon: BluetoothIcon?, at url: URL) throws -> Bool {
+        guard let icon else {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch CocoaError.fileNoSuchFile {
+                return false
+            }
+            return true
+        }
+        let line = icon.rawValue + "\n"
+        guard (try? String(contentsOf: url, encoding: .utf8)) != line else { return false }
+        try writeAtomically(Data(line.utf8), to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return true
     }
 }

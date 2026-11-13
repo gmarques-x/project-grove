@@ -5,16 +5,17 @@ import Foundation
 public enum Subprocess {
     private final class Box: @unchecked Sendable { var data = Data() }
 
-    /// `output` is what it printed, standard error included; empty when it
+    /// `output` is what it printed, standard error included unless
+    /// `includeErrors` is false (then it is thrown away); empty when it
     /// timed out.
-    public static func run(_ path: String, _ args: [String], timeout: TimeInterval)
+    public static func run(_ path: String, _ args: [String], timeout: TimeInterval, includeErrors: Bool = true)
         -> (status: Int32, output: String, timedOut: Bool) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = args
         let pipe = Pipe()
         p.standardOutput = pipe
-        p.standardError = pipe
+        p.standardError = includeErrors ? pipe : FileHandle.nullDevice
         let exited = DispatchSemaphore(value: 0)
         p.terminationHandler = { _ in exited.signal() }
         do { try p.run() } catch { return (-1, "cannot run \(path): \(error.localizedDescription)", false) }
