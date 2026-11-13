@@ -117,4 +117,103 @@ import Testing
         #expect(Tree.operands(of: [entry("/t/z", .file).url, entry("/t/a").url], in: items, index: rows).map(\.path)
             == ["/t/a", "/t/z"])
     }
+
+    // MARK: The fold keys
+
+    private func fold(_ path: String, depth: Int, _ fold: TreeRow.Fold, kind: Entry.Kind = .folder) -> TreeItem {
+        .row(TreeRow(entry: entry(path, kind), depth: depth, fold: fold, isContext: false))
+    }
+
+    /// /t: a (open: a/x a file, a/b open: a/b/y), c (closed with contents),
+    /// d (no chevron), e (being read), f.txt.
+    private var tree: [TreeItem] {
+        [
+            fold("/t/a", depth: 0, .open), fold("/t/a/b", depth: 1, .open), fold("/t/a/b/y", depth: 2, .none, kind: .file),
+            fold("/t/a/x", depth: 1, .none, kind: .file), fold("/t/c", depth: 0, .closed), fold("/t/d", depth: 0, .none),
+            fold("/t/e", depth: 0, .loading), .loading(under: entry("/t/e").url, depth: 1),
+            fold("/t/f.txt", depth: 0, .none, kind: .file),
+        ]
+    }
+
+    private func url(_ path: String, folder: Bool = true) -> URL { entry(path, folder ? .folder : .file).url }
+
+    private func right(_ selected: [URL], everything: Bool = false) -> Tree.FoldAction? {
+        Tree.right(selection: Set(selected), in: tree, index: index(tree), everything: everything)
+    }
+
+    private func left(_ selected: [URL], open: Set<URL> = [], everything: Bool = false) -> Tree.FoldAction? {
+        Tree.left(selection: Set(selected), in: tree, index: index(tree), open: open, everything: everything)
+    }
+
+    @Test func rightOpensAClosedFolderAndGoesIntoAnOpenOne() {
+        #expect(right([url("/t/c")]) == .open(url("/t/c")))
+        #expect(right([url("/t/a")]) == .select(url("/t/a/b")))
+        #expect(right([url("/t/a/b")]) == .select(url("/t/a/b/y", folder: false)))
+        // No chevron (empty, or not looked into yet), being read, a file,
+        // nothing or two selected: nothing.
+        #expect(right([url("/t/d")]) == nil)
+        #expect(right([url("/t/e")]) == nil)
+        #expect(right([url("/t/f.txt", folder: false)]) == nil)
+        #expect(right([]) == nil)
+        #expect(right([url("/t/c"), url("/t/d")]) == nil)
+        // A URL that is no row (inside a closed folder, gone).
+        #expect(right([url("/t/c/inner")]) == nil)
+    }
+
+    @Test func optionRightOpensEverythingInsideAFolderWithAChevron() {
+        #expect(right([url("/t/c")], everything: true) == .openAll(url("/t/c")))
+        #expect(right([url("/t/a")], everything: true) == .openAll(url("/t/a")))
+        #expect(right([url("/t/e")], everything: true) == .openAll(url("/t/e")))
+        #expect(right([url("/t/d")], everything: true) == nil)
+        #expect(right([url("/t/f.txt", folder: false)], everything: true) == nil)
+    }
+
+    @Test func leftClosesAnOpenFolderOrGoesToTheParentRow() {
+        #expect(left([url("/t/a")]) == .close(url("/t/a")))
+        #expect(left([url("/t/e")]) == .close(url("/t/e")))
+        #expect(left([url("/t/a/b/y", folder: false)]) == .select(url("/t/a/b")))
+        #expect(left([url("/t/a/x", folder: false)]) == .select(url("/t/a")))
+        // At the top: nowhere to go.
+        #expect(left([url("/t/c")]) == nil)
+        #expect(left([url("/t/f.txt", folder: false)]) == nil)
+        #expect(left([url("/t/a"), url("/t/c")]) == nil)
+    }
+
+    @Test func optionLeftClosesEverythingInside() {
+        #expect(left([url("/t/a")], everything: true) == .closeAll(url("/t/a")))
+        // Closed, but remembering what was open inside it: that is forgotten.
+        #expect(left([url("/t/c")], open: [url("/t/c/z")], everything: true) == .closeAll(url("/t/c")))
+        // Nothing open in it: as ←.
+        #expect(left([url("/t/c")], everything: true) == nil)
+        #expect(left([url("/t/a/x", folder: false)], everything: true) == .select(url("/t/a")))
+    }
+
+    @Test func closingKeepsOrForgetsWhatWasOpenInside() {
+        let open: Set<URL> = [url("/t/a"), url("/t/a/b"), url("/t/a/b/c"), url("/t/ab"), url("/t/z")]
+        #expect(paths(Tree.closing(url("/t/a"), everything: false, open: open)) == ["/t/a/b", "/t/a/b/c", "/t/ab", "/t/z"])
+        #expect(paths(Tree.closing(url("/t/a"), everything: true, open: open)) == ["/t/ab", "/t/z"])
+    }
+
+    /// Closing a folder with something selected inside it: the folder is
+    /// selected instead, and the rest of the selection stays.
+    @Test func whatWasSelectedInsideAClosedFolderBecomesTheFolder() {
+        let selection: Set<URL> = [url("/t/a/x", folder: false), url("/t/a/b/y", folder: false), url("/t/c")]
+        #expect(paths(Tree.selection(selection, closing: url("/t/a"))) == ["/t/a", "/t/c"])
+        #expect(Tree.selection([url("/t/c")], closing: url("/t/a")) == [url("/t/c")])
+    }
+
+    @Test func theRowsOutsideAFolderCountNothingOfItsContents() {
+        #expect(Tree.rowsOutside(url("/t/a"), in: tree) == 5)  // a c d e f.txt
+        #expect(Tree.rowsOutside(url("/t/a/b"), in: tree) == 7)
+        #expect(Tree.rowsOutside(url("/t/e"), in: tree) == 8)  // the loading line is no row
+        #expect(Tree.rowsOutside(url("/t/nowhere"), in: tree) == 8)
+        for folder in ["/t/a", "/t/a/b", "/t/e", "/t/c", "/t/nowhere"] {
+            #expect(Tree.rowsOutside(url(folder), in: tree, index: index(tree)) == Tree.rowsOutside(url(folder), in: tree))
+        }
+    }
+
+    @Test func theLimitIsSaidAsTheRowLimit() {
+        #expect(Tree.stoppedAtLimit == "Stopped at 10,000 rows")
+        #expect(Tree.rowLimit == 10_000)
+    }
 }

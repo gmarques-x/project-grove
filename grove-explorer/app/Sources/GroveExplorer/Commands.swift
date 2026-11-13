@@ -69,6 +69,14 @@ enum CommandTable {
             "sortByKind": always { $0.sort(by: .kind, in: $0.browser.active) },
             "sortByDate": always { $0.sort(by: .modified, in: $0.browser.active) },
             "sortBySize": always { $0.sort(by: .size, in: $0.browser.active) },
+            // Folders that open in place (spec §16): with the keyboard in a
+            // list only (`listOnly`), and no field up.
+            "openFolderInPlace": files({ $0.foldRight(in: $0.browser.active) }, when: { $0.rightAction(everything: false) != nil }),
+            "closeFolderInPlace": files({ $0.foldLeft(in: $0.browser.active) }, when: { $0.leftAction(everything: false) != nil }),
+            "openFolderAndEverythingInside": files(
+                { $0.foldRightAll(in: $0.browser.active) }, when: { $0.rightAction(everything: true) != nil }),
+            "closeFolderAndEverythingInside": files(
+                { $0.foldLeftAll(in: $0.browser.active) }, when: { $0.leftAction(everything: true) != nil }),
             "nextTab": always { $0.nextTab() },
             "previousTab": always { $0.previousTab() },
             // Go
@@ -144,6 +152,13 @@ enum CommandTable {
     /// on the row it is on and leave it there.
     static let sidebarCommands: Set<String> = ["contextMenu", "contextMenuF10", "eject"]
 
+    /// The fold keys: a list's own arrows. With the keyboard in the sidebar
+    /// they do nothing to the list, and no menu takes them as its key
+    /// (→ ← and ⌥→ ⌥← move the caret in a text field).
+    static let listOnly: Set<String> = [
+        "openFolderInPlace", "closeFolderInPlace", "openFolderAndEverythingInside", "closeFolderAndEverythingInside",
+    ]
+
     /// A key event as `CommandList` writes keys; nil for one that is no key of its own.
     static func stroke(of event: NSEvent) -> (key: String, modifiers: Set<GroveExplorerCore.Modifier>)? {
         var modifiers: Set<GroveExplorerCore.Modifier> = []
@@ -183,8 +198,9 @@ enum CommandTable {
             // A command's key (with ⌘, ⌃ or a function key) still does its
             // command, and the keyboard is the list's again; but the
             // commands that work on the sidebar's row find it there.
-            let onTheRow = CommandList.command(key: stroke.key, modifiers: stroke.modifiers)
-                .map { sidebarCommands.contains($0.id) } ?? false
+            let command = CommandList.command(key: stroke.key, modifiers: stroke.modifiers)
+            if let command, listOnly.contains(command.id) { return true }
+            let onTheRow = command.map { sidebarCommands.contains($0.id) } ?? false
             if !onTheRow { model.sidebarCursor = nil }
         }
         // Return where the folder can't be read: nothing to rename, and the
@@ -251,7 +267,7 @@ struct MenuBar: SwiftUI.Commands {
     /// Return, Space or Tab: as a menu's key each would be taken from a
     /// text field too; the list handles them itself.
     static func shortcut(of info: CommandInfo) -> KeyboardShortcut? {
-        guard let key = info.key else { return nil }
+        guard let key = info.key, !CommandTable.listOnly.contains(info.id) else { return nil }
         let named: [String: KeyEquivalent] = [
             "↑": .upArrow, "↓": .downArrow, "←": .leftArrow, "→": .rightArrow, "⌫": .delete, "Tab": .tab,
             "Return": .return, "Space": .space,

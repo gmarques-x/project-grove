@@ -159,6 +159,8 @@ extension AppModel {
     ) {
         let touched = AfterOperation.touchedFolders(by: operation, outcome: outcome)
         for folder in touched { work.touched[folder.standardizedFileURL.path] = folder }
+        // An open folder renamed or moved here stays open where it went.
+        openFoldersFollow(outcome.changes)
         filesChanged(in: touched)
 
         // What it left is selected once the panes list it (the watcher has
@@ -351,7 +353,11 @@ extension AppModel {
         guard let tab = browser.tab(side), let listing = listing(for: side),
             listing.folder.standardizedFileURL.path == tab.folder.standardizedFileURL.path
         else { return }
-        let here = AfterOperation.arrivals(arrivals.items, in: tab.folder, listed: listing.all.map(\.url))
+        // In the tab's folder or in a folder open in it, at any depth;
+        // selected only where it is a row (`select`).
+        let listed = listing.all.map(\.url) + listing.children.values.flatMap { $0.map(\.url) }
+        let here = AfterOperation.arrivals(
+            arrivals.items, in: [tab.folder] + Array(listing.children.keys), listed: listed)
         guard !here.found.isEmpty else { return }
         select(Set(here.found), in: side)
         reveal(here.found[0], in: side)

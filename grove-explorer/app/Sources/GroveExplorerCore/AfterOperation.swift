@@ -20,8 +20,15 @@ public enum AfterOperation {
     /// writes their URLs (`listed`), and whether that is all of them: a
     /// listing read while the run was going may have only some.
     public static func arrivals(_ new: [URL], in folder: URL, listed: [URL]) -> (found: [URL], complete: Bool) {
-        let here = folder.standardizedFileURL.path
-        let expected = new.map(\.standardizedFileURL).filter { $0.deletingLastPathComponent().path == here }.map(\.path)
+        arrivals(new, in: [folder], listed: listed)
+    }
+
+    /// The same over several listed folders (the tab's and those open in
+    /// place in it, spec §16): of `new`, the items of any of `folders`.
+    public static func arrivals(_ new: [URL], in folders: [URL], listed: [URL]) -> (found: [URL], complete: Bool) {
+        let here = Set(folders.map(\.standardizedFileURL.path))
+        let expected = new.map(\.standardizedFileURL).filter { here.contains($0.deletingLastPathComponent().path) }
+            .map(\.path)
         guard !expected.isEmpty else { return ([], false) }
         var byPath: [String: URL] = [:]
         for url in listed { byPath[url.standardizedFileURL.path] = url }

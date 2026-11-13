@@ -28,6 +28,10 @@ struct PaneTree {
     var arrangeHeld = false
     var arrangeOwed = false
 
+    /// ⌥→ under way on this folder: each read that lands opens more
+    /// (`continueOpenAll`) until it stops.
+    var openingAll: URL?
+
     /// One watcher per open folder that shows, up to
     /// `WatchPlan.openFolderLimit`, by its path.
     var watchers: [String: FolderWatcher] = [:]
@@ -225,12 +229,14 @@ extension AppModel {
             // it simply isn't there).
             closeOpenFolders([folder], in: side, inside: read.gone, peek: false, now: false)
             if !read.gone { say("\(name) can't be opened: \(problem)", in: side) }
+            continueOpenAll(in: side)
             return
         }
         let shows = browser.showHidden ? read.all : read.all.filter { !$0.isHidden }
         if shows.isEmpty {
             // Empty when opened: it closes again and loses its chevron.
             closeOpenFolders([folder], in: side, inside: false, peek: false, now: false)
+            continueOpenAll(in: side)
             return
         }
         let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
@@ -254,6 +260,8 @@ extension AppModel {
         // What is open inside it shows now, and is read in turn.
         keepOpenFolders(side)
         arrived(in: side)
+        // ⌥→ goes on into what it found.
+        continueOpenAll(in: side)
     }
 
     /// A fresh read of `folder` (the tab's own, or one open in it) found
@@ -339,7 +347,7 @@ extension AppModel {
         if let chosen = selections[tab.id], chosen.contains(where: isUnder) {
             selections[tab.id] = chosen.filter { !isUnder($0) }
         }
-        let open = tab.open.filter { !isClosed($0) }
+        let open = folders.reduce(tab.open) { Tree.closing($1, everything: inside, open: $0) }
         if open != tab.open {
             change { $0.setOpen(open, in: side) }
         }

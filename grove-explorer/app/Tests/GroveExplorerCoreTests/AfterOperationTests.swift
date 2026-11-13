@@ -109,4 +109,19 @@ import Testing
         let stale = AfterOperation.staleTotals(among: known, touched: [URL(fileURLWithPath: "/t/a/b/c/d")])
         #expect(stale.map(\.path) == ["/t/a", "/t/a/b", "/t/a/b/c"])
     }
+
+    /// With folders open in place, what a run made is found in whichever
+    /// listed folder it went to, at any depth.
+    @Test func arrivalsAreFoundInEveryListedFolder() {
+        let folders = ["/t", "/t/a", "/t/a/b"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let new = ["/t/x", "/t/a/b/y", "/t/closed/z"].map { URL(fileURLWithPath: $0) }
+        let listed = ["/t/x", "/t/a", "/t/a/b", "/t/a/b/y/"].map { URL(fileURLWithPath: $0) }
+        let here = AfterOperation.arrivals(new, in: folders, listed: listed)
+        // As the listings spell them; z is in no listed folder, so not awaited.
+        #expect(here.found.map(\.path) == ["/t/x", "/t/a/b/y"])
+        #expect(here.complete)
+        let partly = AfterOperation.arrivals(new, in: folders, listed: [URL(fileURLWithPath: "/t/x")])
+        #expect(partly.found.map(\.path) == ["/t/x"])
+        #expect(!partly.complete)
+    }
 }

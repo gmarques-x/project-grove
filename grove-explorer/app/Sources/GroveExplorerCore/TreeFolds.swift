@@ -60,4 +60,121 @@ extension Tree {
         }
         return places.sorted().compactMap { if case .row(let row) = items[$0] { row.entry.url } else { nil } }
     }
+
+    // MARK: The fold keys (→ ← ⌥→ ⌥←)
+
+    /// What a fold key does to the rows.
+    public enum FoldAction: Equatable, Sendable {
+        /// → on a closed folder with a chevron.
+        case open(URL)
+        /// ⌥→: the folder and everything inside it (`openAll`).
+        case openAll(URL)
+        /// ← on an open folder (or one being read): what was open inside
+        /// it is remembered.
+        case close(URL)
+        /// ⌥←: the folder, and what was open inside it is forgotten.
+        case closeAll(URL)
+        /// → on an open folder: its first row; ← on anything else: its parent row.
+        case select(URL)
+    }
+
+    /// The one row selected, if exactly one is, and where it is.
+    private static func single(_ selection: Set<URL>, in items: [TreeItem], index: [URL: Int]) -> (TreeRow, Int)? {
+        guard selection.count == 1, let url = selection.first, let place = index[url], items.indices.contains(place),
+            case .row(let row) = items[place], row.entry.url == url
+        else { return nil }
+        return (row, place)
+    }
+
+    /// → (`everything`: ⌥→), with `selection` selected among `items`
+    /// (`index`: where each row's URL is). Only with one row selected,
+    /// and only a folder with a chevron: → opens it when closed, and goes
+    /// to its first row when open (not while it is being read); ⌥→ opens
+    /// it and everything inside, closed or open.
+    public static func right(selection: Set<URL>, in items: [TreeItem], index: [URL: Int], everything: Bool) -> FoldAction? {
+        guard let (row, place) = single(selection, in: items, index: index), row.entry.kind == .folder else { return nil }
+        let url = row.entry.url
+        if everything { return row.fold == .none ? nil : .openAll(url) }
+        switch row.fold {
+        case .closed: return .open(url)
+        case .open:
+            guard items.indices.contains(place + 1), case .row(let first) = items[place + 1], first.depth == row.depth + 1
+            else { return nil }
+            return .select(first.entry.url)
+        case .none, .loading: return nil
+        }
+    }
+
+    /// ← (`everything`: ⌥←), with `selection` selected among `items`.
+    /// Only with one row selected: ← closes an open folder (or one being
+    /// read), and otherwise goes to the row's parent row (none at the top).
+    /// ⌥← closes a folder and forgets what was open inside it, wherever
+    /// something is open in it or it is open (`open`, the tab's open set);
+    /// on anything else it is ←.
+    public static func left(
+        selection: Set<URL>, in items: [TreeItem], index: [URL: Int], open: Set<URL>, everything: Bool
+    ) -> FoldAction? {
+        guard let (row, place) = single(selection, in: items, index: index) else { return nil }
+        let url = row.entry.url
+        let isOpen = row.fold == .open || row.fold == .loading
+        if row.entry.kind == .folder, everything {
+            let inside = url.standardizedPath + "/"
+            if isOpen || open.contains(where: { $0.standardizedPath.hasPrefix(inside) }) { return .closeAll(url) }
+        }
+        if row.entry.kind == .folder, isOpen { return .close(url) }
+        guard row.depth > 0 else { return nil }
+        for case .row(let above) in items[..<place].reversed() where above.depth == row.depth - 1 {
+            return .select(above.entry.url)
+        }
+        return nil
+    }
+
+    /// The open set once `folder` closes: without it, and (`everything`,
+    /// ⌥←) without anything open inside it either.
+    public static func closing(_ folder: URL, everything: Bool, open: Set<URL>) -> Set<URL> {
+        let path = folder.standardizedPath
+        return open.filter { url in
+            let other = url.standardizedPath
+            return other != path && !(everything && other.hasPrefix(path + "/"))
+        }
+    }
+
+    /// The selection once `folder` closes: what was selected inside it is
+    /// no row any more, and the folder is selected in its stead.
+    public static func selection(_ selection: Set<URL>, closing folder: URL) -> Set<URL> {
+        let inside = folder.standardizedPath + "/"
+        let kept = selection.filter { !$0.standardizedPath.hasPrefix(inside) }
+        return kept.count == selection.count ? selection : kept.union([folder])
+    }
+
+    /// How many rows `items` has outside `folder`'s contents (its own row
+    /// counted, a loading line not): what ⌥→'s `openAll` is given as
+    /// `showing`, so asking again as reads land counts nothing twice.
+    public static func rowsOutside(_ folder: URL, in items: [TreeItem]) -> Int {
+        let inside = folder.standardizedPath + "/"
+        var rows = 0
+        for case .row(let row) in items where !row.entry.url.standardizedPath.hasPrefix(inside) { rows += 1 }
+        return rows
+    }
+
+    /// `rowsOutside(_:in:)` through `index` (where each row's URL is in
+    /// `items`): the folder's contents are the rows deeper than it right
+    /// after it. A folder that is no row has none.
+    public static func rowsOutside(_ folder: URL, in items: [TreeItem], index: [URL: Int]) -> Int {
+        var rows = 0
+        for case .row in items { rows += 1 }
+        guard let place = index[folder], items.indices.contains(place), case .row(let row) = items[place] else {
+            return rows
+        }
+        var inside = 0
+        for item in items[(place + 1)...] {
+            guard case .row(let below) = item else { continue }
+            if below.depth <= row.depth { break }
+            inside += 1
+        }
+        return rows - inside
+    }
+
+    /// What the status bar says when ⌥→ stopped at `rowLimit`.
+    public static let stoppedAtLimit = "Stopped at 10,000 rows"
 }
