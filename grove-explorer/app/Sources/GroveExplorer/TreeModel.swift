@@ -40,6 +40,15 @@ struct PaneTree {
     /// bar says it wasn't watched.
     var refreshing: Set<String> = []
 
+    /// The folders to look into for their chevrons (`FolderPeek`), the
+    /// next first, and those being looked into.
+    var peekQueue: [URL] = []
+    var peeking: Set<String> = []
+    /// Being looked into when they changed: that answer is not taken.
+    var peeksVoid: Set<String> = []
+    /// Looks into folders on their way at once.
+    static let peeksAtOnce = 4
+
     /// Every watcher stops: the pane shows another tab or folder, or the
     /// disk is being ejected.
     func stopWatching() {
@@ -131,6 +140,7 @@ extension AppModel {
         let readNow = gate.changed(folder)
         if trees[side]?.reads[path] != nil { trees[side]?.reads[path]?.gate = gate }
         if readNow { loadOpenFolder(folder, in: side) }
+        forgetPeeks(of: [folder], in: side)
         sizeQueue.changed(folder)
         let stale = AfterOperation.staleTotals(among: Array(sizes.keys), touched: [folder])
         if !stale.isEmpty {
@@ -224,7 +234,8 @@ extension AppModel {
             return
         }
         let wasRefresh = trees[side]?.refreshing.remove(folder.pathKey) != nil
-        guard listing.childEntries(of: folder) != read.all else { return }
+        let before = listing.childEntries(of: folder)
+        guard before != read.all else { return }
         // Past the watchers' limit and changed meanwhile: what showed of it
         // was out of date, and the user is told why.
         if wasRefresh, listing.childEntries(of: folder) != nil {
@@ -235,6 +246,8 @@ extension AppModel {
         var children = listing.children.filter { $0.key.pathKey != folder.pathKey }
         children[folder] = read.all
         listings[side]?.children = children
+        // The folders in it that changed are looked into again.
+        forgetPeeks(of: FolderPeek.outdated(old: before ?? [], new: read.all), in: side)
         listings[side]?.treeVersion += 1
         openFolderWasRead(folder, entries: read.all, begunAt: begunAt, in: side)
         arrangeTree(side)

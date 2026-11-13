@@ -63,6 +63,8 @@ extension AppModel {
                     listing.treeVersion = old.treeVersion
                 }
                 listings[side] = listing
+                // Its folders that changed are looked into again.
+                if let old { forgetPeeks(of: FolderPeek.outdated(old: old.all, new: read.all), in: side) }
                 keepVisibleSelection(in: side)
                 IconCache.shared.forgetPaths()
                 // A folder open in it that is no longer there closes.
@@ -91,7 +93,8 @@ extension AppModel {
             {
                 arrange(side)
             }
-            wantSizes()
+            // The totals, chevrons and watchers the rows want.
+            rowsChanged(in: side)
             // The folder changed while it was read: once more, now.
             if reads[side]?.landed(folder) == true { load(side) }
         }
@@ -143,6 +146,7 @@ extension AppModel {
     /// (their folders' totals) follows.
     func rowsChanged(in side: Side) {
         wantSizes()
+        wantPeeks(in: side)
         // The watchers go to the open folders nearest the top, as the rows now are.
         watchOpenFolders(reachableOpenFolders(in: side), in: side)
     }

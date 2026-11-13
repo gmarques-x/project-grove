@@ -42,6 +42,33 @@ public enum FolderPeek {
         }
     }
 
+    /// The folders of `items` to look into: the rows that are folders and
+    /// not open (an open folder's chevron is its listing's), whose answer
+    /// isn't `known` (keys compared by standardized path), in row order.
+    /// Packages, links and files never have a chevron, and are never asked about.
+    public static func wanted(_ items: [TreeItem], known: [URL: Bool]) -> [URL] {
+        let answered = Set(known.keys.map(\.standardizedPath))
+        var wanted: [URL] = []
+        for case .row(let row) in items where row.entry.kind == .folder && row.fold != .open && row.fold != .loading {
+            if !answered.contains(row.entry.url.standardizedPath) { wanted.append(row.entry.url) }
+        }
+        return wanted
+    }
+
+    /// The folders of a listing whose answers a new read of it (`new`,
+    /// after `old`) makes out of date: those that went, are no folder now,
+    /// or were changed since (their date: what is in a folder changes its
+    /// date). A folder looked into whose date is the same keeps its answer.
+    public static func outdated(old: [Entry], new: [Entry]) -> [URL] {
+        var now: [String: Entry] = [:]
+        for entry in new where entry.kind == .folder { now[entry.url.standardizedPath] = entry }
+        return old.compactMap { entry in
+            guard entry.kind == .folder else { return nil }
+            guard let same = now[entry.url.standardizedPath], same.modified == entry.modified else { return entry.url }
+            return nil
+        }
+    }
+
     /// Whether the item named `name` in the folder open as `descriptor` has
     /// the hidden flag (`chflags hidden`). An item that went since the
     /// listing is taken as not hidden: the folder had it.

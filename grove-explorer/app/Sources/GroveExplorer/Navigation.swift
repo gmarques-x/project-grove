@@ -94,6 +94,8 @@ extension AppModel {
 
     func toggleHidden() {
         change { $0.showHidden.toggle() }
+        // A folder of hidden items only has something to show now, or no longer.
+        forgetAllPeeks()
         for side in sides { arrange(side) }
     }
 
