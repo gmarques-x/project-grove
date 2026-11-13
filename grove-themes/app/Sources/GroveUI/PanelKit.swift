@@ -396,6 +396,7 @@ public struct PanelSwitch: View {
     @Environment(\.theme) private var theme
     @Environment(\.panelSurface) private var surface
     @Environment(\.panelStandIns) private var standIn
+    @Environment(\.isEnabled) private var isEnabled
 
     public init(_ label: String, isOn: Binding<Bool>) {
         self.label = label
@@ -405,13 +406,16 @@ public struct PanelSwitch: View {
     public var body: some View {
         if standIn {
             // Offscreen AppKit leaves the tint out: the same measures, drawn.
+            // Disabled: no green, the knob quiet, as the system dims it.
             let on = isOn.wrappedValue
-            Capsule().fill(on ? Color(theme.green) : theme.selectedFill(on: surface))
+            Capsule().fill(on && isEnabled ? Color(theme.green) : theme.selectedFill(on: surface))
                 .frame(width: PanelMetrics.switchSize.width, height: PanelMetrics.switchSize.height)
                 .overlay(alignment: on ? .trailing : .leading) {
-                    Circle().fill(Color(theme.isDark ? theme.fg : theme.bg0)).padding(1)
+                    Circle().fill(isEnabled ? Color(theme.isDark ? theme.fg : theme.bg0) : theme.quiet).padding(1)
                 }
-                .overlay { if theme.isLight, !on { Capsule().strokeBorder(theme.line, lineWidth: 1) } }
+                .overlay {
+                    if theme.isLight, !on || !isEnabled { Capsule().strokeBorder(theme.line, lineWidth: 1) }
+                }
         } else {
             Toggle(label, isOn: isOn).toggleStyle(.switch).controlSize(.mini).labelsHidden()
                 .tint(Color(theme.green))

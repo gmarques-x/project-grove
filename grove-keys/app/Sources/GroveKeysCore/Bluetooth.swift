@@ -191,9 +191,10 @@ public enum BluetoothSectionContent: Equatable, Sendable {
     /// The power is unknown (no controller, or the output can't be read):
     /// the header alone, its switch disabled ("off" would be a guess).
     case unknown
-    /// Permission refused: says so, with a button to the privacy setting;
-    /// no switch. Grove Keys never asks again (macOS wouldn't show it).
-    case refused
+    /// Permission refused: says so, with a button to the privacy setting,
+    /// over the devices that were read anyway (when on); no switch. Grove
+    /// Keys never asks again (macOS wouldn't show it).
+    case refused([BluetoothDevice])
     /// The controller says off.
     case off
     /// On: the connected devices, "No devices connected" when none.
@@ -201,7 +202,7 @@ public enum BluetoothSectionContent: Equatable, Sendable {
 
     public init(state: BluetoothState?, permission: BluetoothPermission) {
         if permission == .refused {
-            self = .refused
+            self = .refused(state?.power == true ? state?.connected ?? [] : [])
             return
         }
         guard let state else {
@@ -226,7 +227,18 @@ public enum BluetoothSectionContent: Equatable, Sendable {
     }
 
     /// The header has its switch (not when permission is refused).
-    public var showsSwitch: Bool { self != .refused }
+    public var showsSwitch: Bool {
+        if case .refused = self { return false }
+        return true
+    }
+
+    /// The device rows to draw.
+    public var devices: [BluetoothDevice] {
+        switch self {
+        case .devices(let devices), .refused(let devices): return devices
+        case .reading, .unknown, .off: return []
+        }
+    }
 
     /// The switch can be used: only when the power is known.
     public var switchEnabled: Bool {

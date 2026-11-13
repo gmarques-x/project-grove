@@ -11,6 +11,7 @@ struct BluetoothSectionTests {
         let content = BluetoothSectionContent(state: BluetoothState(power: true, connected: [headphones]),
                                               permission: .allowed)
         #expect(content == .devices([headphones]))
+        #expect(content.devices == [headphones])
         #expect(content.switchOn && content.switchEnabled && content.showsSwitch)
     }
 
@@ -47,15 +48,23 @@ struct BluetoothSectionTests {
     }
 
     /// Refused: the section says so (with its button), whatever was read,
-    /// and has no switch (Grove Keys may not use Bluetooth, and never asks again).
+    /// and has no switch (Grove Keys may not use Bluetooth, and never asks
+    /// again); devices that were read anyway stay under the line.
     @Test func refusedSaysSo() {
         for state in [nil, BluetoothState(power: nil, connected: []), BluetoothState(power: false, connected: []),
-                      BluetoothState(power: true, connected: [headphones])] {
+                      BluetoothState(power: true, connected: [])] {
             let content = BluetoothSectionContent(state: state, permission: .refused)
-            #expect(content == .refused)
+            #expect(content == .refused([]))
+            #expect(content.devices.isEmpty)
             #expect(content.line == "Grove Keys needs Bluetooth permission")
             #expect(!content.showsSwitch && !content.switchEnabled)
         }
+        let read = BluetoothSectionContent(state: BluetoothState(power: true, connected: [headphones]),
+                                           permission: .refused)
+        #expect(read == .refused([headphones]))
+        #expect(read.devices == [headphones])
+        #expect(read.line == "Grove Keys needs Bluetooth permission")
+        #expect(!read.showsSwitch)
     }
 
     @Test func batteryText() {

@@ -47,9 +47,18 @@ final class BluetoothSectionModel: ObservableObject {
     var switchOn: Bool { pending ?? content.switchOn }
 
     /// The panel opened: the last reading at once, a fresh one asked for.
+    /// The first opening while macOS hasn't been asked yet asks (once, for
+    /// the app's life); its answer refreshes the section.
     func start() {
         guard live else { return }
         permission = BluetoothPower.permission
+        BluetoothPermissionAsker.shared.askIfUndetermined { [weak self] in
+            guard let self else { return }
+            let permission = BluetoothPower.permission
+            guard permission != self.permission else { return }
+            self.permission = permission
+            BluetoothWriter.shared.refresh(force: true)
+        }
         state = BluetoothWriter.shared.state
         pending = nil
         // `$state` sends the current value first, then each new one (before
@@ -118,22 +127,33 @@ struct BluetoothSection: View {
                     .disabled(!content.switchEnabled)
             }
         }
+        // The title on the Wi-Fi title's column (and the device names'):
+        // SF Symbols has no Bluetooth symbol to fill the icon column.
+        .padding(.leading, PanelMetrics.iconColumn + GroveSpace.s8)
         switch content {
         case .refused:
+            // A warning in the battery panel's yellow: orange is the lines'.
             VStack(alignment: .leading, spacing: GroveSpace.s8) {
-                theme.marked(content.line ?? "", theme.orange)
+                theme.marked(content.line ?? "", theme.yellow)
                 PanelButton("Privacy Settings…") { open(BluetoothPower.privacyURL) }
                     .help("Allow Grove Keys to use Bluetooth")
             }
+            devices(content.devices)
         case .devices(let devices) where !devices.isEmpty:
-            VStack(alignment: .leading, spacing: GroveSpace.s4) {
-                ForEach(devices) { BluetoothDeviceRow(device: $0) }
-            }
+            self.devices(devices)
         default:
             if let line = content.line { Text(line).foregroundStyle(theme.quiet) }
         }
         PanelRule()
         PanelFooter("Bluetooth Settings…") { open(BluetoothPower.settingsURL) }
+    }
+
+    @ViewBuilder private func devices(_ devices: [BluetoothDevice]) -> some View {
+        if !devices.isEmpty {
+            VStack(alignment: .leading, spacing: GroveSpace.s4) {
+                ForEach(devices) { BluetoothDeviceRow(device: $0) }
+            }
+        }
     }
 
     private func open(_ link: String) {

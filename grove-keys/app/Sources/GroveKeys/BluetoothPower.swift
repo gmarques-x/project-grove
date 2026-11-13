@@ -19,10 +19,9 @@ enum BluetoothPower {
     private typealias SetPower = @convention(c) (Int32) -> Void
     private typealias GetPower = @convention(c) () -> Int32
 
-    /// macOS's answer to the one prompt. Reading it never asks: Grove Keys
-    /// asks no more than macOS does (once, the first time it uses
-    /// Bluetooth), and a refusal stays refused until the owner changes it in
-    /// the privacy setting.
+    /// macOS's answer to the one prompt. Reading it never asks (the prompt
+    /// is `BluetoothPermissionAsker`'s, once); a refusal stays refused until
+    /// the owner changes it in the privacy setting.
     static var permission: BluetoothPermission {
         switch CBManager.authorization {
         case .allowedAlways: return .allowed
@@ -50,5 +49,34 @@ enum BluetoothPower {
             usleep(100_000)
         }
         return false
+    }
+}
+
+/// The one thing in Grove Keys that makes macOS ask for Bluetooth: a
+/// `CBCentralManager`, made the first time the live Wi-Fi dropdown opens
+/// while the answer isn't known yet, and kept for the app's life (macOS
+/// shows its prompt once; after a refusal it never asks again, and neither
+/// does Grove Keys). It scans for nothing; its delegate only hears that the
+/// answer (or the radio's state) changed. Never made by a render or a test.
+@MainActor
+final class BluetoothPermissionAsker: NSObject, CBCentralManagerDelegate {
+    static let shared = BluetoothPermissionAsker()
+
+    private var manager: CBCentralManager?
+    private var changed: [@MainActor () -> Void] = []
+
+    /// Asks once, when the answer isn't known. `onChange` runs on the main
+    /// actor each time the manager reports (the prompt answered).
+    func askIfUndetermined(onChange: @escaping @MainActor () -> Void) {
+        guard manager == nil, BluetoothPower.permission == .undetermined else { return }
+        changed.append(onChange)
+        // A nil queue: the delegate is called on the main queue.
+        manager = CBCentralManager(delegate: self, queue: nil)
+    }
+
+    nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        MainActor.assumeIsolated {
+            for change in changed { change() }
+        }
     }
 }
