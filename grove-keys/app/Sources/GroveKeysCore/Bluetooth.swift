@@ -278,3 +278,35 @@ public struct BluetoothPace: Sendable {
         return failure && !failing
     }
 }
+
+/// A reading as the reader publishes it: the state and the reading's
+/// number, counted as readings start (so a later number started later).
+public struct BluetoothReading: Equatable, Sendable {
+    public let state: BluetoothState
+    public let number: Int
+
+    public init(state: BluetoothState, number: Int) {
+        self.state = state
+        self.number = number
+    }
+}
+
+/// The section's switch while the power is being changed: it shows `on`
+/// until a reading that started after the change arrives. Earlier readings
+/// (one under way, the 30 s timer's) would flick it back.
+public struct BluetoothPendingSwitch: Equatable, Sendable {
+    public let on: Bool
+    /// The number of the last reading started when the power had changed;
+    /// nil while it is still being changed.
+    private var after: Int?
+
+    public init(on: Bool) { self.on = on }
+
+    /// The power changed; `number` is the last reading started by then.
+    public mutating func changed(afterReading number: Int) { after = number }
+
+    public func settles(with reading: BluetoothReading) -> Bool {
+        guard let after else { return false }
+        return reading.number > after
+    }
+}

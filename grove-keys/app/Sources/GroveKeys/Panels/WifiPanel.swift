@@ -177,8 +177,8 @@ final class WifiModel: ObservableObject, BarPanelModel {
     private static let sampleNow = Date(timeIntervalSince1970: 1_794_449_580)
 
     private static func sample(_ state: String) -> (snapshot: WifiSnapshot, speed: WifiSpeedState) {
-        var link = WifiLink.wifi(name: "Grove-5G"), wifiOn = true
-        var dns = ["192.168.150.1"]
+        var link = WifiLink.wifi(name: "Home"), wifiOn = true
+        var dns = ["192.0.2.1"]
         var speed = WifiSpeedState.idle
         let result = WifiSpeedResult(down: 412_000_000, up: 38_000_000, delay: .milliseconds(12))
         switch state {
@@ -186,16 +186,16 @@ final class WifiModel: ObservableObject, BarPanelModel {
         case "result", "apps", "measuring":
             speed = .result(result, at: sampleNow.addingTimeInterval(-130), network: "")
         case "failed": speed = .failed(WifiSpeedTest.failureLine)
-        case "dns": dns = ["192.168.150.1", "1.1.1.1", "9.9.9.9"]
+        case "dns": dns = ["192.0.2.1", "1.1.1.1", "9.9.9.9"]
         case "ethernet": (link, wifiOn) = (.ethernet, false)
-        case "vpn": link = .vpn(name: "Grove-5G")
+        case "vpn": link = .vpn(name: "Home")
         case "offline": link = .offline(wifiOn: true)
         case "off": (link, wifiOn) = (.offline(wifiOn: false), false)
         default: break
         }
         let online = link.isOnline
-        return (WifiSnapshot(link: link, ip: online ? WifiAddress(["192.168.150.158"]) : nil,
-                             router: online ? WifiAddress(["192.168.150.1"]) : nil,
+        return (WifiSnapshot(link: link, ip: online ? WifiAddress(["192.0.2.23"]) : nil,
+                             router: online ? WifiAddress(["192.0.2.1"]) : nil,
                              dns: online ? WifiAddress(dns) : nil,
                              primaryInterface: online ? "en0" : nil, wifiInterface: "en0", wifiOn: wifiOn), speed)
     }

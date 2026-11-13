@@ -19,9 +19,9 @@ import SwiftUI
 final class BluetoothSectionModel: ObservableObject {
     @Published private(set) var state: BluetoothState?
     @Published private(set) var permission: BluetoothPermission
-    /// The switch's value while the power is being changed, until the next
-    /// reading (or 5 s).
-    @Published private(set) var pending: Bool?
+    /// The switch while the power is being changed: it holds its new value
+    /// until a reading that started after the change (or 5 s after it).
+    @Published private(set) var pending: BluetoothPendingSwitch?
 
     private let live: Bool
     private var watching: AnyCancellable?
@@ -44,7 +44,7 @@ final class BluetoothSectionModel: ObservableObject {
     }
 
     var content: BluetoothSectionContent { BluetoothSectionContent(state: state, permission: permission) }
-    var switchOn: Bool { pending ?? content.switchOn }
+    var switchOn: Bool { pending?.on ?? content.switchOn }
 
     /// The panel opened: the last reading at once, a fresh one asked for.
     /// The first opening while macOS hasn't been asked yet asks (once, for
@@ -61,14 +61,10 @@ final class BluetoothSectionModel: ObservableObject {
         }
         state = BluetoothWriter.shared.state
         pending = nil
-        // `$state` sends the current value first, then each new one (before
-        // it is stored: the value is the sent one).
-        // The writer publishes on the main actor.
-        watching = BluetoothWriter.shared.$state.dropFirst().sink { [weak self] state in
-            MainActor.assumeIsolated {
-                self?.state = state
-                self?.pending = nil
-            }
+        // `$latest` sends the current value first, then each reading (before
+        // it is stored: the value is the sent one), on the main actor.
+        watching = BluetoothWriter.shared.$latest.dropFirst().sink { [weak self] reading in
+            MainActor.assumeIsolated { self?.took(reading) }
         }
         BluetoothWriter.shared.refresh()
     }
@@ -77,12 +73,23 @@ final class BluetoothSectionModel: ObservableObject {
         watching = nil
     }
 
+    /// A reading: shown, unless the switch is waiting for a later one (a
+    /// reading that started before the change would flick it back).
+    private func took(_ reading: BluetoothReading?) {
+        guard let reading else { return }
+        if let pending {
+            guard pending.settles(with: reading) else { return }
+            self.pending = nil
+        }
+        if reading.state != state { state = reading.state }
+    }
+
     /// The switch: the power through IOBluetooth, off the main thread, then a
     /// fresh reading. When that can't be done, `openSettings` (Bluetooth
     /// Settings). Nothing when permission is refused or the power is unknown.
     func setPower(_ on: Bool, orElse openSettings: @escaping @MainActor () -> Void) {
         guard live, content.switchEnabled, on != switchOn else { return }
-        pending = on
+        pending = BluetoothPendingSwitch(on: on)
         change += 1
         let change = change
         switching.async { [weak self] in
@@ -96,13 +103,16 @@ final class BluetoothSectionModel: ObservableObject {
                         openSettings()
                         return
                     }
+                    // Readings started from now on saw the new power.
+                    self.pending?.changed(afterReading: BluetoothWriter.shared.started)
                     BluetoothWriter.shared.refresh(force: true)
-                    // A reading that changes nothing isn't sent: the switch
-                    // goes back to the last reading after 5 s at the latest.
+                    // A reading that fails never settles it: the switch goes
+                    // back to the last reading after 5 s at the latest.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
                         MainActor.assumeIsolated {
-                            guard let self, self.change == change else { return }
+                            guard let self, self.change == change, self.pending != nil else { return }
                             self.pending = nil
+                            self.state = BluetoothWriter.shared.state
                         }
                     }
                 }

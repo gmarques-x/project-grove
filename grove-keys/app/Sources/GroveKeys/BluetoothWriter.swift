@@ -26,8 +26,14 @@ final class BluetoothWriter: ObservableObject {
     private nonisolated static let sketchybar = ["/opt/homebrew/bin/sketchybar", "/usr/local/bin/sketchybar"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
 
-    /// The latest reading; nil until the first one is in.
-    @Published private(set) var state: BluetoothState?
+    /// The latest successful reading, with its number; nil until the first
+    /// one is in. Sent after every successful reading, changed or not (the
+    /// dropdown's switch waits for one that started after its change).
+    @Published private(set) var latest: BluetoothReading?
+    /// The latest reading's state.
+    var state: BluetoothState? { latest?.state }
+    /// The number of the last reading started (0: none yet).
+    private(set) var started = 0
 
     private enum Mode { case idle, running, stopped }
 
@@ -80,10 +86,12 @@ final class BluetoothWriter: ObservableObject {
         }
         guard pace.due(at: Date(), force: force) else { return }
         reading = true
+        started += 1
+        let number = started
         queue.async { [self] in
             let fresh = Self.read()
             if case .success(let state) = fresh { write(BluetoothIcon.icon(for: state)) }
-            DispatchQueue.main.async { MainActor.assumeIsolated { self.finish(fresh) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { self.finish(fresh, number: number) } }
         }
     }
 
@@ -101,12 +109,12 @@ final class BluetoothWriter: ObservableObject {
         if removed { Self.trigger(timeout: 0.5) }
     }
 
-    private func finish(_ fresh: Result<BluetoothState, Failure>) {
+    private func finish(_ fresh: Result<BluetoothState, Failure>, number: Int) {
         reading = false
         switch fresh {
         case .success(let fresh):
             _ = pace.finished(at: Date(), failure: false)
-            if fresh != state { state = fresh }
+            latest = BluetoothReading(state: fresh, number: number)
         case .failure(let failure):
             if pace.finished(at: Date(), failure: true) {
                 Self.log.error("system_profiler SPBluetoothDataType: \(failure.description, privacy: .public)")

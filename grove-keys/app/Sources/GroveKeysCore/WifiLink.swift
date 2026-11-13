@@ -105,7 +105,7 @@ public enum WifiLink: Equatable, Sendable {
 /// An address row of the Wi-Fi panel (IP, Router, DNS): what it shows and
 /// what a click copies.
 public struct WifiAddress: Equatable, Sendable {
-    /// "192.168.150.1", or the first of several.
+    /// "192.0.2.1", or the first of several.
     public var shown: String
     /// "+2" when there are more.
     public var more: String?

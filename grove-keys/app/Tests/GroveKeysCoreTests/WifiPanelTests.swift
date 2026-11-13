@@ -67,14 +67,14 @@ import Testing
 }
 
 @Suite struct WifiLinkTests {
-    static func facts(_ primary: String?, wifiOn: Bool = true, name: String? = "Grove-5G", service: String? = nil)
+    static func facts(_ primary: String?, wifiOn: Bool = true, name: String? = "Home", service: String? = nil)
         -> WifiLink.Facts {
         WifiLink.Facts(primaryInterface: primary, wifiInterface: "en0", wifiOn: wifiOn, wifiName: name,
                        serviceName: service)
     }
 
     @Test func theLinkFollowsThePrimaryInterface() {
-        #expect(WifiLink(Self.facts("en0")) == .wifi(name: "Grove-5G"))
+        #expect(WifiLink(Self.facts("en0")) == .wifi(name: "Home"))
         #expect(WifiLink(Self.facts("en0", name: nil)) == .wifi(name: nil))
         #expect(WifiLink(Self.facts("en7")) == .ethernet)
         #expect(WifiLink(Self.facts("utun4", service: "Grove VPN")) == .vpn(name: "Grove VPN"))
@@ -92,10 +92,10 @@ import Testing
     }
 
     @Test func titlesAndNotes() {
-        #expect(WifiLink.wifi(name: "Grove-5G").title == "Grove-5G")
+        #expect(WifiLink.wifi(name: "Home").title == "Home")
         #expect(WifiLink.wifi(name: nil).title == "Wi-Fi")
         #expect(WifiLink.ethernet.title == "Ethernet")
-        #expect(WifiLink.vpn(name: "Grove-5G").title == "VPN · Grove-5G")
+        #expect(WifiLink.vpn(name: "Home").title == "VPN · Home")
         #expect(WifiLink.vpn(name: nil).title == "VPN")
         #expect(WifiLink.offline(wifiOn: true).title == "Offline")
         #expect(WifiLink.offline(wifiOn: true).note == "Not connected")
@@ -117,22 +117,22 @@ import Testing
     }
 
     @Test func aNetworkIsItsKindNameAndRouter() {
-        let home = WifiLink.wifi(name: "Grove-5G").identity(router: "192.168.150.1")
-        #expect(home == WifiLink.wifi(name: "Grove-5G").identity(router: "192.168.150.1"))
-        #expect(home != WifiLink.wifi(name: "Cafe").identity(router: "192.168.150.1"))
-        #expect(home != WifiLink.wifi(name: "Grove-5G").identity(router: "10.0.0.1"))
-        #expect(home != WifiLink.ethernet.identity(router: "192.168.150.1"))
+        let home = WifiLink.wifi(name: "Home").identity(router: "192.0.2.1")
+        #expect(home == WifiLink.wifi(name: "Home").identity(router: "192.0.2.1"))
+        #expect(home != WifiLink.wifi(name: "Cafe").identity(router: "192.0.2.1"))
+        #expect(home != WifiLink.wifi(name: "Home").identity(router: "10.0.0.1"))
+        #expect(home != WifiLink.ethernet.identity(router: "192.0.2.1"))
         #expect(WifiLink.offline(wifiOn: true).identity(router: nil) == "offline")
     }
 
     @Test func addressesShowTheFirstAndCopyAll() {
         #expect(WifiAddress([]) == nil)
         #expect(WifiAddress(["", " "]) == nil)
-        let one = WifiAddress(["192.168.150.1"])
-        #expect(one?.shown == "192.168.150.1" && one?.more == nil && one?.copied == "192.168.150.1")
+        let one = WifiAddress(["192.0.2.1"])
+        #expect(one?.shown == "192.0.2.1" && one?.more == nil && one?.copied == "192.0.2.1")
         // macOS lists a server once per resolver.
-        let twice = WifiAddress(["192.168.150.1", "192.168.150.1"])
-        #expect(twice?.more == nil && twice?.copied == "192.168.150.1")
+        let twice = WifiAddress(["192.0.2.1", "192.0.2.1"])
+        #expect(twice?.more == nil && twice?.copied == "192.0.2.1")
         let three = WifiAddress(["1.1.1.1", "8.8.8.8", "1.1.1.1", "9.9.9.9"])
         #expect(three?.shown == "1.1.1.1" && three?.more == "+2" && three?.copied == "1.1.1.1\n8.8.8.8\n9.9.9.9")
     }
@@ -238,8 +238,8 @@ import Testing
 
     @Test func aResultIsForgottenOnAnotherNetwork() {
         let result = WifiSpeedResult(down: 1, up: 1, delay: nil), at = Date(timeIntervalSince1970: 0)
-        let state = WifiSpeedState.result(result, at: at, network: "wifi:Grove-5G|192.168.150.1")
-        #expect(state.on(network: "wifi:Grove-5G|192.168.150.1") == state)
+        let state = WifiSpeedState.result(result, at: at, network: "wifi:Home|192.0.2.1")
+        #expect(state.on(network: "wifi:Home|192.0.2.1") == state)
         #expect(state.on(network: "wifi:Cafe|10.0.0.1") == .idle)
         #expect(state.on(network: "offline") == .idle)
         let running = WifiSpeedState.running(since: at)

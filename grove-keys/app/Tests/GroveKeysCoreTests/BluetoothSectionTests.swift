@@ -107,3 +107,23 @@ struct BluetoothPaceTests {
         #expect(!pace.due(at: start.addingTimeInterval(2), force: false))
     }
 }
+
+/// The switch while the power changes: readings that started before the
+/// change don't move it back (no flicker).
+struct BluetoothPendingSwitchTests {
+    private let on = BluetoothState(power: true, connected: [])
+    private let off = BluetoothState(power: false, connected: [])
+
+    @Test func onlyAReadingStartedAfterTheChangeSettlesIt() {
+        var pending = BluetoothPendingSwitch(on: false)
+        // Still switching: nothing settles it, not even a fresh reading.
+        #expect(!pending.settles(with: BluetoothReading(state: off, number: 9)))
+        // The power changed when reading 4 was the last one started.
+        pending.changed(afterReading: 4)
+        #expect(!pending.settles(with: BluetoothReading(state: on, number: 3)))
+        #expect(!pending.settles(with: BluetoothReading(state: on, number: 4)))
+        #expect(pending.settles(with: BluetoothReading(state: off, number: 5)))
+        // Whatever it read: the reading is the truth from then on.
+        #expect(pending.settles(with: BluetoothReading(state: on, number: 6)))
+    }
+}

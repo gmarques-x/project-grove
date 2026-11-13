@@ -71,7 +71,9 @@ final class BluetoothPermissionAsker: NSObject, CBCentralManagerDelegate {
         guard manager == nil, BluetoothPower.permission == .undetermined else { return }
         changed.append(onChange)
         // A nil queue: the delegate is called on the main queue.
-        manager = CBCentralManager(delegate: self, queue: nil)
+        // No "turn Bluetooth on" alert of its own: the section's switch is for that.
+        manager = CBCentralManager(delegate: self, queue: nil,
+                                   options: [CBCentralManagerOptionShowPowerAlertKey: false])
     }
 
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
