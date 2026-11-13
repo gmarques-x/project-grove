@@ -187,6 +187,17 @@ enum Render {
             panes: [Sample.tree(
                 Sample.project, Sample.projectTree(explorer: Sample.explorerApp(sources: false, core: false), keys: nil),
                 sort: GroveExplorerCore.SortOrder(column: .size, ascending: false))])),
+        // Symbolic links: where each points after its name, a broken one
+        // in orange; wide, then the half-width tile's narrow pane (the
+        // long target cut in its middle, then gone), and renaming a link.
+        ("links", Scene(
+            size: CGSize(width: 1100, height: 420), panes: [Sample.homeLinks(selected: [".ssh"], pointer: ".zshenv")],
+            showHidden: true)),
+        ("links-narrow", Scene(size: half, panes: [Sample.homeLinks(selected: [".ssh"]), Sample.homeLinks()],
+            showHidden: true)),
+        ("links-rename", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.homeLinks(selected: [".ssh"])], showHidden: true,
+            extras: Sample.Extras(rename: ".ssh"))),
     ]
 
     static var stateNames: String { scenes.map(\.name).joined(separator: ", ") }

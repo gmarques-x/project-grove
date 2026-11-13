@@ -73,7 +73,8 @@ public struct FolderReader: Sendable {
         let values = try? listed.resourceValues(forKeys: keySet)
         // Saying whether it is a directory keeps URL from asking the disk.
         let url = folder.appendingPathComponent(name, isDirectory: values?.isDirectory == true)
-        let kind = kind(of: listed, values)
+        let link = values?.isSymbolicLink == true ? Self.link(listed) : nil
+        let kind = kind(of: listed, values, link: link)
         let hasOwnSize = switch kind {
         case .file, .alias, .symlink: true
         case .folder, .package, .volume: false
@@ -85,27 +86,44 @@ public struct FolderReader: Sendable {
             size: hasOwnSize ? values?.fileSize.map(Int64.init) : nil,
             modified: values?.contentModificationDate,
             isHidden: name.hasPrefix(".") || values?.isHidden == true,
-            typeDescription: descriptions.description(of: listed, type: values?.contentType)
+            // macOS calls a link "Alias": a link says it is one, and whether it is broken.
+            typeDescription: link.map { LinkText.kind(isBroken: $0.isBroken) }
+                ?? descriptions.description(of: listed, type: values?.contentType),
+            link: link.map { Entry.Link(target: $0.target, isBroken: $0.isBroken) }
         )
     }
 
-    private static func kind(of url: URL, _ values: URLResourceValues?) -> Entry.Kind {
+    private static func kind(of url: URL, _ values: URLResourceValues?, link: Followed?) -> Entry.Kind {
         guard let values else { return .file }
         // A link first: macOS also calls a symlink an alias file, and every
         // other value here is the link's own, not its target's.
-        if values.isSymbolicLink == true { return .symlink(toFolder: pointsAtFolder(url)) }
+        if values.isSymbolicLink == true { return .symlink(toFolder: link?.toFolder ?? false) }
         if values.isVolume == true { return .volume }
         if values.isAliasFile == true { return .alias }
         if values.isDirectory == true { return values.isPackage == true ? .package : .folder }
         return .file
     }
 
-    /// Whether a link ends at a folder. `stat` follows the whole chain; a
-    /// broken link or a loop fails, which is a "no".
-    private static func pointsAtFolder(_ link: URL) -> Bool {
+    /// A link, read once with the listing: what it says, whether that
+    /// leads anywhere, and whether it ends at a folder.
+    private struct Followed {
+        let target: String
+        let isBroken: Bool
+        let toFolder: Bool
+    }
+
+    /// `readlink` for the text, then `stat`, which follows the whole chain:
+    /// a broken link or a loop fails, which is no folder.
+    private static func link(_ url: URL) -> Followed {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX) + 1)
+        let count = readlink(url.path, &buffer, buffer.count - 1)
+        let target = count > 0 ? String(decoding: buffer[..<count].map { UInt8(bitPattern: $0) }, as: UTF8.self) : ""
         var info = stat()
-        guard stat(link.path, &info) == 0 else { return false }
-        return info.st_mode & S_IFMT == S_IFDIR
+        let followed = stat(url.path, &info) == 0
+        return Followed(
+            target: target,
+            isBroken: LinkText.isBroken(followError: followed ? nil : errno),
+            toFolder: followed && info.st_mode & S_IFMT == S_IFDIR)
     }
 
     private static func readError(_ error: any Error, folder: URL) -> FolderReadError {

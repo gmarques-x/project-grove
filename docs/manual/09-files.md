@@ -29,6 +29,8 @@ From left to right: the sidebar, then one pane or two.
 | The list | Name, Size, Date Modified and Kind. Folders stay on top. A folder shows `···` until its total size is known, and `--` if it can't be read. A folder with something in it has an arrow before its icon | A column's title sorts by it; again reverses. A double-click opens. The arrow opens the folder in place (see below) |
 | Status bar | "212 items" ("212 items · 3 folders open" with folders open in place), or "3 of 212 selected · 48.2 MB", and the disk's free space at the right. While a copy runs: its words, a meter and Cancel | Cancel stops the copy after the file it is on |
 
+A symbolic link shows where it points after its name (`.ssh → ~/Library/CloudStorage/OneDrive-Personal/dot-ssh`, in orange and with the kind "Broken link" when nothing is there); in a tight pane the target is shortened in the middle, then left out, before the name is.
+
 In a narrow pane the Kind column goes first, then the date; in a narrow window the sidebar becomes a rail of icons. Drag the line between two panes to resize them; double-click it to make them even.
 
 ## Finder's keys

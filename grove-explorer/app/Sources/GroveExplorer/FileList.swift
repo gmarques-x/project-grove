@@ -239,6 +239,7 @@ struct FileList: NSViewRepresentable {
             rename.update(
                 renaming, row: renamingRow, depth: renamingRow.flatMap { treeRow(onRow: $0)?.depth } ?? 0, in: table,
                 theme: model.colors)
+            hideLinkUnderRename(renaming?.url, in: table)
             takeKeyboardIfAsked(table, active: active)
         }
 
@@ -356,6 +357,9 @@ struct FileList: NSViewRepresentable {
                 }
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
+                cell.link = entry.link.map { LinkText.shown($0.target, home: model.home.path) } ?? ""
+                cell.linkColor = entry.link?.isBroken == true ? NSColor(theme.ink(theme.orange)) : NSColor(theme.quiet)
+                cell.linkHidden = model.work.rename.map { $0.side == side && $0.url == entry.url } ?? false
                 return cell
             case .size:
                 let cell = detail(tableColumn.identifier, in: tableView, theme)
@@ -417,13 +421,24 @@ struct FileList: NSViewRepresentable {
             return items.firstIndex { if case .row(let row) = $0 { row.entry.url == item } else { false } }
         }
 
+        /// The rename field edits only the name: a link's target is not
+        /// drawn on the row being renamed (it would show past the field).
+        private func hideLinkUnderRename(_ renamed: URL?, in table: NSTableView) {
+            let rows = table.rows(in: table.visibleRect)
+            for row in rows.lowerBound..<rows.upperBound {
+                guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? NameCellView else { continue }
+                cell.linkHidden = renamed != nil && entry(onRow: row)?.url == renamed
+            }
+        }
+
         /// The row as VoiceOver says it; nil for a row that is not there.
         func spoken(_ row: Int) -> String? {
             guard let shown = treeRow(onRow: row) else { return nil }
             let entry = shown.entry
             return Spoken.row(
                 entry, total: model.sizes[entry.url], date: entry.modified == nil ? nil : date(of: entry),
-                awaitsTotal: model.awaitsTotal(entry.url), level: shown.depth + 1, fold: shown.fold)
+                awaitsTotal: model.awaitsTotal(entry.url), level: shown.depth + 1, fold: shown.fold,
+                home: model.home.path)
         }
 
         private func date(of entry: Entry) -> String {

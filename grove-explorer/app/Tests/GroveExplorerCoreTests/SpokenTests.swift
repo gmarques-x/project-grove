@@ -71,10 +71,26 @@ import Testing
         #expect(Spoken.row(folder, total: 4_096, date: nil, awaitsTotal: false) == "private, Folder, 4 KB")
     }
 
+    /// A link says where it points after its name, as the list writes it.
+    @Test func aLinkSaysWhereItPoints() {
+        let working = Entry(
+            url: URL(fileURLWithPath: "/tmp/.ssh"), name: ".ssh", kind: .symlink(toFolder: true), size: nil,
+            modified: nil, isHidden: false, typeDescription: "Symbolic link",
+            link: Entry.Link(target: "/Users/grove/dot-ssh", isBroken: false))
+        #expect(Spoken.row(working, total: nil, date: nil, home: "/Users/grove")
+            == ".ssh, link to ~/dot-ssh, Symbolic link")
+        let broken = Entry(
+            url: URL(fileURLWithPath: "/tmp/old"), name: "old", kind: .symlink(toFolder: false), size: nil,
+            modified: nil, isHidden: false, typeDescription: "Broken link",
+            link: Entry.Link(target: "../gone", isBroken: true))
+        #expect(Spoken.row(broken, total: nil, date: nil, home: "/Users/grove")
+            == "old, broken link to ../gone, Broken link")
+    }
+
     /// What the list writes as "--" is not said at all.
     @Test func whatHasNoSizeOrDateLeavesItOut() {
         #expect(row(entry("Backup", .volume, type: "Volume")) == "Backup, Volume")
-        #expect(row(entry("link", .symlink(toFolder: true), type: "Alias")) == "link, Alias")
+        #expect(row(entry("link", .symlink(toFolder: true), type: "Symbolic link")) == "link, Symbolic link")
         #expect(row(entry("odd", size: 12, type: "")) == "odd, 12 bytes")
     }
 

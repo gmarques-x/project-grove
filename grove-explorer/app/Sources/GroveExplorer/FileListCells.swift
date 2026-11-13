@@ -13,6 +13,8 @@ enum ListMetrics {
     static let fillInset = GroveSpace.s8
     /// Between the icon and the name.
     static let iconGap = GroveSpace.s8
+    /// Between a link's name and its "→ target".
+    static let linkGap = GroveSpace.s8
     /// Clear of the next column at the name's end.
     static let nameTrailing = GroveSpace.s8
     /// Above the first row and below the last.
@@ -126,13 +128,14 @@ class TextCellView: NSView {
         draw(text, in: NSRect(x: leading, y: 0, width: bounds.width - leading, height: bounds.height))
     }
 
-    /// One line, centred on the row, cut in the middle if it still doesn't fit.
-    func draw(_ string: String, in rect: NSRect) {
+    /// One line, centred on the row, cut in the middle if it still doesn't
+    /// fit; in the cell's colour unless given another.
+    func draw(_ string: String, in rect: NSRect, color: NSColor? = nil) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = alignment
         paragraph.lineBreakMode = .byTruncatingMiddle
         let line = NSAttributedString(
-            string: string, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])
+            string: string, attributes: [.font: font, .foregroundColor: color ?? self.color, .paragraphStyle: paragraph])
         let height = ceil(line.size().height)
         line.draw(in: NSRect(x: rect.minX, y: rect.minY + ((rect.height - height) / 2).rounded(), width: rect.width, height: height))
     }
@@ -141,8 +144,11 @@ class TextCellView: NSView {
 /// The Name column's cell, left to right: the indent of its level, the
 /// chevron's gutter (`TreeLayout`; empty on a row without one), the icon,
 /// then the name, cut in the middle with its extension kept when it is too
-/// long. A folder's loading line draws only "···" where its first child's
-/// icon will be.
+/// long. A symbolic link's name is followed, 8 pt on, by "→" and where it
+/// points, in the quiet colour (orange ink when it is broken), the name's
+/// face; short of room the target is cut in its middle, then goes, before
+/// the name is cut (`LinkText.fit`). A folder's loading line draws only
+/// "···" where its first child's icon will be.
 final class NameCellView: TextCellView {
     var icon: EntryIcon? { didSet { needsDisplay = true } }
     var theme = ThemeColors.fallback
@@ -155,6 +161,11 @@ final class NameCellView: TextCellView {
     var chevronLit = false { didSet { if chevronLit != oldValue { needsDisplay = true } } }
     /// A folder's "···" line, not an item's row.
     var isLoadingLine = false { didSet { if isLoadingLine != oldValue { needsDisplay = true } } }
+    /// A link's target as the row writes it (`LinkText.shown`); "" for none.
+    var link = "" { didSet { if link != oldValue { needsDisplay = true } } }
+    var linkColor = NSColor.secondaryLabelColor { didSet { needsDisplay = true } }
+    /// The row's name is being renamed: the field shows the name alone.
+    var linkHidden = false { didSet { if linkHidden != oldValue { needsDisplay = true } } }
 
     override func draw(_ dirtyRect: NSRect) {
         let iconX = CGFloat(TreeLayout.iconStart(depth: depth))
@@ -173,8 +184,15 @@ final class NameCellView: TextCellView {
         let start = iconRect.maxX + ListMetrics.iconGap
         let room = bounds.width - start - ListMetrics.nameTrailing
         guard room > 0 else { return }
-        let fits = Int(room / ListMetrics.nameAdvance)
-        draw(Formatting.middleTruncated(text, to: fits), in: NSRect(x: start, y: 0, width: room, height: bounds.height))
+        let advance = ListMetrics.nameAdvance
+        let target = linkHidden ? "" : link
+        let fit = LinkText.fit(
+            nameLength: text.count, targetLength: target.count, room: room, advance: advance, gap: ListMetrics.linkGap)
+        draw(Formatting.middleTruncated(text, to: fit.nameLength), in: NSRect(x: start, y: 0, width: room, height: bounds.height))
+        guard let length = fit.targetLength else { return }
+        let x = start + CGFloat(fit.nameLength) * advance + ListMetrics.linkGap
+        let shown = LinkText.arrow + LinkText.middleCut(target, to: length)
+        draw(shown, in: NSRect(x: x, y: 0, width: start + room - x, height: bounds.height), color: linkColor)
     }
 }
 

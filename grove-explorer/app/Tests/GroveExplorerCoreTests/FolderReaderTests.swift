@@ -131,6 +131,30 @@ import UniformTypeIdentifiers
         #expect(dangling.modified != nil)
     }
 
+    /// A link keeps what it says, as `ls -l` shows it, and whether that
+    /// leads anywhere; its Kind is a link's, never "Alias".
+    @Test func aSymlinkKeepsItsTargetAndKind() throws {
+        try makeFile("target.bin")
+        try files.createSymbolicLink(atPath: path("relative").path, withDestinationPath: "target.bin")
+        try files.createSymbolicLink(atPath: path("absolute").path, withDestinationPath: path("target.bin").path)
+        try files.createSymbolicLink(atPath: path("dangling").path, withDestinationPath: "../nowhere/at all")
+        let entries = try read()
+        let relative = try #require(entries["relative"])
+        #expect(relative.link == Entry.Link(target: "target.bin", isBroken: false))
+        #expect(relative.typeDescription == "Symbolic link")
+        #expect(entries["absolute"]?.link == Entry.Link(target: path("target.bin").path, isBroken: false))
+        let dangling = try #require(entries["dangling"])
+        #expect(dangling.link == Entry.Link(target: "../nowhere/at all", isBroken: true))
+        #expect(dangling.typeDescription == "Broken link")
+        #expect(entries["target.bin"]?.link == nil)
+    }
+
+    @Test func aSymlinkLoopIsBroken() throws {
+        try files.createSymbolicLink(atPath: path("a").path, withDestinationPath: "b")
+        try files.createSymbolicLink(atPath: path("b").path, withDestinationPath: "a")
+        #expect(try read()["a"]?.link == Entry.Link(target: "b", isBroken: true))
+    }
+
     /// Two links that point at each other: listed, and reading returns.
     @Test func aSymlinkLoopIsListedAndDoesNotHang() throws {
         try files.createSymbolicLink(atPath: path("a").path, withDestinationPath: "b")
@@ -151,7 +175,8 @@ import UniformTypeIdentifiers
     }
 
     /// Each item is described as macOS describes it, also when several
-    /// share a type and when their types differ.
+    /// share a type and when their types differ; a link alone has its own
+    /// words (macOS calls it "Alias").
     @Test func typeDescriptionsAreTheSystemsOwn() throws {
         try makeFile("a.txt", "a")
         try makeFile("b.txt", "b")
@@ -163,7 +188,8 @@ import UniformTypeIdentifiers
         try files.createSymbolicLink(atPath: path("link").path, withDestinationPath: "a.txt")
         let entries = try read()
         #expect(entries.count == 8)
-        for (name, entry) in entries {
+        #expect(entries["link"]?.typeDescription == "Symbolic link")
+        for (name, entry) in entries where name != "link" {
             let system = try path(name).resourceValues(forKeys: [.localizedTypeDescriptionKey]).localizedTypeDescription
             #expect(entry.typeDescription == system, "\(name)")
         }

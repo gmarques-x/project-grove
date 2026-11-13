@@ -342,6 +342,8 @@ extension Sample {
         var children: [Node]?
         /// Open, its contents still being read.
         var loading = false
+        /// A symbolic link's target (`kind` is then a link's).
+        var link: Entry.Link?
 
         static func file(_ name: String, _ size: Int64, _ date: Date) -> Node {
             Node(name: name, size: size, date: date)
@@ -349,6 +351,13 @@ extension Sample {
 
         static func folder(_ name: String, _ size: Int64?, _ date: Date, _ children: [Node]? = nil) -> Node {
             Node(name: name, kind: .folder, size: size, date: date, children: children)
+        }
+
+        /// A link that says `target`; `toFolder` and `broken` as following it would find.
+        static func link(_ name: String, _ target: String, toFolder: Bool = false, broken: Bool = false, _ date: Date) -> Node {
+            Node(
+                name: name, kind: .symlink(toFolder: toFolder && !broken), size: Int64(target.utf8.count), date: date,
+                link: Entry.Link(target: target, isBroken: broken))
         }
 
         static func loading(_ name: String, _ size: Int64?, _ date: Date) -> Node {
@@ -381,9 +390,11 @@ extension Sample {
                         if !node.loading { pane.children[url] = entries(children, in: url) }
                     }
                 }
+                let type = if let link = node.link { LinkText.kind(isBroken: link.isBroken) }
+                    else if isFolder { "Folder" } else { kinds[ext] ?? "Document" }
                 return Entry(
                     url: url, name: node.name, kind: node.kind, size: isFolder ? nil : node.size, modified: node.date,
-                    isHidden: node.name.hasPrefix("."), typeDescription: isFolder ? "Folder" : kinds[ext] ?? "Document")
+                    isHidden: node.name.hasPrefix("."), typeDescription: type, link: node.link)
             }
         }
         pane.entries = entries(nodes, in: folder)
@@ -451,6 +462,27 @@ extension Sample {
         .folder("deps", 64, date(2026, 11, 11, 10, 5)),
         .file("README.md", 3_000, date(2026, 11, 10, 16, 20)),
     ]
+
+    /// The home folder's links (the dotfiles'): one far into home whose
+    /// target is long, relative ones, a broken one; and an open folder with
+    /// a link inside it.
+    static func homeLinks(selected: Set<String> = [], pointer: String? = nil) -> Pane {
+        let homePath = home.path
+        let at = date(2026, 11, 12, 9, 41)
+        return tree(home, [
+            .folder(".config", 4_200, at, [
+                .link("ghostty", "../Developer/project-grove/grove-dotfiles/config/ghostty", toFolder: true, at),
+                .file("starship.toml", 2_000, date(2026, 11, 10, 16, 20)),
+            ]),
+            .link(".gitconfig", "Developer/old-dotfiles/gitconfig", broken: true, date(2026, 9, 2, 10, 15)),
+            .link(".ssh", homePath + "/Library/CloudStorage/OneDrive-Personal/dot-ssh", toFolder: true, at),
+            .link(".zshenv", "Developer/project-grove/grove-dotfiles/config/zsh/.zshenv", at),
+            .link("bin", "/opt/homebrew/bin", toFolder: true, date(2026, 10, 30, 16, 48)),
+            .folder("Developer", 2_400_000_000, date(2026, 11, 12, 9, 30)),
+            .folder("Documents", 1_200_000_000, date(2026, 11, 11, 18, 2)),
+            .file("notes.md", 3_000, date(2026, 11, 12, 9, 41)),
+        ], selected: selected, pointer: pointer)
+    }
 
     /// Downloads as a tree pane: nothing opened, its folders with chevrons.
     static func downloadsTree() -> Pane {

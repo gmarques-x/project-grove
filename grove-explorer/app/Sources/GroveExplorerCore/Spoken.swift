@@ -6,6 +6,9 @@ public enum Spoken {
     // MARK: A row of the list
 
     /// A row as one sentence: "notes.md, Markdown, 4 KB, Today at 09:41".
+    /// A symbolic link says where it points after its name, as the list
+    /// writes it: ".ssh, link to ~/dot-ssh, Symbolic link" ("broken link
+    /// to" when it leads nowhere).
     /// The name, the kind, the size and the date, each as the list writes
     /// it; the date long or short as the pane's dates are (`shortDate`: a
     /// pane too narrow for the full date, or for any). A folder's size is
@@ -20,20 +23,23 @@ public enum Spoken {
     /// of the tab folder's items, nothing at level 1.
     public static func row(
         _ entry: Entry, total: Int64?, now: Date, calendar: Calendar, locale: Locale, shortDate: Bool,
-        awaitsTotal: Bool = true, level: Int = 1, fold: TreeRow.Fold = .none
+        awaitsTotal: Bool = true, level: Int = 1, fold: TreeRow.Fold = .none, home: String = NSHomeDirectory()
     ) -> String {
         let date = entry.modified.map {
             Formatting.date($0, now: now, calendar: calendar, locale: locale, short: shortDate)
         }
-        return row(entry, total: total, date: date, awaitsTotal: awaitsTotal, level: level, fold: fold)
+        return row(entry, total: total, date: date, awaitsTotal: awaitsTotal, level: level, fold: fold, home: home)
     }
 
     /// The same from a date already written (the list keeps each row's).
     public static func row(
         _ entry: Entry, total: Int64?, date: String?, awaitsTotal: Bool = true, level: Int = 1,
-        fold: TreeRow.Fold = .none
+        fold: TreeRow.Fold = .none, home: String = NSHomeDirectory()
     ) -> String {
         var parts = [entry.name]
+        if let link = entry.link, !link.target.isEmpty {
+            parts.append((link.isBroken ? "broken link to " : "link to ") + LinkText.shown(link.target, home: home))
+        }
         if !entry.typeDescription.isEmpty { parts.append(entry.typeDescription) }
         switch fold {
         case .none: break
