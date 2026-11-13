@@ -84,6 +84,81 @@ import Testing
         #expect(SidebarLayout.panesWidth(windowWidth: 948, mode: .hidden) == 948)
     }
 
+    // MARK: The sidebar's chosen width (2026-11-13 sidebar spec, B)
+
+    @Test func theChosenWidthIsKeptBetween160And360() {
+        #expect(SidebarLayout.defaultWidth == 200)
+        #expect(SidebarLayout.clamped(width: 250) == 250)
+        #expect(SidebarLayout.clamped(width: 100) == 160)
+        #expect(SidebarLayout.clamped(width: 400) == 360)
+        // A width from a file that isn't one: the default.
+        #expect(SidebarLayout.clamped(width: .nan) == 200)
+        #expect(SidebarLayout.clamped(width: .infinity) == 200)
+    }
+
+    @Test func theFullSidebarIsAsWideAsChosenTheRailAndHiddenAreNot() {
+        #expect(SidebarLayout.width(of: .full, chosen: 280) == 280)
+        #expect(SidebarLayout.width(of: .full, chosen: 999) == 360)
+        #expect(SidebarLayout.width(of: .rail, chosen: 280) == 48)
+        #expect(SidebarLayout.width(of: .hidden, chosen: 280) == 0)
+    }
+
+    @Test func theRailComesSoonerBesideAWiderSidebar() {
+        // The chosen width + a line + 430: the narrowest one pane beside it.
+        #expect(SidebarLayout.mode(windowWidth: 791, panes: 1, hidden: false, chosen: 360) == .full)
+        #expect(SidebarLayout.mode(windowWidth: 790, panes: 1, hidden: false, chosen: 360) == .rail)
+        #expect(SidebarLayout.mode(windowWidth: 591, panes: 1, hidden: false, chosen: 160) == .full)
+        #expect(SidebarLayout.mode(windowWidth: 590, panes: 1, hidden: false, chosen: 160) == .rail)
+        // Two panes: 360 + 2 lines + 2 × 430.
+        #expect(SidebarLayout.mode(windowWidth: 1222, panes: 2, hidden: false, chosen: 360) == .full)
+        #expect(SidebarLayout.mode(windowWidth: 1221, panes: 2, hidden: false, chosen: 360) == .rail)
+        #expect(SidebarLayout.mode(windowWidth: 1904, panes: 2, hidden: true, chosen: 160) == .hidden)
+    }
+
+    @Test func theChosenWidthReturnsWhenTheWindowWidensAgain() {
+        // Nothing is forgotten on the way: the mode is the window's and the width's alone.
+        #expect(SidebarLayout.mode(windowWidth: 948, panes: 2, hidden: false, chosen: 300) == .rail)
+        #expect(SidebarLayout.mode(windowWidth: 1904, panes: 2, hidden: false, chosen: 300) == .full)
+        #expect(SidebarLayout.panesWidth(windowWidth: 1904, mode: .full, chosen: 300) == 1603)
+    }
+
+    @Test func thePanesTakeWhatTheChosenWidthLeaves() {
+        #expect(SidebarLayout.panesWidth(windowWidth: 948, mode: .full, chosen: 160) == 787)
+        #expect(SidebarLayout.panesWidth(windowWidth: 948, mode: .full, chosen: 360) == 587)
+        #expect(SidebarLayout.panesWidth(windowWidth: 948, mode: .rail, chosen: 360) == 899)
+        #expect(SidebarLayout.panesWidth(windowWidth: 948, mode: .hidden, chosen: 360) == 948)
+    }
+
+    @Test func thePanesKeepTheirSplitWhenTheSidebarWidens() {
+        let narrow = SidebarLayout.panesWidth(windowWidth: 1904, mode: .full, chosen: 160)
+        let wide = SidebarLayout.panesWidth(windowWidth: 1904, mode: .full, chosen: 360)
+        #expect(SidebarLayout.leftPaneWidth(panesWidth: narrow, split: 0.4) == 696)
+        #expect(SidebarLayout.leftPaneWidth(panesWidth: wide, split: 0.4) == 616)
+        // The same share of what the line between them leaves, to the point.
+        for panes in [narrow, wide] {
+            let left = SidebarLayout.leftPaneWidth(panesWidth: panes, split: 0.4)
+            #expect(abs(left / (panes - 1) - 0.4) < 1 / (panes - 1))
+        }
+    }
+
+    @Test func aDraggedSidebarStaysBetween160And360InWholePoints() {
+        #expect(SidebarLayout.dragged(to: 250.4, windowWidth: 1904, panes: 2) == 250)
+        #expect(SidebarLayout.dragged(to: 100, windowWidth: 1904, panes: 2) == 160)
+        #expect(SidebarLayout.dragged(to: 500, windowWidth: 1904, panes: 2) == 360)
+    }
+
+    @Test func aDraggedSidebarStopsBeforeThePanesWouldMakeItARail() {
+        // 1100 with two panes: 1100 − 2 lines − 2 × 430 leaves 238 for the sidebar.
+        #expect(SidebarLayout.dragged(to: 300, windowWidth: 1100, panes: 2) == 238)
+        #expect(SidebarLayout.mode(windowWidth: 1100, panes: 2, hidden: false, chosen: 238) == .full)
+        // With no room even for 160, the narrowest (the window is showing the rail then).
+        #expect(SidebarLayout.dragged(to: 300, windowWidth: 900, panes: 2) == 160)
+    }
+
+    @Test func aDoubleClickGivesTheDefaultWidth() {
+        #expect(SidebarLayout.reset == 200)
+    }
+
     // MARK: The divider
 
     @Test func theLeftPaneTakesItsShareOfWhatTheLineLeaves() {

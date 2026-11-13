@@ -67,15 +67,22 @@ struct WindowView: View {
         .environment(\.theme, theme)
     }
 
-    /// The sidebar (full, a rail or away, by the window's width), then the
-    /// pane or the two panes with the divider between them.
+    /// The sidebar (full at its chosen width, a rail or away, by the
+    /// window's width), then the pane or the two panes with the divider
+    /// between them. The full sidebar's line can be dragged.
     private func parts(width: CGFloat) -> some View {
-        let mode = SidebarLayout.mode(windowWidth: width, panes: model.sides.count, hidden: model.sidebarHidden)
-        let panes = SidebarLayout.panesWidth(windowWidth: width, mode: mode)
+        let chosen = model.sidebarWidth
+        let mode = SidebarLayout.mode(
+            windowWidth: width, panes: model.sides.count, hidden: model.sidebarHidden, chosen: chosen)
+        let panes = SidebarLayout.panesWidth(windowWidth: width, mode: mode, chosen: chosen)
         return HStack(spacing: 0) {
             if mode != .hidden {
-                Sidebar(model: model, rail: mode == .rail)
-                Line(vertical: true)
+                Sidebar(model: model, rail: mode == .rail, width: chosen)
+                if mode == .full {
+                    SidebarDivider(model: model, windowWidth: width)
+                } else {
+                    Line(vertical: true)
+                }
             }
             HStack(spacing: 0) {
                 if model.sides.count == 2 {
@@ -91,6 +98,7 @@ struct WindowView: View {
             // A favourite's row dragged out of the sidebar and let go here: it is removed.
             .onDrop(of: [AppModel.favouriteDrag], isTargeted: nil) { _ in model.removeDraggedFavourite() }
         }
+        .coordinateSpace(name: SidebarDivider.space)
     }
 
     /// One pane or two: two icon segments at the header's right.
@@ -180,5 +188,91 @@ private struct PaneDivider: View {
                 model.split = SidebarLayout.split(
                     leftWidth: (panesWidth - 1) * (model.split + step), panesWidth: panesWidth)
             }
+    }
+}
+
+/// The line after the full sidebar (2026-11-13 sidebar spec, B): dragged,
+/// the sidebar is 160–360 pt wide (the panes take the rest and keep their
+/// split); a double-click makes it 200 again. Caught and dragged as the
+/// line between the panes is; VoiceOver meets it as a splitter whose value
+/// is the width (`SplitterElement`).
+private struct SidebarDivider: View {
+    static let space = "window parts"
+    /// How far one VoiceOver step moves the line, in points.
+    private static let step = 20.0
+
+    @ObservedObject var model: AppModel
+    let windowWidth: CGFloat
+
+    var body: some View {
+        Line(vertical: true)
+            .overlay {
+                // Wider than the line it moves, so it can be caught.
+                Color.clear
+                    .frame(width: GroveSpace.s8)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        // Set, not pushed, as the panes' divider does.
+                        (inside ? NSCursor.resizeLeftRight : NSCursor.arrow).set()
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1, coordinateSpace: .named(Self.space)).onChanged { drag in
+                            resize(to: drag.location.x)
+                        }
+                    )
+                    .onTapGesture(count: 2) { model.sidebarWidth = SidebarLayout.reset }
+            }
+            .background {
+                SplitterElement(label: "Sidebar width", value: model.sidebarWidth) { wider in
+                    resize(to: model.sidebarWidth + (wider ? Self.step : -Self.step))
+                }
+            }
+            .zIndex(1)
+    }
+
+    private func resize(to x: Double) {
+        let width = SidebarLayout.dragged(to: x, windowWidth: windowWidth, panes: model.sides.count)
+        if width != model.sidebarWidth { model.sidebarWidth = width }
+    }
+}
+
+/// A splitter for VoiceOver, with its value (the role SwiftUI has no
+/// modifier for): an AppKit view behind a line that takes no clicks, the
+/// pointer's drag staying SwiftUI's. Increment and decrement move it.
+private struct SplitterElement: NSViewRepresentable {
+    let label: String
+    let value: Double
+    let step: (_ wider: Bool) -> Void
+
+    func makeNSView(context: Context) -> SplitterView { SplitterView() }
+
+    func updateNSView(_ view: SplitterView, context: Context) {
+        view.label = label
+        view.step = step
+        view.value = value
+    }
+
+    final class SplitterView: NSView {
+        var label = ""
+        var step: (Bool) -> Void = { _ in }
+        var value = 0.0 {
+            didSet { if value != oldValue { NSAccessibility.post(element: self, notification: .valueChanged) } }
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func isAccessibilityElement() -> Bool { true }
+        override func accessibilityRole() -> NSAccessibility.Role? { .splitter }
+        override func accessibilityLabel() -> String? { label }
+        override func accessibilityValue() -> Any? { NSNumber(value: value) }
+        override func accessibilityValueDescription() -> String? { "\(Int(value)) points" }
+        override func accessibilityOrientation() -> NSAccessibilityOrientation { .vertical }
+        override func accessibilityPerformIncrement() -> Bool {
+            step(true)
+            return true
+        }
+        override func accessibilityPerformDecrement() -> Bool {
+            step(false)
+            return true
+        }
     }
 }

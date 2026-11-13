@@ -99,7 +99,7 @@ One window, tiled by AeroSpace. From left to right: the sidebar, then one pane o
 
 **Header** (`GroveWindowHeader`): the name on the window buttons' line; in the middle back and forward for the active pane; trailing, the one-pane/two-pane switch (two icon segments). Below it the sidebar and the panes fill the window to its edges, divided by 1 pt lines.
 
-**Sidebar** (fixed width; it becomes a 48 pt rail of icons when the panes would otherwise be under 430 pt each, and ⌘⌥S hides or shows it):
+**Sidebar** (200 pt, adjustable since 2026-11-13: drag the line after it, 160–360 pt, double-click for 200, kept in the session; it becomes a 48 pt rail of icons when the panes would otherwise be under 430 pt each, and ⌘⌥S hides or shows it):
 - *Favourites:* from the config (§9). Drag a folder onto the sidebar to add one; drag a row out to remove it. Both write `explorer.local.toml`.
 - *iCloud:* iCloud Drive when it exists.
 - *Cloud providers* (added 2026-11-13): below iCloud, one section per provider in `~/Library/CloudStorage` (Apple's File Provider), under the provider's name ("OneDrive"), a row per account: `OneDrive-Personal` reads "OneDrive", `OneDrive-Contoso` "OneDrive - Contoso"; `GoogleDrive-…`, `Dropbox`, `Box-Box` get their own headers. The names are worked out from the folder's name (the system's display name says "OneDrive-Personal"); the icon is the plain cloud. CloudStorage is watched, so a provider installed or removed appears or goes without a relaunch; a provider's folder not yet readable still has its row.

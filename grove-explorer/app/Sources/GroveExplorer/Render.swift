@@ -225,6 +225,15 @@ enum Render {
         ("connect-sheet", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
             extras: Sample.Extras(shares: true, connectSheet: (
                 "smb://grove-lab/films", Sample.noShare("smb://grove-lab/films"))))),
+        // The sidebar dragged to its narrowest and its widest, beside two
+        // panes split 40/60 (which keep that split): Locations with the
+        // shares, the long rows cut.
+        ("sidebar-160", Scene(
+            size: CGSize(width: 1672, height: 668), panes: [Sample.media(), Sample.downloads(selected: [])],
+            extras: Sample.Extras(shares: true, sidebarWidth: 160, split: 0.4))),
+        ("sidebar-360", Scene(
+            size: CGSize(width: 1672, height: 668), panes: [Sample.media(), Sample.downloads(selected: [])],
+            extras: Sample.Extras(shares: true, sidebarWidth: 360, split: 0.4))),
         ("links-rename", Scene(
             size: CGSize(width: 948, height: 420), panes: [Sample.homeLinks(selected: [".ssh"])], showHidden: true,
             extras: Sample.Extras(rename: ".ssh"))),

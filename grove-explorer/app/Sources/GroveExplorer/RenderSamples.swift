@@ -76,6 +76,10 @@ enum Sample {
         /// connected, backup not, photos connecting (`Sample.shares`); then
         /// scratch, a network volume that isn't saved.
         var shares = false
+        /// The full sidebar's chosen width (the default when nil).
+        var sidebarWidth: Double?
+        /// The left pane's share of the two panes.
+        var split = 0.5
         /// The Connect to Server sheet is up, saying this, with this sentence under the field.
         var connectSheet: (text: String, problem: String?)?
     }
@@ -180,6 +184,8 @@ enum Sample {
             backup.id: NSWorkspace.shared.icon(for: UTType("com.apple.storage-external") ?? .volume),
             scratchVolume.id: NSWorkspace.shared.icon(for: .volume),
         ]
+        if let width = extras.sidebarWidth { model.sidebarWidth = width }
+        model.split = extras.split
         if extras.ejectPointer { model.ejectPointerStandIn = backup.id }
         if extras.ejecting { model.ejecting = [backup.id] }
         if let failure = extras.ejectFailure { model.ejectFailures = [backup.id: failure] }

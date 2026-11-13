@@ -24,7 +24,8 @@ import SwiftUI
 // The tabs' "+" and close marks, the path bar's parts, the header's arrows
 // and its pane switch had their commands already (⌘T, ⌘W, ⌘↑, ⌘L, ⌘[, ⌘], ⌘\).
 // The one thing left to the pointer is dragging the line between the panes
-// (VoiceOver can move it: it is an adjustable element).
+// and the one after the sidebar (VoiceOver can move both: the panes' is an
+// adjustable element, the sidebar's a splitter).
 
 /// What the model needs of the views to open a menu from a key.
 @MainActor

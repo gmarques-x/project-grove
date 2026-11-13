@@ -69,21 +69,31 @@ public enum Locations {
 
 extension Locations.Row: Equatable where Volume: Equatable, Share: Equatable {}
 
-/// How the window's width is shared:the sidebar (full, a rail of icons, or
+/// How the window's width is shared: the sidebar (full, a rail of icons, or
 /// hidden), a 1 pt line, then the pane or the two panes with a line between.
+/// The full sidebar is as wide as the user chose (dragging the line after
+/// it, 160–360 pt; 2026-11-13 sidebar spec, B).
 public enum SidebarLayout {
     public enum Mode: Equatable, Sendable {
         case full, rail, hidden
 
-        /// In points.
+        /// In points; the full sidebar's at the default width (`width(of:chosen:)` has the chosen one).
         public var width: Double {
             switch self {
-            case .full: 200
+            case .full: SidebarLayout.defaultWidth
             case .rail: 48
             case .hidden: 0
             }
         }
     }
+
+    /// The full sidebar's width until one is chosen.
+    public static let defaultWidth: Double = 200
+    /// What a double-click on the line after the sidebar makes it.
+    public static let reset = defaultWidth
+    /// How narrow and how wide the full sidebar may be made.
+    public static let narrowest: Double = 160
+    public static let widest: Double = 360
 
     /// Under this a pane loses its date column: the sidebar gives way first.
     public static let paneFloor = ListColumns.dateThreshold
@@ -91,20 +101,41 @@ public enum SidebarLayout {
     public static let dragFloor: Double = 240
     static let line: Double = 1
 
-    /// The sidebar is a rail whenever the panes would otherwise be under
-    /// 430 pt each.
-    public static func mode(windowWidth: Double, panes: Int, hidden: Bool) -> Mode {
+    /// A chosen width as a session file may give it, brought into 160–360.
+    public static func clamped(width: Double) -> Double {
+        width.isFinite ? min(max(width, narrowest), widest) : defaultWidth
+    }
+
+    /// How wide the sidebar is in `mode`: the full one as chosen, the rail 48, hidden 0.
+    public static func width(of mode: Mode, chosen: Double) -> Double {
+        mode == .full ? clamped(width: chosen) : mode.width
+    }
+
+    /// The sidebar is a rail whenever the panes beside the full sidebar,
+    /// at its chosen width, would be under 430 pt each. The chosen width
+    /// is kept meanwhile: it is back when the window widens again.
+    public static func mode(windowWidth: Double, panes: Int, hidden: Bool, chosen: Double = defaultWidth) -> Mode {
         if hidden { return .hidden }
         let count = Double(max(1, panes))
         // A line after the sidebar and one between two panes.
-        let each = (windowWidth - Mode.full.width - count * line) / count
+        let each = (windowWidth - width(of: .full, chosen: chosen) - count * line) / count
         return each >= paneFloor ? .full : .rail
     }
 
     /// What the panes share: the window less the sidebar and its line. With
     /// two panes the line between them is part of it.
-    public static func panesWidth(windowWidth: Double, mode: Mode) -> Double {
-        max(0, windowWidth - mode.width - (mode == .hidden ? 0 : line))
+    public static func panesWidth(windowWidth: Double, mode: Mode, chosen: Double = defaultWidth) -> Double {
+        max(0, windowWidth - width(of: mode, chosen: chosen) - (mode == .hidden ? 0 : line))
+    }
+
+    /// The width the line after the sidebar, dragged to `x` (from the
+    /// window's left edge), gives the sidebar: whole points in 160–360, and
+    /// no wider than leaves each pane 430 (it would turn into the rail
+    /// under the pointer).
+    public static func dragged(to x: Double, windowWidth: Double, panes: Int) -> Double {
+        let count = Double(max(1, panes))
+        let room = (windowWidth - count * line - count * paneFloor).rounded(.down)
+        return min(max(x.rounded(), narrowest), max(narrowest, min(widest, room)))
     }
 
     /// The left of two panes: its share of what the line between them leaves, in whole points.

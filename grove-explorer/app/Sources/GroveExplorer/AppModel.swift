@@ -37,6 +37,11 @@ final class AppModel: ObservableObject {
     @Published var sidebarHidden = false {
         didSet { if sidebarHidden != oldValue { sessionChanged() } }
     }
+    /// The full sidebar's width as the user chose it (dragging the line
+    /// after it, 160–360); kept while the window shows the rail.
+    @Published var sidebarWidth = SidebarLayout.defaultWidth {
+        didSet { if sidebarWidth != oldValue { sessionChanged() } }
+    }
     /// The left pane's share of the two panes' width.
     @Published var split = 0.5 {
         didSet { if split != oldValue { sessionChanged() } }
@@ -171,6 +176,7 @@ final class AppModel: ObservableObject {
         let model = AppModel(browser: browser, config: config, clock: ListClock(), live: true)
         model.split = SidebarLayout.clamped(split: saved?.split ?? 0.5)
         model.sidebarHidden = saved?.sidebarHidden ?? false
+        model.sidebarWidth = SidebarLayout.clamped(width: saved?.sidebarWidth ?? SidebarLayout.defaultWidth)
         model.store = store
         return model
     }

@@ -13,13 +13,16 @@ import SwiftUI
 struct Sidebar: View {
     @ObservedObject var model: AppModel
     let rail: Bool
+    /// The full sidebar's width (`AppModel.sidebarWidth`); the rail's is its own.
+    let width: Double
     @Environment(\.theme) private var theme
     /// The row under the pointer. `State` used directly: no SwiftUI macros here.
     private var hovered = State<String?>(initialValue: nil)
 
-    init(model: AppModel, rail: Bool) {
+    init(model: AppModel, rail: Bool, width: Double) {
         self.model = model
         self.rail = rail
+        self.width = width
     }
 
     var body: some View {
@@ -44,7 +47,7 @@ struct Sidebar: View {
             }
             .padding(GroveSpace.s8)
         }
-        .frame(width: rail ? SidebarLayout.Mode.rail.width : SidebarLayout.Mode.full.width)
+        .frame(width: SidebarLayout.width(of: rail ? .rail : .full, chosen: width))
         // Only its own rectangle: a fill that reaches into the title bar's
         // safe area (the default) would paint over the window's header.
         .background(Color(theme.bg0), ignoresSafeAreaEdges: [])

@@ -31,7 +31,7 @@ From left to right: the sidebar, then one pane or two.
 
 A symbolic link shows where it points after its name (`.ssh → ~/Library/CloudStorage/OneDrive-Personal/dot-ssh`, in orange after a warning triangle, with the kind "Broken link", when nothing is there); in a tight pane the target is shortened in the middle, then left out, before the name is.
 
-In a narrow pane the Kind column goes first, then the date; in a narrow window the sidebar becomes a rail of icons. Drag the line between two panes to resize them; double-click it to make them even.
+In a narrow pane the Kind column goes first, then the date; in a narrow window the sidebar becomes a rail of icons. Drag the line after the sidebar to make it narrower or wider (160 to 360 points; double-click it for the usual 200): the panes take the rest and keep their split, the width is kept when you quit, and a wider sidebar turns into the rail sooner, coming back at its width when the window widens again. Drag the line between two panes to resize them; double-click it to make them even.
 
 ## Finder's keys
 

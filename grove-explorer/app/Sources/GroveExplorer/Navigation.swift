@@ -329,7 +329,7 @@ extension AppModel {
     // MARK: The session
 
     var session: Session {
-        Session(browser: browser, sidebarWidth: SidebarLayout.Mode.full.width, split: split, sidebarHidden: sidebarHidden)
+        Session(browser: browser, sidebarWidth: sidebarWidth, split: split, sidebarHidden: sidebarHidden)
     }
 
     /// Something the session keeps changed: saved once it has been still for a second.
