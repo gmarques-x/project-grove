@@ -21,6 +21,9 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     @Published private(set) var status: LabVPNStatus?
     /// The switch while scutil starts or stops the tunnel.
     @Published private(set) var pending: LabVPNPendingSwitch?
+    /// A start or stop that didn't happen ("Didn't start · see WireGuard"),
+    /// in the status line's place until the next switch or opening.
+    @Published private(set) var failure: String?
     /// The zone "since 14:05" is told in.
     let timeZone: TimeZone
 
@@ -42,6 +45,8 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     private var again = false
     /// The number of the last reading started (0: none yet).
     private var started = 0
+    /// A start or stop is on the queue.
+    private var commanding = false
     /// One queue for readings and commands: a reading asked for after a
     /// start or stop runs after it.
     private let queue = DispatchQueue(label: "com.projectgrove.keys.vpn", qos: .userInitiated)
@@ -54,7 +59,9 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
         case .sample:
             live = false
             timeZone = TimeZone(identifier: "UTC")!
-            status = Self.sample(ProcessInfo.processInfo.environment["GROVE_VPN_SAMPLE"] ?? "connected")
+            let name = ProcessInfo.processInfo.environment["GROVE_VPN_SAMPLE"] ?? "connected"
+            status = Self.sample(name)
+            if name == "refused" { failure = LabVPNPendingSwitch.failureLine(on: true) }
         }
     }
 
@@ -65,7 +72,9 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
         guard live else { return }
         open = true
         // A switch left pending at the last closing: the reading tells now.
-        pending = nil
+        // Not while its command still runs: its end sets the reading to wait for.
+        if !commanding { pending = nil }
+        failure = nil
         refresh()
         let timer = Timer(timeInterval: Self.every, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -86,7 +95,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// A fresh reading off the main thread; calls while one is under way are
     /// folded into one more after it.
     private func refresh() {
-        guard live else { return }
+        guard live, open else { return }
         guard !reading else {
             again = true
             return
@@ -112,13 +121,16 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     }
 
     /// A reading: shown, unless the switch waits for one that started after
-    /// its command returned. When the icon changed, the bar is told (a
+    /// its command returned and left the old state (or the cap's). When the icon changed, the bar is told (a
     /// tunnel that came up while the panel was open turns the pill purple
     /// at once, not at the bar's next 10 s reading).
     private func took(_ fresh: LabVPNStatus, number: Int) {
-        if let pending {
-            guard pending.settles(withReading: number) else { return }
+        if var pending {
+            let outcome = pending.settle(with: fresh, reading: number)
+            self.pending = pending
+            guard let outcome else { return }
             self.pending = nil
+            if outcome == .failed { failure = LabVPNPendingSwitch.failureLine(on: pending.on) }
         }
         let before = status
         if fresh != status { status = fresh }
@@ -145,7 +157,9 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// Only live, and only while the tunnel is up or down (not on the way).
     func setOn(_ on: Bool) {
         guard live, pending == nil, let status, status.switchEnabled, on != status.switchOn else { return }
-        pending = LabVPNPendingSwitch(on: on)
+        pending = LabVPNPendingSwitch(on: on, from: status)
+        failure = nil
+        commanding = true
         queue.async { [weak self] in
             let verb = on ? "start" : "stop"
             let run = Subprocess.run(Self.scutil, ["--nc", verb, Self.service], timeout: 10)
@@ -156,12 +170,20 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
                     timed out \(run.timedOut), \(output, privacy: .public)
                     """)
             }
+            let failed = run.status != 0 || run.timedOut
             Self.triggerBar()
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    // Readings started from now on saw the command's effect.
-                    self.pending?.changed(afterReading: self.started)
+                    self.commanding = false
+                    if failed {
+                        // scutil said no: the reading shows where it is.
+                        self.pending = nil
+                        self.failure = LabVPNPendingSwitch.failureLine(on: on)
+                    } else {
+                        // Readings started from now on saw the command's effect.
+                        self.pending?.changed(afterReading: self.started)
+                    }
                     self.refresh()
                 }
             }
@@ -182,13 +204,14 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
 
     /// GROVE_VPN_SAMPLE picks the state: `connected` (the default: 10.0.0.2,
     /// since 14:05 UTC), `connecting`, `disconnecting`, `disconnected`,
-    /// `notsetup` (no grove-lab service). The address is the docs' stand-in,
+    /// `notsetup` (no grove-lab service), `refused` (disconnected, a start
+    /// that didn't happen). The address is the docs' stand-in,
     /// never the lab's (the repo is public).
     private static func sample(_ name: String) -> LabVPNStatus {
         switch name {
         case "connecting": return .connecting
         case "disconnecting": return .disconnecting
-        case "disconnected": return .disconnected
+        case "disconnected", "refused": return .disconnected
         case "notsetup": return .notSetUp
         default: return .connected(address: "10.0.0.2", since: Date(timeIntervalSince1970: 1_794_578_700))
         }
@@ -215,9 +238,14 @@ struct LabVPNPanel: View {
                             .help(status.switchOn ? "Stops the tunnel to the lab" : "Starts the tunnel to the lab")
                     }
                 }
-                Text(status.map { LabVPNStatus.line(for: $0, timeZone: model.timeZone) } ?? "Reading…")
-                    .foregroundStyle(theme.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let failure = model.failure {
+                    // A warning in yellow, as the Bluetooth section's refusal.
+                    theme.marked(failure, theme.yellow)
+                } else {
+                    Text(status.map { LabVPNStatus.line(for: $0, timeZone: model.timeZone) } ?? "Reading…")
+                        .foregroundStyle(theme.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if status == .notSetUp {
                     PanelButton("Open WireGuard", action: openWireGuard)
                         .help("Opens WireGuard, or its App Store page when it isn't installed")

@@ -163,15 +163,34 @@ extension LabVPNStatus {
 
 /// The switch while scutil starts or stops the tunnel: the dropdown shows
 /// `shown` (connecting or disconnecting, so the switch is held and disabled)
-/// until a reading that started after the command returned. A reading under
-/// way when the switch moved (the 2 s timer's) would flick it back.
+/// until a reading that started after the command returned and no longer
+/// says the state the switch left (`scutil --nc start` returns at once, so
+/// the next reading can still say Disconnected), or until `cap` such
+/// readings (about 6 s at the panel's 2 s), whichever comes first.
 public struct LabVPNPendingSwitch: Equatable, Sendable {
     public let on: Bool
+    /// The state before the command.
+    public let from: LabVPNStatus
+    /// Readings after the command that settle it at the latest.
+    public static let cap = 3
     /// The number of the last reading started when the command returned;
     /// nil while it runs.
     private var after: Int?
+    /// Readings after the command so far.
+    private var seen = 0
 
-    public init(on: Bool) { self.on = on }
+    public enum Outcome: Equatable, Sendable {
+        /// The tunnel is where the switch put it.
+        case succeeded
+        /// It isn't (still down after a start, still up after a stop, or no
+        /// service): the dropdown says `failureLine(on:)`.
+        case failed
+    }
+
+    public init(on: Bool, from: LabVPNStatus) {
+        self.on = on
+        self.from = from
+    }
 
     /// What the dropdown shows meanwhile.
     public var shown: LabVPNStatus { on ? .connecting : .disconnecting }
@@ -179,9 +198,20 @@ public struct LabVPNPendingSwitch: Equatable, Sendable {
     /// The command returned; `number` is the last reading started by then.
     public mutating func changed(afterReading number: Int) { after = number }
 
-    /// True for a reading that started after the command returned.
-    public func settles(withReading number: Int) -> Bool {
-        guard let after else { return false }
-        return number > after
+    /// A reading: nil while the switch keeps waiting, else how it ended.
+    /// Readings that started before the command returned don't count. The
+    /// state is compared by its icon (a connected reading's connect time
+    /// moves by a hair between readings).
+    public mutating func settle(with status: LabVPNStatus, reading number: Int) -> Outcome? {
+        guard let after, number > after else { return nil }
+        seen += 1
+        guard LabVPNIcon.icon(for: status) != LabVPNIcon.icon(for: from) || seen >= Self.cap else { return nil }
+        return status.switchOn == on ? .succeeded : .failed
+    }
+
+    /// The status line's place after a start or stop that didn't happen
+    /// (or scutil exiting with an error), in the warning colour.
+    public static func failureLine(on: Bool) -> String {
+        on ? "Didn't start · see WireGuard" : "Didn't stop · see WireGuard"
     }
 }

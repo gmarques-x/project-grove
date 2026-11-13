@@ -52,8 +52,8 @@ The bar replaces the macOS menu bar. From left to right:
 | App icons after a number | The apps open on that workspace (up to six) | Goes to that window |
 | App name | The app in front | Opens that app's menus (File, Edit, View …) |
 | Processor and memory | Two icons with their use in percent | Opens the CPU and memory panel |
-| Shield | The grove-lab VPN: grey when off (or not set up yet), yellow while it connects or disconnects, purple when connected | Opens the VPN panel |
-| Wi-Fi and Bluetooth | The connection in use: signal strength on Wi-Fi, a cable on Ethernet, a shield on a VPN, a slashed fan when offline. Beside it, the Bluetooth rune: struck out in grey when Bluetooth is off, blue when on, with a dot on each side while a device is connected | Opens the network panel, with Bluetooth under it |
+| Shield | The grove-lab VPN (its own pill, not the Wi-Fi pill's shield): grey when off (or not set up yet), yellow while it connects or disconnects, purple when connected | Opens the VPN panel |
+| Wi-Fi and Bluetooth | The connection in use: signal strength on Wi-Fi, a cable on Ethernet, a shield when a VPN carries all your traffic (the grove-lab VPN, which carries only the lab's, has its own pill), a slashed fan when offline. Beside it, the Bluetooth rune: struck out in grey when Bluetooth is off, blue when on, with a dot on each side while a device is connected | Opens the network panel, with Bluetooth under it |
 | Speaker | Volume: the speaker fills with the level, and is slashed when muted | Opens the sound panel |
 | Bolt | Battery level: the bolt fills with the charge, and turns red when low | Opens the battery panel |
 | Clock | Day, date and time | Opens this month's calendar |
@@ -83,7 +83,7 @@ Bluetooth sits under Wi-Fi in the same panel. Its switch turns Bluetooth on and 
 
 ### The grove-lab VPN
 
-The shield is the tunnel to the grove lab: a WireGuard connection that carries only the lab's addresses, so the rest of your traffic goes on as before. The switch in its panel starts and stops it with no password; macOS does the connecting. The switch can't be used while the tunnel is connecting or disconnecting. Starting it from the WireGuard app works too: the shield follows within ten seconds.
+The shield is the tunnel to the grove lab: a WireGuard connection that carries only the lab's addresses, so the rest of your traffic goes on as before. The switch in its panel starts and stops it with no password; macOS does the connecting. The switch can't be used while the tunnel is connecting or disconnecting. If a start or stop doesn't happen, the panel says "Didn't start · see WireGuard" (or "Didn't stop") in yellow until you try again or reopen it. Starting it from the WireGuard app works too: the shield follows within ten seconds.
 
 It needs a one-time setup. Install WireGuard from the App Store; if the tunnel is up from Terminal, take it down with `sudo wg-quick down ~/Developer/grove-lab/wireguard/warden-air.conf`; then in WireGuard choose *Import tunnel(s) from file…*, pick `warden-air.conf`, name the tunnel `grove-lab`, and allow the VPN configuration when macOS asks. Until then the panel says "Import warden-air.conf into WireGuard as grove-lab" with an **Open WireGuard** button (the App Store page if WireGuard isn't installed). Grove never reads the tunnel's file: it holds the private key.
 
