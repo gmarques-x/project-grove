@@ -50,14 +50,18 @@ public enum LinkText {
     /// monospaced): the name whole when it can be, then `gap`, the arrow
     /// and the target, cut first (`middleCut`) and gone once fewer than
     /// `least` of its characters would be left. The name is cut only when
-    /// it doesn't fit alone, as it always was.
-    public static func fit(nameLength: Int, targetLength: Int, room: Double, advance: Double, gap: Double) -> Fit {
+    /// it doesn't fit alone, as it always was. `markLength`: the characters
+    /// a mark between the arrow and the target takes (a broken link's
+    /// warning), counted with the target and gone with it.
+    public static func fit(
+        nameLength: Int, targetLength: Int, room: Double, advance: Double, gap: Double, markLength: Int = 0
+    ) -> Fit {
         let fits = max(Int(room / advance), 0)
         guard nameLength <= fits, targetLength > 0 else {
             return Fit(nameLength: min(nameLength, fits), targetLength: nil)
         }
         let left = room - Double(nameLength) * advance - gap
-        let characters = left > 0 ? Int(left / advance) - arrow.count : 0
+        let characters = left > 0 ? Int(left / advance) - arrow.count - markLength : 0
         guard characters >= min(targetLength, least) else { return Fit(nameLength: nameLength, targetLength: nil) }
         return Fit(nameLength: nameLength, targetLength: min(characters, targetLength))
     }

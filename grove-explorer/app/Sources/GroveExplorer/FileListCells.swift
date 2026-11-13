@@ -15,6 +15,8 @@ enum ListMetrics {
     static let iconGap = GroveSpace.s8
     /// Between a link's name and its "→ target".
     static let linkGap = GroveSpace.s8
+    /// Between a broken link's warning mark and its target.
+    static let markGap = GroveSpace.s4
     /// Clear of the next column at the name's end.
     static let nameTrailing = GroveSpace.s8
     /// Above the first row and below the last.
@@ -145,8 +147,8 @@ class TextCellView: NSView {
 /// chevron's gutter (`TreeLayout`; empty on a row without one), the icon,
 /// then the name, cut in the middle with its extension kept when it is too
 /// long. A symbolic link's name is followed, 8 pt on, by "→" and where it
-/// points, in the quiet colour (orange ink when it is broken), the name's
-/// face; short of room the target is cut in its middle, then goes, before
+/// points, in the quiet colour (orange ink when it is broken, with an
+/// orange warning mark between the arrow and the target), the name's face; short of room the target is cut in its middle, then goes, before
 /// the name is cut (`LinkText.fit`). A folder's loading line draws only
 /// "···" where its first child's icon will be.
 final class NameCellView: TextCellView {
@@ -164,6 +166,9 @@ final class NameCellView: TextCellView {
     /// A link's target as the row writes it (`LinkText.shown`); "" for none.
     var link = "" { didSet { if link != oldValue { needsDisplay = true } } }
     var linkColor = NSColor.secondaryLabelColor { didSet { needsDisplay = true } }
+    /// A broken link: the orange warning mark between the arrow and the
+    /// target carries the colour (in light, orange words alone are too faint).
+    var linkMark: NSColor? { didSet { needsDisplay = true } }
     /// The row's name is being renamed: the field shows the name alone.
     var linkHidden = false { didSet { if linkHidden != oldValue { needsDisplay = true } } }
 
@@ -186,13 +191,26 @@ final class NameCellView: TextCellView {
         guard room > 0 else { return }
         let advance = ListMetrics.nameAdvance
         let target = linkHidden ? "" : link
+        let mark = linkMark.flatMap { ListSymbol.image(.warning, color: $0) }
+        // The mark and the gap after it, counted in whole characters (rounded up).
+        let markLength = mark.map { Int(ceil(($0.size.width + ListMetrics.markGap) / advance)) } ?? 0
         let fit = LinkText.fit(
-            nameLength: text.count, targetLength: target.count, room: room, advance: advance, gap: ListMetrics.linkGap)
+            nameLength: text.count, targetLength: target.count, room: room, advance: advance, gap: ListMetrics.linkGap,
+            markLength: markLength)
         draw(Formatting.middleTruncated(text, to: fit.nameLength), in: NSRect(x: start, y: 0, width: room, height: bounds.height))
         guard let length = fit.targetLength else { return }
         let x = start + CGFloat(fit.nameLength) * advance + ListMetrics.linkGap
-        let shown = LinkText.arrow + LinkText.middleCut(target, to: length)
-        draw(shown, in: NSRect(x: x, y: 0, width: start + room - x, height: bounds.height), color: linkColor)
+        draw(LinkText.arrow, in: NSRect(x: x, y: 0, width: start + room - x, height: bounds.height), color: linkColor)
+        var targetX = x + CGFloat(LinkText.arrow.count) * advance
+        if let mark {
+            let size = mark.size
+            mark.draw(
+                in: NSRect(x: targetX, y: ((bounds.height - size.height) / 2).rounded(), width: size.width, height: size.height),
+                from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            targetX += size.width + ListMetrics.markGap
+        }
+        draw(LinkText.middleCut(target, to: length),
+             in: NSRect(x: targetX, y: 0, width: start + room - targetX, height: bounds.height), color: linkColor)
     }
 }
 

@@ -28,9 +28,17 @@ enum TreeCell {
         image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
-    /// The symbol in `color`, made once per colour.
     private static func image(_ chevron: TreeLayout.Chevron, color: NSColor) -> NSImage? {
-        let name: GroveIcon.Name = chevron == .open ? .menu : .forward
+        ListSymbol.image(chevron == .open ? .menu : .forward, color: color)
+    }
+}
+
+/// A `GroveIcon` symbol the list draws itself, as `GroveIcon` sets one
+/// beside a name: the name's size, medium weight, in one colour.
+@MainActor
+enum ListSymbol {
+    /// The symbol in `color`, made once per symbol and colour.
+    static func image(_ name: GroveIcon.Name, color: NSColor) -> NSImage? {
         let key = "\(name.symbol) \(color.description)"
         if let known = images[key] { return known }
         let configuration = NSImage.SymbolConfiguration(pointSize: GroveType.label, weight: .medium)

@@ -130,6 +130,9 @@ public struct GroveIcon: View {
         case twoPanes = "rectangle.split.2x1"
         /// A field that filters or searches what is under it.
         case search = "magnifyingglass"
+        /// A warning, in the orange accent: the mark that carries the colour
+        /// where orange words would be too faint (a broken link's target).
+        case warning = "exclamationmark.triangle.fill"
 
         /// The SF Symbol's name.
         public var symbol: String { rawValue }

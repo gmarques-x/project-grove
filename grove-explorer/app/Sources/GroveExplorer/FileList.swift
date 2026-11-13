@@ -358,7 +358,9 @@ struct FileList: NSViewRepresentable {
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
                 cell.link = entry.link.map { LinkText.shown($0.target, home: model.home.path) } ?? ""
-                cell.linkColor = entry.link?.isBroken == true ? NSColor(theme.ink(theme.orange)) : NSColor(theme.quiet)
+                let broken = entry.link?.isBroken == true
+                cell.linkColor = broken ? NSColor(theme.ink(theme.orange)) : NSColor(theme.quiet)
+                cell.linkMark = broken ? NSColor(theme.orange) : nil
                 cell.linkHidden = model.work.rename.map { $0.side == side && $0.url == entry.url } ?? false
                 return cell
             case .size:

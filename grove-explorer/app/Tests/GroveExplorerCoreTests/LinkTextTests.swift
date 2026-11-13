@@ -85,6 +85,19 @@ import Testing
         #expect(fit(name: 5, target: 10, room: -4) == LinkText.Fit(nameLength: 0, targetLength: nil))
     }
 
+    /// A broken link's warning mark goes with its target: counted in what
+    /// the target needs, and gone with it.
+    @Test func aMarkBeforeTheTargetGoesWithIt() {
+        func fit(room: Double) -> LinkText.Fit {
+            LinkText.fit(nameLength: 5, targetLength: 10, room: room, advance: 10, gap: 8, markLength: 3)
+        }
+        // 5 + gap + 2 + 3 + 10.
+        #expect(fit(room: 208) == LinkText.Fit(nameLength: 5, targetLength: 10))
+        #expect(fit(room: 207) == LinkText.Fit(nameLength: 5, targetLength: 9))
+        #expect(fit(room: 148) == LinkText.Fit(nameLength: 5, targetLength: 4))
+        #expect(fit(room: 147) == LinkText.Fit(nameLength: 5, targetLength: nil))
+    }
+
     @Test func noTargetIsNoTarget() {
         #expect(fit(name: 5, target: 0, room: 500) == LinkText.Fit(nameLength: 5, targetLength: nil))
     }
