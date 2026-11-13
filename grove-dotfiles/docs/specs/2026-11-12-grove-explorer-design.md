@@ -108,7 +108,7 @@ One window, tiled by AeroSpace. From left to right: the sidebar, then one pane o
 
 **A pane**, top to bottom:
 1. *Tab strip* (32 pt). The current tab is a pill in the selected fill. The tab's title is the folder's name. "+" adds a tab on the same folder. A tab closes with its hover button or ⌘W; the last tab of a pane doesn't close. The active pane's strip carries a 1 pt green line; the other pane's does not, and its selection is drawn in the inactive-selection fill (§6).
-2. *Path bar* (32 pt). The folders from the volume (or Home, shown as "Home") down to the current one, each a click. ⌘L turns it into a text field with the full path selected; Return goes, Escape cancels, a path that doesn't exist marks the field red and stays.
+2. *Path bar* (32 pt). The folders from the volume (or Home, shown as "Home") down to the current one, each a click. ⌘L turns it into a text field with the full path selected; Tab completes the folder's name being typed (as far as the names that begin so agree), Return goes, Escape cancels, a path that doesn't exist marks the field red and stays.
 3. *The list* (§6).
 4. *Status bar.* "212 items" or "3 of 212 selected · 48.2 MB"; the volume's free space at the right (left out under 640 pt). While operations run, in the target pane's bar: the current one's words ("Copying 1,204 items to Downloads"), a meter, and a cancel button. After one finishes: what it did and "⌘Z to undo", for a few seconds.
 
@@ -121,14 +121,15 @@ An AppKit table (`NSTableView` through `NSViewRepresentable`) under the Grove sk
 - **Columns:** Name (icon and name), Size, Date Modified, Kind. Sizes are right-aligned in tabular figures. Name takes the width up to 560 pt; beyond that the other columns follow it and the rest of the row is empty, so a wide single pane doesn't put a screen's width between a name and its size. By the pane's own width: under 640 pt Kind goes and dates shorten ("Today 09:41", "9 Nov 2026"); under 430 pt the date goes too. A long name is cut in the middle, keeping its extension.
 - **Rows:** 24 pt. Selected rows that touch are drawn as one shape.
 - **Fills:** a list has the pointer and a selection at once, in two panes, so it needs three fills that can be told apart in every scheme, in this order of strength: the active pane's selection, the inactive pane's selection, the row under the pointer. The mock-ups showed today's roles don't give that (in dark the hover and the inactive selection are one colour; in light the hover is stronger than the selection). `GroveUI` gains list roles for the three (`listSelected`, `listSelectedInactive`, `listHover`), picked from each palette and checked in renders of all six schemes, with the selection always the strongest; hidden items get a `hiddenInk` role instead of an opacity.
-- **Sorting:** a click on a header sorts by it, a second click reverses; folders stay on top in either direction (Finder's "keep folders on top"). Each tab remembers its sort.
+- **Sorting:** a click on a header sorts by it, a second click reverses; folders stay on top in either direction (Finder's "keep folders on top"). Each tab remembers its sort. Sorting and filtering run off the main thread. When a tab comes to show a folder another tab or pane already lists, a folder of up to 10,000 entries is arranged for it at once; a larger one keeps its rows in the old order (or shows none, when the items themselves differ) until its own order is ready, so the window never waits for a sort.
+- **Between two folders:** from the moment a tab goes to another folder until that folder is read, the list is blank (not "empty") and nothing is selected: no command acts on rows of the folder just left.
 - **Sizes:** files show their size; folders show a quiet "···" until `SizeCalculator` has the total, then the total. Totals are calculated for the folders in view first, a few at a time, and kept until the folder changes. Packages (apps, bundles) count as files.
 - **Dates:** as Finder writes them: "Today at 09:41", "Yesterday at 18:02", then the date and time, in the user's locale.
 - **Names:** extensions always shown. Hidden items are left out until ⌘⇧. shows them, with the name in the quiet colour and the icon dimmed. The setting is per window and remembered.
 - **Selection:** click, ⇧-click, ⌘-click, ⇧-arrows, ⌘A. Typing letters selects the first name that starts with them (a second's pause starts again).
 - **Opening:** Return renames (Finder's rule); ⌘↓ or ⌘O or a double-click opens: a folder in this tab, a file in its default app, a package as its app. ⌘-double-click a folder: a new tab.
 - **Rename:** in place, the name without its extension selected. The field takes a 1 pt green line (as the path and filter fields do), not the focus box. Return commits, Escape cancels; an empty name, a "/" or a name that exists marks the field red with one line of reason beneath.
-- **Filter (⌘F):** a `FilterField` above the list; the list shows the names containing every typed word; the status bar says "4 of 212". Escape clears it and gives the focus back to the list.
+- **Filter (⌘F):** a `FilterField` above the list; the list shows the names containing every typed word; the status bar says "4 of 212". In the field ↑ and ↓ move the list's selection and Return opens what is selected (it does not rename: the keyboard is in the field to find a thing and go to it). Escape clears the filter and gives the focus back to the list, from the field and from the filtered list alike.
 - **Live:** `FolderWatcher` keeps the list current. The selection and scroll position survive a refresh.
 - **Empty and unreadable:** an empty folder says so. A folder macOS won't let the app read says which permission is missing and has a button for Privacy Settings.
 
@@ -138,7 +139,7 @@ Finder's, unchanged:
 
 | Key | Does |
 | --- | --- |
-| ↑ ↓, ⇧↑ ⇧↓, Home, End, Page Up/Down | Move and extend the selection |
+| ↑ ↓, ⇧↑ ⇧↓, Home, End, Page Up/Down | The arrows move and extend the selection; Home, End, Page Up and Page Down scroll the list and leave the selection where it is (Finder's rule) |
 | ⌘↓, ⌘O | Open |
 | ⌘↑ | The enclosing folder |
 | ⌘[ , ⌘] | Back, forward (per tab) |
@@ -154,7 +155,7 @@ Finder's, unchanged:
 | ⌘A | Select all |
 | ⌘⇧G, ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
-| ⌘I | Finder's Get Info for the selection (macOS asks once to let Grove Explorer control Finder) |
+| ⌘I | Finder's Get Info for the selection, or for the folder itself when nothing is selected; ten items at most at a time, more is refused with a sentence (macOS asks once to let Grove Explorer control Finder) |
 | ⌃⌥⌘1, ⌃⌥⌘2, ⌃⌥⌘5, ⌃⌥⌘6 | Sort by Name, Kind, Date Modified, Size, as a click on the column's title (again: the other way round) |
 | Letters | Jump to a name |
 
@@ -174,7 +175,7 @@ Grove's:
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 | ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
-| ⌘E | Eject the disk the keyboard is on, with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why |
+| ⌘E | Eject the disk the keyboard is on, with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why. The other way round, while a disk is being ejected no command onto it is begun (nor an undo or a redo): the status bar says so |
 | ⌘. | Cancel the operation that is running, with the keyboard in a list or the sidebar; in the path or the filter field it does what Esc does there; in the conflict prompt it is Cancel |
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
 | Return | In a folder macOS won't let the app read (nothing to rename there): Open Privacy Settings |
@@ -192,7 +193,9 @@ The right-click menu is the system's (`.contextMenu`): its own font and the Mac'
 - **Errors.** One failed item doesn't stop the rest. At the end the status bar says "3 items could not be copied" in the marked style, with a click showing which and why.
 - **Trash.** `FileManager.trashItem`; the status bar says what went. No confirmation, as in Finder.
 - **Undo.** Every finished operation records its inverse: copies → the copies go to the Trash; moves → moved back; rename → the old name; new folder → to the Trash if still empty; trash → put back from the Trash to where it was; a replace → the replaced item returns. ⌘Z undoes the latest, ⌘⇧Z redoes. An undo that can no longer be done (the item changed or went since) says so and does nothing. The stack is per window and is not kept across launches.
-- **Drag and drop.** Within and between panes: a drop on a folder row (marked with the hover fill and a 1 pt green line) or on a pane's empty space moves on the same volume and copies across volumes; ⌥ forces copy, ⌘ forces move (Finder's rules). To and from other apps through the file pasteboard types. A drag shows the system's drag image with a count. Drops go through the same queue, prompt and undo.
+- **Drag and drop.** Within and between panes: a drop on a folder row (marked with the hover fill and a 1 pt green line) or on a pane's empty space moves on the same volume and copies across volumes; ⌥ forces copy, ⌘ forces move (Finder's rules). A drop on a tab goes to that tab's folder, and a drag held over a tab that is not showing for a moment brings it forward (spring-loading), so the drop can go on to a row of it. To and from other apps through the file pasteboard types. A drag shows the system's drag image with a count. Drops go through the same queue, prompt and undo.
+- **Quitting waits for the file in hand.** ⌘Q, or the window's red button, while a command is in hand: the run is cancelled and stops after the file it is on (its partial copy is removed), an open prompt is answered with Cancel, the commands still waiting are dropped, and the app quits when the one in hand has ended. The window stays meanwhile, and its status bar says "Finishing the current file before quitting…" from the first moment to the last.
+- **ExFAT and FAT.** Such a volume has no extended attributes: macOS keeps a file's in a hidden companion beside it, `._name` for `name`, which it writes (over whatever has that name) whenever `name` is made, renamed or copied there, and carries along with it. So there: a companion (a `._name` beside its `name` that begins as macOS's attribute files do) is not listed as an item of a folder being copied or moved, since it travels with its file. A file of the user's own that is named `._x` is not copied or moved to where an `x` is, or arrives with it: that item fails with "it can't be kept beside “x” on this disk", and of such a pair inside a folder the `._x` is the one left out. And a name `x` is not given (by a copy, a move, a rename or a new folder) where a `._x` of the user's own already is: "“._x” is in the way on this disk". Names are compared there as the volume does ("X.TXT" is "x.txt"). Nothing is written over in any of these cases.
 - **The clipboard.** ⌘C puts file URLs on the general pasteboard, so paste works to and from Finder and other apps.
 
 ## 9. Config and state
@@ -251,7 +254,7 @@ The bundle is signed with the "Grove Code Signing" certificate, as the other app
 As `96-keys-app` and `97-themes-app`, without the login agent:
 - **check:** the app is in `~/Applications/Grove Explorer.app`, built from the current sources (a stamp of the source tree's hash in the bundle), signed, its config linked.
 - **apply:** `swift build -c release`, assemble the bundle (Info.plist with the bundle id `com.projectgrove.explorer`, the URL scheme, the usage strings; no `LSUIElement`, so it is in ⌘Tab), copy the Grove Icons font and map, sign, install; if the app is running, tell the user to reopen it rather than killing it.
-- **remove** (`grove uninstall`): removes the app; leaves the config and session.
+- **remove:** grove has no uninstaller. To remove the app, delete `~/Applications/Grove Explorer.app` by hand (manual chapter 7); the config and the session stay. The module keeps a tested `remove` function that does this, for a later command; nothing calls it yet.
 
 ## 13. Errors
 

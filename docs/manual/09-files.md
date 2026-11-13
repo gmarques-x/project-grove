@@ -14,6 +14,8 @@ Grove Explorer is Grove's file browser: a list of a folder with one pane or two,
 
 It is an ordinary app: it is in ⌘Tab, it does not start at login, and closing its window quits it. Its window is tiled like any other (Finder's float). When you open it again, the panes, tabs, folders and sort orders are as you left them.
 
+A link opens a folder too: `groveexplorer://open?path=` followed by the path (percent-encoded: a space is `%20`) opens that folder in a new tab and brings the window forward; a file's path opens its folder with the file selected. From a terminal: `open 'groveexplorer://open?path=/Users/you/Documents'`.
+
 ## The window
 
 From left to right: the sidebar, then one pane or two.
@@ -35,7 +37,8 @@ These do what they do in Finder.
 
 | Press | To |
 | --- | --- |
-| ↑ ↓, ⇧↑ ⇧↓, Home, End, Page Up, Page Down | Move and extend the selection |
+| ↑ ↓, ⇧↑ ⇧↓ | Move and extend the selection |
+| Home, End, Page Up, Page Down | Scroll the list; the selection stays where it is |
 | ⌘↓ or ⌘O | Open: a folder in this tab, a file in its app |
 | ⌘↑ | Go to the enclosing folder |
 | ⌘[ and ⌘] | Back and forward (each tab has its own history) |
@@ -59,12 +62,12 @@ These do what they do in Finder.
 
 | Press | To |
 | --- | --- |
-| Tab | Go to the other pane (it opens the second pane if there is only one) |
+| Tab or ⇧Tab | Go to the other pane (it opens the second pane if there is only one) |
 | ⌘\ | Switch between one pane and two |
 | ⌘T, ⌘W | New tab, close tab (a pane's last tab stays) |
 | ⌃Tab, ⌃⇧Tab, ⌘1 … ⌘9 | The next tab, the previous one, the nth tab of the active pane |
-| F5 | Copy the selection to the other pane's folder |
-| F6 | Move it there |
+| F5 | Copy the selection to the other pane's folder. On a laptop keyboard press fn with it (fn F5), unless System Settings › Keyboard has the F keys set as standard function keys |
+| F6 | Move it there (fn F6 on a laptop keyboard, in the same way) |
 | ⌘F | Filter this folder |
 | ⌘⌥S | Show or hide the sidebar |
 | ⌥⌘← | Take the keyboard to the sidebar: ↑ ↓ move, ↩ opens the place, → or Esc returns to the list |
@@ -92,6 +95,8 @@ Press ⌘L (or ⌘⇧G). The path bar becomes a text field with the full path se
 
 The other pane's status bar shows the progress and then what was done, with "⌘Z to undo" for a few seconds. A second command given meanwhile waits its turn. ⌘C and ⌘V (or ⌥⌘V to move) do the same job with one pane, and work to and from Finder and other apps.
 
+Quitting waits for the file in hand: if you press ⌘Q or the red button while a copy or a move is running, it stops after the file it is on, the window stays with "Finishing the current file before quitting…" in the status bar, and the app quits when that file is done. What was still waiting is not done.
+
 A copy is written under a temporary name and given its real name only when it is whole, so a cancelled or failed copy leaves nothing half-written. One item that fails does not stop the rest: the status bar says how many could not be done, in red; click it, or press ⌘⇧F, to see which and why.
 
 ## When a name is taken
@@ -111,7 +116,7 @@ Tick "Apply to all" to answer once for every name that is taken.
 
 ⌘Z undoes the last file command and ⌘⇧Z redoes it: a copy's copies go to the Trash, a move goes back, a rename gets its old name, a new folder goes to the Trash if it is still empty, a trashed item returns to where it was, and a replaced item comes back.
 
-Moving to the Trash (⌘⌫) asks nothing, as in Finder; ⌘Z is the way back. Nothing in Grove Explorer deletes a file outright.
+Moving to the Trash (⌘⌫) asks nothing, as in Finder; ⌘Z is the way back. In Grove Explorer nothing is deleted without a copy or a way back.
 
 If an undo can no longer be done (the item has changed or gone since, the Trash was emptied, the disk was ejected), the status bar says so and nothing is touched. The undo list belongs to the window and is forgotten when you quit.
 
