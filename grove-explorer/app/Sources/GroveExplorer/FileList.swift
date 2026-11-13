@@ -202,6 +202,8 @@ struct FileList: NSViewRepresentable {
                 settingSelection = false
                 reloadVisible = false
             }
+            // Other rows are under the pointer now (a folder opened above it): its row and lit chevron are found again.
+            if newRows { table.pointerMovedToCurrentPlace() }
             if reloadVisible {
                 // Every row the table has made, not only those in view: it
                 // keeps some ready beyond the edges, and they scroll in as

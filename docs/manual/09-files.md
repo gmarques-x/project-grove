@@ -26,8 +26,8 @@ From left to right: the sidebar, then one pane or two.
 | Sidebar | **Favourites** (your folders), **iCloud Drive** when you use it, **Locations** (every disk, with an eject button where it can be ejected), and **Trash** at the bottom | Opens the place in the current tab; ⌘-click opens it in a new tab. Trash opens Finder's Trash |
 | Tab strip | One tab for each folder you have open in the pane; the active pane's strip has a green line | A tab shows it; "+" adds a tab on the same folder; the mark that appears under the pointer closes it |
 | Path bar | The folders from the disk (or Home) down to the one you are in | A part goes to that folder |
-| The list | Name, Size, Date Modified and Kind. Folders stay on top. A folder shows `···` until its total size is known | A column's title sorts by it; again reverses. A double-click opens |
-| Status bar | "212 items", or "3 of 212 selected · 48.2 MB", and the disk's free space at the right. While a copy runs: its words, a meter and Cancel | Cancel stops the copy after the file it is on |
+| The list | Name, Size, Date Modified and Kind. Folders stay on top. A folder shows `···` until its total size is known, and `--` if it can't be read. A folder with something in it has an arrow before its icon | A column's title sorts by it; again reverses. A double-click opens. The arrow opens the folder in place (see below) |
+| Status bar | "212 items" ("212 items · 3 folders open" with folders open in place), or "3 of 212 selected · 48.2 MB", and the disk's free space at the right. While a copy runs: its words, a meter and Cancel | Cancel stops the copy after the file it is on |
 
 In a narrow pane the Kind column goes first, then the date; in a narrow window the sidebar becomes a rail of icons. Drag the line between two panes to resize them; double-click it to make them even.
 
@@ -71,6 +71,10 @@ These do what they do in Finder.
 | ⌘F | Filter this folder |
 | ⌘⌥S | Show or hide the sidebar |
 | ⌥⌘← | Take the keyboard to the sidebar: ↑ ↓ move, ↩ opens the place, → or Esc returns to the list |
+| → | Open the selected folder in place (this key and the next three work with the keyboard in a list and no field open) |
+| ← | Close the selected folder in place; on a file or a closed folder, go to the row of the folder it is in |
+| ⌥→ | Open the selected folder and everything inside it, up to 10,000 rows |
+| ⌥← | Close the selected folder and everything inside it |
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 | ⌃↩ or ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Eject) |
@@ -82,6 +86,29 @@ These do what they do in Finder.
 Everything in the window has a key except dragging the line between the panes. Tab never walks through the window's buttons; it always means "the other pane".
 
 The same commands are in the app's menus (click the app's name in the bar, or Pine › Global Menu) and in the right-click menu: Open, Open With, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder and Open in Ghostty on an item; New Folder, Paste and Show Hidden Items on empty space.
+
+## Opening folders in place
+
+A folder with something in it has an arrow before its icon. Click the arrow, or select the folder and press →, and its contents are listed beneath it, indented, without leaving the folder you are in; click it again, or press ←, to close it. Folders open inside open folders as deep as you like, and each folder's contents are sorted among themselves by the tab's column.
+
+| Do this | To |
+| --- | --- |
+| Click the arrow, or → | Open the folder in place. While it is being read, one quiet `···` line shows beneath it |
+| Click it again, or ← | Close it. What was open inside it is remembered for when you open it again |
+| ← on a file or a closed folder | Go to the row of the folder it is in |
+| ⌥-click the arrow, or ⌥→ | Open the folder and everything inside it. It stops at 10,000 rows, and the status bar says "Stopped at 10,000 rows" |
+| ⌥-click an open arrow, or ⌥← | Close the folder and everything inside it, forgetting what was open there |
+| ⌘↓, ⌘O or a double-click | Still go into the folder: the tab moves to it, as before |
+
+An empty folder has no arrow and gets one when something arrives in it; files, apps and other packages, links to folders and folders the app can't read have none. A folder that turns out empty when opened closes again.
+
+The open folders are watched like the one you are in: what another app adds, renames or deletes inside them shows within a second, and an open folder that is deleted closes. One you rename in Grove Explorer stays open. Each tab remembers which folders are open, also when you go elsewhere and come back, and after you quit.
+
+**The filter** (⌘F) looks through every row that shows, open folders' contents included. A folder that holds a match stays as a row, its name in the quiet colour; it is there for context and is not counted ("5 of 33" counts the matches). The filter never opens a folder by itself.
+
+**Commands** act on the rows you can see, at any depth: ⌘A selects them all, and a folder selected together with something inside it is copied, moved or trashed once. **Where things go:** paste, ⌘⇧N, F5 and F6 and a drop on a pane's empty space go to the tab's folder, as in Finder; a drop on a folder's row, open or closed, goes into that folder. A new folder or a renamed item appears where it belongs in the tree.
+
+**VoiceOver** reads a row inside an open folder with its level ("level 2"), and a folder as "open" or "closed"; VoiceOver's own open and close commands open and close it in place.
 
 ## Go to a path
 

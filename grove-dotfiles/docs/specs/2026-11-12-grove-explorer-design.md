@@ -306,7 +306,7 @@ Asked for by the owner after the first live run, and chosen from options put to 
 
 **Live.** Each opened folder is watched like the tab's own folder; a change inside appears within a second. An opened folder that goes away closes (its rows go); one that is renamed keeps its place and its opened state when the rename was made in the app.
 
-**Sizes.** As before, for every showing folder and package.
+**Sizes.** As before, for every showing folder and package. "--" is only for a folder that can't be read: a walk cancelled by a change in the folder keeps the quiet "···" until the folder is quiet and the total comes.
 
 **Remembered.** Which folders are open is kept per tab, survives a refresh and a sort, is kept when the tab navigates away and back (per folder visited, bounded), and is saved in the session.
 
@@ -314,7 +314,7 @@ Asked for by the owner after the first live run, and chosen from options put to 
 
 **Status bar.** "212 items" counts showing rows; with folders open: "212 items · 3 folders open" (a folder still being read counts as open). With a selection: "2 of 19 selected · 350 KB", without the folders-open count; a folder and items inside it selected together count the folder's size once.
 
-**VoiceOver.** A row says its level and, for a folder, "open" or "closed"; the arrow is the row's expand/collapse action (disclosure), not a separate element.
+**VoiceOver.** A row says its level and, for a folder, "open" or "closed"; the arrow is the row's expand/collapse action (disclosure), not a separate element. As built: the list is an outline to VoiceOver, as an `NSOutlineView` is (`AXOutline`; each row `AXOutlineRow` with its `AXDisclosureLevel` from 0, `AXDisclosing` for an open folder, settable on a folder with an arrow alone, which is how VoiceOver opens and closes it, `AXDisclosedByRow` and `AXDisclosedRows`); a loading line is no row, and the rows are numbered without it. A row inside a folder that is closed keeps its element while the folder is a row, so opened again it is the same row. `--audit-accessibility` checks all of it through the accessibility server, in the `tree` state with a folder closed and opened again.
 
 **Safety rules that carry over unchanged.** Commands act only on rows the user can see; a pane or an opened folder whose contents have not arrived has no rows; operations are values captured at the keypress; every change to files goes through the single run path.
 

@@ -8,13 +8,22 @@ import GroveExplorerCore
 // columns of its own here: a row is one thing with its sentence
 // (`Spoken.row`), whether it is selected, and its menu; it has no cells.
 //
+// Folders open in place (spec §16), so the list is an outline, as an
+// `NSOutlineView` is to VoiceOver (looked at in a program of its own:
+// the list "AXOutline", each row "AXOutlineRow" with its level from 0,
+// "AXDisclosing" for an open folder, settable on a folder alone, which is
+// how VoiceOver opens and closes it, the row it is inside and the rows
+// it has open). A folder's loading line is no row: VoiceOver's rows are
+// the table's others, numbered among themselves.
+//
 // An assistive app holds a row by the object it was given: the token it
 // keeps stands for that object and for no other, however equal, and is
 // dead once the object is. So the table keeps one element for each item
 // it has been asked about, for as long as the item is listed: the same
 // file is the same element from one answer to the next and after the
 // list is loaded again, and a row held by VoiceOver follows its file when
-// rows above it come or go.
+// rows above it come or go. A row inside a folder that is closed is kept
+// too, while the folder is a row: opened again, it is the same row.
 
 /// One row of the list, as VoiceOver meets it: the item it shows, in its
 /// table. An `NSAccessibilityElement`, and it has to be: the token an
@@ -41,7 +50,7 @@ final class ListRowElement: NSAccessibilityElement {
         super.init()
         _ = Self.isARow
         setAccessibilityRole(.row)
-        setAccessibilitySubrole(.tableRow)
+        setAccessibilitySubrole(.outlineRow)
         setAccessibilityParent(table)
     }
 
@@ -54,8 +63,63 @@ final class ListRowElement: NSAccessibilityElement {
         }
     }
 
-    override func accessibilityIndex() -> Int { row ?? NSNotFound }
+    /// Its place among VoiceOver's rows, which a loading line is not.
+    override func accessibilityIndex() -> Int {
+        row.flatMap { row in onMain { [me] in me.value.table?.position(ofRow: row) } } ?? NSNotFound
+    }
+
     override func accessibilityChildren() -> [Any]? { [] }
+
+    // MARK: Its place in the tree
+
+    /// The tree's row it is now: its level and its fold.
+    private var tree: TreeRow? {
+        row.flatMap { row in onMain { [me] in me.value.table?.onRowTree?(row) } }
+    }
+
+    /// 0 for the tab folder's own items, 1 inside one of their folders, …
+    override func accessibilityDisclosureLevel() -> Int { tree?.depth ?? 0 }
+
+    /// A folder that is open, or opened and being read.
+    override func isAccessibilityDisclosed() -> Bool {
+        tree.map { $0.fold == .open || $0.fold == .loading } ?? false
+    }
+
+    /// VoiceOver opens or closes the folder: as a click on its chevron
+    /// (the row's pane gets the keys; closing remembers what was open inside).
+    override func setAccessibilityDisclosed(_ disclosed: Bool) {
+        guard let row, folds else { return }
+        onMain { [me] in
+            guard let table = me.value.table else { return }
+            table.clickedByAccessibility()
+            table.onRowFold?(row, disclosed)
+        }
+    }
+
+    /// Only a row with a chevron opens or closes. The server asks the
+    /// newer way, then, told no, the older, whose answer is otherwise yes
+    /// (tried: either alone leaves every row settable).
+    override func isAccessibilitySelectorAllowed(_ selector: Selector) -> Bool {
+        selector == #selector(setAccessibilityDisclosed(_:)) ? folds : super.isAccessibilitySelectorAllowed(selector)
+    }
+
+    @available(macOS, deprecated: 10.10)
+    override func accessibilityIsAttributeSettable(_ attribute: NSAccessibility.Attribute) -> Bool {
+        attribute == .disclosing ? folds : super.accessibilityIsAttributeSettable(attribute)
+    }
+
+    /// Whether it is a folder with a chevron.
+    private var folds: Bool { tree.map { $0.fold != TreeRow.Fold.none } ?? false }
+
+    /// The rows one level down inside its open folder.
+    override func accessibilityDisclosedRows() -> Any? {
+        row.map { row in onMain { [me] in me.value.table?.disclosedRows(of: row) ?? [] } }
+    }
+
+    /// The row of the folder it is inside; nil at the top.
+    override func accessibilityDisclosedByRow() -> Any? {
+        row.flatMap { row in onMain { [me] in me.value.table?.disclosingRow(of: row) } }
+    }
 
     /// "notes.md, Markdown, 4 KB, Today at 09:41": asked for when
     /// VoiceOver comes to the row, not while the list is drawn.
@@ -139,12 +203,72 @@ extension FileTableView {
         rows.compactMap { $0 >= 0 && $0 < numberOfRows ? element($0) : nil }
     }
 
-    /// The rows changed: the elements of items no longer listed are let
-    /// go of (a token held for one then says the element is gone, as for
-    /// anything that went). What VoiceOver never asked about costs nothing.
-    func forgetUnlistedRowElements() {
+    /// The rows changed: the elements of items no longer listed, nor
+    /// inside a folder that is, are let go of (a token held for one then
+    /// says the element is gone, as for anything that went). What
+    /// VoiceOver never asked about costs nothing.
+    func rowsReloadedForAccessibility() {
+        spoken.listed = nil
         guard !spoken.rows.isEmpty else { return }
-        spoken.rows = spoken.rows.filter { item, _ in onRowOf?(item) != nil }
+        let folders = Set(
+            (0..<numberOfRows).compactMap { onRowTree?($0) }.filter { $0.fold != TreeRow.Fold.none }.map(\.entry.url.pathKey))
+        func isInsideAFolderRow(_ item: URL) -> Bool {
+            var path = item.pathKey
+            while path.count > 1 {
+                path = (path as NSString).deletingLastPathComponent
+                if folders.contains(path) { return true }
+            }
+            return false
+        }
+        spoken.rows = spoken.rows.filter { item, _ in onRowOf?(item) != nil || isInsideAFolderRow(item) }
+    }
+
+    /// The table's rows that are VoiceOver's (all but loading lines), in
+    /// order: found once after each reload, when first asked.
+    private var listedRows: [Int] {
+        if let known = spoken.listed { return known }
+        let rows = (0..<numberOfRows).filter { onRowURL?($0) != nil }
+        spoken.listed = rows
+        return rows
+    }
+
+    /// Where VoiceOver's rows from table row `row` on begin, among them.
+    private func firstListed(from row: Int) -> Int {
+        let rows = listedRows
+        var low = 0, high = rows.count
+        while low < high {
+            let middle = (low + high) / 2
+            if rows[middle] < row { low = middle + 1 } else { high = middle }
+        }
+        return low
+    }
+
+    /// The place of table row `row` among VoiceOver's rows; nil for a loading line.
+    fileprivate func position(ofRow row: Int) -> Int? {
+        let place = firstListed(from: row)
+        return place < listedRows.count && listedRows[place] == row ? place : nil
+    }
+
+    /// The rows one level down inside the folder on `row`, while it is open.
+    fileprivate func disclosedRows(of row: Int) -> [ListRowElement] {
+        guard let folder = onRowTree?(row), folder.fold == .open else { return [] }
+        var found: [ListRowElement] = []
+        for below in (row + 1)..<max(row + 1, numberOfRows) {
+            // A loading line beneath a folder further in is passed over.
+            guard let shown = onRowTree?(below) else { continue }
+            if shown.depth <= folder.depth { break }
+            if shown.depth == folder.depth + 1, let element = element(below) { found.append(element) }
+        }
+        return found
+    }
+
+    /// The row of the folder the row `row` is inside; nil at the top.
+    fileprivate func disclosingRow(of row: Int) -> ListRowElement? {
+        guard let shown = onRowTree?(row), shown.depth > 0 else { return nil }
+        for above in stride(from: row - 1, through: 0, by: -1) {
+            if let folder = onRowTree?(above), folder.depth == shown.depth - 1 { return element(above) }
+        }
+        return nil
     }
 
     /// The columns the pane has room for, each the one element kept for it.
@@ -157,9 +281,10 @@ extension FileTableView {
         }
     }
 
-    private var visibleRowRange: Range<Int> {
+    /// VoiceOver's rows in view, as table rows.
+    private var visibleListedRows: ArraySlice<Int> {
         let range = rows(in: visibleRect)
-        return range.location..<(range.location + range.length)
+        return listedRows[firstListed(from: range.location)..<firstListed(from: range.location + range.length)]
     }
 
     /// What is beside the rows among the table's children.
@@ -172,14 +297,17 @@ extension FileTableView {
         if let window, window.firstResponder !== self { window.makeFirstResponder(self) }
     }
 
-    override func accessibilityChildren() -> [Any]? { elements(0..<numberOfRows) + otherChildren }
+    /// An outline, as an `NSOutlineView` is: its folders open in place.
+    override func accessibilityRole() -> NSAccessibility.Role? { .outline }
+
+    override func accessibilityChildren() -> [Any]? { elements(listedRows) + otherChildren }
     /// As AppKit's typed methods want rows (see `ListRowElement.isARow`).
     private func typed(_ rows: [ListRowElement]) -> [any NSAccessibilityRow] {
         rows.compactMap { ($0 as AnyObject) as? any NSAccessibilityRow }
     }
 
-    override func accessibilityRows() -> [any NSAccessibilityRow]? { typed(elements(0..<numberOfRows)) }
-    override func accessibilityVisibleRows() -> [any NSAccessibilityRow]? { typed(elements(visibleRowRange)) }
+    override func accessibilityRows() -> [any NSAccessibilityRow]? { typed(elements(listedRows)) }
+    override func accessibilityVisibleRows() -> [any NSAccessibilityRow]? { typed(elements(visibleListedRows)) }
     override func accessibilitySelectedRows() -> [any NSAccessibilityRow]? { typed(elements(selectedRowIndexes)) }
 
     override func setAccessibilitySelectedRows(_ rows: [any NSAccessibilityRow]?) {
@@ -192,7 +320,7 @@ extension FileTableView {
     /// anything else in it (a row whose file went, something that is no
     /// row) is passed over.
     private func select(asked: NSArray) {
-        let rows = asked.compactMap { ($0 as? ListRowElement)?.accessibilityIndex() }
+        let rows = asked.compactMap { ($0 as? ListRowElement)?.row }
         clickedByAccessibility()
         selectRowIndexes(IndexSet(rows.filter { $0 >= 0 && $0 < numberOfRows }), byExtendingSelection: false)
     }
@@ -205,14 +333,14 @@ extension FileTableView {
     // by: by attribute, and for a count or a part of a long list, which
     // make no more elements than they give.
 
-    /// The rows an attribute is about, by index, and how many other
+    /// The rows an attribute is about, as table rows, and whether other
     /// children follow them; nil for an attribute that is not a list of rows.
     private func rowIndexes(_ attribute: NSAccessibility.Attribute) -> (rows: [Int], others: Bool)? {
         switch attribute {
-        case .rows: (Array(0..<numberOfRows), false)
-        case .children: (Array(0..<numberOfRows), true)
-        case .visibleRows: (Array(visibleRowRange), false)
-        case .visibleChildren: (Array(visibleRowRange), true)
+        case .rows: (listedRows, false)
+        case .children: (listedRows, true)
+        case .visibleRows: (Array(visibleListedRows), false)
+        case .visibleChildren: (Array(visibleListedRows), true)
         case .selectedRows: (Array(selectedRowIndexes), false)
         default: nil
         }
@@ -269,7 +397,7 @@ extension FileTableView {
         let own: Int? = onMain {
             if let row = asked.value as? ListRowElement { return row.accessibilityIndex() }
             if let column = asked.value as? ListColumnElement {
-                return self.numberOfRows + (self.columnElements.firstIndex { $0 === column } ?? 0)
+                return self.listedRows.count + (self.columnElements.firstIndex { $0 === column } ?? 0)
             }
             return nil
         }
@@ -291,6 +419,15 @@ extension FileTableView {
         }
         return found ?? self
     }
+}
+
+/// What the table has handed VoiceOver (`FileTableView.spoken`): one
+/// element per item and one per column, kept; and which of its rows are
+/// VoiceOver's rows, found again after each reload.
+struct SpokenElements {
+    var rows: [URL: ListRowElement] = [:]
+    var columns: [ObjectIdentifier: ListColumnElement] = [:]
+    var listed: [Int]?
 }
 
 /// The older accessibility methods don't say they are called on the main

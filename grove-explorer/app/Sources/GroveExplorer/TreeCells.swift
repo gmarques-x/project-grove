@@ -45,12 +45,23 @@ enum TreeCell {
 }
 
 /// The tree's part of a press and of the pointer in the list: a chevron's
-/// gutter opens or closes its folder, and a loading line takes nothing.
+/// gutter opens or closes its folder, and a loading line takes nothing;
+/// and VoiceOver's: each row's level and fold, and its opening and closing.
 extension FileList.Coordinator {
     func setUpTree(_ table: FileTableView) {
         table.onPress = { [weak self] in self?.pressed($0, row: $1, at: $2) ?? false }
         table.isOnChevron = { [weak self] in self?.isOnChevron(row: $0, at: $1) ?? false }
         table.onChevronRow = { [weak self] in self?.chevronRowChanged(from: $0, to: $1) }
+        table.onRowTree = { [weak self] in self?.treeRow(onRow: $0) }
+        table.onRowFold = { [weak self] in self?.foldedByAccessibility(row: $0, open: $1) }
+    }
+
+    /// VoiceOver opened (`open`) or closed the folder on `row`: as a click
+    /// on its chevron, when that is not what it is already.
+    private func foldedByAccessibility(row: Int, open: Bool) {
+        guard showsModelRows, let shown = treeRow(onRow: row), shown.fold != .none else { return }
+        guard open != (shown.fold == .open || shown.fold == .loading) else { return }
+        model.toggleFold(shown.entry.url, in: side)
     }
 
     /// `x` from the Name column's left edge (the pane's).
@@ -69,8 +80,9 @@ extension FileList.Coordinator {
     /// folder (⌥: everything inside too) and does not select, drag or go
     /// into it, a double-click's second press included. A loading line
     /// takes no press. Anything else is the table's.
+    /// ⌃-click is a right-click wherever it is, as in Finder: the table's.
     func pressed(_ event: NSEvent, row: Int, at point: NSPoint) -> Bool {
-        guard items.indices.contains(row) else { return false }
+        guard items.indices.contains(row), !event.modifierFlags.contains(.control) else { return false }
         guard let shown = treeRow(onRow: row) else { return true }
         guard TreeLayout.togglesFold(atX: columnX(point), depth: shown.depth, fold: shown.fold) else { return false }
         // Rows of another moment (the model changed, this list not yet): no fold is taken from them.

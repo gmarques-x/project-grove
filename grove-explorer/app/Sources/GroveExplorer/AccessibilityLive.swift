@@ -23,6 +23,11 @@ enum AccessibilityLive {
         var problems: [String] = []
         var asked = 0
         var tables = 0
+        /// Rows inside an open folder whose level was checked, folders
+        /// whose fold was, and rows kept through their folder's close and reopen.
+        var levels = 0
+        var folds = 0
+        var reopened = 0
     }
 
     /// The server's own word for "that element is gone".
@@ -65,12 +70,96 @@ enum AccessibilityLive {
         }
         func text(_ element: AXUIElement, _ attribute: String) -> String? { value(element, attribute).value as? String }
         func tables(under element: AXUIElement, depth: Int = 0) -> [AXUIElement] {
-            if text(element, "AXRole") == "AXTable" { return [element] }
+            // A list is an outline, as an `NSOutlineView` is: its folders open in place.
+            if text(element, "AXRole") == "AXOutline" { return [element] }
             guard depth < 16 else { return [] }
             return list(element, "AXChildren").flatMap { tables(under: $0, depth: depth + 1) }
         }
         func same(_ a: [AXUIElement], _ b: [AXUIElement]) -> Bool {
             a.count == b.count && zip(a, b).allSatisfy { CFEqual($0, $1) }
+        }
+        func settable(_ element: AXUIElement, _ attribute: String) -> Bool {
+            var settable: DarwinBoolean = false
+            AXUIElementIsAttributeSettable(element, attribute as CFString, &settable)
+            return settable.boolValue
+        }
+
+        /// Each row as an `NSOutlineView`'s says it: an outline row, its
+        /// level (0 for the tab folder's items), whether its folder is open
+        /// (a folder can be opened and closed by setting that, nothing else
+        /// can), the row it is inside, and the rows it has open beneath it.
+        func checkTree(_ rows: [AXUIElement], shown: [TreeRow], problem: (String) -> Void) {
+            for (index, (row, tree)) in zip(rows, shown).enumerated() {
+                if text(row, "AXSubrole") != "AXOutlineRow" {
+                    problem("row \(index) is not an outline's row")
+                    break
+                }
+                if (value(row, "AXDisclosureLevel").value as? Int) != tree.depth {
+                    problem("row \(index) does not say its level, \(tree.depth)")
+                }
+                let open = tree.fold == .open || tree.fold == .loading
+                if (value(row, "AXDisclosing").value as? Bool) != open {
+                    problem("row \(index) does not say its folder is \(open ? "open" : "closed")")
+                }
+                if settable(row, "AXDisclosing") != (tree.fold != .none) {
+                    problem("row \(index) \(tree.fold == .none ? "can be" : "can't be") opened or closed")
+                }
+                let parent = tree.depth == 0 ? nil : shown[..<index].lastIndex { $0.depth == tree.depth - 1 }
+                let by = value(row, "AXDisclosedByRow").value
+                if let parent, !(by.map { CFEqual($0, rows[parent]) } ?? false) {
+                    problem("row \(index) does not say it is inside row \(parent)")
+                } else if parent == nil, by != nil {
+                    problem("row \(index), at the top, says it is inside a row")
+                }
+                let beneath = shown[(index + 1)...].prefix { $0.depth > tree.depth }
+                let disclosed = beneath.indices.filter { shown[$0].depth == tree.depth + 1 }.map { rows[$0] }
+                if !same(disclosed, list(row, "AXDisclosedRows")) { problem("row \(index) does not give the rows it has open") }
+                if tree.depth > 0 { result.levels += 1 }
+                if tree.fold != .none { result.folds += 1 }
+            }
+        }
+
+        /// A folder closed by VoiceOver's fold action and opened again: the
+        /// rows that were inside it are no rows while it is closed, and
+        /// after its read lands they are the same elements, saying the same.
+        func checkCloseAndReopen(
+            _ table: AXUIElement, rows: [AXUIElement], shown: [TreeRow], model: AppModel, side: Side,
+            problem: (String) -> Void
+        ) {
+            // Under a filter a folder kept for the matches inside it is no
+            // row once closed (nothing inside it shows): there is no row to open again.
+            guard model.listing(for: side)?.filteredFrom == nil,
+                let child = shown.firstIndex(where: { $0.depth > 0 }),
+                let parent = shown[..<child].lastIndex(where: { $0.depth == shown[child].depth - 1 })
+            else { return }
+            let folder = shown[parent].entry.url.pathKey
+            let said = rows.map { text($0, "AXDescription") }
+            // The audit reads nothing: the listings the folder had are put back, as its read would.
+            let read = model.listings[side]?.children.filter {
+                $0.key.pathKey == folder || $0.key.pathKey.hasPrefix(folder + "/")
+            } ?? [:]
+            let closing = AXUIElementSetAttributeValue(rows[parent], "AXDisclosing" as CFString, kCFBooleanFalse)
+            settle()
+            guard closing == .success else { return problem("a folder can't be closed (error \(closing.rawValue))") }
+            if (value(rows[parent], "AXDisclosing").value as? Bool) != false { problem("a folder closed says it is open") }
+            if list(table, "AXRows").contains(where: { CFEqual($0, rows[child]) }) {
+                problem("a row inside a closed folder is still a row")
+            }
+            let opening = AXUIElementSetAttributeValue(rows[parent], "AXDisclosing" as CFString, kCFBooleanTrue)
+            settle()
+            guard opening == .success else { return problem("a folder can't be opened (error \(opening.rawValue))") }
+            if (value(rows[parent], "AXDisclosing").value as? Bool) != true { problem("a folder opened says it is closed") }
+            model.listings[side]?.children.merge(read) { $1 }
+            model.listings[side]?.treeVersion += 1
+            model.arrange(side)
+            settle()
+            if !same(rows, list(table, "AXRows")) {
+                problem("the rows after a folder was closed and opened again are not the same elements")
+            } else if rows.map({ text($0, "AXDescription") }) != said {
+                problem("a row says other words after its folder was closed and opened again")
+            } else {
+                result.reopened += shown[(parent + 1)...].prefix { $0.depth > shown[parent].depth }.count
+            }
         }
 
         let windows = list(app, "AXWindows")
@@ -98,6 +187,11 @@ enum AccessibilityLive {
             let name = "list of the \(side == .left ? "left" : "right") pane"
             func problem(_ words: String) { result.problems.append("\(name): \(words)") }
 
+            // VoiceOver says what the list is by its description, as an NSOutlineView's.
+            let described = text(table, "AXRoleDescription") ?? ""
+            if described != NSAccessibility.Role.outline.description(with: nil) {
+                problem("the list is described as “\(described)”, not as an outline")
+            }
             let rows = list(table, "AXRows")
             guard !rows.isEmpty else { continue }
             // 1. A row answers: what it is, what it says, where it is, whose it is.
@@ -147,6 +241,17 @@ enum AccessibilityLive {
             if value(rows[0], "AXRole").error == gone { problem("a row is gone after the list is loaded again") }
             if !same(rows, list(table, "AXRows")) { problem("the rows after a reload are not the same elements") }
 
+            // 3b. The tree (spec §16), as an outline's rows say it: each
+            // row's level, whether its folder is open, the row it is in
+            // and the rows it has open, as the model has them.
+            let shown = treeRows(model, side)
+            if shown.count != rows.count {
+                problem("\(rows.count) rows for the tree's \(shown.count) (a loading line is no row)")
+            } else {
+                checkTree(rows, shown: shown, problem: problem)
+                checkCloseAndReopen(table, rows: rows, shown: shown, model: model, side: side, problem: problem)
+            }
+
             // 4. The rows move (the sort is turned round): a row held
             // follows its file to where that is now.
             model.sort(by: .name, in: side)
@@ -188,6 +293,12 @@ enum AccessibilityLive {
             }
         }
         return result
+    }
+
+    /// The rows of the pane's tree in their order: what the list shows but
+    /// its loading lines, which are no rows to VoiceOver.
+    private static func treeRows(_ model: AppModel, _ side: Side) -> [TreeRow] {
+        (model.listing(for: side)?.items ?? []).compactMap { if case .row(let row) = $0 { row } else { nil } }
     }
 
     private static func allTables(under view: NSView) -> [NSTableView] {

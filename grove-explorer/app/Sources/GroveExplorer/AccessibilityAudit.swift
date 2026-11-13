@@ -84,7 +84,11 @@ enum AccessibilityAudit {
                 let live = AccessibilityLive.check(window, model: model)
                 print(
                     "  through the accessibility server: \(live.tables) lists, \(live.asked) questions, "
-                        + "\(live.problems.count) problems")
+                        + "\(live.problems.count) problems"
+                        + (live.folds > 0
+                            ? "; \(live.levels) rows at their levels, \(live.folds) folders open or closed, "
+                                + "\(live.reopened) rows kept through a close and reopen"
+                            : ""))
                 for problem in live.problems { print("  LIVE \(problem)") }
                 if !live.problems.isEmpty { failed = true }
             }
@@ -222,7 +226,7 @@ enum AccessibilityAudit {
             walk(child, depth: depth + (isElement ? 1 : 0), path: path, tree: tree, into: &count)
         }
         // After its rows were walked: the second check loads the list again.
-        if isElement, role == "AXTable" {
+        if isElement, role == "AXOutline" {
             checkOlderAnswers(of: node, path: path, into: &count)
             checkRowsKeepTheirIdentity(in: node, path: path, into: &count)
         }

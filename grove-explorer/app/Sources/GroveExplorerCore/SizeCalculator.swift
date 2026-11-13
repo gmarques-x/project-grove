@@ -8,11 +8,26 @@ import Foundation
 /// A size is kept until `invalidate` says the folder changed. At most two
 /// folders are walked at once; the others wait their turn, in the order asked.
 public actor SizeCalculator {
+    /// What a walk came back with.
+    public enum Answer: Equatable, Sendable {
+        case total(Int64)
+        /// Not a folder that can be read (a link to one included): no size
+        /// will come for it as it is ("--").
+        case unreadable
+        /// The walk was cancelled on its way (the folder changed, or its
+        /// size is no longer wanted): its size is still to come.
+        case cancelled
+
+        public var total: Int64? {
+            if case .total(let total) = self { total } else { nil }
+        }
+    }
+
     /// A walk asked for and not yet answered. The number tells this walk
     /// from a later one of the same folder.
     private struct Walk {
         let number: Int
-        let task: Task<Int64?, Never>
+        let task: Task<Answer, Never>
     }
 
     private static let limit = 2
@@ -37,10 +52,15 @@ public actor SizeCalculator {
     }
 
     /// Nil when the walk was cancelled, and when `folder` is not a folder
-    /// that can be read (a link to one included).
+    /// that can be read (a link to one included): `answer(for:)` tells the two apart.
     public func size(of folder: URL) async -> Int64? {
+        await answer(for: folder).total
+    }
+
+    /// The folder's total, or why there is none.
+    public func answer(for folder: URL) async -> Answer {
         let path = Self.key(folder)
-        if let known = cache[path] { return known }
+        if let known = cache[path] { return .total(known) }
         // Asked for again before the answer: the one walk answers both.
         if let walk = walks[path] { return await walk.task.value }
         lastNumber += 1
@@ -52,7 +72,7 @@ public actor SizeCalculator {
 
     /// The folder changed: its size is forgotten, and that of every folder
     /// it is in. A walk of one of them on its way is cancelled (its number
-    /// would be an old one): who asked gets nil and asks again.
+    /// would be an old one): who asked gets `.cancelled` and asks again.
     public func invalidate(_ folder: URL) {
         var path = Self.key(folder)
         while true {
@@ -65,14 +85,14 @@ public actor SizeCalculator {
     }
 
     /// The folder's size is no longer wanted (its row is not shown any
-    /// more): a walk of it on its way is cancelled and who asked gets nil.
+    /// more): a walk of it on its way is cancelled and who asked gets `.cancelled`.
     /// Nothing is forgotten, and no other walk is touched; asked for again,
     /// it is walked from the start.
     public func cancel(_ folder: URL) {
         if let walk = walks.removeValue(forKey: Self.key(folder)) { cancel(walk) }
     }
 
-    /// Every size being waited for is answered with nil. Sizes already
+    /// Every size being waited for is answered `.cancelled`. Sizes already
     /// known are kept.
     public func cancelAll() {
         for walk in walks.values { cancel(walk) }
@@ -93,16 +113,18 @@ public actor SizeCalculator {
 
     private static func key(_ folder: URL) -> String { folder.standardizedFileURL.path }
 
-    private func walk(_ path: String, number: Int) async -> Int64? {
-        guard await takeTurn(number) else { return nil }
+    private func walk(_ path: String, number: Int) async -> Answer {
+        guard await takeTurn(number) else { return .cancelled }
         let measured = await measure(path)
         giveTurn()
         // Cancelled (also by `invalidate`), the walk is no longer in the
-        // books and its number, if it got to one, is not given.
-        guard !Task.isCancelled, walks[path]?.number == number else { return nil }
+        // books and its number, if it got to one, is not given: whatever
+        // the walk came back with, nothing is known of the folder.
+        guard !Task.isCancelled, walks[path]?.number == number else { return .cancelled }
         walks[path] = nil
-        if let measured { cache[path] = measured }
-        return measured
+        guard let measured else { return .unreadable }
+        cache[path] = measured
+        return .total(measured)
     }
 
     /// Off the actor, so sizes already known are answered during a walk.

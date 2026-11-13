@@ -168,6 +168,22 @@ import Testing
         #expect(await calculator.size(of: path("Locked")) == nil)
     }
 
+    /// Nil is of two kinds, which the list shows apart: a folder that can't
+    /// be read ("--"), and a walk cancelled on its way (its size is still to come).
+    @Test func aFolderThatCantBeReadIsToldFromACancelledWalk() async throws {
+        try makeFolder("Locked")
+        try files.setAttributes([.posixPermissions: 0o000], ofItemAtPath: path("Locked").path)
+        defer { try? files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path("Locked").path) }
+        try makeFile("plain.bin", blocks: 1)
+        try makeFolder("Tree")
+        try makeFile("Tree/one.bin", blocks: 1)
+        let calculator = SizeCalculator()
+        #expect(await calculator.answer(for: path("not-here")) == .unreadable)
+        #expect(await calculator.answer(for: path("plain.bin")) == .unreadable)
+        #expect(await calculator.answer(for: path("Locked")) == .unreadable)
+        #expect(await calculator.answer(for: path("Tree")) == .total(Self.block))
+    }
+
     /// One closed folder inside doesn't cost the tree its size: the rest is summed.
     @Test func anUnreadableFolderInsideIsLeftOut() async throws {
         try makeFolder("Tree/Locked")
@@ -342,8 +358,38 @@ private func until(_ condition: @Sendable () async -> Bool) async {
         proceed.signal()
         #expect(await first.value == nil)
         #expect(await calculator.size(of: folder) == 2)
-        #expect(await calculator.size(of: folder) == 2)
         #expect(walks.count == 2)
+    }
+
+    /// A walk cancelled by a change (or by `cancelAll`) says so: it is no
+    /// folder that can't be read. One whose stand-in finds nothing is.
+    @Test func aCancelledWalkIsNotAnUnreadableFolder() async {
+        let walks = Walks()
+        let proceed = DispatchSemaphore(value: 0)
+        let calculator = SizeCalculator { path in
+            walks.begin(path)
+            defer { walks.end() }
+            if path == "/closed" { return nil }
+            _ = proceed.wait(timeout: .now() + 10)
+            return 1
+        }
+        #expect(await calculator.answer(for: URL(fileURLWithPath: "/closed")) == .unreadable)
+        let busy = URL(fileURLWithPath: "/busy/inside")
+        let changed = Task { await calculator.answer(for: busy) }
+        await until { walks.count == 2 }
+        // A change inside it.
+        await calculator.invalidate(URL(fileURLWithPath: "/busy/inside/deeper"))
+        proceed.signal()
+        #expect(await changed.value == .cancelled)
+        let left = Task { await calculator.answer(for: busy) }
+        await until { walks.count == 3 }
+        await calculator.cancelAll()
+        proceed.signal()
+        #expect(await left.value == .cancelled)
+        // Not kept as the folder's answer: asked again, it is walked.
+        proceed.signal()
+        #expect(await calculator.answer(for: busy) == .total(1))
+        #expect(walks.count == 4)
     }
 
     /// An invalidated walk is cancelled, not left running out of reach: it

@@ -222,12 +222,12 @@ final class FileTableView: NSTableView {
     /// counted among the table's own (`ListAccessibility.swift`).
     weak var renameField: NSView?
     /// The rows and columns VoiceOver has been given, each kept while its
-    /// item is listed (`ListAccessibility.swift`).
-    var spoken = (rows: [URL: ListRowElement](), columns: [ObjectIdentifier: ListColumnElement]())
+    /// item is listed or inside a folder that is (`ListAccessibility.swift`).
+    var spoken = SpokenElements()
 
     override func reloadData() {
         super.reloadData()
-        forgetUnlistedRowElements()
+        rowsReloadedForAccessibility()
     }
 
     /// A row as VoiceOver says it (`Spoken.row`), asked for when VoiceOver
@@ -237,6 +237,10 @@ final class FileTableView: NSTableView {
     /// to VoiceOver is its item, wherever a reload puts it.
     var onRowURL: ((Int) -> URL?)?
     var onRowOf: ((URL) -> Int?)?
+    /// The tree's row on a row (its level and fold); nil for a loading line.
+    var onRowTree: ((Int) -> TreeRow?)?
+    /// VoiceOver opened (true) or closed the folder on a row.
+    var onRowFold: ((Int, Bool) -> Void)?
     /// VoiceOver's "show menu" on a row: this list's menu for it; false
     /// when none could be shown.
     var onRowMenu: ((Int) -> Bool)?
