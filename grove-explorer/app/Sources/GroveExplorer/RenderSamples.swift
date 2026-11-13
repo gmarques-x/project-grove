@@ -267,3 +267,29 @@ enum Sample {
         return Pane(folder: home, entries: entries, sizes: [:], selected: ["Desktop"], pointer: nil)
     }
 }
+
+extension AppModel {
+    /// A model that shows what it is given and reads nothing: for a render.
+    static func fixed(
+        browser: Browser, config: ExplorerConfig, clock: ListClock, colors: ThemeColors,
+        entries: [Side: [Entry]], sizes: [URL: Int64], free: Int64, selected: [Side: Set<URL>],
+        problems: [Side: (sentence: String, needsPermission: Bool)] = [:], filters: [Side: String] = [:]
+    ) -> AppModel {
+        let model = AppModel(browser: browser, config: config, clock: clock, live: false)
+        model.colors = colors
+        model.sizes = sizes
+        for (side, all) in entries {
+            guard let tab = browser.tab(side) else { continue }
+            if let text = filters[side] { model.filter.texts[tab.id] = text }
+            let wanted = model.arrangement(for: tab)
+            let arranged = FolderListing.arranged(all, by: wanted, sizes: sizes)
+            model.listings[side] = Listing(
+                folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows,
+                problem: problems[side]?.sentence, needsPermission: problems[side]?.needsPermission ?? false,
+                free: free, filteredFrom: arranged.filteredFrom, state: .arranged(by: wanted), revision: 1)
+            model.selections[tab.id] = selected[side] ?? []
+        }
+        model.revision = 1
+        return model
+    }
+}
