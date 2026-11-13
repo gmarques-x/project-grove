@@ -281,3 +281,37 @@ As `96-keys-app` and `97-themes-app`, without the login agent:
 ## 15. Build order
 
 For the plan: (1) Core reading, sorting and the list in one pane, read-only; (2) navigation, path bar, sidebar, tabs, the second pane, the session; (3) operations, conflicts, undo, the clipboard; (4) drag and drop, Quick Look, the context menu; (5) icons; (6) the module, the Grove menu row, the manual chapter. Each step ends installable.
+
+## 16. Folders that open in place (added 2026-11-13)
+
+Asked for by the owner after the first live run, and chosen from options put to him: folders expand in place in the list, as in Finder's list view, and the arrows are always there (no mode, no switch). Mock-ups: `artifacts/grove-explorer/mockups/tree-*.png`.
+
+**Look.** Every folder row has a small arrow before its icon (`GroveIcon`, quiet colour; pointing right when closed, down when open). A folder's contents are listed beneath it, the name indented one step (16 pt) per level; Size, Date Modified and Kind stay in their columns. No arrow on files, on packages (apps, bundles), on links to folders, or on a folder the app can't read. Rows stay 24 pt.
+
+**Opening and closing.** A click on the arrow; → on the selected folder opens it, ← closes it; ← on a file or a closed folder selects its parent row; ⌥→ or ⌥-click on the arrow opens a folder and everything inside it, ⌥← closes it and everything inside. ⌘↓, ⌘O and a double-click still go INTO the folder (the tab navigates), as before. An opened folder that is still being read shows one quiet "···" row beneath it.
+
+**Order.** Each folder's contents are sorted among themselves by the tab's column and direction, folders on top at every level; a child never leaves its parent.
+
+**Filter (⌘F).** It looks through every row that is showing, opened folders' contents included. A row that matches keeps its ancestors showing, drawn in the quiet colour (they are context, not matches); the status bar counts matches ("4 of 212"). The filter never opens a folder by itself.
+
+**Selection and commands.** They act on the rows that are showing, at any depth; ⌘A selects all showing rows. When a folder and items inside it are both selected, an operation takes the folder once (items whose ancestor is also selected are left out, so nothing is copied twice or moved out from under itself). Type-to-jump looks through all showing rows.
+
+**Where things go.** Paste, new folder, F5/F6's target and a drop on a pane's empty space go to the tab's folder, as in Finder. A drop on an opened or closed folder's row goes into that folder. New folder and rename-in-place then show the row where it belongs in the tree.
+
+**Live.** Each opened folder is watched like the tab's own folder; a change inside appears within a second. An opened folder that goes away closes (its rows go); one that is renamed keeps its place and its opened state when the rename was made in the app.
+
+**Sizes.** As before, for every showing folder and package.
+
+**Remembered.** Which folders are open is kept per tab, survives a refresh and a sort, is kept when the tab navigates away and back (per folder visited, bounded), and is saved in the session.
+
+**Limits.** ⌥→ stops opening when the tab would show more than 10,000 rows and says so in the status bar. A link loop can't be opened (links to folders have no arrow).
+
+**Status bar.** "212 items" counts showing rows; with folders open: "212 items · 3 folders open".
+
+**VoiceOver.** A row says its level and, for a folder, "open" or "closed"; the arrow is the row's expand/collapse action (disclosure), not a separate element.
+
+**Safety rules that carry over unchanged.** Commands act only on rows the user can see; a pane or an opened folder whose contents have not arrived has no rows; operations are values captured at the keypress; every change to files goes through the single run path.
+
+**Keys to add to §7's Grove table when it is built** (the Core test that parses §7 pins its rows, so they are added together with the code): → open the selected folder in place · ← close it, or go to its parent row · ⌥→ open it and everything inside · ⌥← close it and everything inside.
+
+**In the code.** The rows a tab shows (which entries, at what depth, in what order, under which filter, with which ancestors kept) are one pure function in Core over the folders' listings and the set of open folders, with tests; the rows-state machine (§6, `Arrangement`) decides over that result as it does today over a flat list.
