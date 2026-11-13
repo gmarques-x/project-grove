@@ -72,7 +72,8 @@ enum Render {
         ("eject-refused", Scene(size: small, panes: [Sample.downloads(selected: [])], extras: Sample.Extras(
             ejectFailure: VolumeUse.ejectRefusal(
                 of: Sample.backup.name, at: Sample.backup.url,
-                commands: [.operation(.copy(items: [], to: Sample.backup.url))]),
+                // By its path: the sample's disk is not asked for on this Mac.
+                commands: [.operation(.copy(items: [], to: Sample.backup.url))], device: { _ in nil }),
             status: .running(run: 1, words: "Copying 128 of 342 to Backup", fraction: 0.37, percent: "37%")))),
         // The list's three fills side by side, and hidden items selected and
         // not: the active pane at the left, the other at the right.
