@@ -22,14 +22,22 @@ extension AppModel {
         {
             return kept.text
         }
-        // The selected rows; their size counts a folder once, not again
-        // for what is selected inside it (`Tree.operands`).
-        let chosen = selection(for: side)
-        let count = chosen.reduce(0) { $0 + (listing.rows[$1] == nil ? 0 : 1) }
+        // The selected rows, by place: one look-up each. Their size counts
+        // a folder once, not again for what is selected inside it
+        // (`Tree.operandPlaces`); with no folder open, no row is inside another.
+        var places: [Int] = []
+        for url in selection(for: side) {
+            if let place = listing.rows[url] { places.append(place) }
+        }
+        let count = places.count
+        if listing.counts.foldersOpen > 0 { places = Tree.operandPlaces(places.sorted(), in: listing.items) }
         var bytes: Int64? = 0
-        for url in Tree.operands(of: chosen, in: listing.items, index: listing.rows) {
-            guard let entry = listing.row(of: url)?.entry else { continue }
-            if let total = bytes, let size = entry.size ?? sizes[url] { bytes = total + size } else { bytes = nil }
+        for place in places {
+            guard case .row(let row) = listing.items[place] else { continue }
+            if let total = bytes, let size = row.entry.size ?? sizes[row.entry.url] { bytes = total + size } else {
+                bytes = nil
+                break
+            }
         }
         // The rows that show, at every depth, and the folders open among them.
         let text = GroveExplorerCore.StatusText.items(
