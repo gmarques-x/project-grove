@@ -34,6 +34,8 @@ final class FileRowView: NSTableRowView {
     var isUnderPointer = false { didSet { if isUnderPointer != oldValue { needsDisplay = true } } }
     /// A drag of files is over this folder's row: the hover fill and a 1 pt green line.
     var isDropTarget = false { didSet { if isDropTarget != oldValue { needsDisplay = true } } }
+    /// A folder's loading line: no hover fill (and it is never selected or a drop's target).
+    var isInert = false { didSet { if isInert != oldValue { needsDisplay = true } } }
 
     override var isSelected: Bool { didSet { needsDisplay = true } }
     override var isPreviousRowSelected: Bool { didSet { needsDisplay = true } }
@@ -42,7 +44,7 @@ final class FileRowView: NSTableRowView {
     override var interiorBackgroundStyle: NSView.BackgroundStyle { .normal }
 
     override func drawBackground(in dirtyRect: NSRect) {
-        guard isUnderPointer || isDropTarget, !isSelected else { return }
+        guard isUnderPointer || isDropTarget, !isSelected, !isInert else { return }
         shape(roundTop: true, roundBottom: true) { path in
             NSColor(theme.listHoverFill).setFill()
             path.fill()
@@ -136,17 +138,36 @@ class TextCellView: NSView {
     }
 }
 
-/// The Name column's cell: the icon, then the name, cut in the middle with
-/// its extension kept when it is too long.
+/// The Name column's cell, left to right: the indent of its level, the
+/// chevron's gutter (`TreeLayout`; empty on a row without one), the icon,
+/// then the name, cut in the middle with its extension kept when it is too
+/// long. A folder's loading line draws only "···" where its first child's
+/// icon will be.
 final class NameCellView: TextCellView {
     var icon: EntryIcon? { didSet { needsDisplay = true } }
     var theme = ThemeColors.fallback
     /// A hidden item: its icon is dimmed.
     var dimmed = false
+    /// The row's level: 0 for the tab folder's own items.
+    var depth = 0 { didSet { if depth != oldValue { needsDisplay = true } } }
+    var chevron: TreeLayout.Chevron? { didSet { if chevron != oldValue { needsDisplay = true } } }
+    /// The pointer is in the chevron's gutter: the chevron takes the text colour.
+    var chevronLit = false { didSet { if chevronLit != oldValue { needsDisplay = true } } }
+    /// A folder's "···" line, not an item's row.
+    var isLoadingLine = false { didSet { if isLoadingLine != oldValue { needsDisplay = true } } }
 
     override func draw(_ dirtyRect: NSRect) {
+        let iconX = CGFloat(TreeLayout.iconStart(depth: depth))
+        if isLoadingLine {
+            let room = bounds.width - iconX - ListMetrics.nameTrailing
+            if room > 0 { draw(TreeCell.loadingText, in: NSRect(x: iconX, y: 0, width: room, height: bounds.height)) }
+            return
+        }
+        if let chevron {
+            TreeCell.draw(chevron, depth: depth, lit: chevronLit, theme: theme, rowHeight: bounds.height)
+        }
         let cell = IconMetrics.cell
-        let iconRect = NSRect(x: leading, y: ((bounds.height - cell) / 2).rounded(), width: cell, height: cell)
+        let iconRect = NSRect(x: iconX, y: ((bounds.height - cell) / 2).rounded(), width: cell, height: cell)
         icon?.draw(in: iconRect, theme: theme, dimmed: dimmed)
 
         let start = iconRect.maxX + ListMetrics.iconGap
@@ -167,6 +188,17 @@ final class FileTableView: NSTableView {
     /// A key was pressed: true when it was dealt with.
     var onKey: ((NSEvent) -> Bool)?
     var onPointerRow: ((Int) -> Void)?
+    /// A press in the list, before the table's own handling (selection,
+    /// drag, double-click): true when it was dealt with and goes no further
+    /// (a chevron's gutter, a loading line). `TreeCells.swift`.
+    var onPress: ((NSEvent, Int, NSPoint) -> Bool)?
+    /// Whether a point of a row is on its chevron's gutter.
+    var isOnChevron: ((Int, NSPoint) -> Bool)?
+    /// The row whose chevron's gutter the pointer is in; -1 for none.
+    var chevronRow = -1 {
+        didSet { if chevronRow != oldValue { onChevronRow?(oldValue, chevronRow) } }
+    }
+    var onChevronRow: ((Int, Int) -> Void)?
     /// An item of the system's Edit menu was chosen, or its key pressed:
     /// "copy", "paste", "undo" or "redo", as `CommandList` names them.
     var onEdit: ((String) -> Void)?
@@ -237,15 +269,22 @@ final class FileTableView: NSTableView {
         tracking = area
     }
 
-    override func mouseMoved(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
-    override func mouseEntered(with event: NSEvent) { pointerRow = row(at: convert(event.locationInWindow, from: nil)) }
-    override func mouseExited(with event: NSEvent) { pointerRow = -1 }
+    override func mouseMoved(with event: NSEvent) { pointer(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseEntered(with event: NSEvent) { pointer(at: convert(event.locationInWindow, from: nil)) }
+    override func mouseExited(with event: NSEvent) { pointer(at: nil) }
 
     /// After a scroll the pointer is over another row without having moved.
     func pointerMovedToCurrentPlace() {
         guard let window, window.isKeyWindow else { return }
         let place = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        pointerRow = visibleRect.contains(place) ? row(at: place) : -1
+        pointer(at: visibleRect.contains(place) ? place : nil)
+    }
+
+    /// The pointer is at `place` (nil: off the list): its row, and its chevron's gutter.
+    private func pointer(at place: NSPoint?) {
+        let row = place.map { row(at: $0) } ?? -1
+        pointerRow = row
+        chevronRow = row >= 0 && place.map { isOnChevron?(row, $0) ?? false } == true ? row : -1
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -265,6 +304,12 @@ final class FileTableView: NSTableView {
 
     override func mouseDown(with event: NSEvent) {
         onClick?()
+        let place = convert(event.locationInWindow, from: nil)
+        if onPress?(event, row(at: place), place) == true {
+            // Not the table's: the list still takes the keys, as from any click in it.
+            if let window, window.firstResponder !== self { window.makeFirstResponder(self) }
+            return
+        }
         super.mouseDown(with: event)
     }
 

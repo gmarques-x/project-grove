@@ -159,6 +159,11 @@ final class AppModel: ObservableObject {
         self.live = live
         sizeQueue.onSize = { [weak self] url, size in self?.measured(url, size) }
         sizeQueue.onAskAgain = { [weak self] in self?.wantSizes() }
+        // The Size of a folder no total is coming for turns to "--".
+        sizeQueue.onGivenUp = { [weak self] _ in
+            self?.objectWillChange.send()
+            self?.sizesVersion += 1
+        }
     }
 
     /// Reads the folders, and starts following them and the theme.

@@ -134,6 +134,50 @@ enum Render {
             extras: Sample.Extras(dropRow: "invoices-2026"))),
         // The folder with each of its marks, at list size.
         ("folder-marks", Scene(size: CGSize(width: 474, height: 300), panes: [Sample.knownFolders()])),
+        // Folders open in place (spec §16), as the mock-ups have them. Two
+        // panes: three levels open at the left, grove-keys still being read
+        // under them, a selection across levels; nothing open at the right.
+        ("tree", Scene(size: full, panes: [
+            Sample.tree(
+                Sample.project,
+                Sample.projectTree(explorer: Sample.explorerApp(sources: true, core: false), keys: []),
+                selected: ["docs", "grove-explorer/app/Package.swift"], pointer: "grove-wallpapers"),
+            Sample.downloadsTree(),
+        ])),
+        // ⌘F "read" with five folders open: the matches, their folders kept as quiet context.
+        ("tree-filter", Scene(
+            size: CGSize(width: 1100, height: 560),
+            panes: [Sample.tree(
+                Sample.project,
+                Sample.projectTree(explorer: Sample.explorerApp(sources: true, core: true), keys: Sample.keysContents))],
+            extras: Sample.Extras(filter: "read"))),
+        // Return on a row at level 2: the field where its indented name was.
+        ("tree-rename", Scene(
+            size: CGSize(width: 948, height: 640),
+            panes: [Sample.tree(
+                Sample.project, Sample.projectTree(explorer: Sample.explorerApp(sources: false, core: false), keys: nil),
+                selected: ["grove-explorer/app/Package.swift"])],
+            extras: Sample.Extras(rename: "grove-explorer/app/Package.swift"))),
+        // A drag over a folder at level 2: the whole row marked.
+        ("tree-drop", Scene(
+            size: CGSize(width: 948, height: 640),
+            panes: [Sample.tree(
+                Sample.project, Sample.projectTree(explorer: Sample.explorerApp(sources: false, core: false), keys: nil))],
+            extras: Sample.Extras(dropRow: "grove-explorer/app/Sources", dropSide: .left))),
+        // The half-width tile with two panes: level 4 in a 440 pt pane, names cut in the middle.
+        ("tree-narrow", Scene(size: half, panes: [
+            Sample.tree(
+                Sample.project,
+                Sample.projectTree(explorer: Sample.explorerApp(sources: true, core: true), keys: nil),
+                selected: ["grove-explorer/app/Sources/GroveExplorerCore/FolderReader.swift"]),
+            Sample.downloadsTree(),
+        ])),
+        // Sorted by size, largest first: each folder's contents among themselves.
+        ("tree-size-sort", Scene(
+            size: CGSize(width: 948, height: 640),
+            panes: [Sample.tree(
+                Sample.project, Sample.projectTree(explorer: Sample.explorerApp(sources: false, core: false), keys: nil),
+                sort: GroveExplorerCore.SortOrder(column: .size, ascending: false))])),
     ]
 
     static var stateNames: String { scenes.map(\.name).joined(separator: ", ") }

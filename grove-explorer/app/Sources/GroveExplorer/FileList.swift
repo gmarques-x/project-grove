@@ -70,6 +70,7 @@ struct FileList: NSViewRepresentable {
         coordinator.quickLook.table = table
         table.quickLook = coordinator.quickLook
         coordinator.setUpDragging(table)
+        coordinator.setUpTree(table)
         coordinator.offerMenuByKey()
         return scroll
     }
@@ -232,7 +233,10 @@ struct FileList: NSViewRepresentable {
             }
             putDropMark()
             let renaming = model.work.rename.flatMap { $0.side == side ? $0 : nil }
-            rename.update(renaming, row: renaming.flatMap { listing?.rows[$0.url] }, in: table, theme: model.colors)
+            let renamingRow = renaming.flatMap { listing?.rows[$0.url] }
+            rename.update(
+                renaming, row: renamingRow, depth: renamingRow.flatMap { treeRow(onRow: $0)?.depth } ?? 0, in: table,
+                theme: model.colors)
             takeKeyboardIfAsked(table, active: active)
         }
 
@@ -307,24 +311,47 @@ struct FileList: NSViewRepresentable {
             view.theme = model.colors
             view.paneIsActive = paneIsActive
             view.isUnderPointer = row == table?.pointerRow
+            view.isInert = treeRow(onRow: row) == nil
             view.isDropTarget = row == table?.dropRow
             return view
         }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-            // A loading line has no cells yet: it is drawn with the tree's gutter.
             guard let tableColumn, let column = Column(rawValue: tableColumn.identifier.rawValue),
-                let entry = entry(onRow: row)
+                items.indices.contains(row)
             else { return nil }
             let theme = model.colors
+            guard case .row(let shown) = items[row] else {
+                // A loading line: "···" in the Name column at its level, the other columns empty.
+                guard column == .name, case .loading(_, let depth) = items[row] else { return nil }
+                let cell = reused(NameCellView.self, tableColumn.identifier, in: tableView)
+                cell.font = ListMetrics.nameFont
+                cell.theme = theme
+                cell.depth = depth
+                cell.isLoadingLine = true
+                cell.chevron = nil
+                cell.color = NSColor(theme.quiet)
+                return cell
+            }
+            let entry = shown.entry
             switch column {
             case .name:
                 let cell = reused(NameCellView.self, tableColumn.identifier, in: tableView)
                 cell.font = ListMetrics.nameFont
-                cell.leading = ListColumns.edge
                 cell.theme = theme
+                cell.depth = shown.depth
+                cell.isLoadingLine = false
+                cell.chevron = TreeLayout.chevron(for: shown.fold)
+                cell.chevronLit = row == table?.chevronRow
                 cell.dimmed = entry.isHidden
-                cell.color = entry.isHidden ? NSColor(theme.hiddenText) : NSColor(theme.fg)
+                // Kept by the filter for a match inside: the name is quiet, the icon and chevron as ever.
+                if entry.isHidden {
+                    cell.color = NSColor(theme.hiddenText)
+                } else if shown.isContext {
+                    cell.color = NSColor(theme.quiet)
+                } else {
+                    cell.color = NSColor(theme.fg)
+                }
                 cell.icon = IconCache.shared.icon(for: entry, light: theme.isLight)
                 cell.text = entry.name
                 return cell

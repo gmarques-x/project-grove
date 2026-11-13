@@ -12,6 +12,9 @@ final class SizeQueue {
     /// back before the cancelled walk had answered), or it is time to try
     /// the unanswered again: the owner calls `want` with what it shows now.
     var onAskAgain: () -> Void = {}
+    /// A walk came back with nothing: no total is on its way for it now
+    /// (`hasGivenUp`), and its Size says so.
+    var onGivenUp: (URL) -> Void = { _ in }
 
     private let calculator = SizeCalculator()
     /// Wanted and not yet asked for, the next one first.
@@ -89,6 +92,7 @@ final class SizeQueue {
                     onSize(url, size)
                 } else {
                     unanswered.insert(url)
+                    onGivenUp(url)
                 }
                 pump()
             }

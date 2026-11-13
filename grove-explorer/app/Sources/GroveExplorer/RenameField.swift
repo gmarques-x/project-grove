@@ -23,6 +23,8 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
     private var reason: String?
     private weak var table: NSTableView?
     private var row = 0
+    /// The row's level: the name, and so the field, is indented by it.
+    private var depth = 0
     /// The field is being taken away, or Return or Escape was pressed: the
     /// end of its editing is not the keyboard leaving it.
     private var done = false
@@ -36,7 +38,7 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
 
     /// Shows the field for `state` over `row`, or takes it away (`state`
     /// nil). A rename whose row is no longer listed is given up.
-    func update(_ state: RenameState?, row: Int?, in table: NSTableView, theme: ThemeColors) {
+    func update(_ state: RenameState?, row: Int?, depth: Int, in table: NSTableView, theme: ThemeColors) {
         guard let state, let row, row < table.numberOfRows else {
             remove()
             if let state {
@@ -57,6 +59,7 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
         guard let box, let clip = table.superview else { return }
         self.table = table
         self.row = row
+        self.depth = depth
         // Beside the table in its clip view, not in it: the table puts its
         // row views over anything of its own, and takes them out on a
         // reload. Laid out in the table's measures, so it scrolls with the row.
@@ -87,12 +90,14 @@ final class RenameEditor: NSObject, NSTextFieldDelegate {
         }
     }
 
-    /// Where the name is drawn in its row (`NameCellView`), a field's
+    /// Where the name is drawn in its row (`NameCellView`: after the
+    /// indent of its level, the chevron's gutter and the icon), a field's
     /// padding further out, as wide as the name needs and the column allows.
     private func frame(for text: String, row: Int, in table: NSTableView) -> NSRect {
         let rowRect = table.rect(ofRow: row)
         let column = table.tableColumns.first?.width ?? rowRect.width
-        let start = ListColumns.edge + IconMetrics.cell + ListMetrics.iconGap - RenameBox.padding
+        let start = CGFloat(TreeLayout.iconStart(depth: depth)) + IconMetrics.cell + ListMetrics.iconGap
+            - RenameBox.padding
         let room = max(column - start - ListMetrics.nameTrailing, 0)
         let needed = CGFloat((text as NSString).length + 2) * ListMetrics.nameAdvance + 2 * RenameBox.padding
         return NSRect(

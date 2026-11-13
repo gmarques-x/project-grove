@@ -48,13 +48,10 @@ extension AppModel {
     }
 
     /// The Size column's words: a file's size; a folder's or a package's
-    /// total, "···" until it is known; "--" for what has none.
+    /// total, "···" until it is known; "--" for what has none, and for a
+    /// folder no total is on its way for (it can't be read).
     func sizeText(_ entry: Entry) -> String {
-        if let size = entry.size ?? sizes[entry.url] { return Formatting.size(size) }
-        switch entry.kind {
-        case .folder, .package: return "···"
-        case .file, .symlink, .alias, .volume: return "--"
-        }
+        Formatting.sizeColumn(entry, total: sizes[entry.url], awaitsTotal: awaitsTotal(entry.url))
     }
 
     func dateText(_ entry: Entry, short: Bool) -> String {

@@ -137,11 +137,12 @@ extension FileList.Coordinator {
     /// while the conflict prompt is up or a name is being typed.
     func menu(forRow row: Int) -> NSMenu? {
         guard let table, model.canTakeDrop else { return nil }
+        // A folder's loading line has no menu: it is no item, and not the list's empty space.
+        if items.indices.contains(row), treeRow(onRow: row) == nil { return nil }
         model.clicked(side)
         model.listTakesKeyboard()
         if let window = table.window, window.firstResponder !== table { window.makeFirstResponder(table) }
         // The table's own selection: its delegate tells the model at once.
-        // A loading line is as the list's empty space.
         if entry(onRow: row) != nil {
             if !table.isRowSelected(row) { table.selectRowIndexes([row], byExtendingSelection: false) }
         } else if table.numberOfSelectedRows > 0 {
