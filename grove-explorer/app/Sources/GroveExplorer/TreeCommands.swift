@@ -65,6 +65,7 @@ extension AppModel {
     func openInPlace(_ url: URL, in side: Side) {
         guard let tab = browser.tab(side), let row = listing(for: side)?.row(of: url), row.entry.kind == .folder
         else { return }
+        trees[side]?.openedByUser.insert(row.entry.url.pathKey)
         setOpenFolders(tab.open.union([row.entry.url]), opened: [row.entry.url], in: side)
     }
 

@@ -122,4 +122,42 @@ import Testing
         let answer18 = reads.next()
         #expect(answer18 == nil)
     }
+
+    /// ⌥→ on X fills the eight slots and queues more; → opens Y, which
+    /// waits; X closes: its reads go, and Y's turn has come.
+    @Test func whenReadsOnTheirWayAreLetGoTheWaitingOneIsNext() {
+        var reads = OpenReads()
+        for number in 0..<8 {
+            _ = reads.want(folder("/t/x/f\(number)"))
+            reads.begun(folder("/t/x/f\(number)"), number: number + 1)
+        }
+        let queued = reads.want(folder("/t/x/more"))
+        let waits = reads.want(folder("/t/y"))
+        #expect(!queued && !waits)
+        reads.keep(["/t/y"])
+        #expect(reads.reading == 0)
+        let next = reads.next()
+        #expect(next?.path == "/t/y")
+    }
+
+    /// A folder the user just opened goes before a ⌥→ backlog.
+    @Test func aFolderTheUserOpenedJumpsTheQueue() {
+        var reads = OpenReads()
+        for number in 0..<8 {
+            _ = reads.want(folder("/t/x/f\(number)"))
+            reads.begun(folder("/t/x/f\(number)"), number: number + 1)
+        }
+        for number in 0..<50 { _ = reads.want(folder("/t/x/w\(number)")) }
+        let mine = reads.want(folder("/t/y"), first: true)
+        #expect(!mine)
+        _ = reads.landed(folder("/t/x/f0"), number: 1)
+        let next = reads.next()
+        #expect(next?.path == "/t/y")
+        reads.begun(folder("/t/y"), number: 100)
+        // Asked for first again while it waits behind others: moved to the front.
+        _ = reads.want(folder("/t/x/w9"), first: true)
+        _ = reads.landed(folder("/t/x/f1"), number: 2)
+        let after = reads.next()
+        #expect(after?.path == "/t/x/w9")
+    }
 }

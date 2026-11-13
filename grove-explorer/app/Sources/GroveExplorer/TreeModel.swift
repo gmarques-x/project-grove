@@ -11,6 +11,8 @@ struct PaneTree {
     /// The open folders' reads: one at a time each, eight folders at
     /// once, numbered from `AppModel.readCount` (`OpenReads`).
     var reads = OpenReads()
+    /// Folders the user just opened (→, a chevron): read before a ⌥→ backlog.
+    var openedByUser: Set<String> = []
 
     /// When each folder was opened in the app (or renamed into), by
     /// `AppModel.readCount`: a read of its parent begun before then can't
@@ -104,12 +106,17 @@ extension AppModel {
             tree.reads.keep(paths)
             tree.openedAt = tree.openedAt.filter { open.contains($0.key) }
             tree.refreshing.formIntersection(paths)
+            tree.openedByUser.formIntersection(paths)
             trees[side] = tree
         }
         for folder in reachable where !listed.contains(folder.pathKey) && trees[side]?.reads.isWanted(folder) == false {
             loadOpenFolder(folder, in: side)
         }
         watchOpenFolders(reachable, in: side)
+        // Reads let go of above (their folders closed) gave their slots
+        // back: a folder waiting for one is read now, not when something
+        // unrelated lands.
+        readNextOpenFolder(in: side)
     }
 
     // MARK: Watching them
@@ -208,7 +215,8 @@ extension AppModel {
         // (`eject` asks again for what shows if the disk stays.)
         guard live, let tab = browser.tab(side), let key = trees[side]?.key, !isBeingEjected(folder) else { return }
         // Eight at once: the rest wait their turn (`readNextOpenFolder`).
-        guard trees[side]?.reads.want(folder) == true else { return }
+        let first = trees[side]?.openedByUser.remove(folder.pathKey) != nil
+        guard trees[side]?.reads.want(folder, first: first) == true else { return }
         // Numbered for every tab and folder alike: a read begun for
         // another tab, or before the folder closed and opened again, is
         // never this one.
@@ -238,7 +246,7 @@ extension AppModel {
     }
 
     /// A read ended: the next open folder waiting for one is read.
-    private func readNextOpenFolder(in side: Side) {
+    func readNextOpenFolder(in side: Side) {
         while let folder = trees[side]?.reads.next() { loadOpenFolder(folder, in: side) }
     }
 

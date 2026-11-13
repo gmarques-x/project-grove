@@ -33,10 +33,18 @@ public struct OpenReads: Equatable, Sendable {
     /// A read of `folder` is wanted. True: begin it now (`begun`); false:
     /// it waits its turn (`next`). A folder already on its way is read
     /// again at once (the new read supersedes), as for a watcher's tick.
-    public mutating func want(_ folder: URL) -> Bool {
+    /// `first`: the user just opened it (→, a click on its chevron): it
+    /// waits before everything else (a ⌥→ backlog of hundreds).
+    public mutating func want(_ folder: URL, first: Bool = false) -> Bool {
         let path = folder.standardizedPath
         if records[path]?.number != nil || reading < Self.atOnce { return true }
-        if !waiting.contains(where: { $0.standardizedPath == path }) { waiting.append(folder) }
+        let waits = waiting.contains { $0.standardizedPath == path }
+        if first {
+            waiting.removeAll { $0.standardizedPath == path }
+            waiting.insert(folder, at: 0)
+        } else if !waits {
+            waiting.append(folder)
+        }
         return false
     }
 
