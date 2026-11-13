@@ -18,7 +18,7 @@ struct ExplorerApp: App {
             WindowView(model: delegate.model)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1100, height: 700)
+        .defaultSize(width: WindowView.standard.width, height: WindowView.standard.height)
         // A groveexplorer:// link goes to the delegate, not to a new window.
         .handlesExternalEvents(matching: [])
         .commands { MenuBar(model: delegate.model) }

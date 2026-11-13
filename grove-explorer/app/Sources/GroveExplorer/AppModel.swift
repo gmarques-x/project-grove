@@ -409,7 +409,6 @@ final class AppModel: ObservableObject {
         if kept != chosen { selections[tab.id] = kept }
     }
 
-    /// The pane that has the keys.
     /// A click in the pane's list: the pane has the keys, and the click
     /// takes the keyboard back from the sidebar. (Not part of `activate`:
     /// the list also activates its pane when it is handed the keyboard,
@@ -419,6 +418,7 @@ final class AppModel: ObservableObject {
         activate(side)
     }
 
+    /// The pane that has the keys is `side` from now on.
     func activate(_ side: Side) {
         guard browser.active != side, sides.contains(side) else { return }
         browser.active = side

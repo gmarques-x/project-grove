@@ -20,6 +20,11 @@ struct WindowView: View {
 
     /// The smallest window: the rail and a pane narrow enough to have only Name and Size.
     static let minimum = CGSize(width: 368, height: 280)
+    /// The window as it first opens (AeroSpace tiles it from there).
+    static let standard = CGSize(width: 1100, height: 700)
+    /// How much of the quiet colour a history arrow that leads nowhere
+    /// keeps on a dark scheme.
+    private static let disabledArrow = 0.5
 
     var body: some View {
         content
@@ -109,7 +114,7 @@ struct WindowView: View {
     ) -> some View {
         Button(action: action) {
             GroveIcon(icon, size: GroveType.label)
-                .foregroundStyle(enabled ? Color(theme.fg) : theme.quiet(dark: 0.5))
+                .foregroundStyle(enabled ? Color(theme.fg) : theme.quiet(dark: Self.disabledArrow))
                 .frame(width: GroveSpace.s24, height: GroveSpace.s24)
                 .contentShape(Rectangle())
         }
@@ -137,6 +142,8 @@ struct WindowView: View {
 /// the panes even again (spec §5).
 private struct PaneDivider: View {
     static let space = "panes"
+    /// How far one VoiceOver step moves the divider, as a share of the panes' width.
+    private static let step = 0.05
 
     @ObservedObject var model: AppModel
     let panesWidth: CGFloat
@@ -164,7 +171,7 @@ private struct PaneDivider: View {
             .accessibilityElement()
             .accessibilityLabel("Pane divider")
             .accessibilityAdjustableAction { direction in
-                let step = direction == .increment ? 0.05 : -0.05
+                let step = direction == .increment ? Self.step : -Self.step
                 model.split = SidebarLayout.split(
                     leftWidth: (panesWidth - 1) * (model.split + step), panesWidth: panesWidth)
             }
