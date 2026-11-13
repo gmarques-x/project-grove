@@ -27,6 +27,14 @@ extension FileList.Coordinator {
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
         // A loading line has nothing to drag.
         guard model.canTakeDrop, showsModelRows, let entry = entry(onRow: row) else { return nil }
+        // A selected row inside a selected folder goes with the folder, not
+        // again on its own (`Tree.operands`: nothing is copied twice).
+        let chosen = model.selection(for: side)
+        if chosen.contains(entry.url), let listing = model.listing(for: side),
+            !Tree.operands(of: chosen, in: listing.items, index: listing.rows).contains(entry.url)
+        {
+            return nil
+        }
         return entry.url as NSURL
     }
 

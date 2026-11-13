@@ -45,20 +45,42 @@ extension Tree {
     }
 
     /// `operands(of:in:)`, through `index` (where each row's URL is in
-    /// `items`, as the URL is spelled there): a selection of rows that are
-    /// all at depth 0 can't hold one inside another, and costs its own
-    /// size, not the list's. The same URLs in the same order either way.
+    /// `items`, as the URL is spelled there): by the rows' places and
+    /// depths, without a path compared, so a selection costs at most one
+    /// walk of the list from its first row, and only its own size when its
+    /// rows are all at depth 0 (none can then be inside another). The same
+    /// URLs in the same order either way.
     public static func operands(of selection: Set<URL>, in items: [TreeItem], index: [URL: Int]) -> [URL] {
         var places: [Int] = []
         places.reserveCapacity(selection.count)
+        var nested = false
         for url in selection {
             guard let place = index[url], items.indices.contains(place), case .row(let row) = items[place],
                 row.entry.url == url
-            else { return operands(of: selection, in: items) }
-            if row.depth > 0 { return operands(of: selection, in: items) }
+            else {
+                // Not a row as spelled here: the rule by path decides.
+                return operands(of: selection, in: items)
+            }
+            if row.depth > 0 { nested = true }
             places.append(place)
         }
-        return places.sorted().compactMap { if case .row(let row) = items[$0] { row.entry.url } else { nil } }
+        places.sort()
+        guard nested else {
+            return places.compactMap { if case .row(let row) = items[$0] { row.entry.url } else { nil } }
+        }
+        let chosen = Set(places)
+        var operands: [URL] = []
+        var takenDepth: Int?
+        for place in (places.first ?? 0)...(places.last ?? 0) {
+            guard case .row(let row) = items[place] else { continue }
+            if let depth = takenDepth, row.depth > depth { continue }
+            takenDepth = nil
+            if chosen.contains(place) {
+                operands.append(row.entry.url)
+                takenDepth = row.depth
+            }
+        }
+        return operands
     }
 
     // MARK: The fold keys (→ ← ⌥→ ⌥←)
