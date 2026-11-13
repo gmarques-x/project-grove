@@ -78,12 +78,16 @@ final class AppModel: ObservableObject {
     let reach = KeyboardReach()
     /// The ⌘F filters (`FilterBar.swift`).
     @Published var filter = FilterState()
+    /// The pane whose path bar's copy button just copied (its icon is a
+    /// checkmark until the token's moment is over).
+    @Published var pathCopied: (side: Side, token: UUID)?
 
     /// Renders only: the row, the tab and the sidebar row drawn as under
     /// the pointer, and icons for volumes that aren't there.
     var pointerStandIn: [Side: URL] = [:]
     var tabPointerStandIn: [Side: Int] = [:]
     var ejectPointerStandIn: String?
+    var copyPointerStandIn: Side?
     var volumeIconStandIn: [String: NSImage] = [:]
 
     /// False in a render: nothing is read, watched, measured or saved.

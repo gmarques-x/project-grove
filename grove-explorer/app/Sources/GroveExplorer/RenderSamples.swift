@@ -42,6 +42,9 @@ enum Sample {
     struct Extras {
         /// The active pane's path bar is the field, saying this.
         var pathField: String?
+        /// The active pane's path bar's copy button: under the pointer; just copied.
+        var copyPointer = false
+        var pathCopied = false
         var pathMissing = false
         var active = Side.left
         /// Backup's eject button: under the pointer, working, or refused.
@@ -133,6 +136,8 @@ enum Sample {
         if extras.ejectPointer { model.ejectPointerStandIn = backup.id }
         if extras.ejecting { model.ejecting = [backup.id] }
         if let failure = extras.ejectFailure { model.ejectFailures = [backup.id: failure] }
+        if extras.copyPointer { model.copyPointerStandIn = extras.active }
+        if extras.pathCopied { model.pathCopied = (extras.active, UUID()) }
         if let text = extras.pathField {
             model.pathField = PathFieldState(side: extras.active, text: text, missing: extras.pathMissing)
         }

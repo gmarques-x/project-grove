@@ -45,6 +45,27 @@ enum Render {
             Sample.grove(selected: ["grove-keys"], pointer: "grove-wallpapers"),
             Sample.downloads(selected: ["Screenshot 2026-11-11 at 17.30.02.png", "Screenshot 2026-11-12 at 09.12.44.png"]),
         ])),
+        // The path bar's copy button: at rest, under the pointer, just
+        // copied; and in the half-width tile's narrow panes, deep in a
+        // path, where the parts are cut and the button stays whole.
+        ("path-copy", Scene(size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: [])])),
+        ("path-copy-hover", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: [])],
+            extras: Sample.Extras(copyPointer: true))),
+        ("path-copied", Scene(
+            size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: [])],
+            extras: Sample.Extras(pathCopied: true))),
+        ("path-copy-narrow", Scene(size: CGSize(width: 948, height: 420), panes: [
+            Sample.tree(
+                Sample.project.appendingPathComponent("grove-explorer/app/Sources/GroveExplorerCore", isDirectory: true),
+                [
+                    .file("Entry.swift", 2_000, Sample.date(2026, 11, 11, 10, 5)),
+                    .file("FolderReader.swift", 6_000, Sample.date(2026, 11, 11, 12, 44)),
+                    .file("LinkText.swift", 3_000, Sample.date(2026, 11, 13, 9, 30)),
+                    .file("PathBar.swift", 4_000, Sample.date(2026, 11, 11, 14, 9)),
+                ]),
+            Sample.iCloudNotes(),
+        ])),
         // ⌘L: the path bar as a field; and on a path that isn't there.
         ("path-field", Scene(
             size: CGSize(width: 948, height: 420), panes: [Sample.grove(selected: ["grove-keys"])],

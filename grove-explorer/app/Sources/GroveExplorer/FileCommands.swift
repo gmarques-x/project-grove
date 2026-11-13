@@ -88,6 +88,27 @@ extension AppModel {
     func copyPaths() {
         let items = chosenItems.map(\.url)
         guard live, !items.isEmpty else { return }
+        putPaths(items)
+    }
+
+    /// The path bar's copy button: the pane's folder's whole path, as
+    /// Copy Path writes one (from "/", the real folder even where the bar
+    /// shows friendly names). Its icon is a green checkmark for a moment.
+    func copyFolderPath(_ side: Side) {
+        guard let folder = browser.tab(side)?.folder else { return }
+        if live { putPaths([folder]) }
+        let token = UUID()
+        pathCopied = (side, token)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.copiedFor) { [weak self] in
+            guard let self, self.pathCopied?.token == token else { return }
+            self.pathCopied = nil
+        }
+    }
+
+    /// How long the path bar's copy button shows that it copied.
+    static let copiedFor: TimeInterval = 1.5
+
+    private func putPaths(_ items: [URL]) {
         let board = NSPasteboard.general
         board.clearContents()
         board.setString(Decide.pathsText(items), forType: .string)

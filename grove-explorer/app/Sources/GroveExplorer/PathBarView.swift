@@ -12,6 +12,9 @@ struct PathBarView: View {
     @Environment(\.theme) private var theme
     /// The part under the pointer. `State` used directly: no SwiftUI macros here.
     private var hovered = State<URL?>(initialValue: nil)
+    /// The copy button is under the pointer.
+    private var copyHovered = State(initialValue: false)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(model: AppModel, side: Side) {
         self.model = model
@@ -38,6 +41,14 @@ struct PathBarView: View {
                     Text(verbatim: "›").foregroundStyle(theme.quiet).accessibilityHidden(true)
                 }
             }
+            if !parts.isEmpty {
+                copyButton
+                    // 8 pt after the last part (the stack's 4 and 4 more).
+                    .padding(.leading, GroveSpace.s4)
+                    // Kept whole: the parts are cut first.
+                    .fixedSize()
+                    .layoutPriority(2)
+            }
             Spacer(minLength: 0)
         }
         .font(GroveFont.mono(GroveType.label))
@@ -45,6 +56,35 @@ struct PathBarView: View {
         .frame(height: BarMetrics.strip)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Path")
+    }
+
+    /// Copies the folder's whole path (`AppModel.copyFolderPath`): the
+    /// quiet doc.on.doc, in the text colour under the pointer, then a green
+    /// checkmark for a moment, faded in and out (swapped at once with
+    /// Reduce Motion). Keyboard users have Copy Path (⌥⌘C).
+    private var copyButton: some View {
+        let copied = model.pathCopied?.side == side
+        let pointed = copyHovered.wrappedValue || model.copyPointerStandIn == side
+        return Button {
+            model.copyFolderPath(side)
+        } label: {
+            ZStack {
+                GroveIcon(.copy, size: GroveType.label)
+                    .foregroundStyle(pointed ? Color(theme.fg) : theme.quiet)
+                    .opacity(copied ? 0 : 1)
+                GroveIcon(.current, size: GroveType.label)
+                    .foregroundStyle(Color(theme.green))
+                    .opacity(copied ? 1 : 0)
+            }
+            .padding(.horizontal, GroveSpace.s4)
+            .frame(height: BarMetrics.control - GroveSpace.s4)
+            .contentShape(Rectangle())
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: copied)
+        }
+        .buttonStyle(.plain)
+        .onHover { copyHovered.wrappedValue = $0 }
+        .help("Copy path")
+        .accessibilityLabel("Copy path")
     }
 
     private func part(_ part: PathBar.Part, last: Bool) -> some View {

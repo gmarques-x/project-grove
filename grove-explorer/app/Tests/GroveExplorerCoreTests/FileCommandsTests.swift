@@ -107,6 +107,16 @@ import Testing
         #expect(FileCommands.pathsText([]) == "")
     }
 
+    /// The path bar's copy button: the folder's whole path as macOS has it,
+    /// never from "~" and never the bar's friendly names ("iCloud Drive"),
+    /// with no "/" at its end.
+    @Test func aFolderFromThePathBarIsCopiedAsItsRealPath() {
+        let iCloud = URL(fileURLWithPath: "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/Notes", isDirectory: true)
+        #expect(FileCommands.pathsText([iCloud]) == "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/Notes")
+        let home = URL(fileURLWithPath: "/Users/me", isDirectory: true)
+        #expect(FileCommands.pathsText([home]) == "/Users/me")
+    }
+
     @Test func theGetInfoScriptNamesTheItem() {
         #expect(
             FileCommands.getInfoScript(for: file("notes.md", in: downloads))
