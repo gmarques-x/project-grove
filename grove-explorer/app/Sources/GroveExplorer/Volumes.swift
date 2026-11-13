@@ -251,12 +251,13 @@ extension AppModel {
         }
     }
 
-    func readVolumes() {
+    /// The read, for a caller that waits for it (a mount NetFS says is there already).
+    @discardableResult func readVolumes() -> Task<Void, Never> {
         // Numbered like a pane's reads: of two on their way the later one answers.
         volumeReads += 1
         let number = volumeReads
         let home = home
-        Task {
+        return Task {
             let (mounted, hasCloud, providers) = await Task.detached {
                 (Volume.mounted(), Disk.isFolder(home.appendingPathComponent(FolderName.iCloudDrive, isDirectory: true)),
                  Disk.cloudProviders(home: home))

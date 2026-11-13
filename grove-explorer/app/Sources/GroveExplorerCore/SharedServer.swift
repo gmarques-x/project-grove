@@ -103,10 +103,12 @@ public enum SharedRowState: Equatable, Sendable {
 }
 
 /// What a mount ended in: the folder, nothing to say (the password sheet
-/// was cancelled), or the sentence for the notice line.
+/// was cancelled), mounted already (EEXIST: the app looks for the volume,
+/// `SharedServers.alreadyMounted`), or the sentence for the notice line.
 public enum MountOutcome: Equatable, Sendable {
     case mounted(URL)
     case quiet
+    case alreadyMounted
     case failed(String)
 }
 
@@ -174,6 +176,9 @@ public enum SharedServers {
         switch status {
         case userCanceled, ECANCELED:
             return .quiet
+        case EEXIST:
+            // Mounted already, under another spelling of its server (grove-lab.local).
+            return .alreadyMounted
         case EAUTH, EACCES, netFSPasswordNeedsChange:
             return .failed("The password was refused")
         case ENOENT, netFSNoSharesAvailable, netAuthNoSharesAvailable:
@@ -181,8 +186,41 @@ public enum SharedServers {
         case ETIMEDOUT, EHOSTDOWN, EHOSTUNREACH, ENETUNREACH:
             return .failed("\(share.host) didn't answer")
         default:
-            return .failed("Couldn't connect to \(share.host) (error \(status))")
+            return .failed(couldNotConnect(to: server, status: status))
         }
+    }
+
+    /// The sentence for a status said as it is; also for EEXIST when no
+    /// mounted volume turns out to be the share.
+    public static func couldNotConnect(to server: URL, status: Int32) -> String {
+        "Couldn't connect to \(SharedServer(id: "", url: server).host) (error \(status))"
+    }
+
+    /// Which of the mounted volumes (their remount addresses, in order) is
+    /// `url`, which NetFS says is mounted already: the one `match` finds;
+    /// else the one network volume of the same scheme, user and share on a
+    /// server spelled otherwise (`grove-lab.local` for `grove-lab`). Nil
+    /// when none is, or several are (never a guess).
+    public static func alreadyMounted(_ url: URL, remountURLs: [URL?]) -> Int? {
+        let share = SharedServer(id: "", url: url)
+        if let exact = remountURLs.firstIndex(where: { remount in
+            remount.map { match(mountedRemountURL: $0, volumeName: "", among: [share]) != nil } ?? false
+        }) {
+            return exact
+        }
+        let wanted = withoutHost(url, user: url.user != nil)
+        let others = remountURLs.indices.filter { index in
+            remountURLs[index].map { withoutHost($0, user: url.user != nil) == wanted } ?? false
+        }
+        return others.count == 1 ? others[0] : nil
+    }
+
+    /// `key` with the server left out.
+    private static func withoutHost(_ url: URL, user: Bool) -> String {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url.absoluteString }
+        parts.host = "host"
+        parts.port = nil
+        return parts.url.map { key($0, user: user) } ?? url.absoluteString
     }
 
     // NetFS.h's OSStatus codes (macros Swift doesn't import from it).

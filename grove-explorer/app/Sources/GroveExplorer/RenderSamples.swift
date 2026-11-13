@@ -88,7 +88,7 @@ enum Sample {
     /// media, mounted (by the address macOS keeps, with the user it logged in as).
     static let mediaVolume = Volume(
         url: URL(fileURLWithPath: "/Volumes/media", isDirectory: true), name: "media", ejectable: true,
-        remountURL: URL(string: "smb://gm@grove-lab/media"), isNetwork: true)
+        remountURL: URL(string: "smb://you@grove-lab/media"), isNetwork: true)
 
     /// The sentence a mount of `address` gets when the server has no such share (as NetFS answers, ENOENT).
     static func noShare(_ address: String) -> String? {

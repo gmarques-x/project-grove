@@ -77,7 +77,7 @@ failure shows its sentence inside the sheet under the field, the address kept
 so it can be corrected; success closes the sheet, saves the share and opens it
 in the active pane. An address with a
 password in it (`smb://user:pass@…`) is refused with "Leave the password out —
-macOS will ask for it" and nothing is saved; a user name (`smb://gm@grove-lab/media`)
+macOS will ask for it" and nothing is saved; a user name (`smb://you@grove-lab/media`)
 is kept.
 
 **Saving.** In the app-written `~/.config/grove-explorer/explorer.local.toml`

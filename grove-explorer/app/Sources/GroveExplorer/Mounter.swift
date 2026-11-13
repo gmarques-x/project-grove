@@ -28,8 +28,6 @@ final class Mounter {
     /// Where NetFS delivers its answer; it is taken to the main actor from there.
     private let queue = DispatchQueue(label: "grove-explorer.mounts", qos: .userInitiated)
 
-    func isMounting(_ url: URL) -> Bool { requests[SharedServers.key(url)] != nil }
-
     /// Mounts `url` with the default options, and calls `completion` with
     /// what it ended in (`.quiet` when cancelled, here or in the password sheet).
     func mount(_ url: URL, completion: @escaping (MountOutcome) -> Void) {
@@ -137,6 +135,15 @@ extension AppModel {
                 self.go(to: point)
             case .quiet:
                 break
+            case .alreadyMounted:
+                Task { @MainActor in
+                    if let volume = await self.alreadyMountedVolume(server.url) {
+                        self.mounted(server.id, at: volume.url)
+                        self.go(to: volume.url)
+                    } else {
+                        self.say(SharedServers.couldNotConnect(to: server.url, status: EEXIST), in: self.browser.active)
+                    }
+                }
             case .failed(let sentence):
                 self.say(sentence, in: self.browser.active)
             }
@@ -185,9 +192,25 @@ extension AppModel {
             return nil
         case .quiet:
             return ""
+        case .alreadyMounted:
+            guard let volume = await alreadyMountedVolume(url) else {
+                return SharedServers.couldNotConnect(to: url, status: EEXIST)
+            }
+            if let saved = keepShare(url) { sharesMountedHere[volume.id] = saved.id }
+            opened(volume.url)
+            return nil
         case .failed(let sentence):
             return sentence
         }
+    }
+
+    /// NetFS says `url` is mounted already (EEXIST), as macOS spells its
+    /// server another way (`grove-lab.local`): the volumes read again, and
+    /// the one that is it (`SharedServers.alreadyMounted`); nil when none is.
+    private func alreadyMountedVolume(_ url: URL) async -> Volume? {
+        await readVolumes().value
+        let network = volumes.filter { $0.isNetwork || $0.remountURL != nil }
+        return SharedServers.alreadyMounted(url, remountURLs: network.map(\.remountURL)).map { network[$0] }
     }
 
     /// The sheet's Cancel while it connects: the mount is given up.
@@ -260,7 +283,17 @@ extension AppModel {
             // A local file that is there and can't be read is not taken for no file.
             let existing = FileManager.default.fileExists(atPath: local.path)
                 ? try String(contentsOf: local, encoding: .utf8) : nil
-            let before = ExplorerConfig.load(tracked: nil, local: existing, home: home, exists: { _ in true }).servers
+            let loaded = ExplorerConfig.load(tracked: nil, local: existing, home: home, exists: { _ in true })
+            // A local file with a mistake in it (made since the window read
+            // it) gives no shares: changing that empty list would empty
+            // SHARED. Refused instead, the banner saying where, SHARED as it is.
+            if loaded.problem != nil {
+                // Its refusal names the line; the second is for a mistake it would let through.
+                _ = try ExplorerConfig.localText(favourites: nil, servers: loaded.servers, home: home, keeping: existing)
+                throw ConfigWriteRefused(
+                    description: "explorer.local.toml can't be read, so it was left as it is and the shared folders were not saved")
+            }
+            let before = loaded.servers
             let after = change(before)
             if after != before {
                 let text = try ExplorerConfig.localText(favourites: nil, servers: after, home: home, keeping: existing)

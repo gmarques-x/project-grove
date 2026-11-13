@@ -52,7 +52,7 @@
 
 - [ ] **Step 1: Write the failing tests** in `SharedServerTests.swift`:
   - `parsesTheOwnersShare`: `parse("smb://grove-lab/media")` → `smb://grove-lab/media`; `parse("grove-lab/media")` → the same; `parse(" smb://grove-lab/media/ ")` → the same (trimmed, trailing slash dropped).
-  - `keepsAUserRefusesAPassword`: `parse("smb://gm@grove-lab/media")` keeps `gm`; `parse("smb://gm:secret@grove-lab/media")` → `.failure(.password)` and `SharedAddressProblem.password.sentence == "Leave the password out — macOS will ask for it"`.
+  - `keepsAUserRefusesAPassword`: `parse("smb://you@grove-lab/media")` keeps `you`; `parse("smb://you:secret@grove-lab/media")` → `.failure(.password)` and `SharedAddressProblem.password.sentence == "Leave the password out — macOS will ask for it"`.
   - `schemes`: `afp://`, `nfs://` accepted; `http://x/y` → `.unsupportedScheme("http")`; `""` → `.empty`; `smb://grove-lab` → `.noShare`.
   - `nameAndHost`: `SharedServer(url: smb://grove-lab/media)` has `name == "media"`, `host == "grove-lab"`.
   - `idsAreSlugs`: `id(for: smb://grove-lab/media, taken: [])  == "grove-lab-media"`; with `"grove-lab-media"` taken → `"grove-lab-media-2"`.

@@ -20,11 +20,11 @@ import Testing
     }
 
     @Test func keepsAUserRefusesAPassword() throws {
-        let withUser = try SharedAddress.parse("smb://gm@grove-lab/media").get()
-        #expect(withUser == url("smb://gm@grove-lab/media"))
-        #expect(withUser.user == "gm")
-        #expect(SharedAddress.parse("smb://gm:secret@grove-lab/media") == .failure(.password))
-        #expect(SharedAddress.parse("gm:secret@grove-lab/media") == .failure(.password))
+        let withUser = try SharedAddress.parse("smb://you@grove-lab/media").get()
+        #expect(withUser == url("smb://you@grove-lab/media"))
+        #expect(withUser.user == "you")
+        #expect(SharedAddress.parse("smb://you:secret@grove-lab/media") == .failure(.password))
+        #expect(SharedAddress.parse("you:secret@grove-lab/media") == .failure(.password))
         #expect(SharedAddressProblem.password.sentence == "Leave the password out — macOS will ask for it")
     }
 
@@ -86,16 +86,16 @@ import Testing
         #expect(added.map(\.id) == ["grove-lab-media", "grove-lab-media-2"])
         #expect(added.last?.url == url("smb://grove-lab/media"))
         // A user name makes another share: it logs in as someone else.
-        #expect(SharedServers.adding(url("smb://gm@grove-lab/media"), to: [server("smb://grove-lab/media")]).count == 2)
+        #expect(SharedServers.adding(url("smb://you@grove-lab/media"), to: [server("smb://grove-lab/media")]).count == 2)
     }
 
     /// "The same share" is said as a mounted volume is matched: the share's
     /// name in any capitals and either Unicode form, 445 on smb as no port.
     @Test func savingTheSameShareSpelledAnotherWayKeepsOne() {
-        let saved = [server("smb://gm@grove-lab/M%C3%BAsica")]
-        #expect(SharedServers.adding(url("smb://GM@grove-lab:445/m%c3%basica/"), to: saved) == saved)
-        #expect(SharedServers.adding(url("smb://gm@grove-lab/Mu%CC%81sica"), to: saved) == saved)
-        #expect(SharedServers.adding(url("smb://gm@grove-lab:139/M%C3%BAsica"), to: saved).count == 2)
+        let saved = [server("smb://you@grove-lab/M%C3%BAsica")]
+        #expect(SharedServers.adding(url("smb://YOU@grove-lab:445/m%c3%basica/"), to: saved) == saved)
+        #expect(SharedServers.adding(url("smb://you@grove-lab/Mu%CC%81sica"), to: saved) == saved)
+        #expect(SharedServers.adding(url("smb://you@grove-lab:139/M%C3%BAsica"), to: saved).count == 2)
     }
 
     @Test func removingForgetsOne() {
@@ -113,7 +113,7 @@ import Testing
 
         #expect(SharedServers.match(mountedRemountURL: url("smb://grove-lab/media"), volumeName: "media", among: saved) == media)
         // macOS spells it its own way: capitals, a trailing slash, the user it logged in as.
-        #expect(SharedServers.match(mountedRemountURL: url("smb://GM@Grove-Lab/media/"), volumeName: "x", among: saved) == media)
+        #expect(SharedServers.match(mountedRemountURL: url("smb://YOU@Grove-Lab/media/"), volumeName: "x", among: saved) == media)
         // A second mount of the share is /Volumes/media-1.
         #expect(SharedServers.match(mountedRemountURL: url("smb://grove-lab/media"), volumeName: "media-1", among: saved) == media)
         // Another server's share of the same name is not this one.
@@ -127,8 +127,8 @@ import Testing
     }
 
     @Test func aSavedUserMustBeTheOneMounted() {
-        let mine = server("smb://gm@grove-lab/media")
-        #expect(SharedServers.match(mountedRemountURL: url("smb://gm@grove-lab/media"), volumeName: "media", among: [mine]) == mine)
+        let mine = server("smb://you@grove-lab/media")
+        #expect(SharedServers.match(mountedRemountURL: url("smb://you@grove-lab/media"), volumeName: "media", among: [mine]) == mine)
         #expect(SharedServers.match(mountedRemountURL: url("smb://guest@grove-lab/media"), volumeName: "media", among: [mine]) == nil)
     }
 
@@ -148,8 +148,8 @@ import Testing
         #expect(!matches("smb://grove-lab/media", "smb://grove-lab:139/media"))
         // 445 is smb's alone.
         #expect(!matches("afp://grove-lab/media", "afp://grove-lab:445/media"))
-        #expect(matches("smb://GM@grove-lab/media", "smb://gm@grove-lab/media"))
-        #expect(matches("smb://gm@grove-lab/media", "SMB://GM@GROVE-LAB/MEDIA"))
+        #expect(matches("smb://YOU@grove-lab/media", "smb://you@grove-lab/media"))
+        #expect(matches("smb://you@grove-lab/media", "SMB://YOU@GROVE-LAB/MEDIA"))
         #expect(!matches("smb://grove-lab/media", "smb://grove-lab/media2"))
         #expect(!matches("smb://grove-lab/media", "afp://grove-lab/media"))
     }
@@ -162,9 +162,9 @@ import Testing
             SharedServers.keepable(remountURL: remount.map(url), among: saved)
         }
         #expect(keepable("smb://grove-lab/media") == url("smb://grove-lab/media"))
-        #expect(keepable("smb://gm@grove-lab/media") == url("smb://gm@grove-lab/media"))
+        #expect(keepable("smb://you@grove-lab/media") == url("smb://you@grove-lab/media"))
         // The password macOS may keep in it is never saved.
-        #expect(keepable("smb://gm:secret@grove-lab/media") == url("smb://gm@grove-lab/media"))
+        #expect(keepable("smb://you:secret@grove-lab/media") == url("smb://you@grove-lab/media"))
         #expect(keepable("afp://grove-lab/media") == url("afp://grove-lab/media"))
         // WebDAV, FTP, no share, no address: nothing the sheet would connect to.
         #expect(keepable("https://dav.example.com/files") == nil)
@@ -173,7 +173,7 @@ import Testing
         #expect(keepable(nil) == nil)
         // Saved already (a second mount, media-1, spelled macOS's way): nothing to keep.
         #expect(keepable("smb://grove-lab/media", [media]) == nil)
-        #expect(keepable("smb://GM@Grove-Lab/Media/", [media]) == nil)
+        #expect(keepable("smb://YOU@Grove-Lab/Media/", [media]) == nil)
         // Another server's share of that name is not saved.
         #expect(keepable("smb://nas/media", [media]) == url("smb://nas/media"))
     }
@@ -195,7 +195,7 @@ import Testing
         #expect(SharedRowState.notConnected.spoken(media) == "media on grove-lab, shared folder, not connected")
         #expect(SharedRowState.connecting.spoken(media) == "media on grove-lab, shared folder, connecting")
         // The user it logs in as is not said; nor, ever, a password.
-        #expect(SharedRowState.notConnected.spoken(server("smb://gm@grove-lab/media")) == "media on grove-lab, shared folder, not connected")
+        #expect(SharedRowState.notConnected.spoken(server("smb://you@grove-lab/media")) == "media on grove-lab, shared folder, not connected")
         // A name decoded, as the row shows it.
         #expect(SharedRowState.notConnected.spoken(server("smb://grove-lab/M%C3%BAsica")) == "Música on grove-lab, shared folder, not connected")
     }
@@ -234,5 +234,29 @@ import Testing
         for status: Int32 in [61, -5999, -5997, -5996, -6602] {
             #expect(outcome(status) == .failed("Couldn't connect to grove-lab (error \(status))"))
         }
+
+        // EEXIST: mounted already (under another spelling of its server).
+        #expect(outcome(17) == .alreadyMounted)
+        #expect(SharedServers.couldNotConnect(to: share, status: 17) == "Couldn't connect to grove-lab (error 17)")
+    }
+
+    /// After EEXIST, the mounted volume that is the share: by its address,
+    /// else the one network volume of the same scheme and share on a
+    /// server spelled otherwise (`grove-lab.local`); never a guess among several.
+    @Test func theVolumeAShareIsAlreadyMountedAs() {
+        let media = url("smb://grove-lab/media")
+        func found(_ remounts: [String?]) -> Int? {
+            SharedServers.alreadyMounted(media, remountURLs: remounts.map { $0.map(url) })
+        }
+        #expect(found([nil, "smb://you@grove-lab/media"]) == 1)
+        #expect(found(["smb://grove-lab.local/media"]) == 0)
+        #expect(found(["smb://you@GROVE-LAB.local/Media/"]) == 0)
+        // The address itself wins over another spelling.
+        #expect(found(["smb://grove-lab.local/media", "smb://grove-lab/media"]) == 1)
+        // Two other spellings: not a guess.
+        #expect(found(["smb://grove-lab.local/media", "smb://nas/media"]) == nil)
+        // Another share, another scheme, no address: not it.
+        #expect(found(["smb://grove-lab.local/films", "afp://grove-lab.local/media", nil]) == nil)
+        #expect(found([]) == nil)
     }
 }

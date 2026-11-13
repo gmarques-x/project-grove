@@ -403,14 +403,14 @@ import Testing
             order = 2
 
             [servers.grove-lab-media]
-            url = "smb://gm@grove-lab/media"
+            url = "smb://you@grove-lab/media"
             order = 1
 
             """
         let config = load(tracked: tracked, local: local)
         #expect(config.problem == nil)
         #expect(config.servers == [
-            share("grove-lab-media", "smb://gm@grove-lab/media"),
+            share("grove-lab-media", "smb://you@grove-lab/media"),
             share("grove-lab-backup", "smb://grove-lab/backup"),
         ])
         // The tracked file's favourites still stand: servers are not favourites.
@@ -519,11 +519,11 @@ import Testing
     /// "Keep in Sidebar" saves the address macOS mounted the share by,
     /// which can carry a password: never written.
     @Test func aPasswordIsNeverWritten() throws {
-        let kept = SharedServer(id: "grove-lab-media", url: URL(string: "smb://gm:secret@grove-lab/media")!)
+        let kept = SharedServer(id: "grove-lab-media", url: URL(string: "smb://you:secret@grove-lab/media")!)
         let text = try ExplorerConfig.localText(favourites: nil, servers: [kept], home: home, keeping: nil)
-        #expect(text == "[servers.\"grove-lab-media\"]\nurl = \"smb://gm@grove-lab/media\"\norder = 1\n")
+        #expect(text == "[servers.\"grove-lab-media\"]\nurl = \"smb://you@grove-lab/media\"\norder = 1\n")
         #expect(!text.contains("secret"))
-        #expect(load(local: text).servers == [share("grove-lab-media", "smb://gm@grove-lab/media")])
+        #expect(load(local: text).servers == [share("grove-lab-media", "smb://you@grove-lab/media")])
     }
 
     @Test func unreadableLocalFileIsNotWrittenOver() {
@@ -546,7 +546,7 @@ import Testing
         ("[servers.x]\nurl = 3\n", "explorer.local.toml line 2: \"url\" must be a string"),
         ("[servers.x]\nurl = \"http://grove-lab/media\"\n",
          "explorer.local.toml line 2: \"url\" must be a share's address: Use an smb://, afp:// or nfs:// address"),
-        ("[servers.x]\nurl = \"smb://gm:secret@grove-lab/media\"\n",
+        ("[servers.x]\nurl = \"smb://you:secret@grove-lab/media\"\n",
          "explorer.local.toml line 2: \"url\" must be a share's address: Leave the password out — macOS will ask for it"),
         ("[servers.x]\nurl = \"smb://grove-lab/media\"\norder = \"1\"\n",
          "explorer.local.toml line 3: \"order\" must be a number"),
