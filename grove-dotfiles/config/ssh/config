@@ -1,3 +1,6 @@
+# Per-machine hosts live outside this repo, in ~/.ssh/config.d/ (not tracked).
+Include config.d/*
+
 Host *
     UseKeychain yes
     AddKeysToAgent yes
