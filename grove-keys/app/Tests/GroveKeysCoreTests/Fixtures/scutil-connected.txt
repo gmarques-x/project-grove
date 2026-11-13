@@ -1,0 +1,23 @@
+Connected
+Extended Status <dictionary> {
+  IPv4 : <dictionary> {
+    Addresses : <array> {
+      0 : 10.0.0.2
+    }
+    DestAddresses : <array> {
+      0 : 10.0.0.2
+    }
+    InterfaceName : utun4
+    Router : 10.0.0.2
+    ServerAddress : 192.0.2.1
+  }
+  IPv6 : <dictionary> {
+  }
+  Proxies : <dictionary> {
+  }
+  Status : 2
+  VPN : <dictionary> {
+    ConnectTime : 86400
+    Status : 2
+  }
+}

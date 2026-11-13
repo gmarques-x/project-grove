@@ -116,7 +116,8 @@ func drawRune(color: NSColor, connected: Bool = false, struck: Bool = false, to 
 
 for appearance in ["dark", "light"] {
     let c = palette("\(appearance)-medium")
-    let blue = c["blue"]!, yellow = c["yellow"]!, green = c["green"]!, red = c["red"]!, aqua = c["aqua"]!, off = c["grey2"]!
+    let blue = c["blue"]!, yellow = c["yellow"]!, green = c["green"]!, red = c["red"]!, aqua = c["aqua"]!, purple = c["purple"]!
+    let off = c["grey2"]!
     // Wi-Fi: one, two or three arcs by signal; other ways of being online; off.
     for (level, value) in [(1, 0.2), (2, 0.5), (3, 1.0)] {
         draw("wifi", value: value, color: blue, to: "wifi-\(level)-\(appearance).png")
@@ -128,6 +129,10 @@ for appearance in ["dark", "light"] {
     drawRune(color: off, struck: true, to: "bt-off-\(appearance).png")
     drawRune(color: blue, to: "bt-on-\(appearance).png")
     drawRune(color: blue, connected: true, to: "bt-connected-\(appearance).png")
+    // The grove-lab VPN, its own pill: off (or not set up), on the way, on.
+    draw("lock.shield", color: off, to: "vpn-off-\(appearance).png")
+    draw("lock.shield", color: yellow, to: "vpn-connecting-\(appearance).png")
+    draw("lock.shield", color: purple, to: "vpn-on-\(appearance).png")
     for step in 0...10 {
         let level = Double(step) / 10
         // Battery: a bolt's outline, filled from the bottom with the charge;

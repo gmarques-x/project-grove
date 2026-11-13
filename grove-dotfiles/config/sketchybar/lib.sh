@@ -101,6 +101,20 @@ sb_bluetooth() {
   case "$word" in on | connected) echo "bt-$word" ;; *) echo bt-off ;; esac
 }
 
+# sb_vpn_icon < `scutil --nc status "grove-lab"`: the VPN pill's icon for
+# the status on scutil's first line: vpn-on (Connected), vpn-connecting
+# (Connecting, Disconnecting), or vpn-off for Disconnected, "No service" (not
+# set up: the pill stays, grey), no output or anything else.
+sb_vpn_icon() {
+  local first=""
+  IFS= read -r first || true
+  case "$first" in
+    Connected) echo vpn-on ;;
+    Connecting | Disconnecting) echo vpn-connecting ;;
+    *) echo vpn-off ;;
+  esac
+}
+
 # sb_vol_level PERCENT: the speaker icon's fill in tenths, 0 to 10; anything
 # above silence shows at least 1.
 sb_vol_level() {
@@ -127,6 +141,7 @@ sb_pill() {
   case "$1" in
     grove | battery | wifi | volume | clock) echo "pill.$1" ;;
     bt) echo pill.wifi ;;
+    vpn.lab) echo pill.vpn ;;
     cpu | mem) echo pill.sys ;;
     ws.[1-9] | ws.[1-9].*) n="${1#ws.}"; echo "pill.ws.${n%%.*}" ;;
   esac

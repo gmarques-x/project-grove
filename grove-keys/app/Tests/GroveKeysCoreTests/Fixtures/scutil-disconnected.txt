@@ -1,0 +1,8 @@
+Disconnected
+Extended Status <dictionary> {
+  Status : 0
+  VPN : <dictionary> {
+    LastCause : 0
+    Status : 0
+  }
+}

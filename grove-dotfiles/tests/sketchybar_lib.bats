@@ -113,6 +113,7 @@ setup() {
   [ "$(sb_pill battery)" = pill.battery ]
   [ "$(sb_pill wifi)" = pill.wifi ]
   [ "$(sb_pill bt)" = pill.wifi ]
+  [ "$(sb_pill vpn.lab)" = pill.vpn ]
   [ "$(sb_pill volume)" = pill.volume ]
   [ "$(sb_pill clock)" = pill.clock ]
   [ "$(sb_pill ws.3)" = pill.ws.3 ]
@@ -210,6 +211,20 @@ setup() {
   local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
   [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /Users/someone/.local/state/grove/bluetooth ]
   [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /tmp/state/bluetooth ]
+}
+
+@test "sb_vpn_icon: scutil's first line as the VPN icon: on, connecting, or off for anything else" {
+  [ "$(echo Connected | sb_vpn_icon)" = vpn-on ]
+  [ "$(printf 'Connected\nExtended Status <dictionary> {\n  Status : 2\n}\n' | sb_vpn_icon)" = vpn-on ]
+  [ "$(echo Connecting | sb_vpn_icon)" = vpn-connecting ]
+  [ "$(echo Disconnecting | sb_vpn_icon)" = vpn-connecting ]
+  [ "$(echo Disconnected | sb_vpn_icon)" = vpn-off ]
+  [ "$(echo "No service" | sb_vpn_icon)" = vpn-off ]
+  [ "$(printf '' | sb_vpn_icon)" = vpn-off ]
+  [ "$(echo Invalid | sb_vpn_icon)" = vpn-off ]
+  [ "$(echo connected | sb_vpn_icon)" = vpn-off ]
+  # Only the first line counts.
+  [ "$(printf 'Disconnected\nConnected\n' | sb_vpn_icon)" = vpn-off ]
 }
 
 @test "sb_panel_close: sends Grove Keys the close link, in the background; nothing is run when none is open" {

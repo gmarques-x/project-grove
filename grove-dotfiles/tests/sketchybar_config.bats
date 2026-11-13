@@ -122,7 +122,7 @@ argb() {
 # icon_names: every symbol icon a plugin or sketchybarrc can name.
 icon_names() {
   local i
-  echo wifi-off eth vpn vol-mute cpu mem bt-off bt-on bt-connected
+  echo wifi-off eth vpn vol-mute cpu mem bt-off bt-on bt-connected vpn-off vpn-connecting vpn-on
   for i in 1 2 3; do echo "wifi-$i"; done
   for i in 0 1 2 3 4 5 6 7 8 9 10; do echo "vol-$i bolt-$i"; done
   for i in 0 1 2; do echo "bolt-low-$i"; done
@@ -153,9 +153,9 @@ icon_names() {
     esac
     grep -qF "to: \"$file\"" "$gen" || { echo "$name"; false; }
   done
-  # And nothing the bar doesn't use: thirteen families.
+  # And nothing the bar doesn't use: sixteen families.
   drawn="$(grep -oE 'to: "[a-z-]+' "$gen" | sed -e 's/to: "//' -e 's/-$//' | sort -u | tr '\n' ' ')"
-  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cpu eth mem vol vol-mute vpn wifi wifi-off " ] || { echo "$drawn"; false; }
+  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cpu eth mem vol vol-mute vpn vpn-connecting vpn-off vpn-on wifi wifi-off " ] || { echo "$drawn"; false; }
   # The levels it loops over are the ones the plugins ask for.
   grep -q 'for step in 0...10' "$gen"
   grep -q 'if step <= 2' "$gen"
@@ -181,9 +181,10 @@ rc() {
   local want="gap.l0 grove gap.l1 " n
   for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end gap.ws.$n "; done
   [ "$left" = "${want}front_app " ] || { echo "$left"; false; }
-  # The first added is the rightmost: left to right, CPU and memory, Wi-Fi
-  # and Bluetooth, sound, power, the clock.
-  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 mem cpu " ] || { echo "$right"; false; }
+  # The first added is the rightmost: left to right, CPU and memory, the
+  # grove-lab VPN, Wi-Fi and Bluetooth, sound, power, the clock.
+  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 vpn.lab gap.r5 mem cpu " ] || { echo "$right"; false; }
+  [ "$(printf '%s' "$right" | tr ' ' '\n' | grep -v '^gap' | tr '\n' ' ')" = "clock battery volume bt wifi vpn.lab mem cpu " ]
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
   # A gap is empty room of a fixed width.
@@ -211,7 +212,7 @@ pills() {
   [ "$status" -eq 0 ]
   want="pill.grove grove"$'\n'
   for n in 1 2 3 4 5 6 7 8 9; do want+="pill.ws.$n ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end"$'\n'; done
-  want+="pill.sys cpu mem"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
+  want+="pill.sys cpu mem"$'\n'"pill.vpn vpn.lab"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
   [ "$(pills)" = "$want" ] || { pills; false; }
   . "$CFG/colors.sh"
   [ "$TRANSPARENT" = 0x00000000 ]
@@ -258,10 +259,10 @@ pills() {
     calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
   done
   # The icons are images in a 22 pt slot, whatever the state; three items are an icon alone.
-  for item in cpu mem battery wifi bt volume; do
+  for item in cpu mem battery wifi bt vpn.lab volume; do
     calls | grep -qE -- "--set $item icon.background.image=[^ ]+ icon.background.image.scale=0.5 icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0\$" || { echo "$item icon"; false; }
   done
-  for item in battery wifi bt volume; do
+  for item in battery wifi bt vpn.lab volume; do
     calls | grep -qE -- "--set $item label.drawing=off " || { echo "$item label"; false; }
   done
 }
@@ -286,7 +287,8 @@ prop() {
   # (checked against `sketchybar --query <item>` bounding rects on the live
   # bar, where the right side measured 434 pt with the old ends, 4 + the
   # bar's 8; the end is now one 5 pt gap and no bar padding: 427; Bluetooth
-  # beside Wi-Fi, the two padded as CPU and memory are: 32 more, 459).
+  # beside Wi-Fi, the two padded as CPU and memory are: 32 more, 459; the
+  # VPN's pill, an icon padded as the volume's, and its gap: 44 more, 503).
   local item total=0 w
   [ "$(prop cpu padding_right 5)" = 5 ]
   for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}'); do
@@ -299,7 +301,7 @@ prop() {
     fi
     total=$((total + w))
   done
-  [ "$total" -eq 459 ] || { echo "$total"; false; }
+  [ "$total" -eq 503 ] || { echo "$total"; false; }
   # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle:
   # the right side has ~860 pt.
   [ "$total" -le 860 ]
@@ -318,13 +320,13 @@ prop() {
 @test "sketchybar: clickable items subscribe to hover; only the app's name, in no pill, has a fill of its own" {
   rc
   local item
-  for item in grove front_app clock volume wifi bt battery cpu mem; do
+  for item in grove front_app clock volume wifi bt vpn.lab battery cpu mem; do
     calls | grep -qE -- "--subscribe $item .*mouse.entered mouse.exited" || { echo "$item"; false; }
     calls | grep -qE -- "--set $item .*script=[^ ]*/plugins/[a-z_]+\\.sh" || { echo "$item script"; false; }
   done
   # An item's own background would be drawn over its pill's outline: the pill
   # itself is what fills (sb_hover).
-  for item in grove clock wifi bt battery cpu mem volume; do
+  for item in grove clock wifi bt vpn.lab battery cpu mem volume; do
     ! calls | grep -qE -- "--set $item (.* )?background\\.(height|corner_radius|drawing|color)=" || { echo "$item has a background"; false; }
   done
   calls | grep -qE -- "--set front_app .*background.height=24 background.corner_radius=12 background.drawing=off"
@@ -335,7 +337,7 @@ prop() {
 # hover ITEM EVENT: the pointer entering or leaving ITEM, as its plugin gets it.
 hover() {
   local script
-  case "$1" in grove | mem) script=hover ;; bt) script=bluetooth ;; *) script="$1" ;; esac
+  case "$1" in grove | mem) script=hover ;; bt) script=bluetooth ;; vpn.lab) script=vpn ;; *) script="$1" ;; esac
   : > "$CALLS"
   run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME="$1" SENDER="$2" \
     SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" GROVE_STATE="$GROVE_STATE" \
@@ -348,7 +350,7 @@ hover() {
     gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
     if [ "$s" = dark-medium ]; then fill="$(argb "$s" bg1)"; else fill="$(argb "$s" bg3)"; fi
     # CPU and memory share a pill: either lights the whole of it.
-    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi battery:pill.battery cpu:pill.sys mem:pill.sys; do
+    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi vpn.lab:pill.vpn battery:pill.battery cpu:pill.sys mem:pill.sys; do
       item="${pair%%:*}"; pill="${pair#*:}"
       hover "$item" mouse.entered
       [ "$status" -eq 0 ]
@@ -380,7 +382,7 @@ hover() {
 @test "hover: one helper in lib.sh, called only by the plugins of items that subscribe to the pointer" {
   local f
   ! grep -n 'mouse\.entered' "$SB"/plugins/*.sh
-  for f in hover front_app clock volume wifi bluetooth battery cpu; do
+  for f in hover front_app clock volume wifi bluetooth vpn battery cpu; do
     grep -qx 'sb_hover && exit 0' "$SB/plugins/$f.sh" || { echo "$f"; false; }
   done
   ! grep -q 'sb_hover' "$SB/plugins/workspaces.sh"
@@ -398,6 +400,11 @@ hover() {
   hover bt mouse.entered
   [ "$status" -eq 0 ]
   [ "$(calls)" = "--set pill.wifi background.color=$(argb dark-medium bg1)" ]
+  # The VPN's hover asks scutil nothing.
+  fake scutil 'echo called >> "'"$BATS_TEST_TMPDIR"'/reads"'
+  hover vpn.lab mouse.entered
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "--set pill.vpn background.color=$(argb dark-medium bg1)" ]
   [ ! -e "$BATS_TEST_TMPDIR/reads" ]
   [ -z "$(opens)" ]
 }
@@ -450,6 +457,14 @@ hover() {
     GROVE_STATE="$GROVE_STATE" /bin/bash "$CFG/sketchybarrc"
   [ "$(calls | tail -2 | head -1)" = "--set pill.wifi background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
   calls | grep -q -- "--add bracket pill.wifi wifi bt --set"
+  # The VPN's dropdown open: its own pill.
+  : > "$CALLS"
+  echo pill.vpn > "$PANEL"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" \
+    GROVE_STATE="$GROVE_STATE" /bin/bash "$CFG/sketchybarrc"
+  [ "$status" -eq 0 ]
+  [ "$(calls | tail -2 | head -1)" = "--set pill.vpn background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
+  calls | grep -q -- "--add bracket pill.vpn vpn.lab --set"
 }
 
 @test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar, nothing drawn around it" {
@@ -775,6 +790,68 @@ bt_icon() {
   calls | grep -qE -- "--set bt icon.background.image=$CFG/icons/bt-off-dark.png "
 }
 
+# vpn_icon [FIRST_LINE]: the call vpn.sh makes when `scutil --nc status
+# "grove-lab"` prints FIRST_LINE (and an extended status after a connected
+# one); scutil fails without an argument.
+vpn_icon() {
+  : > "$CALLS"
+  if [ "$#" -gt 0 ]; then
+    fake scutil 'printf "%s\n" "$*" >> "'"$BATS_TEST_TMPDIR"'/scutil-calls"; printf "%s\n" "'"$1"'"; [ "'"$1"'" != Connected ] || printf "Extended Status <dictionary> {\n  Status : 2\n}\n"'
+  else
+    fake scutil 'exit 1'
+  fi
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME=vpn.lab SENDER="${VPN_SENDER:-routine}" \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" GROVE_STATE="$GROVE_STATE" \
+    /bin/bash "$CFG/plugins/vpn.sh"
+  calls
+}
+
+@test "vpn: the shield by the grove-lab service's state: on, connecting, or off (not set up too)" {
+  local s set
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    [ "$(vpn_icon Connected)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-on-$set.png" ] || { calls; false; }
+    [ "$(vpn_icon Connecting)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-connecting-$set.png" ]
+    [ "$(vpn_icon Disconnecting)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-connecting-$set.png" ]
+    [ "$(vpn_icon Disconnected)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-off-$set.png" ]
+    # No service: the pill stays, grey.
+    [ "$(vpn_icon "No service")" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-off-$set.png" ]
+    [ "$(vpn_icon)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-off-$set.png" ]
+  done
+  # It asks for the grove-lab service by name, and only its status.
+  [ "$(sort -u "$BATS_TEST_TMPDIR/scutil-calls")" = "--nc status grove-lab" ]
+}
+
+@test "vpn: scutil is run through sb_timeout, never started or stopped from the bar" {
+  grep -qE '^status="\$\(sb_timeout [0-9]+ scutil --nc status "grove-lab"' "$SB/plugins/vpn.sh"
+  # Outside comments, every scutil is behind the timeout.
+  [ "$(grep -v '^ *#' "$SB/plugins/vpn.sh" | grep -c 'scutil')" -eq "$(grep -c 'sb_timeout [0-9]* scutil' "$SB/plugins/vpn.sh")" ]
+  ! grep -nE 'scutil --nc (start|stop)' "$SB/plugins/vpn.sh" "$SB/sketchybarrc" "$SB/lib.sh"
+  # A scutil that hangs is stopped: the plugin still sets the icon, off.
+  fake scutil 'exec /bin/sleep 30'
+  local started=$SECONDS
+  : > "$CALLS"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME=vpn.lab \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" GROVE_STATE="$GROVE_STATE" \
+    /bin/bash "$CFG/plugins/vpn.sh"
+  [ $((SECONDS - started)) -lt 10 ]
+  [ "$(calls)" = "--set vpn.lab icon.background.image=$CFG/icons/vpn-off-dark.png" ] || { calls; false; }
+}
+
+@test "vpn: the vpn.lab item in its own pill, read every 10 s, on wake and on Grove Keys' vpn_change" {
+  rc
+  calls | grep -qx -- '--add event vpn_change'
+  calls | grep -qE -- '--subscribe vpn.lab vpn_change system_woke mouse.entered mouse.exited$'
+  calls | grep -qE -- '--set vpn.lab .*script=[^ ]*/plugins/vpn.sh '
+  calls | grep -qE -- '--set vpn.lab .*update_freq=10 '
+  calls | grep -qE -- '--set vpn.lab .*click_script=open -g grovekeys://panel/vpn( |$)'
+  # Off until the plugin first reads it.
+  calls | grep -qE -- "--set vpn.lab icon.background.image=$CFG/icons/vpn-off-dark.png "
+  # The Wi-Fi pill's own tunnel icon is untouched.
+  grep -qF 'draw("lock.shield", color: blue, to: "vpn-\(appearance).png")' "$SB/icons/make.swift"
+}
+
 @test "volume: a speaker filled with the level from INFO in tenths, struck out when muted" {
   local s set
   for s in dark-medium light-medium; do
@@ -829,7 +906,7 @@ bt_icon() {
   # CPU and memory share one panel; the volume's is the sound panel; the
   # pine's is the Grove menu.
   # Wi-Fi and Bluetooth share one too: a click on either opens it.
-  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi battery:battery cpu:system mem:system; do
+  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi vpn.lab:vpn battery:battery cpu:system mem:system; do
     item="${pair%%:*}"; name="${pair#*:}"
     calls | grep -qE -- "--set $item .*click_script=open -g grovekeys://panel/$name( |\$)" || { echo "$item"; false; }
     : > "$OPENS"

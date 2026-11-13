@@ -100,8 +100,9 @@ sketchybar --add item front_app left \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
 # Right (the first added is the rightmost): clock, power, volume, Bluetooth
-# and Wi-Fi, memory and CPU, each group in its own pill with a gap between.
-# Volume, Wi-Fi, Bluetooth and power are an icon alone that changes with the
+# and Wi-Fi, the grove-lab VPN, memory and CPU, each group in its own pill
+# with a gap between.
+# Volume, Wi-Fi, Bluetooth, the VPN and power are an icon alone that changes with the
 # level, the signal, the state and the charge; CPU and memory are an icon and
 # a value.
 # A click on any of them sends its panel's link to Grove Keys, which draws
@@ -149,6 +150,18 @@ symbol wifi wifi-3
 
 gap gap.r4 right 6
 
+# The grove-lab VPN (a WireGuard tunnel to the lab, a macOS VPN
+# configuration): its shield, read from scutil every 10 s and on wake; Grove
+# Keys sends vpn_change after its switch starts or stops it.
+sketchybar --add event vpn_change
+sketchybar --add item vpn.lab right \
+  --set vpn.lab label.drawing=off padding_left=8 padding_right=8 script="$P/vpn.sh" update_freq=10 \
+    click_script="$(panel vpn)" \
+  --subscribe vpn.lab vpn_change system_woke mouse.entered mouse.exited
+symbol vpn.lab vpn-off
+
+gap gap.r5 right 6
+
 # CPU and memory share one panel: a click on either opens it.
 sketchybar --add item mem right \
   --set mem label.width=$W4 label.align=right label.padding_left=4 padding_right=8 \
@@ -174,6 +187,7 @@ for n in 1 2 3 4 5 6 7 8 9; do
   pill "pill.ws.$n" "ws.$n" "ws.$n.1" "ws.$n.2" "ws.$n.3" "ws.$n.4" "ws.$n.5" "ws.$n.6" "ws.$n.end"
 done
 pill pill.sys cpu mem
+pill pill.vpn vpn.lab
 pill pill.wifi wifi bt
 pill pill.volume volume
 pill pill.battery battery
