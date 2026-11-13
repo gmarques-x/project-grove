@@ -25,8 +25,9 @@ extension FileList.Coordinator {
 
     /// A row dragged: its file's URL, for the panes, Finder and other apps.
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-        guard model.canTakeDrop, showsModelRows, entries.indices.contains(row) else { return nil }
-        return entries[row].url as NSURL
+        // A loading line has nothing to drag.
+        guard model.canTakeDrop, showsModelRows, let entry = entry(onRow: row) else { return nil }
+        return entry.url as NSURL
     }
 
     func tableView(
@@ -56,12 +57,15 @@ extension FileList.Coordinator {
             listing.problem == nil, listing.folder.standardizedFileURL.path == tab.folder.standardizedFileURL.path
         else { return nil }
         let row = table.row(at: table.convert(info.draggingLocation, from: nil))
+        // An open folder's loading line is nowhere to drop: its folder's
+        // contents aren't there yet, and the pane's own folder is not
+        // what the pointer is on.
+        if items.indices.contains(row), entry(onRow: row) == nil { return nil }
         // A folder being dragged is no place to drop itself: over its own
         // row the drag is over the pane (where it already is: nothing).
-        if entries.indices.contains(row), Drop.takesDrop(entries[row].kind),
-            !model.isDragged(entries[row].url, on: info.draggingPasteboard)
-        {
-            return (entries[row].url, .row(side, entries[row].url))
+        // A folder at any depth takes a drop into itself.
+        if let entry = entry(onRow: row), Drop.takesDrop(entry.kind), !model.isDragged(entry.url, on: info.draggingPasteboard) {
+            return (entry.url, .row(side, entry.url))
         }
         return (tab.folder, .pane(side))
     }

@@ -10,11 +10,26 @@ extension AppModel {
     /// A text field has the keyboard: the list's commands are not for it.
     var isEditingText: Bool { work.rename != nil || pathField != nil || filter.focused != nil }
 
-    /// The active pane's selected items, in the list's order.
+    /// What an operation on the active pane's selection takes, in the
+    /// list's order: the selected rows, less those inside a selected folder
+    /// (`Tree.operands`: a folder and an item in it are copied, moved or
+    /// trashed once, as the folder). Only rows the list shows: nothing of
+    /// a folder still being read, closed, filtered out or left.
     var chosenItems: [Entry] {
         let side = browser.active
         let chosen = selection(for: side)
-        return chosen.isEmpty ? [] : entries(for: side).filter { chosen.contains($0.url) }
+        guard !chosen.isEmpty, let listing = listing(for: side) else { return [] }
+        return Tree.operands(of: chosen, in: listing.items, index: listing.rows).compactMap { listing.row(of: $0)?.entry }
+    }
+
+    /// The selected rows of `side`, every one of them, in the list's order:
+    /// what opens, what Quick Look shows. Only rows the list shows.
+    func selectedRows(in side: Side) -> [Entry] {
+        let chosen = selection(for: side)
+        guard !chosen.isEmpty, let listing = listing(for: side) else { return [] }
+        return chosen.compactMap { listing.rows[$0] }.sorted().compactMap {
+            if case .row(let row) = listing.items[$0] { row.entry } else { nil }
+        }
     }
 
     /// Whether anything the active pane's list shows is selected. (What a
@@ -139,14 +154,15 @@ extension AppModel {
 
     /// Return: the one selected item's name becomes a field.
     func beginRename() {
-        let items = chosenItems
+        let items = selectedRows(in: browser.active)
         guard items.count == 1 else { return }
         beginRename(of: items[0].url, in: browser.active)
     }
 
-    /// The row of `url` (as the pane's listing writes it) becomes a field.
+    /// The row of `url` (as the pane's listing writes it), at any depth,
+    /// becomes a field. Not an item that is no row.
     func beginRename(of url: URL, in side: Side) {
-        guard work.rename == nil, let entry = listing(for: side)?.all.first(where: { $0.url == url }) else { return }
+        guard work.rename == nil, let entry = listing(for: side)?.row(of: url)?.entry else { return }
         if pathField != nil { pathField = nil }
         sidebarCursor = nil
         // An app or a bundle is named like a file: its extension stays out.

@@ -18,12 +18,18 @@ extension AppModel {
         guard let tab = browser.tab(side) else { return }
         let folder = tab.folder, asked = arrangement(for: tab)
         let sizes = sizes, sizesWere = sizesVersion
+        // The open folders' listings as the pane has them now: the read's
+        // rows are made with them, and made again if they change meanwhile.
+        let tree = listings[side].flatMap { $0.folder.pathKey == folder.pathKey ? FolderListing.Tree(of: $0) : nil }
+            ?? FolderListing.Tree()
         let number = (loads[side] ?? 0) + 1
         loads[side] = number
+        readCount += 1
+        let begunAt = readCount
         reads[side, default: ReadGate()].begin(folder)
         watch(folder, for: side)
         Task {
-            let read = await Task.detached { FolderListing.read(by: asked, sizes: sizes) }.value
+            let read = await Task.detached { FolderListing.read(by: asked, tree: tree, sizes: sizes) }.value
             // A later read of this pane answers instead.
             guard loads[side] == number else { return }
             // The folder went while it was shown, or back/forward landed on
@@ -31,8 +37,11 @@ extension AppModel {
             // there (spec §13), and this pane reads that one instead.
             // Until the check returns the pane says the folder is gone.
             if read.gone { repairGoneFolders() }
-            if let old = listings[side], old.folder.standardizedFileURL.path == folder.standardizedFileURL.path,
-                old.all == read.all, old.problem == read.problem, old.state.isUnchanged(byReadFor: asked)
+            let old = listings[side].flatMap { $0.folder.pathKey == folder.pathKey ? $0 : nil }
+            // A child read's landing is not "nothing changed": the
+            // arrangement holds the open set, not the open folders' listings.
+            if let old, old.isRead, old.all == read.all, old.problem == read.problem,
+                old.state.isUnchanged(byReadFor: asked), old.treeVersion == tree.version
             {
                 // A watcher's tick that changed nothing the list shows: the
                 // rows, the icons and the table stay as they are. (Rows
@@ -43,15 +52,24 @@ extension AppModel {
                 // An older sort of what was there before has nothing to say now.
                 sorts[side] = (sorts[side] ?? 0) + 1
                 revision += 1
-                listings[side] = Listing(
-                    folder: folder, all: read.all, shown: read.arranged.shown, rows: read.arranged.rows,
-                    problem: read.problem, needsPermission: read.needsPermission, free: read.free,
-                    filteredFrom: read.arranged.filteredFrom, state: .arranged(by: asked), revision: revision)
-                let present = Set(read.all.map(\.url))
-                let chosen = selections[tab.id] ?? []
-                if !chosen.isSubset(of: present) { selections[tab.id] = chosen.intersection(present) }
+                var listing = Listing(
+                    folder: folder, all: read.all, problem: read.problem, needsPermission: read.needsPermission,
+                    free: read.free, state: .arranged(by: asked), revision: revision)
+                listing.take(read.arranged)
+                // What the pane had of the folders open in it stays theirs.
+                if let old {
+                    listing.children = old.children
+                    listing.peeks = old.peeks
+                    listing.treeVersion = old.treeVersion
+                }
+                listings[side] = listing
                 keepVisibleSelection(in: side)
                 IconCache.shared.forgetPaths()
+                // A folder open in it that is no longer there closes.
+                openFolderWasRead(folder, entries: read.all, begunAt: begunAt, in: side)
+                // An open folder's read landed while this one was on its
+                // way: the rows are made again with it.
+                if let old, old.treeVersion != tree.version { arrange(side) }
             }
             if let name = selectWhenRead.removeValue(forKey: side),
                 let entry = read.all.first(where: { $0.name == name })
@@ -61,6 +79,8 @@ extension AppModel {
             }
             // What the last operation left here is selected.
             arrived(in: side)
+            // The folders open in it are read.
+            keepOpenFolders(side)
             // The header was clicked, hidden items were switched, the filter
             // was typed in or a total arrived while this read was on its
             // way: what it sorted by is no longer what the pane asks for.
@@ -82,15 +102,15 @@ extension AppModel {
         // Nothing to sort before the folder is read: the read arranges its
         // own, and asks again when the tab wants something else by then.
         guard let tab = browser.tab(side), let listing = listing(for: side), listing.isRead else { return }
-        let all = listing.all, wanted = arrangement(for: tab), sizes = sizes
+        let all = listing.all, tree = FolderListing.Tree(of: listing), wanted = arrangement(for: tab), sizes = sizes
         guard live else {
-            show(FolderListing.arranged(all, by: wanted, sizes: sizes), by: wanted, in: side)
+            show(FolderListing.arranged(all, tree: tree, by: wanted, sizes: sizes), by: wanted, in: side)
             return
         }
         let number = (sorts[side] ?? 0) + 1
         sorts[side] = number
         Task {
-            let arranged = await Task.detached { FolderListing.arranged(all, by: wanted, sizes: sizes) }.value
+            let arranged = await Task.detached { FolderListing.arranged(all, tree: tree, by: wanted, sizes: sizes) }.value
             guard sorts[side] == number else { return }
             show(arranged, by: wanted, in: side)
         }
@@ -107,14 +127,20 @@ extension AppModel {
         if listing.state != state { listings[side]?.state = state }
         // Rows that were awaited are shown even when there are none (a
         // filter that matches nothing): the pane then says so.
-        guard wasBlank || arranged.shown != listing.shown || arranged.filteredFrom != listing.filteredFrom
+        guard wasBlank || arranged.items != listing.items || arranged.filteredFrom != listing.filteredFrom
         else { return }
         revision += 1
-        listings[side]?.shown = arranged.shown
-        listings[side]?.rows = arranged.rows
-        listings[side]?.filteredFrom = arranged.filteredFrom
+        listings[side]?.take(arranged)
         listings[side]?.revision = revision
         keepVisibleSelection(in: side)
+        // Other rows: other folders whose sizes, chevrons and watchers count.
+        rowsChanged(in: side)
+    }
+
+    /// The rows the pane shows are others now: what is wanted for them
+    /// (their folders' totals) follows.
+    func rowsChanged(in side: Side) {
+        wantSizes()
     }
 
     // MARK: Watching

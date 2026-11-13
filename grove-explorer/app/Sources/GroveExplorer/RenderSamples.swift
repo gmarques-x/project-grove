@@ -273,7 +273,8 @@ extension AppModel {
     static func fixed(
         browser: Browser, config: ExplorerConfig, clock: ListClock, colors: ThemeColors,
         entries: [Side: [Entry]], sizes: [URL: Int64], free: Int64, selected: [Side: Set<URL>],
-        problems: [Side: (sentence: String, needsPermission: Bool)] = [:], filters: [Side: String] = [:]
+        problems: [Side: (sentence: String, needsPermission: Bool)] = [:], filters: [Side: String] = [:],
+        tree: [Side: FolderListing.Tree] = [:]
     ) -> AppModel {
         let model = AppModel(browser: browser, config: config, clock: clock, live: false)
         model.colors = colors
@@ -282,11 +283,14 @@ extension AppModel {
             guard let tab = browser.tab(side) else { continue }
             if let text = filters[side] { model.filter.texts[tab.id] = text }
             let wanted = model.arrangement(for: tab)
-            let arranged = FolderListing.arranged(all, by: wanted, sizes: sizes)
-            model.listings[side] = Listing(
-                folder: tab.folder, all: all, shown: arranged.shown, rows: arranged.rows,
+            // The folders open in the tab (the browser's) and their listings, as given.
+            let opened = tree[side] ?? FolderListing.Tree()
+            var listing = Listing(
+                folder: tab.folder, all: all, children: opened.children, peeks: opened.peeks,
                 problem: problems[side]?.sentence, needsPermission: problems[side]?.needsPermission ?? false,
-                free: free, filteredFrom: arranged.filteredFrom, state: .arranged(by: wanted), revision: 1)
+                free: free, state: .arranged(by: wanted), revision: 1)
+            listing.take(FolderListing.arranged(all, tree: opened, by: wanted, sizes: sizes))
+            model.listings[side] = listing
             model.selections[tab.id] = selected[side] ?? []
         }
         model.revision = 1

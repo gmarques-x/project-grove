@@ -81,9 +81,7 @@ extension AppModel {
     /// ⌘O, ⌘↓: opens what is selected in the active pane, in the list's
     /// order. One folder opens in this tab; of several, each in a tab of its own.
     func openSelection() {
-        let side = browser.active
-        let chosen = selection(for: side)
-        let entries = entries(for: side).filter { chosen.contains($0.url) }
+        let entries = selectedRows(in: browser.active)
         let folders = entries.filter(\.opensAsFolder)
         for entry in entries where !entry.opensAsFolder { open(entry) }
         for folder in folders { open(folder, inNewTab: folders.count > 1) }

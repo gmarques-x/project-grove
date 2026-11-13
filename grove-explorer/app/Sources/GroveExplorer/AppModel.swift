@@ -107,6 +107,12 @@ final class AppModel: ObservableObject {
     var reads: [Side: ReadGate] = [:]
     var sorts: [Side: Int] = [:]
     var watchers: [Side: (path: String, watcher: FolderWatcher)] = [:]
+    /// The folders open in place in each pane's tab: their reads, watchers
+    /// and peeks (`TreeModel.swift`).
+    var trees: [Side: PaneTree] = [:]
+    /// Counts the reads begun, of the panes' folders and of their open
+    /// folders: a read begun before a folder was opened can't say it went.
+    var readCount = 0
     let sizeQueue = SizeQueue()
     /// The file operations: the runner, the undo stack, what the views show of them.
     let work = FileWork()
@@ -217,6 +223,7 @@ final class AppModel: ObservableObject {
                     reads[side] = nil
                     watchers[side]?.watcher.stop()
                     watchers[side] = nil
+                    forgetOpenFolders(side)
                 }
                 continue
             }
@@ -225,6 +232,10 @@ final class AppModel: ObservableObject {
             guard shownKeys[side] != key else { continue }
             shownKeys[side] = key
             changed.append(side)
+            // The reads, watchers and peeks of the folders open in the tab
+            // the pane showed are that tab's: none of their answers is
+            // taken from here on.
+            forgetOpenFolders(side)
             // Rows of this folder that a pane already has (this pane's
             // other tab's, or the other pane's) are shown at once, as
             // `RowsState.reuse` says: as they are only when they are what
@@ -258,14 +269,9 @@ final class AppModel: ObservableObject {
             case .asItIs, .oldOrder, .keepWaiting:
                 break
             case .arrangeNow:
-                let arranged = FolderListing.arranged(listing.all, by: wanted, sizes: sizes)
-                listing.shown = arranged.shown
-                listing.rows = arranged.rows
-                listing.filteredFrom = arranged.filteredFrom
+                listing.take(FolderListing.arranged(listing.all, tree: .init(of: listing), by: wanted, sizes: sizes))
             case .blank:
-                listing.shown = []
-                listing.rows = [:]
-                listing.filteredFrom = nil
+                listing.take(FolderListing.Arranged())
             }
             listings[side] = listing
             keepVisibleSelection(in: side)
@@ -280,7 +286,11 @@ final class AppModel: ObservableObject {
         // The walks on their way for a folder just left give their slots
         // back; those for what a pane still shows go on.
         sizeQueue.keep(Set(wantedSizes()))
-        for side in changed { load(side) }
+        for side in changed {
+            load(side)
+            // The folders open in the tab are read beside its own.
+            keepOpenFolders(side)
+        }
     }
 
     // MARK: What the views read
@@ -288,9 +298,11 @@ final class AppModel: ObservableObject {
     /// The sides that have a pane, left first.
     var sides: [Side] { browser.panes.count == 2 ? [.left, .right] : [.left] }
 
-    /// The pane's rows: sorted, and without the hidden items unless they
-    /// are shown. None while the pane's listing is not of its tab's folder.
-    func entries(for side: Side) -> [Entry] { listing(for: side)?.shown ?? [] }
+    /// The pane's rows' entries, in the list's order, at every depth (the
+    /// tree's rows, `Tree.items`): sorted, without the hidden items unless
+    /// they are shown, and nothing of an open folder whose read hasn't
+    /// landed. None while the pane's listing is not of its tab's folder.
+    func entries(for side: Side) -> [Entry] { listing(for: side)?.shownEntries ?? [] }
 
     /// What the pane lists of the folder its tab is on; nil while it has
     /// nothing of that folder (`PaneRows.areCurrent`). The one way to a
@@ -310,13 +322,14 @@ final class AppModel: ObservableObject {
 
     // MARK: What the views ask for
 
-    /// The pane's selection is now `urls`; under a filter, those of them
-    /// that it shows (no command acts on a row the user can't see), and
+    /// The pane's selection is now `urls`: those of them that are rows of
+    /// its list (no command acts on a row the user can't see: one a filter
+    /// hides, one inside a closed folder or one still being read), and
     /// nothing while the pane has not read its tab's folder.
     func select(_ urls: Set<URL>, in side: Side) {
         var urls = urls
         if let listing = listing(for: side), listing.isRead {
-            if listing.filteredFrom != nil { urls = Filter.visibleSelection(urls, among: listing.shown) }
+            urls = urls.filter { listing.rows[$0] != nil }
         } else {
             // Not read yet: a click that still found a row of the folder
             // before selects nothing here.
@@ -335,12 +348,14 @@ final class AppModel: ObservableObject {
             open: tab.open)
     }
 
-    /// The rows changed under a filter: what it hides is selected no more.
+    /// The rows changed: what is no row now (a filter hides it, its folder
+    /// closed or went, it went itself) is selected no more. Not while the
+    /// pane awaits its rows: it has none to tell by.
     func keepVisibleSelection(in side: Side) {
-        guard let tab = browser.tab(side), let listing = listing(for: side), listing.filteredFrom != nil,
+        guard let tab = browser.tab(side), let listing = listing(for: side), !listing.state.isAwaitingRows,
             let chosen = selections[tab.id], !chosen.isEmpty
         else { return }
-        let kept = Filter.visibleSelection(chosen, among: listing.shown)
+        let kept = chosen.filter { listing.rows[$0] != nil }
         if kept != chosen { selections[tab.id] = kept }
     }
 

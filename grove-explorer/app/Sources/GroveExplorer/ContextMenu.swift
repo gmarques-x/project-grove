@@ -141,7 +141,8 @@ extension FileList.Coordinator {
         model.listTakesKeyboard()
         if let window = table.window, window.firstResponder !== table { window.makeFirstResponder(table) }
         // The table's own selection: its delegate tells the model at once.
-        if entries.indices.contains(row) {
+        // A loading line is as the list's empty space.
+        if entry(onRow: row) != nil {
             if !table.isRowSelected(row) { table.selectRowIndexes([row], byExtendingSelection: false) }
         } else if table.numberOfSelectedRows > 0 {
             table.deselectAll(nil)

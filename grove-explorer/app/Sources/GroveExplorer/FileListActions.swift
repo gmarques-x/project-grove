@@ -11,15 +11,15 @@ extension FileList.Coordinator {
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let table, !settingSelection else { return }
-        model.select(Set(table.selectedRowIndexes.compactMap { entries.indices.contains($0) ? entries[$0].url : nil }), in: side)
+        model.select(Set(table.selectedRowIndexes.compactMap { item(onRow: $0) }), in: side)
         quickLook.selectionChanged()
     }
 
     @objc func opened(_ sender: Any?) {
-        guard let table, showsModelRows, entries.indices.contains(table.clickedRow) else { return }
+        guard let table, showsModelRows, let entry = entry(onRow: table.clickedRow) else { return }
         model.activate(side)
         // ⌘-double-click a folder: a new tab (spec §6).
-        model.open(entries[table.clickedRow], inNewTab: NSEvent.modifierFlags.contains(.command))
+        model.open(entry, inNewTab: NSEvent.modifierFlags.contains(.command))
     }
 
     /// A key pressed in the list: a command's, the sidebar's, a letter
@@ -61,8 +61,8 @@ extension FileList.Coordinator {
     func reportVisible() {
         guard let table else { return }
         let rows = table.rows(in: table.visibleRect)
-        let first = min(max(0, rows.location), entries.count)
-        let visible = entries[first..<min(entries.count, first + rows.length)]
+        let first = min(max(0, rows.location), items.count)
+        let visible = (first..<min(items.count, first + rows.length)).compactMap { entry(onRow: $0) }
         model.wantSizesFirst(for: visible.filter(\.isMeasured).map(\.url))
     }
 }

@@ -26,11 +26,9 @@ final class QuickLookController: NSObject, @preconcurrency QLPreviewPanelDataSou
         self.side = side
     }
 
-    /// The pane's selected items that its list shows, in the list's order.
-    private var items: [URL] {
-        let chosen = model.selection(for: side)
-        return chosen.isEmpty ? [] : model.entries(for: side).filter { chosen.contains($0.url) }.map(\.url)
-    }
+    /// The pane's selected items that its list shows, in the list's order
+    /// (at any depth; never a folder's loading line, which is no item).
+    private var items: [URL] { model.selectedRows(in: side).map(\.url) }
 
     /// The panel, when it is up and this list's.
     private var panel: QLPreviewPanel? {

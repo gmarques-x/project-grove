@@ -30,7 +30,7 @@ struct PaneView: View {
             let active = model.browser.active == side
             let listing = model.listing(for: side)
             // Nothing to list: no column titles, since there is nothing under them.
-            let bare = listing.map { $0.problem != nil || ($0.shown.isEmpty && !$0.state.isAwaitingRows) } ?? false
+            let bare = listing.map { $0.problem != nil || ($0.items.isEmpty && !$0.state.isAwaitingRows) } ?? false
             VStack(spacing: 0) {
                 // Green on the pane that has the keys, and on one a drag
                 // would drop into (its list's empty space).

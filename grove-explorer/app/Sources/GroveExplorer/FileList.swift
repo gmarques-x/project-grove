@@ -106,8 +106,10 @@ struct FileList: NSViewRepresentable {
         let side: Side
         weak var table: FileTableView?
 
-        /// The rows the table shows now.
-        private(set) var entries: [Entry] = []
+        /// The rows the table shows now: the tree's items, an open folder's
+        /// loading line among them (no entry, never selected, dragged,
+        /// dropped on or spoken).
+        private(set) var items: [TreeItem] = []
         private var revision = -1
         private var columns: ListColumns?
         private var theme: ThemeColors?
@@ -169,7 +171,7 @@ struct FileList: NSViewRepresentable {
             var newRows = false
             if let listing, listing.revision != revision {
                 revision = listing.revision
-                entries = listing.shown
+                items = listing.items
                 dates = [:]
                 newRows = true
                 // The table's own selection is by row: it means nothing in
@@ -187,11 +189,11 @@ struct FileList: NSViewRepresentable {
                 // The table is called by its folder's name.
                 table.setAccessibilityLabel(model.browser.tab(side)?.title ?? listing.folder.lastPathComponent)
                 reportVisible()
-            } else if listing == nil, !entries.isEmpty {
+            } else if listing == nil, !items.isEmpty {
                 // The pane has nothing of its tab's folder: no row of
                 // another folder stays in the table to be opened or dragged.
                 revision = -1
-                entries = []
+                items = []
                 dates = [:]
                 newRows = true
                 settingSelection = true
@@ -289,7 +291,14 @@ struct FileList: NSViewRepresentable {
 
         // MARK: The table asks
 
-        func numberOfRows(in tableView: NSTableView) -> Int { entries.count }
+        func numberOfRows(in tableView: NSTableView) -> Int { items.count }
+
+        /// A folder's loading line is no row to select: a click on it
+        /// selects nothing, and the arrows pass over it.
+        /// (A row the table selects some other way, ⇧-click over one say,
+        /// is no URL: `tableViewSelectionDidChange` leaves it out, and the
+        /// model's selection is put back on the table.)
+        func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { entry(onRow: row) != nil }
 
         func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
             let id = NSUserInterfaceItemIdentifier("row")
@@ -303,10 +312,10 @@ struct FileList: NSViewRepresentable {
         }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            // A loading line has no cells yet: it is drawn with the tree's gutter.
             guard let tableColumn, let column = Column(rawValue: tableColumn.identifier.rawValue),
-                entries.indices.contains(row)
+                let entry = entry(onRow: row)
             else { return nil }
-            let entry = entries[row]
             let theme = model.colors
             switch column {
             case .name:
@@ -353,9 +362,21 @@ struct FileList: NSViewRepresentable {
             return cell
         }
 
+        /// The entry on a row; nil for a loading line or no row.
+        func entry(onRow row: Int) -> Entry? {
+            guard items.indices.contains(row), case .row(let shown) = items[row] else { return nil }
+            return shown.entry
+        }
+
+        /// The tree's row on a row of the table; nil for a loading line or no row.
+        func treeRow(onRow row: Int) -> TreeRow? {
+            guard items.indices.contains(row), case .row(let shown) = items[row] else { return nil }
+            return shown
+        }
+
         /// The item on a row, and the row an item is on: through the
         /// listing's index while the table shows that listing's rows.
-        func item(onRow row: Int) -> URL? { entries.indices.contains(row) ? entries[row].url : nil }
+        func item(onRow row: Int) -> URL? { entry(onRow: row)?.url }
 
         /// Whether the table's rows are the ones the model has for the
         /// pane now. Not for the moment between a change to the model and
@@ -364,16 +385,16 @@ struct FileList: NSViewRepresentable {
 
         func row(of item: URL) -> Int? {
             if let listing = model.listing(for: side), listing.revision == revision { return listing.rows[item] }
-            return entries.firstIndex { $0.url == item }
+            return items.firstIndex { if case .row(let row) = $0 { row.entry.url == item } else { false } }
         }
 
         /// The row as VoiceOver says it; nil for a row that is not there.
         func spoken(_ row: Int) -> String? {
-            guard entries.indices.contains(row) else { return nil }
-            let entry = entries[row]
+            guard let shown = treeRow(onRow: row) else { return nil }
+            let entry = shown.entry
             return Spoken.row(
                 entry, total: model.sizes[entry.url], date: entry.modified == nil ? nil : date(of: entry),
-                awaitsTotal: model.awaitsTotal(entry.url))
+                awaitsTotal: model.awaitsTotal(entry.url), level: shown.depth + 1, fold: shown.fold)
         }
 
         private func date(of entry: Entry) -> String {
