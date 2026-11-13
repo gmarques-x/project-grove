@@ -72,7 +72,7 @@ extension BarPanelModel {
 /// A panel beside an open panel: a menu's submenu. Same frame, its left
 /// outline on the right outline of the panel before it (one shared line),
 /// its first row level with the row it opens from, kept on the screen
-/// (`MenuListPlacement.submenu`). It is a child window of the main panel:
+/// (`MenuPlacement.submenu`). It is a child window of the main panel:
 /// a click in it is not a click outside, it never takes the keyboard (the
 /// keys stay the main panel's model's), and it goes when the panel does.
 @MainActor
@@ -118,33 +118,10 @@ protocol BarPanelWithSides: BarPanelModel {
     var sides: [BarPanelSide] { get }
 }
 
-/// A key as a panel's model is told it.
-enum BarPanelKey: Equatable {
-    case left, right, up, down, home, end, pageUp, pageDown, enter, space
-    /// A typed character, lower-cased ("t").
-    case character(String)
-
-    init?(_ event: NSEvent) {
-        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return nil }
-        switch event.keyCode {
-        case 123: self = .left
-        case 124: self = .right
-        case 125: self = .down
-        case 126: self = .up
-        case 115: self = .home
-        case 119: self = .end
-        case 116: self = .pageUp
-        case 121: self = .pageDown
-        case 36, 76: self = .enter
-        case 49: self = .space
-        default:
-            guard let text = event.charactersIgnoringModifiers?.lowercased(), text.count == 1,
-                  let scalar = text.unicodeScalars.first, scalar.properties.isAlphabetic || ("0"..."9").contains(scalar)
-            else { return nil }
-            self = .character(text)
-        }
-    }
-}
+/// A key as a panel's model is told it: the Grove menu's own keys
+/// (`GroveMenuListKey`, from a key-down event), so a menu panel passes them on
+/// as they are.
+typealias BarPanelKey = GroveMenuListKey
 
 /// What a panel's views can ask of the host: `@Environment(\.barPanel)`.
 @MainActor

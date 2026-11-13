@@ -1,24 +1,33 @@
 import AppKit
-import GroveKeysCore
 import GroveThemesCore
-import GroveUI
 import SwiftUI
 
-// A menu in the bar panels' frame: rows in a panel, a submenu as a second
-// panel beside it (`BarPanelSide`), one highlighted row per level shared by
-// the pointer and the keys. The Grove menu is built from it
-// (`GroveMenuPanel.swift`); so can any later menu: give `MenuListModel` its
-// rows, draw `MenuListPanel(model:level: 0)` and pass on the keys.
+// The Grove menu: rows in a panel (the panels' card, its outline, mono
+// type), a submenu as a second panel beside it, one highlighted row per
+// level shared by the pointer and the keys. Grove Keys' bar Grove menu is
+// built from it, and so is every in-window menu: give `GroveMenuListModel`
+// its rows, draw `GroveMenuListPanel(model:level: 0)` (and a panel per open
+// submenu, `submenus`) and pass on the keys.
 //
 // Hand-built on purpose: a native menu (`NSMenu`, `Menu`) can't take the
 // panels' frame, outline, font or place (the owner's decision, spec
-// 2026-11-12-bar-panels-design §2), and `KeyPanelList` has no levels. What
-// is pure (the keys' moves, the hover timing, the rows' rectangles, a
-// submenu's place) is `GroveKeysCore/MenuList.swift`, tested.
+// 2026-11-12-bar-panels-design §2; for every in-window menu, spec
+// 2026-11-13-grove-context-menus-design), and `KeyPanelList` has no
+// levels. What is pure (the keys' moves, the hover timing, the rows'
+// rectangles, a submenu's place) is `GroveThemesCore/MenuListRules.swift`,
+// tested.
+
+/// What is drawn before a row's title.
+public enum GroveMenuListIcon: Equatable {
+    /// One of Grove's icons.
+    case symbol(GroveIcon.Name)
+    /// An image of its own (an app's icon), drawn in the icon column's square.
+    case image(NSImage)
+}
 
 /// One row of a menu.
-struct MenuListRow: Identifiable, Equatable {
-    enum Kind: Equatable {
+public struct GroveMenuListRow: Identifiable, Equatable {
+    public enum Kind: Equatable {
         /// Choosing it does something.
         case action
         /// The same, for a row that opens something that is not one of
@@ -26,29 +35,48 @@ struct MenuListRow: Identifiable, Equatable {
         /// without the chevron (`MenuListRowKind.showsChevron`).
         case link
         /// It opens these rows in a panel beside this one.
-        case submenu([MenuListRow])
+        case submenu([GroveMenuListRow])
         /// Text that can't be chosen (an error, a warning's line).
         case note
     }
 
     /// Unique in the whole menu: what `onChoose` and `checked` know a row by.
-    var id: String
-    var title: String
-    /// Drawn before the title, in a column every row of the level keeps.
-    var icon: GroveIcon.Name?
+    public var id: String
+    public var title: String
+    /// Drawn before the title, in a column every row of the level keeps
+    /// (at any level: a level keeps the column when one of its rows has an
+    /// icon, and the menu's own level when the model is told to).
+    public var icon: GroveMenuListIcon?
     /// A line above the row (not drawn above a level's first row).
-    var separator = false
-    var kind: Kind
+    public var separator: Bool
+    public var kind: Kind
+    /// A disabled row is drawn quiet; the keys and the pointer pass it by
+    /// and it can't be chosen.
+    public var enabled: Bool
+    /// Ticked when the menu is shown (the model's `checked` can add more).
+    public var checked: Bool
 
-    var isSelectable: Bool { kind != .note }
+    public init(id: String, title: String, icon: GroveMenuListIcon? = nil, separator: Bool = false,
+                kind: Kind = .action, enabled: Bool = true, checked: Bool = false) {
+        self.id = id
+        self.title = title
+        self.icon = icon
+        self.separator = separator
+        self.kind = kind
+        self.enabled = enabled
+        self.checked = checked
+    }
 
-    var children: [MenuListRow]? {
+    /// The keys, the pointer and type-to-jump stop on it.
+    public var isSelectable: Bool { kind != .note && enabled }
+
+    public var children: [GroveMenuListRow]? {
         if case .submenu(let rows) = kind { return rows }
         return nil
     }
 
     /// The kind without its rows, for what Core decides about it.
-    var coreKind: MenuListRowKind {
+    public var coreKind: MenuListRowKind {
         switch kind {
         case .action: .action
         case .link: .link
@@ -58,11 +86,41 @@ struct MenuListRow: Identifiable, Equatable {
     }
 }
 
+/// A key as a menu (and a Grove Keys bar panel) is told it.
+public enum GroveMenuListKey: Equatable, Sendable {
+    case left, right, up, down, home, end, pageUp, pageDown, enter, space
+    /// A typed character, lower-cased ("t").
+    case character(String)
+
+    /// The key of a key-down event; nil for one pressed with ⌘, ⌃ or ⌥ and
+    /// for what is neither a moving key nor a letter or digit.
+    public init?(_ event: NSEvent) {
+        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return nil }
+        switch event.keyCode {
+        case 123: self = .left
+        case 124: self = .right
+        case 125: self = .down
+        case 126: self = .up
+        case 115: self = .home
+        case 119: self = .end
+        case 116: self = .pageUp
+        case 121: self = .pageDown
+        case 36, 76: self = .enter
+        case 49: self = .space
+        default:
+            guard let text = event.charactersIgnoringModifiers?.lowercased(), text.count == 1,
+                  let scalar = text.unicodeScalars.first, scalar.properties.isAlphabetic || ("0"..."9").contains(scalar)
+            else { return nil }
+            self = .character(text)
+        }
+    }
+}
+
 /// The measures of a menu's panel. Rows have fixed heights, so where each
 /// row is can be computed (`MenuListLayout`) rather than read back from the
 /// drawn views.
 @MainActor
-enum MenuListMetrics {
+enum GroveMenuListMetrics {
     /// A row: a line of label text and the rows' 4 pt above and below.
     static let row = GroveSpace.s24
     /// A submenu's width, unless its titles need more (up to `widest`).
@@ -97,28 +155,42 @@ enum MenuListMetrics {
 /// A menu's state: the levels shown (the menu itself, then each open
 /// submenu), each with its highlighted row.
 @MainActor
-final class MenuListModel: ObservableObject {
-    struct Level {
-        let rows: [MenuListRow]
-        let layout: MenuListLayout
+public final class GroveMenuListModel: ObservableObject {
+    public struct Level {
+        public let rows: [GroveMenuListRow]
+        public let layout: MenuListLayout
         /// Whether the rows keep an icon column.
-        let icons: Bool
+        public let icons: Bool
         /// The row under the pointer or chosen with the keys.
-        var highlighted: Int?
+        public internal(set) var highlighted: Int?
+    }
+
+    /// An open submenu's panel, for the host to place beside the panel
+    /// before it (`MenuPlacement.submenu`).
+    public struct Submenu {
+        /// Its level (1 for the menu's own submenu): `GroveMenuListPanel`'s.
+        public let depth: Int
+        public let size: CGSize
+        /// The row it opens from, in the coordinates of the panel before it:
+        /// points from that panel's top-left corner, y down.
+        public let row: CGRect
+        /// From the panel's top to its first row.
+        public let firstRow: CGFloat
     }
 
     /// The menu (0), then each open submenu in order.
-    @Published private(set) var levels: [Level] = []
-    /// The ids of the rows to tick.
-    @Published var checked: Set<String> = []
+    @Published public private(set) var levels: [Level] = []
+    /// The ids of the rows to tick: the rows' own `checked` when shown, and
+    /// whatever is added while the menu is up.
+    @Published public var checked: Set<String> = []
 
     /// A row that does something was chosen (a click, Return, Space).
-    var onChoose: (MenuListRow) -> Void = { _ in }
+    public var onChoose: (GroveMenuListRow) -> Void = { _ in }
     /// A level was shown (the menu, a submenu just opened): the place to
     /// start what its rows need (their `checked` tests).
-    var onShow: ([MenuListRow]) -> Void = { _ in }
+    public var onShow: ([GroveMenuListRow]) -> Void = { _ in }
     /// The open submenus changed: the host re-places the side panels.
-    var onLevels: () -> Void = {}
+    public var onLevels: () -> Void = {}
 
     private let width: CGFloat
     private let icons: Bool
@@ -132,9 +204,10 @@ final class MenuListModel: ObservableObject {
     private var timer: Timer?
 
     /// - `width`: the menu's own panel; submenus fit their titles.
-    /// - `icons`: the menu's rows keep an icon column (a row without an
-    ///   icon keeps the indent). Submenus have none.
-    init(width: CGFloat, icons: Bool) {
+    /// - `icons`: the menu's rows keep an icon column even when none has an
+    ///   icon (a row without one keeps the indent). Any level whose rows
+    ///   have an icon keeps one.
+    public init(width: CGFloat, icons: Bool) {
         self.width = width
         self.icons = icons
     }
@@ -142,9 +215,9 @@ final class MenuListModel: ObservableObject {
     // MARK: Showing
 
     /// Shows `rows` as the menu, nothing open or highlighted.
-    func show(_ rows: [MenuListRow]) {
+    public func show(_ rows: [GroveMenuListRow]) {
         cancelTimer()
-        checked = []
+        checked = Self.checkedIDs(rows)
         levels = [level(rows, depth: 0)]
         intents = [MenuHoverIntent()]
         pointers = [nil]
@@ -154,8 +227,15 @@ final class MenuListModel: ObservableObject {
         onLevels()
     }
 
+    private static func checkedIDs(_ rows: [GroveMenuListRow]) -> Set<String> {
+        rows.reduce(into: Set<String>()) { ids, row in
+            if row.checked { ids.insert(row.id) }
+            if let children = row.children { ids.formUnion(checkedIDs(children)) }
+        }
+    }
+
     /// Nothing shown and nothing running (the panel closed).
-    func clear() {
+    public func clear() {
         cancelTimer()
         levels = []
         intents = []
@@ -166,7 +246,7 @@ final class MenuListModel: ObservableObject {
 
     /// Opens the submenus along `ids` (each a row of the level before) and
     /// highlights the last row named; stops at the first id that isn't there.
-    func open(path ids: [String]) {
+    public func open(path ids: [String]) {
         for id in ids {
             let depth = levels.count - 1
             guard depth >= 0, let index = levels[depth].rows.firstIndex(where: { $0.id == id }) else { return }
@@ -181,42 +261,49 @@ final class MenuListModel: ObservableObject {
     }
 
     /// The highlighted row of the level the keys act on.
-    func highlight(first: Bool) {
+    public func highlight(first: Bool) {
         guard levels.indices.contains(focus) else { return }
         let selectable = levels[focus].rows.map(\.isSelectable)
         highlight(focus, first ? MenuListMove.first(selectable: selectable) : MenuListMove.last(selectable: selectable))
     }
 
-    /// The side panels the open submenus need, in order.
-    func sides(view: (Int) -> AnyView) -> [BarPanelSide] {
+    /// The panels the open submenus need, in order.
+    public var submenus: [Submenu] {
         (1..<max(levels.count, 1)).compactMap { depth in
             guard let open = intents[depth - 1].open, levels[depth - 1].layout.rows.indices.contains(open) else { return nil }
-            return BarPanelSide(id: depth, view: view(depth), size: levels[depth].layout.size,
-                                row: levels[depth - 1].layout.rows[open],
-                                firstRow: MenuListMetrics.layout.edge,
-                                placed: { [weak self] onLeft in
-                                    guard let self, self.submenuOnLeft.indices.contains(depth - 1) else { return }
-                                    self.submenuOnLeft[depth - 1] = onLeft
-                                })
+            return Submenu(depth: depth, size: levels[depth].layout.size, row: levels[depth - 1].layout.rows[open],
+                           firstRow: GroveMenuListMetrics.layout.edge)
         }
     }
 
-    private func level(_ rows: [MenuListRow], depth: Int) -> Level {
-        let icons = depth == 0 && self.icons
+    /// The host put the submenu of `depth` at the left of the panel before
+    /// it (`onLeft`, no room at the right) or at its right: the pointer
+    /// moving that way is on its way into it.
+    public func placed(_ depth: Int, onLeft: Bool) {
+        guard submenuOnLeft.indices.contains(depth - 1) else { return }
+        submenuOnLeft[depth - 1] = onLeft
+    }
+
+    private func level(_ rows: [GroveMenuListRow], depth: Int) -> Level {
+        let icons = (depth == 0 && self.icons) || rows.contains { $0.icon != nil }
         var width = self.width
         if depth > 0 {
-            let titles = rows.map { MenuListMetrics.width(of: $0.title) + ($0.isSelectable ? GroveSpace.s8 + MenuListMetrics.mark : 0) }
-            width = min(MenuListMetrics.widest,
-                        max(MenuListMetrics.submenu, (titles.max() ?? 0) + 2 * PanelMetrics.inset))
+            let column = icons ? PanelMetrics.iconColumn + GroveSpace.s8 : 0
+            let titles = rows.map {
+                GroveMenuListMetrics.width(of: $0.title)
+                    + ($0.kind != .note ? column + GroveSpace.s8 + GroveMenuListMetrics.mark : 0)
+            }
+            width = min(GroveMenuListMetrics.widest,
+                        max(GroveMenuListMetrics.submenu, (titles.max() ?? 0) + 2 * PanelMetrics.inset))
         }
         // A note has the whole line (no icon column, no mark) and wraps.
         let heights = rows.map { row in
-            row.isSelectable ? MenuListMetrics.row
-                : MenuListMetrics.noteHeight(row.title, width: width - 2 * PanelMetrics.inset)
+            row.kind != .note ? GroveMenuListMetrics.row
+                : GroveMenuListMetrics.noteHeight(row.title, width: width - 2 * PanelMetrics.inset)
         }
         return Level(rows: rows,
                      layout: MenuListLayout(width: width, heights: heights.map(Double.init),
-                                            separators: rows.map(\.separator), metrics: MenuListMetrics.layout),
+                                            separators: rows.map(\.separator), metrics: GroveMenuListMetrics.layout),
                      icons: icons, highlighted: nil)
     }
 
@@ -276,6 +363,7 @@ final class MenuListModel: ObservableObject {
     private func activate(_ depth: Int, _ index: Int, byKey: Bool) {
         guard levels.indices.contains(depth), levels[depth].rows.indices.contains(index) else { return }
         let row = levels[depth].rows[index]
+        guard row.isSelectable else { return }
         switch row.kind {
         case .submenu: openSubmenu(depth, index, highlightFirst: byKey)
         case .action, .link: onChoose(row)
@@ -288,8 +376,9 @@ final class MenuListModel: ObservableObject {
     /// ↑/↓ move (skipping what can't be chosen, wrapping), Home/End go to
     /// the ends, → or Return opens a submenu and goes into it, Return or
     /// Space runs a row, ← closes the submenu the keys are in, a letter
-    /// jumps to the next row starting with it.
-    func key(_ key: BarPanelKey) -> Bool {
+    /// jumps to the next row starting with it. False: the menu didn't use
+    /// the key.
+    public func key(_ key: GroveMenuListKey) -> Bool {
         guard levels.indices.contains(focus) else { return false }
         let rows = levels[focus].rows
         let selectable = rows.map(\.isSelectable)
@@ -332,7 +421,7 @@ final class MenuListModel: ObservableObject {
 
     /// Escape: the deepest open submenu closes. False with none open (the
     /// menu itself is then put away by its host).
-    func escape() -> Bool {
+    public func escape() -> Bool {
         guard levels.count > 1 else { return false }
         let parent = levels.count - 2
         closeSubmenus(below: parent)
@@ -344,7 +433,7 @@ final class MenuListModel: ObservableObject {
 
     /// The pointer moved in the panel of `depth`, to `point` in the panel's
     /// coordinates; nil: it left the panel.
-    func pointer(_ depth: Int, at point: CGPoint?) {
+    public func pointer(_ depth: Int, at point: CGPoint?) {
         guard levels.indices.contains(depth) else { return }
         let now = ProcessInfo.processInfo.systemUptime
         guard let point else {
@@ -377,7 +466,7 @@ final class MenuListModel: ObservableObject {
     }
 
     /// A click in the panel of `depth`.
-    func click(_ depth: Int, at point: CGPoint) {
+    public func click(_ depth: Int, at point: CGPoint) {
         guard levels.indices.contains(depth), let row = levels[depth].layout.row(at: point),
               levels[depth].rows[row].isSelectable else { return }
         focus = depth
@@ -386,7 +475,9 @@ final class MenuListModel: ObservableObject {
     }
 
     /// VoiceOver's "press" on a row.
-    func press(_ depth: Int, _ row: Int) {
+    public func press(_ depth: Int, _ row: Int) {
+        guard levels.indices.contains(depth), levels[depth].rows.indices.contains(row),
+              levels[depth].rows[row].isSelectable else { return }
         focus = depth
         highlight(depth, row)
         activate(depth, row, byKey: true)
@@ -437,11 +528,16 @@ final class MenuListModel: ObservableObject {
 
 /// One level of a menu as a panel: `level` 0 is the menu, the others its
 /// open submenus (side panels). Draws nothing for a level that isn't open.
-struct MenuListPanel: View {
-    @ObservedObject var model: MenuListModel
+public struct GroveMenuListPanel: View {
+    @ObservedObject var model: GroveMenuListModel
     let level: Int
 
-    var body: some View {
+    public init(model: GroveMenuListModel, level: Int) {
+        self.model = model
+        self.level = level
+    }
+
+    public var body: some View {
         if model.levels.indices.contains(level) {
             let shown = model.levels[level]
             BarPanel(width: shown.layout.width) {
@@ -450,9 +546,9 @@ struct MenuListPanel: View {
                         if MenuListLayout.showsRule(index, separators: shown.rows.map(\.separator)) {
                             PanelRule().padding(.vertical, GroveSpace.s4)
                         }
-                        MenuListRowView(row: row, height: shown.layout.rows[index].height, icons: shown.icons,
-                                        highlighted: shown.highlighted == index,
-                                        checked: model.checked.contains(row.id)) {
+                        GroveMenuListRowView(row: row, height: shown.layout.rows[index].height, icons: shown.icons,
+                                             highlighted: shown.highlighted == index,
+                                             checked: model.checked.contains(row.id)) {
                             model.press(level, index)
                         }
                     }
@@ -463,8 +559,8 @@ struct MenuListPanel: View {
             // The pointer is followed by AppKit, over the whole panel: a
             // side panel never has the keyboard, and SwiftUI's hover and
             // buttons want a key window.
-            .overlay(MenuListPointer(moved: { model.pointer(level, at: $0) },
-                                     clicked: { model.click(level, at: $0) }))
+            .overlay(GroveMenuListPointer(moved: { model.pointer(level, at: $0) },
+                                          clicked: { model.click(level, at: $0) }))
             .accessibilityElement(children: .contain)
             .accessibilityLabel(level == 0 ? "Menu" : "Submenu")
         }
@@ -472,9 +568,10 @@ struct MenuListPanel: View {
 }
 
 /// A menu's row: `PanelRow`'s measures and fill, lit by the model's
-/// highlight (the pointer's or the keys') instead of its own hover.
-private struct MenuListRowView: View {
-    let row: MenuListRow
+/// highlight (the pointer's or the keys') instead of its own hover. A
+/// disabled row is drawn quiet, title and all.
+private struct GroveMenuListRowView: View {
+    let row: GroveMenuListRow
     let height: CGFloat
     let icons: Bool
     let highlighted: Bool
@@ -484,17 +581,29 @@ private struct MenuListRowView: View {
     @Environment(\.panelSurface) private var surface
 
     var body: some View {
-        if row.isSelectable {
+        if row.kind != .note {
             HStack(alignment: .firstTextBaseline, spacing: GroveSpace.s8) {
                 if icons {
                     // A row without an icon keeps the column, so titles line up.
                     Group {
-                        if let icon = row.icon { GroveIcon(icon, size: GroveType.label) } else { Color.clear.frame(height: 1) }
+                        switch row.icon {
+                        case .symbol(let name): GroveIcon(name, size: GroveType.label)
+                        case .image(let image):
+                            Image(nsImage: image).resizable().interpolation(.high)
+                                .frame(width: PanelMetrics.iconColumn, height: PanelMetrics.iconColumn)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + GroveType.label / 3 }
+                                .opacity(row.enabled ? 1 : 0.5)
+                        case nil: Color.clear.frame(height: 1)
+                        }
                     }
                     .foregroundStyle(theme.quiet)
                     .frame(width: PanelMetrics.iconColumn)
                 }
-                Text(row.title).truncationMode(.tail)
+                if row.enabled {
+                    Text(row.title).truncationMode(.tail)
+                } else {
+                    Text(row.title).truncationMode(.tail).foregroundStyle(theme.quiet)
+                }
                 Spacer(minLength: 0)
                 if checked { GroveIcon(.current, size: GroveType.label).foregroundStyle(Color(theme.green)) }
                 if row.coreKind.showsChevron { GroveIcon(.forward, size: GroveType.body).foregroundStyle(theme.quiet) }
@@ -513,6 +622,7 @@ private struct MenuListRowView: View {
             .accessibilityHint(row.children != nil ? "submenu" : "")
             .accessibilityAddTraits(highlighted ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction(.default, press)
+            .disabled(!row.enabled)
         } else {
             Text(row.title)
                 .font(GroveFont.mono(GroveType.label))
@@ -525,24 +635,24 @@ private struct MenuListRowView: View {
 
 /// Follows the pointer and the clicks over a menu's panel, in the panel's
 /// coordinates (y down), whether or not its window has the keyboard.
-private struct MenuListPointer: NSViewRepresentable {
+private struct GroveMenuListPointer: NSViewRepresentable {
     let moved: (CGPoint?) -> Void
     let clicked: (CGPoint) -> Void
 
-    func makeNSView(context: Context) -> MenuListPointerView {
-        let view = MenuListPointerView()
+    func makeNSView(context: Context) -> GroveMenuListPointerView {
+        let view = GroveMenuListPointerView()
         view.moved = moved
         view.clicked = clicked
         return view
     }
 
-    func updateNSView(_ view: MenuListPointerView, context: Context) {
+    func updateNSView(_ view: GroveMenuListPointerView, context: Context) {
         view.moved = moved
         view.clicked = clicked
     }
 }
 
-final class MenuListPointerView: NSView {
+final class GroveMenuListPointerView: NSView {
     var moved: (CGPoint?) -> Void = { _ in }
     var clicked: (CGPoint) -> Void = { _ in }
     private var area: NSTrackingArea?

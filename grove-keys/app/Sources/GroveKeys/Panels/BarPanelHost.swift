@@ -257,9 +257,9 @@ final class BarPanelHost {
                             height: geometry.bottom - geometry.lines.top)
         var parent = open.frame
         for (index, side) in wanted.enumerated() {
-            let frame = MenuListPlacement.submenu(parent: parent, row: side.row, size: side.size,
+            let frame = MenuPlacement.submenu(parent: parent, row: side.row, size: side.size,
                                                   firstRow: side.firstRow, bounds: bounds)
-            let (whole, inset) = MenuListPlacement.window(for: frame)
+            let (whole, inset) = MenuPlacement.window(for: frame)
             let shown: Side
             if index < open.sides.count {
                 shown = open.sides[index]

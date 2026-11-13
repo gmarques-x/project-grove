@@ -88,7 +88,7 @@ enum BarPanelRender {
     }
 
     /// The panel with its side panels placed as the host places them
-    /// (`MenuListPlacement.submenu`), on a screen without limits; the panel
+    /// (`MenuPlacement.submenu`), on a screen without limits; the panel
     /// alone when it has none.
     private static func composite(_ panel: some View, width: CGFloat, sides: [BarPanelSide]) -> AnyView {
         guard !sides.isEmpty else { return AnyView(panel) }
@@ -97,7 +97,7 @@ enum BarPanelRender {
         var parent = CGRect(x: 0, y: 0, width: width, height: 0)
         var frames: [CGRect] = []
         for side in sides {
-            parent = MenuListPlacement.submenu(parent: parent, row: side.row, size: side.size,
+            parent = MenuPlacement.submenu(parent: parent, row: side.row, size: side.size,
                                                firstRow: side.firstRow, bounds: everywhere)
             frames.append(parent)
         }

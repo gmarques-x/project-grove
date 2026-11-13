@@ -1,9 +1,10 @@
 import AppKit
 import GroveKeysCore
+import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// The Grove menu's state: the menu's files as rows of a `MenuListModel`,
+/// The Grove menu's state: the menu's files as rows of a `GroveMenuListModel`,
 /// their `checked` tests, and what choosing a row does.
 ///
 /// The rows are the ones the launcher lists and `grovekeys://menu/<id>`
@@ -17,7 +18,7 @@ final class GroveMenuModel: ObservableObject, BarPanelWithSides {
     /// just before it shows the panel.
     static var openAt: String?
 
-    let list = MenuListModel(width: GroveMenuPanel.width, icons: true)
+    let list = GroveMenuListModel(width: GroveMenuPanel.width, icons: true)
     var link = BarPanelLink()
     private var menu = GroveMenu(rows: [])
     /// Which opening the running `checked` tests belong to: a tick that
@@ -35,7 +36,11 @@ final class GroveMenuModel: ObservableObject, BarPanelWithSides {
 
     /// The submenus' panels, beside the menu.
     var sides: [BarPanelSide] {
-        list.sides { [list] depth in AnyView(MenuListPanel(model: list, level: depth)) }
+        list.submenus.map { [list] submenu in
+            BarPanelSide(id: submenu.depth, view: AnyView(GroveMenuListPanel(model: list, level: submenu.depth)),
+                         size: submenu.size, row: submenu.row, firstRow: submenu.firstRow,
+                         placed: { [weak list] onLeft in list?.placed(submenu.depth, onLeft: onLeft) })
+        }
     }
 
     func start() {
@@ -60,34 +65,35 @@ final class GroveMenuModel: ObservableObject, BarPanelWithSides {
 
     // MARK: Rows
 
-    /// The menu's rows as the list draws them. An icon is drawn when its
-    /// name is one of Grove's (`GroveIcon.Name`); any other name is no icon.
-    static func rows(_ rows: [GroveMenuRow]) -> [MenuListRow] {
+    /// The menu's rows as the list draws them. An icon is drawn for a
+    /// top-level row (as the menu file says) when its name is one of
+    /// Grove's (`GroveIcon.Name`); any other name is no icon.
+    static func rows(_ rows: [GroveMenuRow]) -> [GroveMenuListRow] {
         var notes = 0
-        func convert(_ rows: [GroveMenuRow]) -> [MenuListRow] {
+        func convert(_ rows: [GroveMenuRow], top: Bool) -> [GroveMenuListRow] {
             rows.map { row in
-                let kind: MenuListRow.Kind
+                let kind: GroveMenuListRow.Kind
                 var id = row.id
                 switch MenuListRowKind(row) {
                 case .note:
                     notes += 1
                     id = "note \(notes)"   // a row's id has no space
                     kind = .note
-                case .submenu: kind = .submenu(convert(row.children))
+                case .submenu: kind = .submenu(convert(row.children, top: false))
                 case .link: kind = .link
                 case .action: kind = .action
                 }
-                return MenuListRow(id: id, title: row.title, icon: row.icon.flatMap(GroveIcon.Name.init(rawValue:)),
-                                   separator: row.separator, kind: kind)
+                let icon = top ? row.icon.flatMap(GroveIcon.Name.init(rawValue:)).map(GroveMenuListIcon.symbol) : nil
+                return GroveMenuListRow(id: id, title: row.title, icon: icon, separator: row.separator, kind: kind)
             }
         }
-        return convert(rows)
+        return convert(rows, top: true)
     }
 
     /// The `checked` tests of a level just shown: all at once, off the main
     /// thread, each with its 0.5 s limit; a row is ticked when its test
     /// succeeds.
-    private func test(_ rows: [MenuListRow]) {
+    private func test(_ rows: [GroveMenuListRow]) {
         guard !isSample else { return }
         let tests = rows.compactMap { row in
             menu.row(id: row.id)?.checked.map { (id: row.id, command: $0) }
@@ -104,7 +110,7 @@ final class GroveMenuModel: ObservableObject, BarPanelWithSides {
     /// Does what the row says, as `MenuRunner` does for the launcher. The
     /// panel is put away first; the app that was in front keeps the
     /// keyboard unless the row brings something forward itself.
-    private func choose(_ chosen: MenuListRow) {
+    private func choose(_ chosen: GroveMenuListRow) {
         guard let row = menu.row(id: chosen.id), let action = row.action else { return }
         let panel = link.actions
         if action == .builtin(.globalMenu) {
@@ -236,6 +242,6 @@ struct GroveMenuPanel: View {
     let model: GroveMenuModel
 
     var body: some View {
-        MenuListPanel(model: model.list, level: 0)
+        GroveMenuListPanel(model: model.list, level: 0)
     }
 }
