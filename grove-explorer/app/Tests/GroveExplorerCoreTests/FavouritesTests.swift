@@ -65,7 +65,7 @@ import Testing
 
     @Test func whatIsAddedCanBeWrittenAndReadBack() throws {
         let added = Favourites.adding([folder("/Users/me/My Work (2026)"), folder("/Volumes/Backup/Música")], to: [])
-        let text = try ExplorerConfig.localText(favourites: added, home: home, keeping: nil)
+        let text = try ExplorerConfig.localText(favourites: added, servers: nil, home: home, keeping: nil)
         #expect(ExplorerConfig.allFavourites(tracked: nil, local: text, home: home) == added)
     }
 }

@@ -203,7 +203,7 @@ import Testing
             Favourite(id: "disk 2", url: folder("/Volumes/Disk 2"), title: "Disk 2"),
             Favourite(id: "namesake", url: folder("/Users/someone else/Music"), title: "Music"),
         ]
-        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: nil)
+        let text = try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: nil)
         #expect(text == """
             [favourites.home]
             path = "~"
@@ -228,7 +228,7 @@ import Testing
     }
 
     @Test func theLocalTextOfNoFavouritesStillReplacesTheTrackedList() throws {
-        let text = try ExplorerConfig.localText(favourites: [], home: home, keeping: nil)
+        let text = try ExplorerConfig.localText(favourites: [], servers: nil, home: home, keeping: nil)
         #expect(text == "[favourites]\n")
         let config = load(local: text)
         #expect(config.favourites.isEmpty)
@@ -245,7 +245,7 @@ import Testing
 
             """
         let favourites = [Favourite(id: "music", url: folder("/Users/someone/Music"), title: "Music")]
-        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: existing)
+        let text = try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: existing)
         #expect(text == """
             # mine
             [general]
@@ -279,7 +279,7 @@ import Testing
             Favourite(id: "a", url: folder("/a"), title: "a"),
             Favourite(id: "b", url: folder("/b"), title: "B"),
         ]
-        let text = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: existing)
+        let text = try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: existing)
         #expect(text == """
             [favourites.a]
             path = "/a"
@@ -302,7 +302,7 @@ import Testing
 
     @Test func noFavouritesBesideOtherSettingsIsTheBareTable() throws {
         let text = try ExplorerConfig.localText(
-            favourites: [], home: home, keeping: "[general]\nshow_hidden = true\n\n[favourites.x]\npath = \"/x\"\n")
+            favourites: [], servers: nil, home: home, keeping: "[general]\nshow_hidden = true\n\n[favourites.x]\npath = \"/x\"\n")
         #expect(text == "[general]\nshow_hidden = true\n\n[favourites]\n")
         let config = load(local: text)
         #expect(config.favourites.isEmpty)
@@ -311,8 +311,8 @@ import Testing
 
     @Test func anEmptyOrMissingLocalFileGivesTheFavouritesAlone() throws {
         let favourites = [Favourite(id: "a", url: folder("/a"), title: "a")]
-        let alone = try ExplorerConfig.localText(favourites: favourites, home: home, keeping: nil)
-        #expect(try ExplorerConfig.localText(favourites: favourites, home: home, keeping: "") == alone)
+        let alone = try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: nil)
+        #expect(try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: "") == alone)
         #expect(alone == "[favourites.a]\npath = \"/a\"\ntitle = \"a\"\n")
     }
 
@@ -322,7 +322,7 @@ import Testing
         #expect(throws: ConfigWriteRefused(
             description: "explorer.local.toml line 2 can't be read, so it was left as it is and the favourites were not saved"
         )) {
-            try ExplorerConfig.localText(favourites: favourites, home: home, keeping: broken)
+            try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: broken)
         }
     }
 
@@ -330,7 +330,7 @@ import Testing
         // It parses as TOML, but the config refuses it (an unknown table):
         // rewriting it would be rewriting something not understood.
         #expect(throws: ConfigWriteRefused.self) {
-            try ExplorerConfig.localText(favourites: [], home: home, keeping: "[colours]\nred = true\n")
+            try ExplorerConfig.localText(favourites: [], servers: nil, home: home, keeping: "[colours]\nred = true\n")
         }
     }
 
@@ -366,7 +366,7 @@ import Testing
 
         let kept = ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: local, home: home)
             .filter { $0.id != "music" }
-        let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: local)
+        let text = try ExplorerConfig.localText(favourites: kept, servers: nil, home: home, keeping: local)
         #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: text, home: home).map(\.id)
             == ["disk", "films"])
         // The disk comes back: its favourite is in the sidebar again.
@@ -376,10 +376,179 @@ import Testing
     @Test func removingATrackedFavouriteWritesTheOthersToTheLocalFile() throws {
         let kept = ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: nil, home: home)
             .filter { $0.id != "developer" }
-        let text = try ExplorerConfig.localText(favourites: kept, home: home, keeping: nil)
+        let text = try ExplorerConfig.localText(favourites: kept, servers: nil, home: home, keeping: nil)
         // Nothing exists but Home: the window shows one, the file still holds four.
         #expect(load(local: text, exists: { $0 == self.home }).favourites.map(\.id) == ["home"])
         #expect(ExplorerConfig.allFavourites(tracked: ExplorerConfig.builtIn, local: text, home: home).map(\.id)
             == ["applications", "home", "documents", "downloads"])
+    }
+
+    // MARK: Shared folders
+
+    private func share(_ id: String, _ text: String) -> SharedServer {
+        SharedServer(id: id, url: URL(string: text)!)
+    }
+
+    @Test func serversReadFromLocalOnly() {
+        let tracked = ExplorerConfig.builtIn + """
+
+            [servers.tracked]
+            url = "smb://nas/films"
+            order = 1
+
+            """
+        let local = """
+            [servers.grove-lab-backup]
+            url = "smb://grove-lab/backup"
+            order = 2
+
+            [servers.grove-lab-media]
+            url = "smb://gm@grove-lab/media"
+            order = 1
+
+            """
+        let config = load(tracked: tracked, local: local)
+        #expect(config.problem == nil)
+        #expect(config.servers == [
+            share("grove-lab-media", "smb://gm@grove-lab/media"),
+            share("grove-lab-backup", "smb://grove-lab/backup"),
+        ])
+        // The tracked file's favourites still stand: servers are not favourites.
+        #expect(config.favourites.count == 5)
+        #expect(load(tracked: tracked).servers.isEmpty)
+        #expect(load().servers.isEmpty)
+    }
+
+    @Test func serversWithoutAnOrderComeAfterInFileOrder() {
+        let config = load(local: """
+            [servers.b]
+            url = "smb://grove-lab/b"
+
+            [servers.a]
+            url = "smb://grove-lab/a"
+
+            [servers.c]
+            url = "smb://grove-lab/c"
+            order = 9
+
+            """)
+        #expect(config.servers.map(\.id) == ["c", "b", "a"])
+    }
+
+    @Test func savingAShareKeepsFavouritesAndComments() throws {
+        let original = """
+            # my own settings
+            [general]
+            show_hidden = true # always
+
+            # the folders I use
+            [favourites.music]
+            path = "~/Music" # songs
+            title = "Songs"
+
+            """
+        let media = share("grove-lab-media", "smb://grove-lab/media")
+        let saved = try ExplorerConfig.localText(favourites: nil, servers: [media], home: home, keeping: original)
+        #expect(saved == original + """
+
+            [servers."grove-lab-media"]
+            url = "smb://grove-lab/media"
+            order = 1
+
+            """)
+        let config = load(local: saved)
+        #expect(config.problem == nil)
+        #expect(config.servers == [media])
+        #expect(config.showHidden == true)
+        #expect(config.favourites == [Favourite(id: "music", url: folder("/Users/someone/Music"), title: "Songs")])
+
+        // A second one goes after it; the list is written in its order.
+        let backup = share("grove-lab-backup", "smb://grove-lab/backup")
+        let two = try ExplorerConfig.localText(favourites: nil, servers: [media, backup], home: home, keeping: saved)
+        #expect(load(local: two).servers == [media, backup])
+        #expect(two.hasPrefix(original))
+
+        let removed = try ExplorerConfig.localText(favourites: nil, servers: [], home: home, keeping: saved)
+        #expect(removed == original)
+    }
+
+    @Test func serversAreWrittenWhereTheFirstStood() throws {
+        let existing = """
+            [servers.old]
+            url = "smb://grove-lab/old"
+            order = 1
+
+            [general]
+            two_panes = true
+
+            """
+        let media = share("grove-lab-media", "smb://grove-lab/media")
+        let text = try ExplorerConfig.localText(favourites: nil, servers: [media], home: home, keeping: existing)
+        #expect(text == """
+            [servers."grove-lab-media"]
+            url = "smb://grove-lab/media"
+            order = 1
+
+            [general]
+            two_panes = true
+
+            """)
+    }
+
+    @Test func changingFavouritesKeepsTheServers() throws {
+        let existing = """
+            [servers.grove-lab-media]
+            url = "smb://grove-lab/media"
+            order = 1
+
+            """
+        let favourites = [Favourite(id: "a", url: folder("/a"), title: "a")]
+        let text = try ExplorerConfig.localText(favourites: favourites, servers: nil, home: home, keeping: existing)
+        let config = load(local: text)
+        #expect(config.servers == [share("grove-lab-media", "smb://grove-lab/media")])
+        #expect(config.favourites == favourites)
+    }
+
+    @Test func savingAShareWithNoLocalFileLeavesTheTrackedFavourites() throws {
+        let media = share("grove-lab-media", "smb://grove-lab/media")
+        let text = try ExplorerConfig.localText(favourites: nil, servers: [media], home: home, keeping: nil)
+        #expect(text == "[servers.\"grove-lab-media\"]\nurl = \"smb://grove-lab/media\"\norder = 1\n")
+        #expect(load(local: text).favourites.count == 5)
+    }
+
+    @Test func unreadableLocalFileIsNotWrittenOver() {
+        let media = share("grove-lab-media", "smb://grove-lab/media")
+        #expect(throws: ConfigWriteRefused(
+            description: "explorer.local.toml line 2 can't be read, so it was left as it is and the shared folders were not saved"
+        )) {
+            try ExplorerConfig.localText(favourites: nil, servers: [media], home: home,
+                                         keeping: "[servers.x]\nurl = \"smb://grove-lab/x\n")
+        }
+        #expect(throws: ConfigWriteRefused.self) {
+            try ExplorerConfig.localText(favourites: nil, servers: [media], home: home,
+                                         keeping: "[servers.x]\norder = 1\n")
+        }
+    }
+
+    @Test(arguments: [
+        ("[servers.x]\norder = 1\n", "explorer.local.toml line 2: [servers.x] has no \"url\""),
+        ("[servers.x]\n", "explorer.local.toml: [servers.x] has no \"url\""),
+        ("[servers.x]\nurl = 3\n", "explorer.local.toml line 2: \"url\" must be a string"),
+        ("[servers.x]\nurl = \"http://grove-lab/media\"\n",
+         "explorer.local.toml line 2: \"url\" must be a share's address: Use an smb://, afp:// or nfs:// address"),
+        ("[servers.x]\nurl = \"smb://gm:secret@grove-lab/media\"\n",
+         "explorer.local.toml line 2: \"url\" must be a share's address: Leave the password out — macOS will ask for it"),
+        ("[servers.x]\nurl = \"smb://grove-lab/media\"\norder = \"1\"\n",
+         "explorer.local.toml line 3: \"order\" must be a number"),
+        ("[servers.x]\nurl = \"smb://grove-lab/media\"\nname = \"m\"\n", "explorer.local.toml line 3: unknown key \"name\""),
+        ("[servers]\nurl = \"smb://grove-lab/media\"\n",
+         "explorer.local.toml line 2: a shared folder is a table of its own: [servers.name]"),
+        ("[servers.a.b]\nurl = \"smb://grove-lab/media\"\n", "explorer.local.toml line 2: unknown table [servers.a.b]"),
+    ])
+    func badServerTableIsReported(text: String, problem: String) {
+        let config = load(local: text)
+        #expect(config.problem == problem)
+        #expect(config.servers.isEmpty)
+        #expect(config.favourites.count == 5)
     }
 }

@@ -338,7 +338,7 @@ extension AppModel {
             let before = ExplorerConfig.allFavourites(tracked: tracked, local: existing, home: home)
             let after = change(before)
             guard after != before else { return }
-            let text = try ExplorerConfig.localText(favourites: after, home: home, keeping: existing)
+            let text = try ExplorerConfig.localText(favourites: after, servers: nil, home: home, keeping: existing)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(text.utf8).write(to: local, options: .atomic)
             // The window's own list: without what went, with what is new.
