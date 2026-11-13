@@ -135,8 +135,8 @@ import Testing
             case .blank: hasRows = false; onItsWay = tab
             case .keepWaiting:
                 hasRows = known.hasRows
-                // Its own arrange goes on; another pane's is not this pane's.
-                if other != nil || onItsWay == nil { onItsWay = tab }
+                // Begun again, its own as much as another pane's.
+                onItsWay = tab
             }
         }
 

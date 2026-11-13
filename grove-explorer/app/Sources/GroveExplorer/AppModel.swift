@@ -261,9 +261,9 @@ final class AppModel: ObservableObject {
                 .map { (side: $0.key, listing: $0.value, reuse: $0.value.state.reuse(for: wanted, entries: $0.value.all.count)) }
                 .min { ($0.reuse, $0.side == side ? 0 : 1) < ($1.reuse, $1.side == side ? 0 : 1) }
             // A sort still on its way was for the tab the pane showed:
-            // given up, unless it is the very one this tab waits for.
-            let waitsOn = known?.reuse == .keepWaiting && known?.side == side
-            if !waitsOn { sorts[side] = (sorts[side] ?? 0) + 1 }
+            // given up. (Also the very one this tab waits for: it is begun
+            // again below, which is simpler than telling the two apart.)
+            sorts[side] = (sorts[side] ?? 0) + 1
             guard let known else {
                 // No pane has this folder's rows: the pane is blank until
                 // they are read. It never shows the rows of the folder it
@@ -296,8 +296,7 @@ final class AppModel: ObservableObject {
             // The tab's own rows are arranged off the main thread; the
             // state says meanwhile that they are not here yet.
             switch known.reuse {
-            case .oldOrder, .blank: arrange(side)
-            case .keepWaiting: if !waitsOn { arrange(side) }
+            case .oldOrder, .blank, .keepWaiting: arrange(side)
             case .asItIs, .arrangeNow: break
             }
         }

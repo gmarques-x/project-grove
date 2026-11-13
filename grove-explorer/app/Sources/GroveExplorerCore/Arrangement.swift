@@ -83,8 +83,8 @@ public enum RowsState: Equatable, Sendable {
         /// shown so until the tab's order, arranged off the main thread, is ready.
         case oldOrder
         /// The rows the tab asks for are already awaited: nothing is
-        /// shown differently, and the arrange on its way is not begun
-        /// again (a pane taking another pane's listing begins its own).
+        /// shown differently. The pane begins the arrange again all the
+        /// same, its own as much as another pane's.
         case keepWaiting
         /// A big folder whose rows are other items than the tab's (another
         /// filter, hidden items) or are not there yet: no rows are shown
