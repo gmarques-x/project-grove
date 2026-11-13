@@ -120,9 +120,20 @@ public enum KeyboardLayout {
 
     /// Every cap's key name. Bindings on other keys (Escape sits in the
     /// function row) are listed under the keyboard.
-    public static let names: Set<String> = names(for: .ansi)
+    public static let names: Set<String> = ansiNames
 
+    /// Each shape's, made once: asked on every key press and every draw.
     public static func names(for shape: KeyboardShape) -> Set<String> {
+        switch shape {
+        case .ansi: return ansiNames
+        case .iso: return isoNames
+        }
+    }
+
+    private static let ansiNames = makeNames(.ansi)
+    private static let isoNames = makeNames(.iso)
+
+    private static func makeNames(_ shape: KeyboardShape) -> Set<String> {
         Set(rows(for: shape).flatMap { $0 }.compactMap(\.name))
     }
 

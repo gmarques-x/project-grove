@@ -71,10 +71,7 @@ public enum Layers {
     /// A launcher wins over a `hyper-` binding on the same key; both are marked
     /// `conflict`, and the AeroSpace one appears only in the Bindings rows.
     /// `appName` returns nil for an app that isn't installed.
-    /// `legends`: the current input source's characters; a layer's title
-    /// is its modifiers only, so they never change it.
-    public static func build(from keys: KeysFile, legends: Legends = .us,
-                             appName: (String) -> String?) -> [Layer] {
+    public static func build(from keys: KeysFile, appName: (String) -> String?) -> [Layer] {
         var layers = [
             Layer(id: "hyper", title: "Hyper"),
             Layer(id: "alt", title: "Option"),
@@ -117,8 +114,8 @@ public enum Layers {
                     i = 2
                 } else {
                     let prefix = String(sc.aerospace.dropLast(sc.key.count + 1))
-                    // The modifiers' glyphs, before the space and the key.
-                    let written = Shortcut(modifiers: sc.modifiers, key: "x").symbols(using: legends)
+                    // Only the modifiers' glyphs, cut before the space: the key's legend never shows.
+                    let written = Shortcut(modifiers: sc.modifiers, key: "x").symbols(using: .us)
                     let title = String(written.prefix { $0 != " " })
                     i = sc.modifiers.isEmpty ? index("none", title: "No modifier") : index(prefix, title: title)
                 }

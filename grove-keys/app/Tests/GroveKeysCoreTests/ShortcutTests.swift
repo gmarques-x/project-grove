@@ -65,9 +65,12 @@ import Testing
     }
 
     @Test func symbolsWithoutArgumentIsUS() throws {
-        for text in ["hyper-semicolon", "alt-shift-quote", "cmd-backtick", "esc", "alt-1", "hyper-t"] {
-            let s = try #require(Shortcut(aerospace: text))
-            #expect(s.symbols == s.symbols(using: .us))
+        let expected = [
+            "hyper-semicolon": "⌃⌥⇧⌘ ;", "alt-shift-quote": "⌥⇧ '", "alt-backtick": "⌥ `",
+            "cmd-backtick": "⌘ `", "alt-1": "⌥ 1", "hyper-t": "⌃⌥⇧⌘ T",
+        ]
+        for (text, symbols) in expected {
+            #expect(try #require(Shortcut(aerospace: text)).symbols == symbols, "\(text)")
         }
     }
 
