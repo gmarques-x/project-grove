@@ -72,7 +72,9 @@ struct PaneView: View {
                     onFailures: { work.failuresShown = work.failuresShown == side ? nil : side })
             }
         }
-        .background(Color(theme.bg0))
+        // Only its own rectangle: a fill that reaches into the title bar's
+        // safe area (the default) would paint over the window's header.
+        .background(Color(theme.bg0), ignoresSafeAreaEdges: [])
         // One thing to VoiceOver, with its tabs, path, list and status
         // inside: "Left pane, active".
         .accessibilityElement(children: .contain)
@@ -115,7 +117,9 @@ struct PaneView: View {
         }
         .padding(GroveSpace.s24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(theme.bg0))
+        // Only its own rectangle: a fill that reaches into the title bar's
+        // safe area (the default) would paint over the window's header.
+        .background(Color(theme.bg0), ignoresSafeAreaEdges: [])
         // It covers the list: a click here is a click in the pane.
         .contentShape(Rectangle())
         .onTapGesture {

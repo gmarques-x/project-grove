@@ -43,7 +43,9 @@ struct Sidebar: View {
             .padding(GroveSpace.s8)
         }
         .frame(width: rail ? SidebarLayout.Mode.rail.width : SidebarLayout.Mode.full.width)
-        .background(Color(theme.bg0))
+        // Only its own rectangle: a fill that reaches into the title bar's
+        // safe area (the default) would paint over the window's header.
+        .background(Color(theme.bg0), ignoresSafeAreaEdges: [])
         // A folder dropped on the sidebar itself, between or below its rows,
         // becomes a favourite; on a row it goes into that place.
         .onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, target: .favourites))
