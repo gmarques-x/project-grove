@@ -1,0 +1,60 @@
+{
+  "SPBluetoothDataType" : [
+    {
+      "controller_properties" : {
+        "controller_address" : "00:00:00:00:00:00",
+        "controller_chipset" : "BCM_4388C2",
+        "controller_discoverable" : "attrib_off",
+        "controller_firmwareVersion" : "1.0.0",
+        "controller_productID" : "0x0000",
+        "controller_state" : "attrib_on",
+        "controller_supportedServices" : "0x392039 < HFP AVRCP A2DP HID Braille LEA AACP GATT SerialPort >",
+        "controller_transport" : "PCIe",
+        "controller_vendorID" : "0x004C (Apple)"
+      },
+      "device_connected" : [
+        {
+          "Headphones" : {
+            "device_address" : "00:00:00:00:00:01",
+            "device_batteryLevelCase" : "100%",
+            "device_batteryLevelLeft" : "80%",
+            "device_batteryLevelRight" : "60%",
+            "device_firmwareVersion" : "1.0.0",
+            "device_minorType" : "Headphones",
+            "device_productID" : "0x0000",
+            "device_services" : "0x980019 < HFP AVRCP A2DP AACP GATT >",
+            "device_vendorID" : "0x004C"
+          }
+        },
+        {
+          "Keyboard" : {
+            "device_address" : "00:00:00:00:00:02",
+            "device_batteryLevelMain" : "45%",
+            "device_firmwareVersion" : "1.0.0",
+            "device_minorType" : "Keyboard",
+            "device_productID" : "0x0000",
+            "device_services" : "0x400020 < HID GATT >",
+            "device_vendorID" : "0x004C"
+          }
+        },
+        {
+          "Mouse" : {
+            "device_address" : "00:00:00:00:00:03",
+            "device_firmwareVersion" : "1.0.0",
+            "device_minorType" : "Mouse",
+            "device_productID" : "0x0000",
+            "device_vendorID" : "0x0000"
+          }
+        }
+      ],
+      "device_not_connected" : [
+        {
+          "Speaker" : {
+            "device_address" : "00:00:00:00:00:04",
+            "device_rssi" : "-60"
+          }
+        }
+      ]
+    }
+  ]
+}
