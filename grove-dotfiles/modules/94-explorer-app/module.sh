@@ -17,8 +17,15 @@ _XA_IDENTITY="Grove Code Signing"
 _xa_swift() { printf '%s' "${GROVE_SWIFT:-swift}"; }
 # The key's access list trusts /usr/bin/codesign by path, so use exactly that.
 _xa_codesign() { printf '%s' "${GROVE_CODESIGN:-/usr/bin/codesign}"; }
-_xa_apps() { printf '%s' "${GROVE_APPS_DIR:-$HOME/Applications}"; }
-_xa_app() { printf '%s/Grove Explorer.app' "$(_xa_apps)"; }
+# With neither GROVE_APPS_DIR nor HOME there is no such folder: the expansion
+# stops there, and _xa_app fails rather than name "/Grove Explorer.app".
+_xa_apps() { printf '%s' "${GROVE_APPS_DIR:-${HOME:?}/Applications}"; }
+_xa_app() {
+  local apps
+  apps="$(_xa_apps)" || return 1
+  [ -n "$apps" ] || return 1
+  printf '%s/Grove Explorer.app' "$apps"
+}
 # The stamp is in the bundle (spec §12): it is sealed by the signature and
 # goes when the app goes.
 _xa_stamp() { printf '%s/Contents/Resources/source.stamp' "$(_xa_app)"; }
@@ -170,9 +177,12 @@ check() {
 }
 
 apply() {
-  local src app tmp log stage rc=0 identity icons resources
+  local src app tmp log stage rc=0 identity icons resources hash old
   src="$(_xa_src)"
-  app="$(_xa_app)"
+  if ! app="$(_xa_app)"; then
+    grove_fail "no folder to put Grove Explorer.app in: neither GROVE_APPS_DIR nor HOME is set"
+    return 1
+  fi
   icons="$(_xa_icons)"
   if ! command -v "$(_xa_swift)" >/dev/null 2>&1; then
     grove_fail "Grove Explorer needs the Xcode command line tools (swift); run grove install xcode-tools"
@@ -202,6 +212,14 @@ apply() {
     rm -rf "$tmp"
     return 1
   fi
+  # The stamp is the hash of what the build reads: taken before it starts, so
+  # a file saved while it runs leaves the app behind its source (check then
+  # says so) instead of stamped as built from text it never saw.
+  if ! hash="$(_xa_source_hash)"; then
+    grove_fail "could not read the sources Grove Explorer is built from"
+    rm -rf "$tmp"
+    return 1
+  fi
   if ! (cd "$src" && "$(_xa_swift)" build -c release) >"$log" 2>&1; then
     grove_fail "swift build failed:"
     tail -n 15 "$log" >&2
@@ -219,7 +237,7 @@ apply() {
       && _xa_info_plist > "$stage/Contents/Info.plist" \
       && cp "$icons/seti.woff" "$icons/grove-icon-theme.json" "$stage/Contents/Resources/" \
       && _xa_keys_app _ka_iconset "$(_xa_themes_src)/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
-      && _xa_source_hash > "$stage/Contents/Resources/source.stamp" \
+      && printf '%s\n' "$hash" > "$stage/Contents/Resources/source.stamp" \
       || rc=1
   fi
   if [ "$rc" -ne 0 ]; then
@@ -236,9 +254,30 @@ apply() {
   fi
 
   # Signed: now replace the installed app. One that is open keeps running the
-  # build it was started from; it is never stopped here.
-  rm -rf "$app"
-  mv "$stage" "$app" || { rm -rf "$tmp"; return 1; }
+  # build it was started from; it is never stopped here. The old bundle is
+  # moved aside first and comes back if the new one can't take its place: at
+  # no moment is there no app, and the old one is removed only with $tmp.
+  old="$tmp/old/Grove Explorer.app"
+  if [ -e "$app" ] || [ -L "$app" ]; then
+    if ! { mkdir -p "$tmp/old" && mv "$app" "$old"; }; then
+      grove_fail "could not move the installed Grove Explorer.app aside; it is left as it was"
+      rm -rf "$tmp"
+      return 1
+    fi
+  fi
+  if ! mv "$stage" "$app"; then
+    if [ ! -e "$old" ] && [ ! -L "$old" ]; then
+      grove_fail "could not put Grove Explorer.app in place"
+    elif mv "$old" "$app"; then
+      grove_fail "could not put Grove Explorer.app in place; the one that was installed is back"
+    else
+      # Nothing is deleted: the old bundle is still in the build folder.
+      grove_fail "could not put Grove Explorer.app in place, nor the old one back: it is in $tmp/old"
+      return 1
+    fi
+    rm -rf "$tmp"
+    return 1
+  fi
   rm -rf "$tmp"
   if _xa_running; then
     grove_note "Grove Explorer is open: quit and reopen it to use the new build"
@@ -248,7 +287,11 @@ apply() {
 }
 
 # remove: take the app away. Its config (~/.config/grove-explorer) and its
-# session ($GROVE_STATE/explorer-session.json) stay.
+# session ($GROVE_STATE/explorer-session.json) stay. Nothing calls it yet:
+# grove has no uninstall command (the manual says how to delete the app by
+# hand); it is kept, tested, for when there is one.
 remove() {
-  rm -rf "$(_xa_app)"
+  local app
+  app="$(_xa_app)" || return 1
+  rm -rf "$app"
 }

@@ -46,6 +46,8 @@ setup() {
   stub swift '
 echo "$*" >> "$BATS_TEST_TMPDIR/swift-args"
 if [ -n "$FAKE_SWIFT_FAIL" ]; then echo "error: boom.swift:1: cannot find x" >&2; exit 1; fi
+# A source file saved while the build runs (the build itself is of the old text).
+if [ -n "$FAKE_SWIFT_EDITS" ]; then echo "// saved while building" >> Package.swift; fi
 for f in seti.woff grove-icon-theme.json; do
   [ -f "Sources/GroveExplorer/Resources/$f" ] || { echo "error: resources are missing ($f)" >&2; exit 1; }
 done
@@ -448,6 +450,71 @@ plist() { plutil -extract "$1" raw "$APP/Contents/Info.plist"; }
   [ "$(cat "$APP/Contents/MacOS/GroveExplorer")" = old ]
   [ "$(cat "$STAMP")" = oldstamp ]
   [ "$(ls -A "$GROVE_APPS_DIR")" = "Grove Explorer.app" ]
+}
+
+@test "explorer-app: the stamp is the hash of the source as it was before the build" {
+  load_module
+  before="$(_xa_source_hash)"
+  export FAKE_SWIFT_EDITS=1
+  run apply
+  [ "$status" -eq 0 ]
+  # What was built is the text from before the edit: the stamp says so, and
+  # check then sees that the app is behind its source.
+  [ "$(cat "$STAMP")" = "$before" ]
+  [ "$(_xa_source_hash)" != "$before" ]
+  run check
+  [ "$status" -eq 3 ]
+}
+
+@test "explorer-app: a new bundle that can't be put in place brings the old one back" {
+  xa_ready
+  echo old > "$APP/Contents/MacOS/GroveExplorer"
+  echo oldstamp > "$STAMP"
+  # mv fails only for the new bundle going to its place.
+  stub mv '
+case "$1" in
+  */old/*) ;;
+  */.grove-explorer.*/Grove\ Explorer.app) [ "$2" = "$GROVE_APPS_DIR/Grove Explorer.app" ] && { echo "mv: $2: Operation not permitted" >&2; exit 1; } ;;
+esac
+exec /bin/mv "$@"'
+  run apply
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"could not put Grove Explorer.app in place"* ]] || false
+  [ "$(cat "$APP/Contents/MacOS/GroveExplorer")" = old ]
+  [ "$(cat "$STAMP")" = oldstamp ]
+  [ "$(ls -A "$GROVE_APPS_DIR")" = "Grove Explorer.app" ]
+}
+
+@test "explorer-app: the old bundle is never removed before the new one is in place" {
+  xa_ready
+  echo old > "$APP/Contents/MacOS/GroveExplorer"
+  # rm may only ever be given the build folder, never the installed app.
+  stub rm '
+for a in "$@"; do
+  [ "$a" = "$GROVE_APPS_DIR/Grove Explorer.app" ] && echo "rm $*" >> "$BATS_TEST_TMPDIR/rm-of-the-app"
+done
+exec /bin/rm "$@"'
+  run apply
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/rm-of-the-app" ]
+  [ "$(cat "$APP/Contents/MacOS/GroveExplorer")" != old ]
+  [ "$(ls -A "$GROVE_APPS_DIR")" = "Grove Explorer.app" ]
+}
+
+@test "explorer-app: without HOME and GROVE_APPS_DIR nothing is built, checked or removed at /" {
+  load_module
+  unset GROVE_APPS_DIR
+  run env -u HOME bash -c '. "$1"; _xa_apps' _ "$MODULE_DIR/module.sh"
+  [ "$status" -ne 0 ]
+  [ -z "$output" ] || [[ "$output" == *"HOME"* ]] || false
+  # remove gives up before any rm (it would otherwise be "/Grove Explorer.app").
+  stub rm 'echo "rm $*" >> "$BATS_TEST_TMPDIR/rm-args"; exec /bin/rm "$@"'
+  HOME= run remove
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/rm-args" ]
+  HOME= run apply
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/swift-args" ]
 }
 
 @test "explorer-app: codesign defaults to /usr/bin/codesign (the key trusts it by path)" {
