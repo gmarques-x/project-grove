@@ -92,12 +92,17 @@ extension EnvironmentValues {
 ///     }
 public struct BarPanel<Content: View>: View {
     let width: CGFloat
+    let surface: Surface
     let content: Content
     @Environment(\.theme) private var theme
     @Environment(\.barPanelShape) private var shape
 
-    public init(width: CGFloat, @ViewBuilder content: () -> Content) {
+    /// `surface`: the fill, bg0 (`.base`, every bar panel) or bg1 (`.panel`:
+    /// a Grove menu over a window, one step above the window's bg0); the
+    /// rows inside are told it (`panelSurface`).
+    public init(width: CGFloat, surface: Surface = .base, @ViewBuilder content: () -> Content) {
         self.width = width
+        self.surface = surface
         self.content = content()
     }
 
@@ -112,9 +117,9 @@ public struct BarPanel<Content: View>: View {
             .frame(width: width, alignment: .topLeading)
             .font(GroveFont.mono(GroveType.body))
             .foregroundStyle(Color(theme.fg))
-            .background(Color(theme.bg0), in: outline)
+            .background(Color(surface == .base ? theme.bg0 : theme.bg1), in: outline)
             .overlay(outline.strokeBorder(theme.panelOutline, lineWidth: 1).allowsHitTesting(false))
-            .environment(\.panelSurface, .base)
+            .environment(\.panelSurface, surface)
     }
 }
 

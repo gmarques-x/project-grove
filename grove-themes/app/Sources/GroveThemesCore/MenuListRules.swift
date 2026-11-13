@@ -220,6 +220,29 @@ public struct MenuListLayout: Equatable, Sendable {
 
 /// Where a menu's panels go.
 public enum MenuPlacement {
+    /// The frame of a menu popped up at `origin` (`GroveMenuList.popUp`), in
+    /// the coordinates `screen` is in (y down), on whole points.
+    ///
+    /// Its top-left corner is at `origin`. Without room at the right it goes
+    /// to the point's left (its right edge at the point); without room below,
+    /// above the point (its bottom edge at the point), as a native menu.
+    /// Where flipping doesn't fit either it is pushed back onto the screen:
+    /// against its right or bottom edge, and never past its left or top.
+    ///
+    /// - `size`: the menu panel's.
+    /// - `screen`: what the menu may cover (the screen's visible frame).
+    public static func menu(origin: CGPoint, size: CGSize, screen: CGRect) -> CGRect {
+        let point = CGPoint(x: origin.x.rounded(.down), y: origin.y.rounded(.down))
+        func place(_ start: Double, _ length: Double, _ low: Double, _ high: Double) -> Double {
+            guard start + length > high else { return start }
+            let flipped = start - length
+            return flipped >= low ? flipped : max(low, high - length)
+        }
+        return CGRect(x: place(point.x, size.width, screen.minX, screen.maxX),
+                      y: place(point.y, size.height, screen.minY, screen.maxY),
+                      width: size.width, height: size.height)
+    }
+
     /// The frame of a submenu's panel, in the coordinates `parent` is in
     /// (y down).
     ///

@@ -55,9 +55,14 @@ public struct GroveMenuListRow: Identifiable, Equatable {
     public var enabled: Bool
     /// Ticked when the menu is shown (the model's `checked` can add more).
     public var checked: Bool
+    /// A submenu's rows, asked for each time it opens (Open With asks
+    /// NSWorkspace then); they replace the kind's own rows. Nil: the kind's
+    /// rows. A filled submenu with no rows doesn't open. Not compared by `==`.
+    public var fill: (() -> [GroveMenuListRow])?
 
     public init(id: String, title: String, icon: GroveMenuListIcon? = nil, separator: Bool = false,
-                kind: Kind = .action, enabled: Bool = true, checked: Bool = false) {
+                kind: Kind = .action, enabled: Bool = true, checked: Bool = false,
+                fill: (() -> [GroveMenuListRow])? = nil) {
         self.id = id
         self.title = title
         self.icon = icon
@@ -65,6 +70,13 @@ public struct GroveMenuListRow: Identifiable, Equatable {
         self.kind = kind
         self.enabled = enabled
         self.checked = checked
+        self.fill = fill
+    }
+
+    /// Everything but `fill` (a function can't be compared).
+    public static func == (lhs: GroveMenuListRow, rhs: GroveMenuListRow) -> Bool {
+        lhs.id == rhs.id && lhs.title == rhs.title && lhs.icon == rhs.icon && lhs.separator == rhs.separator
+            && lhs.kind == rhs.kind && lhs.enabled == rhs.enabled && lhs.checked == rhs.checked
     }
 
     /// The keys, the pointer and type-to-jump stop on it.
@@ -123,7 +135,8 @@ public enum GroveMenuListKey: Equatable, Sendable {
 enum GroveMenuListMetrics {
     /// A row: a line of label text and the rows' 4 pt above and below.
     static let row = GroveSpace.s24
-    /// A submenu's width, unless its titles need more (up to `widest`).
+    /// A submenu's width, and a popped-up menu's (`GroveMenuList.popUp`),
+    /// unless its titles need more (up to `widest`).
     static let submenu: CGFloat = 190
     /// A measured limit: what the longest of Grove Keys' own lines needs at
     /// label size ("Grove Keys needs Input Monitoring — Open Settings");
@@ -192,7 +205,7 @@ public final class GroveMenuListModel: ObservableObject {
     /// The open submenus changed: the host re-places the side panels.
     public var onLevels: () -> Void = {}
 
-    private let width: CGFloat
+    private let width: CGFloat?
     private let icons: Bool
     /// Per level: its submenu's timing, the pointer's last place in it, and
     /// whether its submenu's panel is at its left (no room at the right).
@@ -203,11 +216,12 @@ public final class GroveMenuListModel: ObservableObject {
     private var focus = 0
     private var timer: Timer?
 
-    /// - `width`: the menu's own panel; submenus fit their titles.
+    /// - `width`: the menu's own panel; nil fits its titles, as submenus
+    ///   always do.
     /// - `icons`: the menu's rows keep an icon column even when none has an
     ///   icon (a row without one keeps the indent). Any level whose rows
     ///   have an icon keeps one.
-    public init(width: CGFloat, icons: Bool) {
+    public init(width: CGFloat?, icons: Bool) {
         self.width = width
         self.icons = icons
     }
@@ -245,11 +259,13 @@ public final class GroveMenuListModel: ObservableObject {
     }
 
     /// Opens the submenus along `ids` (each a row of the level before) and
-    /// highlights the last row named; stops at the first id that isn't there.
+    /// highlights the last row named; stops at the first id that isn't
+    /// there or can't be chosen (a note, a disabled row).
     public func open(path ids: [String]) {
         for id in ids {
             let depth = levels.count - 1
-            guard depth >= 0, let index = levels[depth].rows.firstIndex(where: { $0.id == id }) else { return }
+            guard depth >= 0, let index = levels[depth].rows.firstIndex(where: { $0.id == id }),
+                  levels[depth].rows[index].isSelectable else { return }
             if levels[depth].rows[index].children != nil {
                 openSubmenu(depth, index, highlightFirst: false)
             } else {
@@ -276,6 +292,12 @@ public final class GroveMenuListModel: ObservableObject {
         }
     }
 
+    /// The row of `depth` whose submenu is open, if one is.
+    func openRow(_ depth: Int) -> Int? {
+        guard levels.count > depth + 1, intents.indices.contains(depth) else { return nil }
+        return intents[depth].open
+    }
+
     /// The host put the submenu of `depth` at the left of the panel before
     /// it (`onLeft`, no room at the right) or at its right: the pointer
     /// moving that way is on its way into it.
@@ -286,8 +308,8 @@ public final class GroveMenuListModel: ObservableObject {
 
     private func level(_ rows: [GroveMenuListRow], depth: Int) -> Level {
         let icons = (depth == 0 && self.icons) || rows.contains { $0.icon != nil }
-        var width = self.width
-        if depth > 0 {
+        var width = self.width ?? 0
+        if depth > 0 || self.width == nil {
             let column = icons ? PanelMetrics.iconColumn + GroveSpace.s8 : 0
             let titles = rows.map {
                 GroveMenuListMetrics.width(of: $0.title)
@@ -317,9 +339,14 @@ public final class GroveMenuListModel: ObservableObject {
     /// Opens the submenu of `row` at `depth`, at once. `highlightFirst`:
     /// the keys go into it (→, Return); otherwise they stay where they are.
     private func openSubmenu(_ depth: Int, _ row: Int, highlightFirst: Bool) {
-        guard levels.indices.contains(depth), let children = levels[depth].rows[row].children else { return }
+        guard levels.indices.contains(depth), var children = levels[depth].rows[row].children else { return }
         let alreadyOpen = intents[depth].open == row && levels.count > depth + 1
         if !alreadyOpen {
+            if let fill = levels[depth].rows[row].fill {
+                children = fill()
+                guard !children.isEmpty else { return }
+                checked.formUnion(Self.checkedIDs(children))
+            }
             truncate(to: depth)
             intents[depth].set(open: row)
             levels.append(level(children, depth: depth + 1))
@@ -531,16 +558,20 @@ public final class GroveMenuListModel: ObservableObject {
 public struct GroveMenuListPanel: View {
     @ObservedObject var model: GroveMenuListModel
     let level: Int
+    let surface: Surface
 
-    public init(model: GroveMenuListModel, level: Int) {
+    /// `surface`: the card's fill: `.base` (bg0) for the bar's Grove menu,
+    /// `.panel` (bg1) for a menu over a window (`GroveMenuList.popUp`).
+    public init(model: GroveMenuListModel, level: Int, surface: Surface = .base) {
         self.model = model
         self.level = level
+        self.surface = surface
     }
 
     public var body: some View {
         if model.levels.indices.contains(level) {
             let shown = model.levels[level]
-            BarPanel(width: shown.layout.width) {
+            BarPanel(width: shown.layout.width, surface: surface) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.rows.enumerated()), id: \.element.id) { index, row in
                         if MenuListLayout.showsRule(index, separators: shown.rows.map(\.separator)) {
@@ -592,7 +623,7 @@ private struct GroveMenuListRowView: View {
                             Image(nsImage: image).resizable().interpolation(.high)
                                 .frame(width: PanelMetrics.iconColumn, height: PanelMetrics.iconColumn)
                                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + GroveType.label / 3 }
-                                .opacity(row.enabled ? 1 : 0.5)
+                                .opacity(row.enabled ? 1 : GroveOpacity.disabledImage)
                         case nil: Color.clear.frame(height: 1)
                         }
                     }
@@ -605,7 +636,11 @@ private struct GroveMenuListRowView: View {
                     Text(row.title).truncationMode(.tail).foregroundStyle(theme.quiet)
                 }
                 Spacer(minLength: 0)
-                if checked { GroveIcon(.current, size: GroveType.label).foregroundStyle(Color(theme.green)) }
+                // A disabled row's tick is quiet, as its title.
+                if checked {
+                    GroveIcon(.current, size: GroveType.label)
+                        .foregroundStyle(row.enabled ? Color(theme.green) : theme.quiet)
+                }
                 if row.coreKind.showsChevron { GroveIcon(.forward, size: GroveType.body).foregroundStyle(theme.quiet) }
             }
             .font(GroveFont.mono(GroveType.label))

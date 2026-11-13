@@ -52,3 +52,12 @@ public enum GroveSpace {
     /// Every step, smallest first.
     public static let scale: [CGFloat] = [s2, s4, s8, s12, s16, s24]
 }
+
+/// How strongly something is drawn, for what can't take a colour role. Views
+/// take an opacity from here, not a literal.
+public enum GroveOpacity {
+    /// 0.5: an image (an app's icon) on a disabled row, in every Grove menu.
+    /// A disabled row's text and symbols are `theme.quiet` instead; an image
+    /// keeps its own colours, so it is drawn at half strength.
+    public static let disabledImage: Double = 0.5
+}

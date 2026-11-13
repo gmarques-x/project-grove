@@ -320,6 +320,81 @@ import Testing
     }
 }
 
+/// A menu popped up at a point (`GroveMenuList.popUp`): its top-left at the
+/// point, flipped to the point's left or above it at the screen's edges.
+@Suite struct MenuPlacementMenuTests {
+    /// A 1512 × 982 screen's visible frame, below a 33 pt menu bar (y down).
+    static let screen = CGRect(x: 0, y: 33, width: 1512, height: 949)
+    static let size = CGSize(width: 220, height: 161)
+
+    @Test func itsTopLeftIsAtThePoint() {
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 400, y: 300), size: Self.size, screen: Self.screen)
+        #expect(frame == CGRect(x: 400, y: 300, width: 220, height: 161))
+    }
+
+    @Test func itIsOnWholePoints() {
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 400.6, y: 300.4), size: Self.size, screen: Self.screen)
+        #expect(frame == CGRect(x: 400, y: 300, width: 220, height: 161))
+    }
+
+    @Test func atTheRightEdgeItGoesToThePointsLeft() {
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 1400, y: 300), size: Self.size, screen: Self.screen)
+        #expect(frame.maxX == 1400)
+        #expect(frame.minY == 300)
+        // Exactly fitting stays at the right.
+        let fits = MenuPlacement.menu(origin: CGPoint(x: 1292, y: 300), size: Self.size, screen: Self.screen)
+        #expect(fits.minX == 1292 && fits.maxX == 1512)
+    }
+
+    @Test func atTheBottomItGoesAboveThePoint() {
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 400, y: 900), size: Self.size, screen: Self.screen)
+        #expect(frame.maxY == 900)
+        #expect(frame.minX == 400)
+        let fits = MenuPlacement.menu(origin: CGPoint(x: 400, y: 821), size: Self.size, screen: Self.screen)
+        #expect(fits.minY == 821 && fits.maxY == 982)
+    }
+
+    @Test func inTheBottomRightCornerItFlipsBothWays() {
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 1500, y: 970), size: Self.size, screen: Self.screen)
+        #expect(frame == CGRect(x: 1280, y: 809, width: 220, height: 161))
+        #expect(Self.screen.contains(frame))
+    }
+
+    @Test func withRoomOnNeitherSideItIsKeptOnScreen() {
+        // Flipping would take it past the top or the left: it is pushed in.
+        let small = CGRect(x: 0, y: 33, width: 300, height: 200)
+        let frame = MenuPlacement.menu(origin: CGPoint(x: 150, y: 150), size: Self.size, screen: small)
+        #expect(small.contains(frame))
+        #expect(frame == CGRect(x: 80, y: 72, width: 220, height: 161))
+        // Bigger than the screen: from its top-left.
+        let huge = MenuPlacement.menu(origin: CGPoint(x: 150, y: 150), size: CGSize(width: 400, height: 400),
+                                      screen: small)
+        #expect(huge.minX == 0 && huge.minY == 33)
+    }
+
+    @Test func aSubmenuOpenedInTheBottomRightCornerStaysOnScreen() {
+        // The menu flipped up and left; its last row's submenu has no room
+        // at the right, so it goes to the menu's left, and it is moved up
+        // from the screen's bottom.
+        let layout = MenuListLayout(width: 220, heights: Array(repeating: 24, count: 6),
+                                    separators: Array(repeating: false, count: 6),
+                                    metrics: .init(edge: 8, side: 4, rule: 9))
+        let menu = MenuPlacement.menu(origin: CGPoint(x: 1500, y: 970), size: layout.size, screen: Self.screen)
+        #expect(Self.screen.contains(menu))
+        let submenu = MenuPlacement.submenu(parent: menu, row: layout.rows[5], size: CGSize(width: 190, height: 113),
+                                            firstRow: 8, bounds: Self.screen)
+        #expect(Self.screen.contains(submenu))
+        #expect(submenu.maxX == menu.minX + 1)
+        #expect(submenu.maxY == Self.screen.maxY)
+        // With room at the right, beside its row, its first row level with it.
+        let roomy = MenuPlacement.menu(origin: CGPoint(x: 400, y: 300), size: layout.size, screen: Self.screen)
+        let beside = MenuPlacement.submenu(parent: roomy, row: layout.rows[2], size: CGSize(width: 190, height: 113),
+                                           firstRow: 8, bounds: Self.screen)
+        #expect(beside.minX == roomy.maxX - 1)
+        #expect(beside.minY + 8 == roomy.minY + layout.rows[2].minY)
+    }
+}
+
 @Suite struct MenuListRowKindTests {
     @Test func onlyASubmenuShowsAChevron() {
         #expect(MenuListRowKind.submenu.showsChevron)

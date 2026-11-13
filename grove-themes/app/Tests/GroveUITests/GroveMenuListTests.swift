@@ -64,6 +64,83 @@ import Testing
         #expect(model.checked == ["with.b"])
     }
 
+    @Test func thePointerAndAClickOverADisabledRowDoNothing() {
+        let model = GroveMenuListModel(width: 200, icons: false)
+        var chosen: [String] = []
+        model.onChoose = { chosen.append($0.id) }
+        model.show(Self.rows)
+        let rename = model.levels[0].layout.rows[1]
+        let middle = CGPoint(x: rename.midX, y: rename.midY)
+        model.pointer(0, at: middle)
+        #expect(model.levels[0].highlighted == nil)
+        model.click(0, at: middle)
+        #expect(model.levels[0].highlighted == nil)
+        #expect(chosen.isEmpty)
+        // Over "Open" it lights; moving onto "Rename" doesn't take the light.
+        let open = model.levels[0].layout.rows[0]
+        model.pointer(0, at: CGPoint(x: open.midX, y: open.midY))
+        #expect(model.levels[0].highlighted == 0)
+        model.pointer(0, at: middle)
+        #expect(model.levels[0].highlighted == 0)
+    }
+
+    @Test func openingAPathStopsAtARowThatCanNotBeChosen() {
+        let model = GroveMenuListModel(width: 200, icons: false)
+        model.show(Self.rows)
+        model.open(path: ["rename"])
+        #expect(model.levels[0].highlighted == nil)
+        // A disabled submenu row doesn't open.
+        var rows = Self.rows
+        rows[3].enabled = false
+        model.show(rows)
+        model.open(path: ["with", "with.a"])
+        #expect(model.levels.count == 1)
+        #expect(model.levels[0].highlighted == nil)
+    }
+
+    @Test func aFilledSubmenuAsksForItsRowsEachTimeItOpens() {
+        var asked = 0
+        let rows = [
+            GroveMenuListRow(id: "with", title: "Open With", kind: .submenu([]), fill: {
+                asked += 1
+                return [GroveMenuListRow(id: "with.\(asked)", title: "App \(asked)", checked: asked == 1)]
+            }),
+            GroveMenuListRow(id: "none", title: "Nothing", kind: .submenu([]), fill: { [] }),
+        ]
+        let model = GroveMenuListModel(width: nil, icons: false)
+        model.show(rows)
+        #expect(asked == 0)
+        model.open(path: ["with"])
+        #expect(asked == 1)
+        #expect(model.levels[1].rows.map(\.id) == ["with.1"])
+        #expect(model.checked.contains("with.1"))
+        #expect(model.key(.left))
+        model.open(path: ["with"])
+        #expect(asked == 2)
+        #expect(model.levels[1].rows.map(\.id) == ["with.2"])
+        // Filled with nothing: it doesn't open.
+        #expect(model.key(.left))
+        model.open(path: ["none"])
+        #expect(model.levels.count == 1)
+    }
+
+    @Test func withoutAWidthTheMenuFitsItsTitles() {
+        let model = GroveMenuListModel(width: nil, icons: false)
+        model.show([GroveMenuListRow(id: "a", title: "A")])
+        // (Double against Double: Swift Testing's mixed CGFloat/Double `==`
+        // reports equal values as different.)
+        #expect(model.levels[0].layout.width == Double(GroveMenuListMetrics.submenu))
+        model.show([GroveMenuListRow(id: "a", title: String(repeating: "Long title ", count: 4))])
+        #expect(model.levels[0].layout.width > Double(GroveMenuListMetrics.submenu))
+        #expect(model.levels[0].layout.width <= Double(GroveMenuListMetrics.widest))
+    }
+
+    @Test func rowsCompareWithoutTheirFill() {
+        let a = GroveMenuListRow(id: "a", title: "A", kind: .submenu([]), fill: { [] })
+        let b = GroveMenuListRow(id: "a", title: "A", kind: .submenu([]))
+        #expect(a == b)
+    }
+
     @Test func aSubmenuGoesBesideItsRow() {
         let model = GroveMenuListModel(width: 200, icons: false)
         model.show(Self.rows)
