@@ -3,7 +3,9 @@ import GroveExplorerCore
 import SwiftUI
 
 /// Started from main.swift, after the `--render` check. An ordinary app: one
-/// window, in ⌘Tab, nothing in the menu bar; closing the window quits it.
+/// window, in ⌘Tab, nothing in the menu bar; closing the window quits it,
+/// and while a file command is in hand the red button quits instead, so
+/// the window stays to say what the quit waits for (`Quitting.swift`).
 struct ExplorerApp: App {
     // `@State` is a macro and the Command Line Tools ship no SwiftUIMacros
     // plugin: the one model is made here and kept by the delegate.
@@ -42,7 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// ⌘W closes a tab and never the window: on a pane's last tab it does
     /// nothing. The system's own Close item has the same key and can't be
     /// taken out of a SwiftUI menu, so the key is caught here, before any
-    /// menu sees it. The red button and ⌘Q close and quit as ever.
+    /// menu sees it. ⌘Q quits as ever; the red button is the model's
+    /// (`AppModel.takeCloseButton`).
     private func keepCommandWForTabs() {
         commandW = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             // Only in the Explorer window itself: in the About panel, a
@@ -67,8 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
     }
 
-    /// Quitting (⌘Q, or the window's red button) while a file command is
-    /// in hand waits for it: its run is cancelled and stops after the file
+    /// Quitting (⌘Q, or the window's red button, which then quits rather
+    /// than closes) while a file command is in hand waits for it: its run is cancelled and stops after the file
     /// it is on, an open prompt is answered with Cancel, what was queued is
     /// dropped, and the app quits when that has ended (`Quitting.swift`).
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

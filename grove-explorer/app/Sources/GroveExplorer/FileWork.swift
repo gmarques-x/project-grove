@@ -128,8 +128,6 @@ final class FileWork: ObservableObject {
     /// The app was asked to quit and waits for the command in hand to end:
     /// nothing new is taken in, and nothing not yet running starts.
     var quitting = false
-    /// It has waited ten seconds: the status bar says what for.
-    var quitIsSlow = false
     var statusTimers: [Side: Task<Void, Never>] = [:]
     var arrivals: Arrivals?
     /// Every folder a run of this window changed: an undo or a redo may

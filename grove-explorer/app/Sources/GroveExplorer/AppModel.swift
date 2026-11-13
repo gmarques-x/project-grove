@@ -115,6 +115,9 @@ final class AppModel: ObservableObject {
     /// The status bar's words, kept while nothing they are made of changed.
     private var statuses: [Side: (tab: UUID?, revision: Int, selection: Int, sizes: Int, text: String)] = [:]
 
+    /// What the window's red button calls (`Quitting.swift`).
+    var closeButton: CloseButton?
+
     var themeWatcher: FolderWatcher?
     var themeState: Data?
 

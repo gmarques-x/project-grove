@@ -138,10 +138,10 @@ extension AppModel {
         // A quit asked for before the run had begun: its cancel found
         // nothing to stop then.
         if work.quitting { Task { await work.runner.cancel() } }
-        guard Date().timeIntervalSince(started) >= 0.2 || work.quitIsSlow else { return }
+        guard Date().timeIntervalSince(started) >= 0.2 || work.quitting else { return }
         show(
             .running(
-                run: run, words: work.quitIsSlow ? Self.finishingToQuit : OperationStatus.running(operation, progress),
+                run: run, words: work.quitting ? Self.finishingToQuit : OperationStatus.running(operation, progress),
                 fraction: OperationStatus.fraction(progress), percent: OperationStatus.percent(progress)),
             in: side, for: nil)
     }

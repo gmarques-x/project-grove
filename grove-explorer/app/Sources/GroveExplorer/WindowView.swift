@@ -27,6 +27,8 @@ struct WindowView: View {
             .runsUnderTitleBar()
             .keyboardFocusRing()
             .preferredColorScheme(model.colors.colorScheme)
+            // The red button asks the model: a quit that waits keeps the window.
+            .background(WindowAccessor { [model] window in model.takeCloseButton(of: window) })
     }
 
     /// The window's inside, without what ties it to a real window (a render
