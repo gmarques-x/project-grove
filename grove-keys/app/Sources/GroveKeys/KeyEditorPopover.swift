@@ -76,7 +76,7 @@ struct KeyEditorPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: GroveSpace.s12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(Shortcut(aerospace: target.shortcut)?.symbols ?? target.shortcut)
+                Text(Shortcut(aerospace: target.shortcut)?.symbols(using: model.legends) ?? target.shortcut)
                     .font(GroveFont.mono(GroveType.heading, .semibold))
                 Spacer()
                 Text("\(layerTitle) layer · \(kind.wrappedValue == .launcher ? "launch" : "aerospace.\(mode)")")
@@ -93,7 +93,7 @@ struct KeyEditorPopover: View {
                 case .launcher: launcher
                 case .aerospace: aerospace
                 case .none:
-                    Text("\(Shortcut(aerospace: target.shortcut)?.symbols ?? target.shortcut) does nothing in this layer.")
+                    Text("\(Shortcut(aerospace: target.shortcut)?.symbols(using: model.legends) ?? target.shortcut) does nothing in this layer.")
                         .foregroundStyle(theme.quiet)
                 }
             }

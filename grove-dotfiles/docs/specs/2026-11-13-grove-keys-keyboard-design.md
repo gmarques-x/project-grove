@@ -91,11 +91,14 @@ the names shown when a key types nothing.
 
 All key text goes through one function, `Shortcut.symbols(using: Legends)`:
 
-- the Keyboard tab (caps: base and Shift legends, binding below as today);
-- the cheat sheet on Hyper hold and the searchable cheat sheet (Hyper+K);
+- the Keyboard tab (caps: base and Shift legends, binding below as today; the
+  "Not on the keyboard" list);
+- the cheat sheet on Hyper hold and the searchable cheat sheet (Hyper+K: the
+  Hyper, AeroSpace and Ghostty rows; the shell and macOS lists are fixed text);
 - the key editor popover;
-- the Bindings rows;
-- the Grove menu's shortcut hints.
+- the Bindings rows and their clash lines.
+
+(As built: the Grove menu writes no shortcut hints, so it has none to change.)
 
 `hyper-semicolon` reads `⌃⌥⇧⌘ Ç` on the owner's Mac and `⌃⌥⇧⌘ ;` on a US Mac.
 Special keys keep their glyphs (⇥ ↩ ⌫ Esc Space ← → ↑ ↓). Letters show as

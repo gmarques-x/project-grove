@@ -330,7 +330,7 @@ final class AppModel: ObservableObject {
 
     private func publish(_ new: KeysFile) {
         if new != keys { keys = new }
-        layers = Layers.build(from: keys) { Launcher.appName(bundleID: $0) }
+        layers = Layers.build(from: keys, legends: legends) { Launcher.appName(bundleID: $0) }
     }
 
     /// `[keyboard] shape` (spec §5): auto removes it from keys.toml.

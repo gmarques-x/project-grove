@@ -23,7 +23,7 @@ public enum GhosttyKeybinds {
     ///   the fewest modifiers (the first of them when equal);
     /// - `goto_tab:1` … `goto_tab:8` on ⌘ 1 … 8 fold into one row.
     /// Key sequences (`ctrl+a>n`) and lines that aren't bindings are skipped.
-    public static func rows(listing: String) -> [CheatRow] {
+    public static func rows(listing: String, legends: Legends = .us) -> [CheatRow] {
         var kept: [Binding] = []
         for line in listing.split(whereSeparator: \.isNewline) {
             guard let binding = parse(String(line)),
@@ -48,11 +48,11 @@ public enum GhosttyKeybinds {
             let last = run.count
             if binding.key == binding.parameters, last >= 3, run.map(\.key) == (1...last).map(String.init) {
                 guard folded.insert(binding.name).inserted else { continue }
-                rows.append(CheatRow(id: "ghostty/\(binding.name)", keys: symbols(run[0]) + " … \(last)",
+                rows.append(CheatRow(id: "ghostty/\(binding.name)", keys: symbols(run[0], legends) + " … \(last)",
                                      text: words(binding.name, "1 … \(last)"),
                                      detail: binding.name))
             } else {
-                rows.append(CheatRow(id: "ghostty/\(binding.action)", keys: symbols(binding),
+                rows.append(CheatRow(id: "ghostty/\(binding.action)", keys: symbols(binding, legends),
                                      text: words(binding.name, binding.parameters), detail: binding.action))
             }
         }
@@ -96,13 +96,13 @@ public enum GhosttyKeybinds {
     }
 
     /// The key as the rest of the sheet writes one: `⌥⌘ ↑`.
-    private static func symbols(_ binding: Binding) -> String {
+    private static func symbols(_ binding: Binding, _ legends: Legends) -> String {
         let names = [
             "arrow_left": "left", "arrow_right": "right", "arrow_up": "up", "arrow_down": "down",
             "escape": "esc", "backquote": "backtick", "grave_accent": "backtick",
             "page_up": "Page Up", "page_down": "Page Down", "home": "Home", "end": "End",
         ]
-        return Shortcut(modifiers: binding.modifiers, key: names[binding.key] ?? binding.key).symbols
+        return Shortcut(modifiers: binding.modifiers, key: names[binding.key] ?? binding.key).symbols(using: legends)
     }
 
     /// `new_split` and `right` are "New split: right".

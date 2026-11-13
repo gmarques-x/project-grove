@@ -238,7 +238,7 @@ struct KeyboardView: View {
         let tint = theme.named(binding.kind.tint)
         return Button { editing.wrappedValue = target } label: {
             HStack(spacing: GroveSpace.s8) {
-                Text(Shortcut(aerospace: shortcut)?.symbols ?? shortcut)
+                Text(Shortcut(aerospace: shortcut)?.symbols(using: model.legends) ?? shortcut)
                     .font(GroveFont.mono(GroveType.body))
                     .padding(.horizontal, GroveSpace.s8).padding(.vertical, GroveSpace.s2)
                     .background(Color(theme.bg0), in: RoundedRectangle(cornerRadius: GroveRadius.control))
@@ -259,7 +259,7 @@ struct KeyboardView: View {
         .focusBox(showFocus.wrappedValue && focused.wrappedValue == binding.key,
                   cornerRadius: GroveRadius.control, outset: 3)
         .help(binding.words)
-        .accessibilityLabel((Shortcut(aerospace: shortcut)?.symbols ?? shortcut) + ", "
+        .accessibilityLabel((Shortcut(aerospace: shortcut)?.symbols(using: model.legends) ?? shortcut) + ", "
                             + (binding.words.isEmpty ? binding.label : binding.words))
         .popover(isPresented: presented(target), arrowEdge: .bottom) {
             editor(target, layer: layer)

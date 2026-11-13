@@ -137,7 +137,7 @@ struct BindingsView: View {
                     let missing = binding?.missingApp ?? false
                     let slot = BindingSlot.launcher(key: key)
                     RowView(
-                        shortcut: Self.launcherSymbols(key), recording: recorder.recording == row,
+                        shortcut: Self.launcherSymbols(key, model.legends), recording: recorder.recording == row,
                         recordable: true, conflict: conflicts.contains(key) ? "Also a ⌃⌥⇧⌘ AeroSpace binding · the launcher wins" : nil,
                         selected: selected.wrappedValue == row, onSelect: { select(row) },
                         onRecord: { record(row: row, from: slot, launcher: true, mode: "main") },
@@ -180,8 +180,8 @@ struct BindingsView: View {
         }
     }
 
-    private static func launcherSymbols(_ key: String) -> String {
-        Shortcut(modifiers: Set(Modifier.allCases), key: key).symbols
+    private static func launcherSymbols(_ key: String, _ legends: Legends) -> String {
+        Shortcut(modifiers: Set(Modifier.allCases), key: key).symbols(using: legends)
     }
 
     private func pickApp(anchor: String, key: String) {
@@ -205,7 +205,7 @@ struct BindingsView: View {
     private func modeGroup(_ mode: String) -> some View {
         let bindings = model.keys.modes.first { $0.name == mode }?.bindings ?? []
         let open = expanded.wrappedValue.contains(mode)
-        let rows = BindingRows.rows(mode: bindings, folded: !open)
+        let rows = BindingRows.rows(mode: bindings, folded: !open, legends: model.legends)
         let canFold = BindingRows.rows(mode: bindings, folded: true).count < bindings.count
         let conflicts = mode == "main" ? Layers.conflictingAerospaceKeys(model.keys) : []
         return BindingsGroup(title: "AeroSpace · \(mode)", note: bindings.count == 1 ? "1 binding" : "\(bindings.count) bindings") {
@@ -259,7 +259,9 @@ struct BindingsView: View {
 
     private func draftRow(_ d: Draft, mode: String) -> some View {
         let row = "draft:" + mode
-        let shortcut: String = if case .binding(_, let key) = d.slot { Shortcut(aerospace: key)?.symbols ?? key } else { "" }
+        let shortcut: String = if case .binding(_, let key) = d.slot {
+            Shortcut(aerospace: key)?.symbols(using: model.legends) ?? key
+        } else { "" }
         return VStack(spacing: GroveSpace.s2) {
             RowView(shortcut: shortcut.isEmpty ? "record" : shortcut, recording: recorder.recording == row,
                     recordable: true, conflict: nil, selected: false, onSelect: nil,
@@ -466,8 +468,8 @@ struct BindingsView: View {
 
     private func describe(_ slot: BindingSlot) -> String {
         switch slot {
-        case .launcher(let key): return Self.launcherSymbols(key)
-        case .binding(_, let key): return Shortcut(aerospace: key)?.symbols ?? key
+        case .launcher(let key): return Self.launcherSymbols(key, model.legends)
+        case .binding(_, let key): return Shortcut(aerospace: key)?.symbols(using: model.legends) ?? key
         }
     }
 

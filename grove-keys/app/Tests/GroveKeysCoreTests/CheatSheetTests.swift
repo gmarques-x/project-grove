@@ -231,3 +231,24 @@ import Testing
         #expect(GhosttyKeybinds.rows(listing: "").isEmpty)
     }
 }
+
+@Suite struct CheatSheetLegendsTests {
+    @Test func cheatSheetSearchShowsLegends() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        var keys = try KeysFile(text: fixture("keys.toml"))
+        keys.setLaunch(key: "semicolon", bundleID: "com.apple.finder")
+        let all = CheatSheet.sections(keys: keys, legends: pt) { _ in "Finder" }
+        let hyper = try #require(all.first { $0.id == "hyper" })
+        #expect(hyper.rows.first { $0.id == "hyper/launch:semicolon" }?.keys == "Hyper Ç")
+        // The modes' rows too: main's ⌥⇧ ; is the Ç key on Portuguese.
+        let rows = all.flatMap(\.rows)
+        #expect(rows.first { $0.id == "mode:main/alt-shift-semicolon" }?.keys == "⌥⇧ Ç")
+    }
+
+    @Test func ghosttyKeysShowLegends() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        let rows = GhosttyKeybinds.rows(listing: "keybind = super+semicolon=reload_config\n", legends: pt)
+        #expect(rows.first?.keys == "⌘ Ç")
+        #expect(GhosttyKeybinds.rows(listing: "keybind = super+semicolon=reload_config\n").first?.keys == "⌘ ;")
+    }
+}

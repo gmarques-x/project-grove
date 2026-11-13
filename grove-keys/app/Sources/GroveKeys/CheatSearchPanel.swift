@@ -27,6 +27,10 @@ final class CheatSearchPanel: ObservableObject {
     private let host = KeyPanelHost { PointerMenu.shared.previousApp }
     /// Counts openings, so Ghostty's keys asked for by an earlier one are dropped.
     private var opening = 0
+    /// What the sections were made from, so another input source's
+    /// characters can be put in while the sheet is open (`relegend`).
+    private var keys: KeysFile?
+    private var ghosttyListing: String?
 
     func toggle() {
         if host.isOpen {
@@ -38,7 +42,9 @@ final class CheatSearchPanel: ObservableObject {
 
     private func open() {
         let keys = AppModel.shared.keys
-        sections = Self.sections(keys, ghostty: [])
+        self.keys = keys
+        ghosttyListing = nil
+        sections = Self.sections(keys, ghosttyListing: nil, legends: AppModel.shared.legends)
         query = ""
         guard host.open(CheatSearchView(sheet: self, model: AppModel.shared)) else { return }
         opening += 1
@@ -48,17 +54,26 @@ final class CheatSearchPanel: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async {
             let listing = Subprocess.run(GhosttyKeybinds.binary, GhosttyKeybinds.arguments, timeout: 1)
             guard listing.status == 0 else { return }
-            let rows = GhosttyKeybinds.rows(listing: listing.output)
             DispatchQueue.main.async { [self] in
                 guard opening == self.opening, host.isOpen else { return }
-                sections = Self.sections(keys, ghostty: rows)
+                ghosttyListing = listing.output
+                sections = Self.sections(keys, ghosttyListing: listing.output, legends: AppModel.shared.legends)
                 refilter(keepingSelection: true)
             }
         }
     }
 
-    private static func sections(_ keys: KeysFile, ghostty: [CheatRow]) -> [CheatSection] {
-        CheatSheet.sections(keys: keys, ghostty: ghostty) { Launcher.appName(bundleID: $0) }
+    /// Another input source was chosen while the sheet is open: the same
+    /// rows, with its characters; the selection stays.
+    func relegend(_ legends: Legends) {
+        guard host.isOpen, let keys else { return }
+        sections = Self.sections(keys, ghosttyListing: ghosttyListing, legends: legends)
+        refilter(keepingSelection: true)
+    }
+
+    private static func sections(_ keys: KeysFile, ghosttyListing: String?, legends: Legends) -> [CheatSection] {
+        let ghostty = ghosttyListing.map { GhosttyKeybinds.rows(listing: $0, legends: legends) } ?? []
+        return CheatSheet.sections(keys: keys, ghostty: ghostty, legends: legends) { Launcher.appName(bundleID: $0) }
     }
 
     func close() {
@@ -153,6 +168,8 @@ private struct CheatSearchView: View {
                 }
             }
         }
+        // Another input source while the sheet is open: its characters at once.
+        .onChange(of: model.legends) { _, legends in sheet.relegend(legends) }
     }
 
     private func column(_ sections: [CheatSection], _ theme: ThemeColors) -> some View {

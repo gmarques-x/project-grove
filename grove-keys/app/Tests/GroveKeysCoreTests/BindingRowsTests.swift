@@ -51,3 +51,13 @@ import GroveThemesCore
         #expect(BindingRows.neighbor(ofRemoved: "x", in: ids) == nil)
     }
 }
+
+@Suite struct BindingRowsLegendsTests {
+    @Test func bindingRowsShowLegends() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        let mode: [(key: String, value: TomlValue)] = [(key: "hyper-semicolon", value: .string("workspace 1"))]
+        #expect(BindingRows.rows(mode: mode, folded: false, legends: pt).first?.shortcuts == "⌃⌥⇧⌘ Ç")
+        // Without legends: the US characters, as before.
+        #expect(BindingRows.rows(mode: mode, folded: false).first?.shortcuts == "⌃⌥⇧⌘ ;")
+    }
+}

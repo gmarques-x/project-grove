@@ -93,8 +93,10 @@ public enum CheatSheet {
     /// in the file's order (main first, without its Hyper bindings, the 1 … 9
     /// runs folded), then the fixed lists: the shell, macOS and, when
     /// `ghostty` has rows, Ghostty. A section without rows is left out.
-    /// `appName` returns nil for an app that isn't installed.
-    public static func sections(keys: KeysFile, ghostty: [CheatRow] = [],
+    /// `appName` returns nil for an app that isn't installed. Keys are
+    /// written with `legends` (`Hyper Ç` on Portuguese); the fixed lists
+    /// keep their own text.
+    public static func sections(keys: KeysFile, ghostty: [CheatRow] = [], legends: Legends = .us,
                                 appName: (String) -> String?) -> [CheatSection] {
         var hyper: [CheatRow] = []
         var launcherKeys: Set<String> = []
@@ -103,7 +105,7 @@ public enum CheatSheet {
             let name = appName(bundleID)
             let short = String(bundleID.split(separator: ".").last ?? Substring(bundleID))
             hyper.append(CheatRow(
-                id: "hyper/launch:" + key, keys: hyperKeys(key),
+                id: "hyper/launch:" + key, keys: hyperKeys(key, legends),
                 text: name ?? short + " (not installed)", detail: bundleID,
                 action: name == nil ? .none : .launch(bundleID: bundleID)))
         }
@@ -117,12 +119,13 @@ public enum CheatSheet {
                 for entry in entries {
                     guard let shortcut = Shortcut(aerospace: entry.key), shortcut.isHyper,
                           !launcherKeys.contains(shortcut.key) else { continue }
-                    hyper.append(row(entry, id: "hyper/", keys: hyperKeys(shortcut.key)))
+                    hyper.append(row(entry, id: "hyper/", keys: hyperKeys(shortcut.key, legends)))
                 }
                 entries.removeAll { Shortcut(aerospace: $0.key)?.isHyper == true }
             }
             let byKey = Dictionary(entries.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
-            let folded = BindingRows.rows(mode: entries.map { (key: $0.key, value: $0.value) }, folded: true)
+            let folded = BindingRows.rows(mode: entries.map { (key: $0.key, value: $0.value) }, folded: true,
+                                          legends: legends)
             let rows = folded.compactMap { line -> CheatRow? in
                 guard let first = line.keys.first, let entry = byKey[first] else { return nil }
                 let id = "mode:\(name)/"
@@ -195,8 +198,8 @@ public enum CheatSheet {
         return rows
     }
 
-    private static func hyperKeys(_ key: String) -> String {
-        "Hyper " + Shortcut(modifiers: [], key: key).symbols
+    private static func hyperKeys(_ key: String, _ legends: Legends) -> String {
+        "Hyper " + Shortcut(modifiers: [], key: key).symbols(using: legends)
     }
 
     /// A binding's row: its trailing comment says what it does when it has

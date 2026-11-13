@@ -88,6 +88,10 @@ In the file, `alt` is ⌥ and `hyper-` means Caps Lock held. The right-hand side
 
 If the file has a mistake, the Grove Keys window shows it as `keys.toml line N: …` and the last good set of bindings keeps working.
 
+## The keyboard you type on
+
+The Keyboard tab draws your Mac's keyboard: the ISO shape (a short left Shift with a key beside it, a tall Return, `§` at the top left) or the ANSI shape, whichever macOS reports. Each key shows what it types with your current input source, its Shift character above, so on a Portuguese keyboard you see `Ç`, `º` and `<` where they are on the keys; choose another input source in the menu bar and the drawing, the cheat sheets and every shortcut Grove Keys writes (`⌃⌥⇧⌘ Ç`, `⌥⇧ Ç`) change with it. If the shape is wrong, pick ISO or ANSI under Keyboard in the tab, or set `shape = "iso"` (or `"ansi"`, or `"auto"`) under `[keyboard]` in `keys.toml`. The file keeps naming keys by their place on a US keyboard, so it works on any Mac: the key that types `Ç` on a Portuguese keyboard is `semicolon`, the `§` key is `section`, and pressing a key to record a shortcut saves that name.
+
 ## The cheat sheet
 
 | Do this | To |

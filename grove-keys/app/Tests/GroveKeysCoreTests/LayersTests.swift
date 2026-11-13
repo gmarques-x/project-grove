@@ -143,3 +143,17 @@ import Testing
         #expect(CapWords.spoken(legend: "x", binding: bare) == "X, close")
     }
 }
+
+@Suite struct LayersLegendsTests {
+    /// A layer's title is its modifiers alone, whatever the layout puts on
+    /// the key it was written with (on Dvorak, the X position types Q).
+    @Test func otherModifierSetsAreTitledByTheirModifiersOnAnyLayout() throws {
+        var raw = LegendsTests.letters
+        raw[KeyNames.code(for: "x")!] = RawTranslation(base: "q", shift: "Q")
+        let dvorak = Legends(raw: raw)
+        var keys = try KeysFile(text: fixture("keys.toml"))
+        keys.setBinding(mode: "main", key: "ctrl-alt-x", value: .string("close"))
+        let layers = Layers.build(from: keys, legends: dvorak) { _ in nil }
+        #expect(layers.first { $0.id == "ctrl-alt" }?.title == "⌃⌥")
+    }
+}

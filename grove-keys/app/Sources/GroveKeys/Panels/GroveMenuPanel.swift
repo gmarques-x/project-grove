@@ -68,14 +68,14 @@ final class GroveMenuModel: ObservableObject, BarPanelWithSides {
             rows.map { row in
                 let kind: MenuListRow.Kind
                 var id = row.id
-                if row.isNote {
+                switch MenuListRowKind(row) {
+                case .note:
                     notes += 1
                     id = "note \(notes)"   // a row's id has no space
                     kind = .note
-                } else if !row.children.isEmpty {
-                    kind = .submenu(convert(row.children))
-                } else {
-                    kind = row.action == .builtin(.globalMenu) ? .link : .action
+                case .submenu: kind = .submenu(convert(row.children))
+                case .link: kind = .link
+                case .action: kind = .action
                 }
                 return MenuListRow(id: id, title: row.title, icon: row.icon.flatMap(GroveIcon.Name.init(rawValue:)),
                                    separator: row.separator, kind: kind)

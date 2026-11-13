@@ -21,8 +21,9 @@ struct MenuListRow: Identifiable, Equatable {
     enum Kind: Equatable {
         /// Choosing it does something.
         case action
-        /// The same, drawn with a submenu's chevron: it opens something
-        /// that is not one of these panels (the native Global Menu).
+        /// The same, for a row that opens something that is not one of
+        /// these panels (the native Global Menu): → opens it too; drawn
+        /// without the chevron (`MenuListRowKind.showsChevron`).
         case link
         /// It opens these rows in a panel beside this one.
         case submenu([MenuListRow])
@@ -44,6 +45,16 @@ struct MenuListRow: Identifiable, Equatable {
     var children: [MenuListRow]? {
         if case .submenu(let rows) = kind { return rows }
         return nil
+    }
+
+    /// The kind without its rows, for what Core decides about it.
+    var coreKind: MenuListRowKind {
+        switch kind {
+        case .action: .action
+        case .link: .link
+        case .submenu: .submenu
+        case .note: .note
+        }
     }
 }
 
@@ -486,7 +497,7 @@ private struct MenuListRowView: View {
                 Text(row.title).truncationMode(.tail)
                 Spacer(minLength: 0)
                 if checked { GroveIcon(.current, size: GroveType.label).foregroundStyle(Color(theme.green)) }
-                if row.kind != .action { GroveIcon(.forward, size: GroveType.body).foregroundStyle(theme.quiet) }
+                if row.coreKind.showsChevron { GroveIcon(.forward, size: GroveType.body).foregroundStyle(theme.quiet) }
             }
             .font(GroveFont.mono(GroveType.label))
             .lineLimit(1)

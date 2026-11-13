@@ -10,7 +10,10 @@ public struct BindingRow: Equatable, Sendable {
 }
 
 public enum BindingRows {
-    public static func rows(mode: [(key: String, value: TomlValue)], folded: Bool) -> [BindingRow] {
+    /// The shortcuts are written with `legends`, the keys' characters on
+    /// the current input source (`⌥⇧ Ç` on Portuguese).
+    public static func rows(mode: [(key: String, value: TomlValue)], folded: Bool,
+                            legends: Legends = .us) -> [BindingRow] {
         var runs: [String: [Int]] = [:]  // "<mods>|<command>" → entry indices, indexed by digit-1
         var runOf: [Int: String] = [:]
         if folded {
@@ -33,11 +36,11 @@ public enum BindingRows {
                 guard emitted.insert(id).inserted else { continue }
                 let idx = runs[id]!
                 let parts = id.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
-                let first = symbols(mode[idx[0]].key)
+                let first = symbols(mode[idx[0]].key, legends)
                 out.append(BindingRow(shortcuts: first + " … 9", action: parts[1] + " 1 … 9",
                                       keys: idx.map { mode[$0].key }, count: 9))
             } else {
-                out.append(BindingRow(shortcuts: symbols(entry.key), action: describe(entry.value),
+                out.append(BindingRow(shortcuts: symbols(entry.key, legends), action: describe(entry.value),
                                       keys: [entry.key], count: 1))
             }
         }
@@ -64,8 +67,8 @@ public enum BindingRows {
         return at > 0 ? ids[at - 1] : nil
     }
 
-    private static func symbols(_ key: String) -> String {
-        Shortcut(aerospace: key)?.symbols ?? key
+    private static func symbols(_ key: String, _ legends: Legends) -> String {
+        Shortcut(aerospace: key)?.symbols(using: legends) ?? key
     }
 
     private static func describe(_ v: TomlValue) -> String {

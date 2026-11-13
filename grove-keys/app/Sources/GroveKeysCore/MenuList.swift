@@ -7,6 +7,35 @@ import Foundation
 // the pointer, where each row is and where a submenu's panel goes. The
 // model and the views are in the app (`Panels/MenuList.swift`).
 
+/// What a row is, as the list draws it (the app's `MenuListRow.Kind`
+/// without its rows).
+public enum MenuListRowKind: Equatable, Sendable {
+    /// Choosing it does something.
+    case action
+    /// The same, for a row that opens something that is not one of these
+    /// panels (the native Global Menu): → opens it too, but it has no arrow.
+    case link
+    /// It opens its rows in a panel beside this one.
+    case submenu
+    /// Text that can't be chosen (an error, a warning's line).
+    case note
+
+    /// Only a row that opens a panel beside this one is drawn with the
+    /// submenu's arrow.
+    public var showsChevron: Bool { self == .submenu }
+
+    /// A Grove menu row's kind: the Global Menu builtin is a link.
+    public init(_ row: GroveMenuRow) {
+        if row.isNote {
+            self = .note
+        } else if !row.children.isEmpty {
+            self = .submenu
+        } else {
+            self = row.action == .builtin(.globalMenu) ? .link : .action
+        }
+    }
+}
+
 /// Which row the highlight moves to. `selectable[i]` is false for a row that
 /// can't be chosen (a note); separators are not rows.
 public enum MenuListMove {
