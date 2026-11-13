@@ -246,6 +246,27 @@ private func refusal(_ body: () async throws -> String) async -> String? {
         #expect(await stack.restored.isEmpty)
     }
 
+    /// What an undo or a redo renamed or moved, from where to where: an
+    /// open folder among them stays open (spec §16).
+    @Test func anUndoAndARedoTellWhatTheyMoved() async throws {
+        let folder = try box.makeFolder("src/drafts")
+        try box.makeFile("src/drafts/one.md", "one")
+        await perform(.rename(item: folder, to: "ideas"))
+        #expect(await stack.moved.isEmpty)
+
+        _ = try await stack.undo()
+        let undone = await stack.moved
+        #expect(undone.map { places([$0.from]) } == [["src/ideas"]])
+        #expect(undone.map { places([$0.to]) } == [["src/drafts"]])
+        _ = try await stack.redo()
+        let redone = await stack.moved
+        #expect(redone.map { places([$0.from]) } == [["src/drafts"]])
+        #expect(redone.map { places([$0.to]) } == [["src/ideas"]])
+        // A refusal moved nothing.
+        _ = try? await stack.redo()
+        #expect(await stack.moved.isEmpty)
+    }
+
     @Test func aRefusedUndoBroughtNothingBack() async throws {
         let file = try box.makeFile("src/notes.md", "some notes")
         await perform(.trash(items: [file]))

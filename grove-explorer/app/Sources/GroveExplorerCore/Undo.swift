@@ -95,6 +95,17 @@ public actor UndoStack {
     /// and for what an undo sent to the Trash.
     public private(set) var restored: [URL] = []
 
+    /// An item moved or renamed by an undo or a redo: from where to where.
+    public struct Move: Equatable, Sendable {
+        public let from: URL
+        public let to: URL
+    }
+
+    /// What the last undo or redo moved or renamed (a rename taken back is
+    /// the new name to the old), for the window to follow: a folder open
+    /// in place stays open under its name. Empty when it was refused.
+    public private(set) var moved: [Move] = []
+
     public var canUndo: Bool { !working && !undos.isEmpty }
     public var canRedo: Bool { !working && !redos.isEmpty }
 
@@ -128,6 +139,7 @@ public actor UndoStack {
     public func undo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't undo: another undo or redo is still going on") }
         restored = []
+        moved = []
         guard let entry = undos.last else { throw UndoRefusal(sentence: "There is nothing to undo") }
         working = true
         defer { working = false }
@@ -142,6 +154,9 @@ public actor UndoStack {
             // An operation recorded meanwhile has cleared redo: it stays so.
             if let again = entry.again, recorded == before { redos.append(again) }
             restored = steps.compactMap(\.place)
+            moved = steps.compactMap { step in
+                if case let .moved(from, to) = step.change { Move(from: to, to: from) } else { nil }
+            }
             return "Undid: \(Self.lowered(entry.words))"
         case let .refused(problem):
             guard !problem.heals else { throw UndoRefusal(sentence: "Can't undo: \(problem.words)") }
@@ -160,6 +175,7 @@ public actor UndoStack {
     public func redo() async throws(UndoRefusal) -> String {
         guard !working else { throw UndoRefusal(sentence: "Can't redo: another undo or redo is still going on") }
         restored = []
+        moved = []
         guard let again = redos.last else { throw UndoRefusal(sentence: "There is nothing to redo") }
         working = true
         defer { working = false }
@@ -186,6 +202,9 @@ public actor UndoStack {
         redos.removeAll { $0.id == again.id }
         undos.append(entry)
         restored = AfterOperation.newItems(of: outcome)
+        moved = outcome.changes.compactMap { change in
+            if case let .moved(from, to) = change { Move(from: from, to: to) } else { nil }
+        }
         return "Redid: \(Self.lowered(words))"
     }
 

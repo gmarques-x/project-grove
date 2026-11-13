@@ -124,4 +124,30 @@ import Testing
         #expect(partly.found.map(\.path) == ["/t/x"])
         #expect(!partly.complete)
     }
+
+    /// F5 into an open folder: its listing has the copy before its rows
+    /// do (the rows are arranged off the main thread). Looked for among
+    /// the rows, the copy is not there yet and the arrivals are not done;
+    /// once the rows land with it, it is found, and they are.
+    @Test func arrivalsInAnOpenFolderAreFoundOnceItsRowsLand() {
+        func entry(_ path: String, _ kind: Entry.Kind = .file) -> Entry {
+            let url = URL(fileURLWithPath: path, isDirectory: kind == .folder)
+            return Entry(url: url, name: url.lastPathComponent, kind: kind, size: nil, modified: nil, isHidden: false,
+                typeDescription: "")
+        }
+        let root = URL(fileURLWithPath: "/t", isDirectory: true), open = entry("/t/a", .folder).url
+        func rows(_ children: [Entry]) -> [URL] {
+            Tree.items(TreeInput(
+                root: [entry("/t/a", .folder), entry("/t/z.txt")], children: [open: children], open: [open],
+                hasContents: [:], sort: .byName, folderSizes: [:], filter: "", showHidden: false)
+            ).compactMap { if case .row(let row) = $0 { row.entry.url } else { nil } }
+        }
+        let made = [URL(fileURLWithPath: "/t/a/new.txt")]
+        let before = rows([entry("/t/a/old.txt")])
+        let early = AfterOperation.arrivals(made, in: [root, open], listed: before)
+        #expect(early.found.isEmpty && !early.complete)
+        let after = rows([entry("/t/a/old.txt"), entry("/t/a/new.txt")])
+        let landed = AfterOperation.arrivals(made, in: [root, open], listed: after)
+        #expect(landed.found.map(\.path) == ["/t/a/new.txt"] && landed.complete)
+    }
 }

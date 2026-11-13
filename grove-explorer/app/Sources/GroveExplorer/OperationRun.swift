@@ -162,6 +162,9 @@ extension AppModel {
         // An open folder renamed or moved here stays open where it went.
         openFoldersFollow(outcome.changes)
         filesChanged(in: touched)
+        // An open folder it changed that no watcher looks at (past the 64)
+        // is read again now.
+        readUnwatchedOpenFolders(touched)
 
         // What it left is selected once the panes list it (the watcher has
         // them read their folders); what is listed already, now.
@@ -204,6 +207,9 @@ extension AppModel {
             // Refused: the sentence says why, and whether the entry is gone.
             say(error.sentence, in: side)
         }
+        // An open folder it renamed or moved back stays open there.
+        let moved = await work.undo.moved
+        openFoldersFollow(moved.map { .moved(from: $0.from, to: $0.to) })
         // What it put back or made again is selected, as after a run.
         let restored = await work.undo.restored
         work.arrivals = restored.isEmpty
@@ -342,8 +348,9 @@ extension AppModel {
         wantSizes()
     }
 
-    /// The pane has read its folder (or a run just ended): the items the
-    /// last run left there are selected, and a new folder is renamed in place.
+    /// The pane has new rows (its folder or an open folder was read and
+    /// arranged, or a run just ended): the items the last run left among
+    /// them are selected, and a new folder is renamed in place.
     func arrived(in side: Side) {
         guard let arrivals = work.arrivals, !arrivals.done.contains(side) else { return }
         guard arrivals.until > Date() else {
@@ -353,11 +360,12 @@ extension AppModel {
         guard let tab = browser.tab(side), let listing = listing(for: side),
             listing.folder.standardizedFileURL.path == tab.folder.standardizedFileURL.path
         else { return }
-        // In the tab's folder or in a folder open in it, at any depth;
-        // selected only where it is a row (`select`).
-        let listed = listing.all.map(\.url) + listing.children.values.flatMap { $0.map(\.url) }
+        // In the tab's folder or in a folder open in it, at any depth, and
+        // looked for among the rows: an open folder's listing has an item
+        // before the rows made from it are arranged, and until then it is
+        // not found (nothing selected is cleared for it) and not done.
         let here = AfterOperation.arrivals(
-            arrivals.items, in: [tab.folder] + Array(listing.children.keys), listed: listed)
+            arrivals.items, in: [tab.folder] + Array(listing.children.keys), listed: Array(listing.rows.keys))
         guard !here.found.isEmpty else { return }
         select(Set(here.found), in: side)
         reveal(here.found[0], in: side)
