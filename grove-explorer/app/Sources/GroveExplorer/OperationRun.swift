@@ -218,6 +218,8 @@ extension AppModel {
         // The stack doesn't tell which folders it changed: any a run of
         // this window touched may be among them.
         filesChanged(in: Array(work.touched.values))
+        // And an open folder among them that no watcher looks at is read again.
+        readUnwatchedOpenFolders(Array(work.touched.values))
     }
 
     // MARK: The prompt
@@ -351,7 +353,10 @@ extension AppModel {
     /// The pane has new rows (its folder or an open folder was read and
     /// arranged, or a run just ended): the items the last run left among
     /// them are selected, and a new folder is renamed in place.
-    func arrived(in side: Side) {
+    /// `fromRows`: rows just arranged (`show`): what they had of the
+    /// arrivals is selected once, and the pane is done with them, so a
+    /// selection the user makes meanwhile isn't taken over again.
+    func arrived(in side: Side, fromRows: Bool = false) {
         guard let arrivals = work.arrivals, !arrivals.done.contains(side) else { return }
         guard arrivals.until > Date() else {
             work.arrivals = nil
@@ -364,13 +369,19 @@ extension AppModel {
         // looked for among the rows: an open folder's listing has an item
         // before the rows made from it are arranged, and until then it is
         // not found (nothing selected is cleared for it) and not done.
+        // What won't show (filtered out, hidden) is not awaited.
+        let folders = [tab.folder] + Array(listing.children.keys)
+        let entries = listing.all + listing.children.values.flatMap { $0 }
+        let unshown = AfterOperation.unshown(
+            arrivals.items, among: entries, showHidden: browser.showHidden, filter: filter.texts[tab.id] ?? "")
         let here = AfterOperation.arrivals(
-            arrivals.items, in: [tab.folder] + Array(listing.children.keys), listed: Array(listing.rows.keys))
+            arrivals.items, in: folders, listed: Array(listing.rows.keys), leavingOut: unshown)
         guard !here.found.isEmpty else { return }
         select(Set(here.found), in: side)
         reveal(here.found[0], in: side)
-        // A listing read while the run was going has only some: the next has all.
-        guard here.complete else { return }
+        // A listing read while the run was going has only some: the next
+        // has all (but rows just arranged select only once).
+        guard here.complete || fromRows else { return }
         // Done for this pane: a later read leaves the selection to the user.
         work.arrivals?.done.insert(side)
         if arrivals.renameIn == side, let made = here.found.first { beginRename(of: made, in: side) }

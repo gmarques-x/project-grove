@@ -25,15 +25,33 @@ public enum AfterOperation {
 
     /// The same over several listed folders (the tab's and those open in
     /// place in it, spec §16): of `new`, the items of any of `folders`.
-    public static func arrivals(_ new: [URL], in folders: [URL], listed: [URL]) -> (found: [URL], complete: Bool) {
+    /// `leavingOut`: items listed that won't show (`unshown`), which are
+    /// not awaited: the arrivals are complete without them.
+    public static func arrivals(
+        _ new: [URL], in folders: [URL], listed: [URL], leavingOut: Set<URL> = []
+    ) -> (found: [URL], complete: Bool) {
         let here = Set(folders.map(\.standardizedFileURL.path))
+        let left = Set(leavingOut.map(\.standardizedFileURL.path))
         let expected = new.map(\.standardizedFileURL).filter { here.contains($0.deletingLastPathComponent().path) }
-            .map(\.path)
+            .map(\.path).filter { !left.contains($0) }
         guard !expected.isEmpty else { return ([], false) }
         var byPath: [String: URL] = [:]
         for url in listed { byPath[url.standardizedFileURL.path] = url }
         let found = expected.compactMap { byPath[$0] }
         return (found, found.count == expected.count)
+    }
+
+    /// Of `new`, those listed among `entries` that the list won't show:
+    /// hidden while hidden items are hidden, or without every word of the
+    /// ⌘F `filter`. (One not listed yet is not known not to show.)
+    public static func unshown(_ new: [URL], among entries: [Entry], showHidden: Bool, filter: String) -> Set<URL> {
+        let wanted = Set(new.map(\.standardizedFileURL.path))
+        let listed = entries.filter { wanted.contains($0.url.standardizedFileURL.path) }
+        guard !listed.isEmpty else { return [] }
+        let visible = showHidden ? listed : listed.filter { !$0.isHidden }
+        let shows = filter.contains { !$0.isWhitespace } ? Filter.matches(visible, words: filter) : visible
+        let showing = Set(shows.map(\.url.standardizedFileURL.path))
+        return Set(listed.filter { !showing.contains($0.url.standardizedFileURL.path) }.map(\.url))
     }
 
     /// The folders whose contents a run changed, each once: where its items

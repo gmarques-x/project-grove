@@ -150,4 +150,31 @@ import Testing
         let landed = AfterOperation.arrivals(made, in: [root, open], listed: after)
         #expect(landed.found.map(\.path) == ["/t/a/new.txt"] && landed.complete)
     }
+
+    /// F5 of foo.txt and bar.txt into a pane filtered on "foo": bar.txt is
+    /// listed but won't show, so it is not awaited, and the arrivals are
+    /// complete with foo.txt. A hidden item while hidden items are hidden
+    /// is the same; one not listed yet is still awaited.
+    @Test func whatWontShowIsNotAwaited() {
+        func entry(_ path: String, hidden: Bool = false) -> Entry {
+            let url = URL(fileURLWithPath: path)
+            return Entry(url: url, name: url.lastPathComponent, kind: .file, size: nil, modified: nil, isHidden: hidden,
+                typeDescription: "")
+        }
+        let folder = URL(fileURLWithPath: "/t", isDirectory: true)
+        let listed = [entry("/t/foo.txt"), entry("/t/bar.txt"), entry("/t/.foo-hidden", hidden: true)]
+        let made = ["/t/foo.txt", "/t/bar.txt", "/t/.foo-hidden"].map { URL(fileURLWithPath: $0) }
+        let unshown = AfterOperation.unshown(made, among: listed, showHidden: false, filter: "foo")
+        #expect(Set(unshown.map(\.path)) == ["/t/bar.txt", "/t/.foo-hidden"])
+        let here = AfterOperation.arrivals(
+            made, in: [folder], listed: [URL(fileURLWithPath: "/t/foo.txt")], leavingOut: unshown)
+        #expect(here.found.map(\.path) == ["/t/foo.txt"] && here.complete)
+        // Without a filter, with hidden items shown: everything listed shows.
+        #expect(AfterOperation.unshown(made, among: listed, showHidden: true, filter: "  ").isEmpty)
+        // One not listed yet is awaited.
+        let early = AfterOperation.arrivals(
+            made + [URL(fileURLWithPath: "/t/foo 2.txt")], in: [folder], listed: [URL(fileURLWithPath: "/t/foo.txt")],
+            leavingOut: unshown)
+        #expect(!early.complete)
+    }
 }
