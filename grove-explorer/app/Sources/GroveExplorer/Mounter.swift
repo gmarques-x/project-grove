@@ -89,7 +89,7 @@ struct PendingMount: Equatable {
     let read: Int
 }
 
-/// The sidebar's SHARED section: connecting, saving and forgetting shares.
+/// The saved shares in the sidebar's Locations: connecting, saving and forgetting them.
 extension AppModel {
     // MARK: What the rows show
 
@@ -219,7 +219,7 @@ extension AppModel {
         mounter.cancel(url)
     }
 
-    /// ⌘K, File ▸ Connect to Server…, the SHARED header's +.
+    /// ⌘K, File ▸ Connect to Server…, the LOCATIONS header's +.
     func showConnectSheet() {
         sidebarCursor = nil
         if pathField != nil { pathField = nil }
@@ -255,7 +255,7 @@ extension AppModel {
 
     /// "Keep in Sidebar" on a mounted network volume of Locations: its
     /// address (any password left out) is saved, and the volume moves to
-    /// its row in SHARED.
+    /// its share's row (after the disks).
     func keepInSidebar(_ volume: Volume) {
         guard let url = SharedServers.keepable(remountURL: volume.remountURL, among: config.servers),
             let saved = keepShare(url)
@@ -286,7 +286,7 @@ extension AppModel {
             let loaded = ExplorerConfig.load(tracked: nil, local: existing, home: home, exists: { _ in true })
             // A local file with a mistake in it (made since the window read
             // it) gives no shares: changing that empty list would empty
-            // SHARED. Refused instead, the banner saying where, SHARED as it is.
+            // the saved shares. Refused instead, the banner saying where, the shares as they are.
             if loaded.problem != nil {
                 // Its refusal names the line; the second is for a mistake it would let through.
                 _ = try ExplorerConfig.localText(favourites: nil, servers: loaded.servers, home: home, keeping: existing)

@@ -12,7 +12,7 @@ import SwiftUI
 //     Remove from Sidebar, Keep in Sidebar,
 //     Eject) ...................................... the same, after ⌥⌘←
 //   a connecting share's spinner (cancel) ......... Esc, after ⌥⌘← (on that row)
-//   the SHARED header's + ......................... ⌘K
+//   the LOCATIONS header's + ...................... ⌘K
 //   a disk's eject button ......................... ⌘E, after ⌥⌘← (on that row only)
 //   the status bar's Cancel ....................... ⌘. (in a text field ⌘. is the field's Escape)
 //   the conflict prompt's Cancel .................. Esc, ⌘.

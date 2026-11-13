@@ -104,7 +104,7 @@ One window, tiled by AeroSpace. From left to right: the sidebar, then one pane o
 - *iCloud:* iCloud Drive when it exists.
 - *Cloud providers* (added 2026-11-13): below iCloud, one section per provider in `~/Library/CloudStorage` (Apple's File Provider), under the provider's name ("OneDrive"), a row per account: `OneDrive-Personal` reads "OneDrive", `OneDrive-Contoso` "OneDrive - Contoso"; `GoogleDrive-…`, `Dropbox`, `Box-Box` get their own headers. The names are worked out from the folder's name (the system's display name says "OneDrive-Personal"); the icon is the plain cloud. CloudStorage is watched, so a provider installed or removed appears or goes without a relaunch; a provider's folder not yet readable still has its row.
 - The lit row is the deepest place above the active pane's folder: iCloud Drive and a provider's folder win over Home.
-- *Locations:* mounted volumes, each with an eject button where it can be ejected; they come and go live.
+- *Locations:* mounted volumes, each with an eject button where it can be ejected; they come and go live. Since 2026-11-13 the saved shares are here too, after the disks and before the network volumes that aren't saved, and the + of Connect to Server is on this header (no SHARED section; `2026-11-13-explorer-sidebar-design.md`).
 - *Trash* at the bottom: opens Finder's Trash.
 - A click opens the place in the active pane's current tab; ⌘-click in a new tab; a drop on a row copies or moves there.
 
@@ -157,7 +157,7 @@ Finder's, unchanged:
 | ⌘A | Select all |
 | ⌘⇧G, ⌘L | Go to a path |
 | ⌘⇧H, ⌘⇧D, ⌘⇧O, ⌘⌥L, ⌘⇧A | Home, Desktop, Documents, Downloads, Applications |
-| ⌘K | Connect to Server…: a share's address (`smb://grove-lab/media`), mounted, kept in the sidebar's SHARED section and opened (spec 2026-11-13-grove-explorer-shared-folders) |
+| ⌘K | Connect to Server…: a share's address (`smb://grove-lab/media`), mounted, kept in the sidebar's LOCATIONS (after the disks) and opened (spec 2026-11-13-grove-explorer-shared-folders) |
 | ⌘I | Finder's Get Info for the selection, or for the folder itself when nothing is selected; ten items at most at a time, more is refused with a sentence (macOS asks once to let Grove Explorer control Finder) |
 | ⌃⌥⌘1, ⌃⌥⌘2, ⌃⌥⌘5, ⌃⌥⌘6 | Sort by Name, Kind, Date Modified, Size, as a click on the column's title (again: the other way round) |
 | Letters | Jump to a name |
@@ -182,7 +182,7 @@ Grove's:
 | ⌘⌥T | Open this folder in Ghostty |
 | ⌘⌥C | Copy the selection's paths |
 | ⌃Return, ⇧F10 | The right-click menu, by keyboard: of the selection, at its row; while the keyboard is in the sidebar, of the row it is on (Open in New Tab, Remove from Sidebar, Keep in Sidebar, Eject) |
-| ⌘E | Eject the disk the keyboard is on, or the connected shared folder (it is unmounted and its row stays in SHARED), with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why. The other way round, while a disk is being ejected no command onto it is begun (nor an undo or a redo): the status bar says so |
+| ⌘E | Eject the disk the keyboard is on, or the connected shared folder (it is unmounted and its row stays in LOCATIONS), with the keyboard in the sidebar (⌥⌘←); with the keyboard in a list it does nothing. A disk a copy or a move is using is not ejected, by key or by pointer: its row says why. The other way round, while a disk is being ejected no command onto it is begun (nor an undo or a redo): the status bar says so |
 | ⌘. | Cancel the operation that is running, with the keyboard in a list or the sidebar; in the path or the filter field it does what Esc does there; in the conflict prompt it is Cancel |
 | ⌘⇧F | Show or hide the items the last operation could not do (↑ ↓ scroll a long list, Esc closes it) |
 | Return | In a folder macOS won't let the app read (nothing to rename there): Open Privacy Settings |

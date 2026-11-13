@@ -72,8 +72,9 @@ enum Sample {
         var filter: String?
         /// The sidebar lists OneDrive's two accounts under their header.
         var clouds = false
-        /// The sidebar has SHARED's three rows: media connected, backup
-        /// not, photos connecting (`Sample.shares`).
+        /// Locations has the three saved shares after the disks: media
+        /// connected, backup not, photos connecting (`Sample.shares`); then
+        /// scratch, a network volume that isn't saved.
         var shares = false
         /// The Connect to Server sheet is up, saying this, with this sentence under the field.
         var connectSheet: (text: String, problem: String?)?
@@ -89,6 +90,10 @@ enum Sample {
     static let mediaVolume = Volume(
         url: URL(fileURLWithPath: "/Volumes/media", isDirectory: true), name: "media", ejectable: true,
         remountURL: URL(string: "smb://you@grove-lab/media"), isNetwork: true)
+    /// scratch, mounted by Finder and not saved: the last of Locations, with "Keep in Sidebar".
+    static let scratchVolume = Volume(
+        url: URL(fileURLWithPath: "/Volumes/scratch", isDirectory: true), name: "scratch", ejectable: true,
+        remountURL: URL(string: "smb://you@grove-lab/scratch"), isNetwork: true)
 
     /// The sentence a mount of `address` gets when the server has no such share (as NetFS answers, ENOENT).
     static func noShare(_ address: String) -> String? {
@@ -166,12 +171,14 @@ enum Sample {
         model.volumes = [disk, backup]
         if extras.shares {
             model.config.servers = shares
-            model.volumes = [disk, mediaVolume, backup]
+            // As macOS lists them: Locations puts the shares after the disks.
+            model.volumes = [disk, mediaVolume, scratchVolume, backup]
             model.connectingShares = [shares[2].id]
         }
         model.volumeIconStandIn = [
             disk.id: NSWorkspace.shared.icon(forFile: "/"),
             backup.id: NSWorkspace.shared.icon(for: UTType("com.apple.storage-external") ?? .volume),
+            scratchVolume.id: NSWorkspace.shared.icon(for: .volume),
         ]
         if extras.ejectPointer { model.ejectPointerStandIn = backup.id }
         if extras.ejecting { model.ejecting = [backup.id] }

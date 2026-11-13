@@ -4,7 +4,7 @@ import GroveThemesCore
 import GroveUI
 import SwiftUI
 
-/// Connect to Server… (⌘K, File ▸ Connect to Server…, the SHARED header's +):
+/// Connect to Server… (⌘K, File ▸ Connect to Server…, the LOCATIONS header's +):
 /// a share's address, mounted, then saved and opened (shared-folders spec).
 /// What the address is wrong in is said under the field before anything is
 /// mounted; while it connects, a spinner by Connect and Cancel gives the

@@ -17,7 +17,59 @@ public enum Places {
     }
 }
 
-/// How the window's width is shared: the sidebar (full, a rail of icons, or
+/// The sidebar's sections, in its order: Favourites, iCloud, one for each
+/// cloud provider in `~/Library/CloudStorage` (by its name), Locations
+/// (the disks and the shares, saved or not), and the Trash. There is no
+/// section of its own for the saved shares (2026-11-13: they are in
+/// Locations, the + on its header).
+public enum SidebarSection: Hashable, Sendable {
+    case favourites, cloud
+    case provider(String)
+    case locations
+    /// The Trash, at the bottom, without a caption.
+    case trash
+
+    /// Its caption, before it is set in capitals.
+    public var caption: String {
+        switch self {
+        case .favourites: "Favourites"
+        case .cloud: "iCloud"
+        case .provider(let name): name
+        case .locations: "Locations"
+        case .trash: ""
+        }
+    }
+
+    /// Its header carries the + of Connect to Server… (⌘K).
+    public var connects: Bool { self == .locations }
+}
+
+/// What LOCATIONS lists, top to bottom.
+public enum Locations {
+    public enum Row<Volume, Share> {
+        case volume(Volume)
+        case share(Share)
+    }
+
+    /// The startup disk, the other disks as macOS lists them, the saved
+    /// shares in the order they were added, then the network volumes that
+    /// aren't saved, as listed. A saved share's mount is its share's row,
+    /// not a row of its own.
+    public static func rows<Volume, Share>(
+        volumes: [Volume], shares: [Share], isStartup: (Volume) -> Bool, isNetwork: (Volume) -> Bool,
+        isSavedShare: (Volume) -> Bool
+    ) -> [Row<Volume, Share>] {
+        let listed = volumes.filter { !isSavedShare($0) }
+        let disks = listed.filter { !isNetwork($0) }
+        let startup = disks.filter(isStartup), others = disks.filter { !isStartup($0) }
+        return (startup + others).map { .volume($0) } + shares.map { .share($0) }
+            + listed.filter(isNetwork).map { .volume($0) }
+    }
+}
+
+extension Locations.Row: Equatable where Volume: Equatable, Share: Equatable {}
+
+/// How the window's width is shared:the sidebar (full, a rail of icons, or
 /// hidden), a 1 pt line, then the pane or the two panes with a line between.
 public enum SidebarLayout {
     public enum Mode: Equatable, Sendable {

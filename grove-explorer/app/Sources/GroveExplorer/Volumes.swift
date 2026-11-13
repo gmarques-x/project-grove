@@ -71,30 +71,9 @@ final class MountObserver {
 
 /// A row of the sidebar.
 struct Place: Identifiable, Equatable {
-    /// The sidebar's sections, in its order: Favourites, iCloud, one for
-    /// each cloud provider in `~/Library/CloudStorage` (by its name), the
-    /// saved shares, Locations, and the Trash.
-    enum Section: Hashable {
-        case favourites, cloud
-        case provider(String)
-        /// The shares saved in `explorer.local.toml`, while there is one.
-        case shared
-        case locations
-        /// The Trash, at the bottom, without a caption.
-        case trash
-
-        /// Its caption, before it is set in capitals.
-        var caption: String {
-            switch self {
-            case .favourites: "Favourites"
-            case .cloud: "iCloud"
-            case .provider(let name): name
-            case .shared: "Shared"
-            case .locations: "Locations"
-            case .trash: ""
-            }
-        }
-    }
+    /// The sidebar's sections, in its order (`SidebarSection`): the saved
+    /// shares are in Locations.
+    typealias Section = SidebarSection
 
     enum Kind: Equatable {
         case favourite, cloud, trash
@@ -131,17 +110,23 @@ extension AppModel {
                 id: "cloud." + place.url.lastPathComponent, kind: .cloud, section: .provider(name), title: place.title,
                 url: place.url)
         }
-        // The saved shares, each at its mount point while connected. A
-        // volume that is one of them is its row's, not listed again.
+        // Locations: the disks, the saved shares (each at its mount point
+        // while connected), then the network volumes that aren't saved. A
+        // volume that is a saved share is its row's, not listed again.
         let mountedShares = shareVolumes()
-        places += config.servers.map { server in
-            Place(
-                id: "share." + server.id, kind: .share(server), section: .shared, title: server.name,
-                url: mountedShares[server.id]?.url ?? pendingMounts[server.id]?.point)
-        }
         let shown = Set(mountedShares.values.map(\.id))
-        places += volumes.filter { !shown.contains($0.id) }.map {
-            Place(id: "volume." + $0.id, kind: .volume($0), section: .locations, title: $0.name, url: $0.url)
+        let locations = Locations.rows(
+            volumes: volumes, shares: config.servers, isStartup: { $0.url.path == "/" }, isNetwork: \.isNetwork,
+            isSavedShare: { shown.contains($0.id) })
+        places += locations.map { row in
+            switch row {
+            case .volume(let volume):
+                Place(id: "volume." + volume.id, kind: .volume(volume), section: .locations, title: volume.name, url: volume.url)
+            case .share(let server):
+                Place(
+                    id: "share." + server.id, kind: .share(server), section: .locations, title: server.name,
+                    url: mountedShares[server.id]?.url ?? pendingMounts[server.id]?.point)
+            }
         }
         places.append(Place(
             id: "trash", kind: .trash, section: .trash, title: "Trash",

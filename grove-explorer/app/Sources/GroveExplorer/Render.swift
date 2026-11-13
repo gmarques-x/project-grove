@@ -216,8 +216,9 @@ enum Render {
             showHidden: true)),
         ("links-narrow", Scene(size: half, panes: [Sample.homeLinks(selected: [".ssh"]), Sample.homeLinks()],
             showHidden: true)),
-        // Shared folders: SHARED's three rows, media connected (and open,
-        // its row lit), backup not connected, photos connecting; then
+        // Shared folders, in Locations after the disks (the + on its
+        // header): media connected (and open, its row lit), backup not
+        // connected, photos connecting, then scratch, not saved; then
         // Connect to Server with the sentence a wrong share name gets.
         ("shared", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
             extras: Sample.Extras(shares: true))),

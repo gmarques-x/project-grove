@@ -5,9 +5,9 @@ import GroveUI
 import SwiftUI
 
 /// The sidebar (spec §5): Favourites, iCloud, a section for each cloud
-/// provider (OneDrive…), the saved shares (Shared) and Locations under
-/// fine-print captions, the Trash
-/// at the bottom. The row lit is the active pane's
+/// provider (OneDrive…) and Locations (the disks, the saved shares, the
+/// network volumes) under fine-print captions, the + of Connect to Server
+/// on Locations', the Trash at the bottom. The row lit is the active pane's
 /// place. As a rail (a narrow window) it is the icons alone, the sections
 /// divided by lines and the names in tooltips.
 struct Sidebar: View {
@@ -73,18 +73,18 @@ struct Sidebar: View {
                     .font(GroveFont.mono(GroveType.finePrint)).tracking(1)
                     .foregroundStyle(theme.quiet)
                     .accessibilityAddTraits(.isHeader)
-                if section == .shared {
+                if section.connects {
                     Spacer(minLength: 0)
                     connectButton
                 }
             }
             .padding(.leading, GroveSpace.s8)
-            .padding(.trailing, section == .shared ? GroveSpace.s8 : 0)
+            .padding(.trailing, section.connects ? GroveSpace.s8 : 0)
             .padding(.top, first ? GroveSpace.s4 : GroveSpace.s16).padding(.bottom, GroveSpace.s4)
         }
     }
 
-    /// The SHARED header's +: Connect to Server… (⌘K). Quiet, the text's
+    /// The LOCATIONS header's +: Connect to Server… (⌘K). Quiet, the text's
     /// colour under the pointer. Its own line height: the caption's row
     /// keeps the fine-print size.
     private var connectButton: some View {

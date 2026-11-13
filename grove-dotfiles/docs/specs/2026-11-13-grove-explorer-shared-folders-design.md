@@ -15,7 +15,7 @@ remembered it) and opens it in the pane, and after a restart it is still there.
 
 ## Goals, non-goals, anti-goals
 
-- Goals: a SHARED sidebar section; "Connect to Server…" to add one; saved
+- Goals: saved shares in the sidebar (under LOCATIONS); "Connect to Server…" to add one; saved
   servers survive unmount and restart; one click reconnects; clear states
   (connected, not connected, connecting, failed and why); remove a saved one.
 - Non-goals: SCP/SSH (dropped by the owner for now; Stage 4 stays its own
@@ -39,10 +39,13 @@ remembered it) and opens it in the pane, and after a restart it is still there.
 
 ## Design
 
-**Sidebar.** A SHARED section below the cloud sections and above LOCATIONS,
-shown when at least one share is saved; its header carries
-a + (GroveIcon add, quiet, text colour on hover, `.help("Connect to Server…")`).
-One row per saved share: the share's name (last path part of the URL, e.g.
+**Sidebar.** The saved shares are rows of LOCATIONS (changed 2026-11-13,
+see `2026-11-13-explorer-sidebar-design.md`: there is no SHARED section).
+LOCATIONS lists, in order: the startup disk, the other disks and volumes as
+macOS lists them, the saved shares in the order they were added, then the
+mounted network volumes that aren't saved. The LOCATIONS header always
+carries a + (GroveIcon add, quiet, text colour on hover,
+`.help("Connect to Server…")`). One row per saved share: the share's name (last path part of the URL, e.g.
 "media"), with the host in quiet text after it ("media  grove-lab"), icon
 `server.rack` (quiet when not connected). States, one value per row:
 
@@ -59,13 +62,13 @@ One row per saved share: the share's name (last path part of the URL, e.g.
 
 A share mounted by someone else (Finder, the command line) that matches a saved
 one shows as connected on that row, and only there: a saved share's mount is
-not listed again under LOCATIONS. A mounted network share that isn't saved stays
-in LOCATIONS as today, with "Keep in Sidebar" in its context menu, which saves it.
+not listed again as a volume row. A mounted network share that isn't saved is
+listed after the saved shares, with "Keep in Sidebar" in its context menu, which saves it.
 
 Cancelling macOS's password sheet is quiet: the row (or the connect sheet)
 goes back to how it was, with no notice.
 
-**Connect to Server…** Reached from the SHARED header's +, from File ▸
+**Connect to Server…** Reached from the LOCATIONS header's +, from File ▸
 Connect to Server… and with ⌘K (Finder's key; added to spec §7's table), so it
 works before anything is saved. A small sheet (native `TextField` + buttons, Grove
 tokens): "Server address" with placeholder `smb://grove-lab/share`, Connect and
@@ -88,8 +91,8 @@ of tables, so each share is a table like the favourites: `[servers.<id>]` with
 share (`grove-lab-media`, `-2` on a clash). The tracked file has no
 `[servers]`; the list is the local file's alone (nothing to merge). Removing:
 the row's context menu "Remove from Sidebar" forgets the share and does not
-eject it; if it is mounted, it moves to LOCATIONS, where it can be ejected or
-kept again. Order: as added; drag to reorder is not in scope.
+eject it; if it is mounted, its volume is listed in LOCATIONS among the
+network volumes that aren't saved, where it can be ejected or kept again. Order: as added; drag to reorder is not in scope.
 
 **Connecting.** `NetFSMountURLAsync` with the URL, `nil` mount path (macOS picks
 /Volumes/<share>), the default open options (so macOS shows its authentication
@@ -125,7 +128,7 @@ with the user-cancelled code mapped to "quiet" (no sentence).
 - ⌘K and File ▸ Connect to Server…, as in Finder, so it works before anything is saved.
 - The sheet stays open while connecting and shows a failure inside it.
 - No app timeout; a cancel on the spinner instead.
-- A saved share's mount shows only in SHARED, not again in LOCATIONS.
+- A saved share's mount shows only on its share's row, not again as a volume row.
 - Cancelling the password sheet is quiet.
 - "Remove from Sidebar" forgets without ejecting.
 

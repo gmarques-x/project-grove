@@ -60,7 +60,7 @@ final class AppModel: ObservableObject {
     /// Shares this window just mounted, by id: their rows are connected
     /// until a read of the volumes begun after the mount has landed.
     @Published var pendingMounts: [String: PendingMount] = [:]
-    /// ⌘K, File ▸ Connect to Server…, the SHARED header's +.
+    /// ⌘K, File ▸ Connect to Server…, the LOCATIONS header's +.
     @Published var showsConnectSheet = false
     /// The mounts this window made, by mount point (`Volume.id`): the share
     /// each is, whatever address macOS gives it back by.

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A share saved in the sidebar's SHARED section: `[servers.<id>]` in
+/// A share saved in the sidebar (under Locations): `[servers.<id>]` in
 /// `explorer.local.toml`, with its `url` (`smb://grove-lab/media`).
 public struct SharedServer: Equatable, Sendable, Identifiable {
     /// Its table's name in the file.
