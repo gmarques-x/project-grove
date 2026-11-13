@@ -64,7 +64,7 @@ Grove Keys does this, so it works while Grove Keys is running (also with Hyper o
 
 | Press | To |
 | --- | --- |
-| ⌃` | Drop a terminal down from the top of the screen, from any app |
+| ⌃` | Drop a terminal down from the top of the screen, from any app (on an ISO keyboard, ⌃ and the key beside the left Shift) |
 | ⌃R ⌃T ⌥C | In the shell: search history, pick a file, jump to a folder |
 
 More in [The terminal](06-the-terminal.md).

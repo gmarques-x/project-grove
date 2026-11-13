@@ -250,5 +250,33 @@ import Testing
         let rows = GhosttyKeybinds.rows(listing: "keybind = super+semicolon=reload_config\n", legends: pt)
         #expect(rows.first?.keys == "⌘ Ç")
         #expect(GhosttyKeybinds.rows(listing: "keybind = super+semicolon=reload_config\n").first?.keys == "⌘ ;")
+        // Ghostty's quick terminal is the backquote position: the key beside
+        // left Shift on a Portuguese ISO Mac.
+        #expect(GhosttyKeybinds.rows(listing: "keybind = ctrl+backquote=toggle_quick_terminal\n", legends: pt)
+            .first?.keys == "⌃ <")
+        #expect(GhosttyKeybinds.rows(listing: "keybind = super+arrow_up=jump_to_prompt:-1\n", legends: pt)
+            .first?.keys == "⌘ ↑")
+    }
+
+    /// A single-character trigger matches the character typed, wherever the
+    /// layout puts it: it is written as it is, whatever is at the US place.
+    @Test func ghosttyCharacterTriggersAreWrittenAsTheyAre() {
+        var raw = LegendsTests.letters
+        raw[KeyNames.code(for: "w")!] = RawTranslation(base: "z", shift: "Z")
+        let other = Legends(raw: raw)
+        let rows = GhosttyKeybinds.rows(listing: """
+            keybind = super+w=close_surface
+            keybind = super+,=open_config
+            keybind = super+[=goto_split:previous
+            """, legends: other)
+        #expect(rows.map(\.keys) == ["⌘ W", "⌘ ,", "⌘ ["])
+    }
+
+    @Test func theShellsQuickTerminalRowShowsLegends() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        let keys = try KeysFile(text: fixture("keys.toml"))
+        let shell = try #require(CheatSheet.sections(keys: keys, legends: pt) { _ in nil }.first { $0.id == "shell" })
+        // zsh's keys match by character, so they stay; Ghostty's is a position.
+        #expect(shell.rows.map(\.keys) == ["⌃ R", "⌃ T", "⌥ C", "⌃ <"])
     }
 }

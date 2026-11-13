@@ -96,10 +96,22 @@ public enum GhosttyKeybinds {
     }
 
     /// The key as the rest of the sheet writes one: `⌥⌘ ↑`.
+    ///
+    /// Ghostty matches a one-character trigger (`w`, `,`, `[`, `1`) by the
+    /// character typed, wherever the layout puts it, so it is written as it
+    /// is (a letter as a capital). A longer name (`backquote`, `arrow_up`)
+    /// is a W3C physical key, a place on the keyboard: it is written with
+    /// `legends`, what that place types (`⌃ <` for `ctrl+backquote` on a
+    /// Portuguese ISO Mac).
     private static func symbols(_ binding: Binding, _ legends: Legends) -> String {
+        if binding.key.count == 1 {
+            // The US legends write a one-character name as itself.
+            return Shortcut(modifiers: binding.modifiers, key: binding.key).symbols(using: .us)
+        }
         let names = [
             "arrow_left": "left", "arrow_right": "right", "arrow_up": "up", "arrow_down": "down",
             "escape": "esc", "backquote": "backtick", "grave_accent": "backtick",
+            "bracket_left": "leftSquareBracket", "bracket_right": "rightSquareBracket",
             "page_up": "Page Up", "page_down": "Page Down", "home": "Home", "end": "End",
         ]
         return Shortcut(modifiers: binding.modifiers, key: names[binding.key] ?? binding.key).symbols(using: legends)

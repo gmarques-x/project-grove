@@ -94,7 +94,8 @@ public enum CheatSheet {
     /// runs folded), then the fixed lists: the shell, macOS and, when
     /// `ghostty` has rows, Ghostty. A section without rows is left out.
     /// `appName` returns nil for an app that isn't installed. Keys are
-    /// written with `legends` (`Hyper Ç` on Portuguese); the fixed lists
+    /// written with `legends` (`Hyper Ç` on Portuguese), and so is the
+    /// quick terminal's place in the shell list; the rest of the fixed lists
     /// keep their own text.
     public static func sections(keys: KeysFile, ghostty: [CheatRow] = [], legends: Legends = .us,
                                 appName: (String) -> String?) -> [CheatSection] {
@@ -142,7 +143,7 @@ public enum CheatSheet {
         }
 
         let all = [CheatSection(id: "hyper", title: "Hyper", rows: hyper)] + modes + [
-            CheatSection(id: "shell", title: "Shell", fixed: true, rows: shell),
+            CheatSection(id: "shell", title: "Shell", fixed: true, rows: shell(legends)),
             CheatSection(id: "macos", title: "macOS", fixed: true, rows: macOS(keys.hyper)),
             CheatSection(id: "ghostty", title: "Ghostty", fixed: true, rows: ghostty),
         ]
@@ -165,13 +166,19 @@ public enum CheatSheet {
     }
 
     /// The keys fzf binds in zsh (config/zsh/conf.d/40-tools.zsh) and
-    /// Ghostty's quick terminal (config/ghostty/config).
-    static let shell = [
-        CheatRow(id: "shell/history", keys: "⌃ R", text: "Search the history"),
-        CheatRow(id: "shell/files", keys: "⌃ T", text: "Find a file"),
-        CheatRow(id: "shell/folders", keys: "⌥ C", text: "Jump to a folder (left Option)"),
-        CheatRow(id: "shell/quick", keys: "⌃ `", text: "Quick terminal, from anywhere"),
-    ]
+    /// Ghostty's quick terminal (config/ghostty/config). zsh's match the
+    /// character typed, so they are fixed text; the quick terminal's
+    /// `ctrl+grave_accent` is a place on the keyboard, written with
+    /// `legends` (`⌃ <` on a Portuguese ISO Mac), as Ghostty's own row.
+    static func shell(_ legends: Legends) -> [CheatRow] {
+        [
+            CheatRow(id: "shell/history", keys: "⌃ R", text: "Search the history"),
+            CheatRow(id: "shell/files", keys: "⌃ T", text: "Find a file"),
+            CheatRow(id: "shell/folders", keys: "⌥ C", text: "Jump to a folder (left Option)"),
+            CheatRow(id: "shell/quick", keys: Shortcut(modifiers: [.ctrl], key: "backtick").symbols(using: legends),
+                     text: "Quick terminal, from anywhere"),
+        ]
+    }
 
     /// macOS's own keys, and the two Grove Keys changes under them: ⌘Space is
     /// the Grove Launcher, not Spotlight, and the right ⌥ types characters

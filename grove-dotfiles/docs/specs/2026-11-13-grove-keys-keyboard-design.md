@@ -94,7 +94,12 @@ All key text goes through one function, `Shortcut.symbols(using: Legends)`:
 - the Keyboard tab (caps: base and Shift legends, binding below as today; the
   "Not on the keyboard" list);
 - the cheat sheet on Hyper hold and the searchable cheat sheet (Hyper+K: the
-  Hyper, AeroSpace and Ghostty rows; the shell and macOS lists are fixed text);
+  Hyper and AeroSpace rows; Ghostty's rows whose trigger is a W3C physical key
+  name such as `backquote` or `arrow_up`, while its one-character triggers
+  (`w`, `,`, `[`) match the character typed and are written as they are; the
+  shell list's quick terminal, `ctrl+grave_accent`, a place: `⌃ <` on the
+  owner's Mac. zsh's ⌃R, ⌃T, ⌥C match by character and macOS's list is fixed
+  text);
 - the key editor popover;
 - the Bindings rows and their clash lines.
 
