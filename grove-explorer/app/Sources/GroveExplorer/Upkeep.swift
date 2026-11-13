@@ -9,7 +9,8 @@ import SwiftUI
 extension AppModel {
     // MARK: Sizes
 
-    /// Asks for the total of every folder and package the panes show whose
+    /// Asks for the total of every folder and package the panes show (at
+    /// any depth, in folders open in place too) whose
     /// total isn't known, in the order shown (so the top of the list first),
     /// and forgets the totals of what is no longer shown.
     func wantSizes() {
@@ -22,12 +23,12 @@ extension AppModel {
     }
 
     /// The folders and packages whose totals are wanted: the rows of each
-    /// pane that shows the folder its tab is on. A pane between two folders
+    /// pane that shows the folder its tab is on, at every depth. A pane between two folders
     /// (navigated, the new one not yet read) wants none of its old rows.
     func wantedSizes() -> [URL] {
         SizeWanted.urls(in: sides.compactMap { side in
             browser.tab(side).map {
-                SizeWanted.Pane(tabFolder: $0.folder, listedFolder: listing(for: side)?.folder, shown: entries(for: side))
+                SizeWanted.Pane(tabFolder: $0.folder, listedFolder: listing(for: side)?.folder, items: listing(for: side)?.items ?? [])
             }
         })
         // Nothing is walked on a disk that is being ejected: a walk would hold it.

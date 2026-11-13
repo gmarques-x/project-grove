@@ -15,6 +15,15 @@ public enum SizeWanted {
             self.listedFolder = listedFolder
             self.shown = shown
         }
+
+        /// The rows as a tab with folders open in place has them (spec
+        /// §16): every row at every depth, in row order; a loading line is
+        /// no row and wants nothing.
+        public init(tabFolder: URL, listedFolder: URL?, items: [TreeItem]) {
+            self.init(
+                tabFolder: tabFolder, listedFolder: listedFolder,
+                shown: items.compactMap { if case .row(let row) = $0 { row.entry } else { nil } })
+        }
     }
 
     /// Whether an entry's size is a total to be worked out (a package's

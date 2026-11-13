@@ -101,4 +101,12 @@ import Testing
         #expect(stale == [known[0], known[1]])
         #expect(AfterOperation.staleTotals(among: known, touched: []).isEmpty)
     }
+
+    /// A change deep inside open folders: the totals of every folder it is
+    /// in that shows as a row are stale, and no other.
+    @Test func aChangeInsideOpenFoldersMakesTheirTotalsStale() {
+        let known = ["/t/a", "/t/a/b", "/t/a/b/c", "/t/a/b2", "/t/a2", "/t/z"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let stale = AfterOperation.staleTotals(among: known, touched: [URL(fileURLWithPath: "/t/a/b/c/d")])
+        #expect(stale.map(\.path) == ["/t/a", "/t/a/b", "/t/a/b/c"])
+    }
 }

@@ -42,4 +42,25 @@ import Testing
             tabFolder: folder("/a"), listedFolder: folder("/a"), shown: [entry("/a/one"), entry("/a/two")])
         #expect(SizeWanted.urls(in: [pane, pane]).map(\.path) == ["/a/one", "/a/two"])
     }
+
+    // MARK: Folders open in place
+
+    private func row(_ entry: Entry, depth: Int) -> TreeItem {
+        .row(TreeRow(entry: entry, depth: depth, fold: .none, isContext: false))
+    }
+
+    /// Every folder and package that shows, at any depth, in row order;
+    /// nothing of a loading line.
+    @Test func theRowsOfOpenFoldersAreWantedAtEveryDepth() {
+        let items: [TreeItem] = [
+            row(entry("/a/one"), depth: 0), row(entry("/a/one/inner"), depth: 1),
+            row(entry("/a/one/inner/App.app", .package), depth: 2), row(entry("/a/one/inner/f.txt", .file), depth: 2),
+            row(entry("/a/two"), depth: 0), .loading(under: folder("/a/two"), depth: 1), row(entry("/a/z.txt", .file), depth: 0),
+        ]
+        let pane = SizeWanted.Pane(tabFolder: folder("/a"), listedFolder: folder("/a"), items: items)
+        #expect(SizeWanted.urls(in: [pane]).map(\.path) == ["/a/one", "/a/one/inner", "/a/one/inner/App.app", "/a/two"])
+        // Between two folders: none, at any depth.
+        let leaving = SizeWanted.Pane(tabFolder: folder("/b"), listedFolder: folder("/a"), items: items)
+        #expect(SizeWanted.urls(in: [leaving]).isEmpty)
+    }
 }
