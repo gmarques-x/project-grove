@@ -793,10 +793,13 @@ bt_icon() {
 
 # vpn_icon [FIRST_LINE]: the call vpn.sh makes when `scutil --nc status
 # "grove-lab"` prints FIRST_LINE (and an extended status after a connected
-# one); scutil fails without an argument.
+# one); scutil fails without an argument. "No service" goes to standard
+# error with status 1, as scutil does for a missing service.
 vpn_icon() {
   : > "$CALLS"
-  if [ "$#" -gt 0 ]; then
+  if [ "${1:-}" = "No service" ]; then
+    fake scutil 'printf "%s\n" "$*" >> "'"$BATS_TEST_TMPDIR"'/scutil-calls"; echo "No service" >&2; exit 1'
+  elif [ "$#" -gt 0 ]; then
     fake scutil 'printf "%s\n" "$*" >> "'"$BATS_TEST_TMPDIR"'/scutil-calls"; printf "%s\n" "'"$1"'"; [ "'"$1"'" != Connected ] || printf "Extended Status <dictionary> {\n  Status : 2\n}\n"'
   else
     fake scutil 'exit 1'

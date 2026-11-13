@@ -103,8 +103,9 @@ sb_bluetooth() {
 
 # sb_vpn_icon < `scutil --nc status "grove-lab"`: the VPN pill's icon for
 # the status on scutil's first line: vpn-on (Connected), vpn-connecting
-# (Connecting, Disconnecting), or vpn-off for Disconnected, "No service" (not
-# set up: the pill stays, grey), no output or anything else.
+# (Connecting, Disconnecting), or vpn-off for Disconnected, no output (a
+# missing service: scutil says "No service" on standard error and exits 1;
+# the pill stays, grey) or anything else.
 sb_vpn_icon() {
   local first=""
   IFS= read -r first || true

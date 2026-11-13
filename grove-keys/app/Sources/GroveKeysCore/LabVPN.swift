@@ -23,11 +23,14 @@ import Foundation
 //   }
 // ConnectTime (in the VPN, IPSec or PPP dictionary) is "the time when the
 // connection was established", in seconds of the uptime clock (as
-// ProcessInfo.systemUptime counts it). A missing service prints `No service`.
+// ProcessInfo.systemUptime counts it). A missing service prints `No service`
+// on standard error, nothing on standard output, and exits 1: the output
+// read (standard output alone) is empty, which reads as not set up.
 
 /// The tunnel's state, as the bar and its dropdown show it.
 public enum LabVPNStatus: Equatable, Sendable {
-    /// No `grove-lab` service (`No service`), or output that can't be read.
+    /// No `grove-lab` service (scutil prints nothing on standard output and
+    /// `No service` on standard error), or output that can't be read.
     case notSetUp
     case disconnected
     case connecting
@@ -163,10 +166,14 @@ extension LabVPNStatus {
 
 /// The switch while scutil starts or stops the tunnel: the dropdown shows
 /// `shown` (connecting or disconnecting, so the switch is held and disabled)
-/// until a reading that started after the command returned and no longer
-/// says the state the switch left (`scutil --nc start` returns at once, so
-/// the next reading can still say Disconnected), or until `cap` such
-/// readings (about 6 s at the panel's 2 s), whichever comes first.
+/// until a reading that started after the command returned ends it:
+/// - a final state (not Connecting or Disconnecting) other than the one the
+///   switch left, or any final state once the tunnel was seen on the way
+///   (`scutil --nc start` returns at once, so the next reading can still say
+///   Disconnected; Connecting and then Disconnected is a start that failed);
+/// - else the `cap`th such reading (about 6 s at the panel's 2 s), whatever
+///   it says: a transitional state by where it is heading, a reading that
+///   timed out as unknown. So the switch never stays disabled.
 public struct LabVPNPendingSwitch: Equatable, Sendable {
     public let on: Bool
     /// The state before the command.
@@ -176,15 +183,19 @@ public struct LabVPNPendingSwitch: Equatable, Sendable {
     /// The number of the last reading started when the command returned;
     /// nil while it runs.
     private var after: Int?
-    /// Readings after the command so far.
+    /// Readings after the command so far, timed-out ones included.
     private var seen = 0
+    /// A reading after the command said Connecting or Disconnecting.
+    private var moved = false
 
     public enum Outcome: Equatable, Sendable {
         /// The tunnel is where the switch put it.
         case succeeded
         /// It isn't (still down after a start, still up after a stop, or no
-        /// service): the dropdown says `failureLine(on:)`.
+        /// service): the dropdown says `LabVPNFailure.line`.
         case failed
+        /// No reading came back by the cap: the switch is let go, nothing said.
+        case unknown
     }
 
     public init(on: Bool, from: LabVPNStatus) {
@@ -198,14 +209,22 @@ public struct LabVPNPendingSwitch: Equatable, Sendable {
     /// The command returned; `number` is the last reading started by then.
     public mutating func changed(afterReading number: Int) { after = number }
 
-    /// A reading: nil while the switch keeps waiting, else how it ended.
-    /// Readings that started before the command returned don't count. The
-    /// state is compared by its icon (a connected reading's connect time
-    /// moves by a hair between readings).
-    public mutating func settle(with status: LabVPNStatus, reading number: Int) -> Outcome? {
+    /// A reading (nil: it timed out): nil while the switch keeps waiting,
+    /// else how it ended. Readings that started before the command returned
+    /// don't count. States are compared by their icon (a connected
+    /// reading's connect time moves by a hair between readings).
+    public mutating func settle(with status: LabVPNStatus?, reading number: Int) -> Outcome? {
         guard let after, number > after else { return nil }
         seen += 1
-        guard LabVPNIcon.icon(for: status) != LabVPNIcon.icon(for: from) || seen >= Self.cap else { return nil }
+        let atCap = seen >= Self.cap
+        guard let status else { return atCap ? .unknown : nil }
+        let transitional = status == .connecting || status == .disconnecting
+        if transitional {
+            moved = true
+        } else if moved || LabVPNIcon.icon(for: status) != LabVPNIcon.icon(for: from) {
+            return status.switchOn == on ? .succeeded : .failed
+        }
+        guard atCap else { return nil }
         return status.switchOn == on ? .succeeded : .failed
     }
 
@@ -214,4 +233,17 @@ public struct LabVPNPendingSwitch: Equatable, Sendable {
     public static func failureLine(on: Bool) -> String {
         on ? "Didn't start · see WireGuard" : "Didn't stop · see WireGuard"
     }
+}
+
+/// A start (`on`) or stop that didn't happen, said in the dropdown's status
+/// line until the next switch or opening, or until a reading shows the
+/// tunnel got there after all (no "Didn't start" under a connected header).
+public struct LabVPNFailure: Equatable, Sendable {
+    public let on: Bool
+
+    public init(on: Bool) { self.on = on }
+
+    public var line: String { LabVPNPendingSwitch.failureLine(on: on) }
+
+    public func cleared(by status: LabVPNStatus) -> Bool { status.switchOn == on }
 }

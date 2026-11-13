@@ -124,8 +124,8 @@ struct LabVPNTests {
         #expect(starting.settle(with: .connecting, reading: 7) == nil)
         starting.changed(afterReading: 7)
         // Reading 7 started before the command returned.
-        #expect(starting.settle(with: .connecting, reading: 7) == nil)
-        #expect(starting.settle(with: .connecting, reading: 8) == .succeeded)
+        #expect(starting.settle(with: .connected(address: nil, since: nil), reading: 7) == nil)
+        #expect(starting.settle(with: .connected(address: nil, since: nil), reading: 8) == .succeeded)
         #expect(LabVPNPendingSwitch(on: false, from: .connecting).shown == .disconnecting)
     }
 
@@ -166,5 +166,55 @@ struct LabVPNTests {
     @Test func theFailureLines() {
         #expect(LabVPNPendingSwitch.failureLine(on: true) == "Didn't start · see WireGuard")
         #expect(LabVPNPendingSwitch.failureLine(on: false) == "Didn't stop · see WireGuard")
+    }
+
+    @Test func aTransitionalReadingIsNotTheEnd() {
+        // Connecting, then back to Disconnected: the start didn't happen.
+        var starting = LabVPNPendingSwitch(on: true, from: .disconnected)
+        starting.changed(afterReading: 0)
+        #expect(starting.settle(with: .connecting, reading: 1) == nil)
+        #expect(starting.settle(with: .disconnected, reading: 2) == .failed)
+        // Connecting, then Connected: it did.
+        var up = LabVPNPendingSwitch(on: true, from: .disconnected)
+        up.changed(afterReading: 0)
+        #expect(up.settle(with: .connecting, reading: 1) == nil)
+        #expect(up.settle(with: .connected(address: nil, since: nil), reading: 2) == .succeeded)
+        // Still on the way at the cap: the way it is going decides.
+        var slow = LabVPNPendingSwitch(on: true, from: .disconnected)
+        slow.changed(afterReading: 0)
+        for n in 1...2 { #expect(slow.settle(with: .connecting, reading: n) == nil) }
+        #expect(slow.settle(with: .connecting, reading: 3) == .succeeded)
+        var stopping = LabVPNPendingSwitch(on: false, from: .connected(address: nil, since: nil))
+        stopping.changed(afterReading: 0)
+        for n in 1...2 { #expect(stopping.settle(with: .disconnecting, reading: n) == nil) }
+        #expect(stopping.settle(with: .disconnecting, reading: 3) == .succeeded)
+    }
+
+    @Test func aReadingThatTimedOutCountsTowardTheCap() {
+        var starting = LabVPNPendingSwitch(on: true, from: .disconnected)
+        starting.changed(afterReading: 0)
+        #expect(starting.settle(with: nil, reading: 1) == nil)
+        #expect(starting.settle(with: nil, reading: 2) == nil)
+        // Nothing known at the cap: the switch is let go, no failure said.
+        #expect(starting.settle(with: nil, reading: 3) == .unknown)
+        // A timed-out reading before the command returned doesn't count.
+        var early = LabVPNPendingSwitch(on: true, from: .disconnected)
+        #expect(early.settle(with: nil, reading: 1) == nil)
+        early.changed(afterReading: 1)
+        for n in 2...3 { #expect(early.settle(with: nil, reading: n) == nil) }
+        #expect(early.settle(with: nil, reading: 4) == .unknown)
+    }
+
+    @Test func aFailureClearsWhenTheTunnelGetsThereAfterAll() {
+        let start = LabVPNFailure(on: true)
+        #expect(start.line == "Didn't start · see WireGuard")
+        #expect(start.cleared(by: .connected(address: "10.0.0.2", since: nil)))
+        #expect(start.cleared(by: .connecting))
+        #expect(!start.cleared(by: .disconnected))
+        #expect(!start.cleared(by: .notSetUp))
+        let stop = LabVPNFailure(on: false)
+        #expect(stop.line == "Didn't stop · see WireGuard")
+        #expect(stop.cleared(by: .disconnected))
+        #expect(!stop.cleared(by: .connected(address: nil, since: nil)))
     }
 }

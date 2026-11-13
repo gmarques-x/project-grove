@@ -23,7 +23,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     @Published private(set) var pending: LabVPNPendingSwitch?
     /// A start or stop that didn't happen ("Didn't start · see WireGuard"),
     /// in the status line's place until the next switch or opening.
-    @Published private(set) var failure: String?
+    @Published private(set) var failure: LabVPNFailure?
     /// The zone "since 14:05" is told in.
     let timeZone: TimeZone
 
@@ -61,7 +61,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
             timeZone = TimeZone(identifier: "UTC")!
             let name = ProcessInfo.processInfo.environment["GROVE_VPN_SAMPLE"] ?? "connected"
             status = Self.sample(name)
-            if name == "refused" { failure = LabVPNPendingSwitch.failureLine(on: true) }
+            if name == "refused" { failure = LabVPNFailure(on: true) }
         }
     }
 
@@ -113,25 +113,29 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
 
     private func finish(_ text: String?, number: Int) {
         reading = false
-        if open, let text { took(LabVPNStatus.parse(scutilStatus: text), number: number) }
+        // A reading that timed out still counts toward the pending switch's cap.
+        if open { took(text.map { LabVPNStatus.parse(scutilStatus: $0) }, number: number) }
         if again {
             again = false
             if open { refresh() }
         }
     }
 
-    /// A reading: shown, unless the switch waits for one that started after
-    /// its command returned and left the old state (or the cap's). When the icon changed, the bar is told (a
-    /// tunnel that came up while the panel was open turns the pill purple
-    /// at once, not at the bar's next 10 s reading).
-    private func took(_ fresh: LabVPNStatus, number: Int) {
+    /// A reading (nil: it timed out): shown, unless the switch is still
+    /// waiting (`LabVPNPendingSwitch.settle`). A failure line goes once the
+    /// tunnel got where it was asked after all. When the icon changed, the
+    /// bar is told (a tunnel that came up while the panel was open turns the
+    /// pill purple at once, not at the bar's next 10 s reading).
+    private func took(_ fresh: LabVPNStatus?, number: Int) {
         if var pending {
             let outcome = pending.settle(with: fresh, reading: number)
             self.pending = pending
             guard let outcome else { return }
             self.pending = nil
-            if outcome == .failed { failure = LabVPNPendingSwitch.failureLine(on: pending.on) }
+            if outcome == .failed { failure = LabVPNFailure(on: pending.on) }
         }
+        guard let fresh else { return }
+        if let failure, failure.cleared(by: fresh) { self.failure = nil }
         let before = status
         if fresh != status { status = fresh }
         if let before, LabVPNIcon.icon(for: before) != LabVPNIcon.icon(for: fresh) {
@@ -179,7 +183,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
                     if failed {
                         // scutil said no: the reading shows where it is.
                         self.pending = nil
-                        self.failure = LabVPNPendingSwitch.failureLine(on: on)
+                        self.failure = LabVPNFailure(on: on)
                     } else {
                         // Readings started from now on saw the command's effect.
                         self.pending?.changed(afterReading: self.started)
@@ -240,7 +244,7 @@ struct LabVPNPanel: View {
                 }
                 if let failure = model.failure {
                     // A warning in yellow, as the Bluetooth section's refusal.
-                    theme.marked(failure, theme.yellow)
+                    theme.marked(failure.line, theme.yellow)
                 } else {
                     Text(status.map { LabVPNStatus.line(for: $0, timeZone: model.timeZone) } ?? "Reading…")
                         .foregroundStyle(theme.quiet)
