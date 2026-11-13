@@ -44,6 +44,33 @@ import Testing
         #expect(KeyNames.name(41) == "semicolon")
     }
 
+    @Test func symbolsUseLegends() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        let s = try #require(Shortcut(aerospace: "hyper-semicolon"))
+        #expect(s.symbols(using: pt) == "⌃⌥⇧⌘ Ç")
+        #expect(s.symbols(using: .us) == "⌃⌥⇧⌘ ;")
+        #expect(try #require(Shortcut(aerospace: "alt-t")).symbols(using: pt) == "⌥ T")
+        #expect(try #require(Shortcut(aerospace: "alt-section")).symbols(using: pt) == "⌥ §")
+    }
+
+    @Test func specialKeysKeepTheirGlyphs() throws {
+        let pt = try fixtureLegends("legends-pt-PT.json")
+        let expected = ["tab": "⇥", "enter": "↩", "backspace": "⌫", "esc": "Esc", "space": "Space",
+                        "left": "←", "right": "→", "up": "↑", "down": "↓"]
+        for (key, glyph) in expected {
+            let s = try #require(Shortcut(aerospace: "alt-" + key))
+            #expect(s.symbols(using: pt) == "⌥ " + glyph)
+            #expect(s.symbols(using: pt) == s.symbols(using: .us))
+        }
+    }
+
+    @Test func symbolsWithoutArgumentIsUS() throws {
+        for text in ["hyper-semicolon", "alt-shift-quote", "cmd-backtick", "esc", "alt-1", "hyper-t"] {
+            let s = try #require(Shortcut(aerospace: text))
+            #expect(s.symbols == s.symbols(using: .us))
+        }
+    }
+
     @Test func commandQAndWLeaveTheRecorder() throws {
         #expect(try #require(Shortcut(aerospace: "cmd-q")).leavesRecorder)
         #expect(try #require(Shortcut(aerospace: "cmd-w")).leavesRecorder)

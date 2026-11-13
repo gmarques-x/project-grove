@@ -39,14 +39,22 @@ public struct Shortcut: Hashable, Sendable {
         return (order.filter(modifiers.contains).map(\.rawValue) + [key]).joined(separator: "-")
     }
 
-    /// Mac order ⌃⌥⇧⌘, a space, then the key: `⌃⌥⇧⌘ T`, `⌥⇧ 1`, `Esc`.
-    public var symbols: String {
+    /// With the US legends: `symbols(using: .us)`.
+    public var symbols: String { symbols(using: .us) }
+
+    /// Mac order ⌃⌥⇧⌘, a space, then the key as the input source shows it:
+    /// `⌃⌥⇧⌘ Ç` (`hyper-semicolon` on Portuguese), `⌥⇧ 1`, `Esc`.
+    public func symbols(using legends: Legends) -> String {
         let glyphs: [(Modifier, String)] = [(.ctrl, "⌃"), (.alt, "⌥"), (.shift, "⇧"), (.cmd, "⌘")]
         let mods = glyphs.filter { modifiers.contains($0.0) }.map(\.1).joined()
-        return mods.isEmpty ? keySymbol : mods + " " + keySymbol
+        let keyText = keySymbol(using: legends)
+        return mods.isEmpty ? keyText : mods + " " + keyText
     }
 
-    private var keySymbol: String {
+    /// The legend's character first; the name table for special keys and
+    /// keys the layout has nothing printable on.
+    private func keySymbol(using legends: Legends) -> String {
+        if let symbol = legends.symbol(forKey: key) { return symbol }
         switch key {
         case "minus": return "-"
         case "equal": return "="
