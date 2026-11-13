@@ -268,6 +268,8 @@ import Testing
         tree.open.remove(url(folder))
         tree.children = tree.children.filter { !($0.key.path == folder || $0.key.path.hasPrefix(folder + "/")) }
         tree.closedUnderFilter = remembered ? [url(folder, folder: true)] : []
+        // What it had in it is known when it closes: its chevron says so.
+        tree.hasContents[url(folder, folder: true)] = true
         return tree
     }
 
@@ -317,6 +319,81 @@ import Testing
         #expect(lines(Tree.items(reading)).prefix(3) == ["docs~ v", "  deep~ …", "    ···"])
     }
 
+    /// A folder closed under the filter has a chevron as any folder does:
+    /// none once it has nothing that would show. Opened again and read with
+    /// no match inside, it goes, as any open folder without one; only while
+    /// it is read does it stay.
+    @Test func aFolderClosedUnderTheFilterFollowsItsPeekAndTheFilterOnceRead() {
+        var emptied = closedUnderRead("/f/docs/deep", remembered: true)
+        emptied.hasContents[url("/f/docs/deep/", folder: true)] = false
+        #expect(lines(Tree.items(emptied)).contains("  deep~"))
+        var read = closedUnderRead("/f/docs/deep", remembered: true)
+        read.open.insert(url("/f/docs/deep"))
+        read.children[url("/f/docs/deep")] = [entry("/f/docs/deep/zzz.txt")]
+        #expect(!lines(Tree.items(read)).contains { $0.contains("deep") })
+    }
+
+    // MARK: Under a filter: what ⌘A selects and what operations take (final review A1)
+
+    private func filtered() -> [TreeItem] { Tree.items(filterTree(filter: "read")) }
+
+    private func rowURLs(_ items: [TreeItem]) -> [URL] {
+        items.compactMap { if case .row(let row) = $0 { row.entry.url } else { nil } }
+    }
+
+    private func index(_ items: [TreeItem]) -> [URL: Int] {
+        var rows: [URL: Int] = [:]
+        for (place, item) in items.enumerated() { if case .row(let row) = item { rows[row.entry.url] = place } }
+        return rows
+    }
+
+    /// ⌘A under a filter: the matches, never the folders kept as context.
+    @Test func selectAllUnderAFilterSelectsTheMatchesOnly() {
+        #expect(Tree.selectAll(in: filtered()).map(\.path) == [
+            "/f/docs/deep/inner/thread.txt", "/f/docs/reading", "/f/docs/reading/bread.txt", "/f/Réadable.txt",
+            "/f/readme.md",
+        ])
+        // Without a filter there is no context: every row.
+        let plain = Tree.items(filterTree(filter: ""))
+        #expect(Tree.selectAll(in: plain) == rowURLs(plain))
+    }
+
+    /// Every row selected (a ⇧-range over all of them): a context folder
+    /// with rows selected inside it gives those rows, not itself; a
+    /// matching folder still takes what is inside it.
+    @Test func aRangeAcrossContextFoldersTakesTheMatches() {
+        let items = filtered()
+        let all = Set(rowURLs(items))
+        let expected = ["/f/docs/deep/inner/thread.txt", "/f/docs/reading", "/f/Réadable.txt", "/f/readme.md"]
+        #expect(Tree.operands(of: all, in: items).map(\.path) == expected)
+        #expect(Tree.operands(of: all, in: items, index: index(items)).map(\.path) == expected)
+        // Two of them, the context folders between them in the range.
+        let range: Set<URL> = [url("/f/docs"), url("/f/docs/deep"), url("/f/docs/deep/inner"),
+            url("/f/docs/deep/inner/thread.txt")]
+        #expect(Tree.operands(of: range, in: items, index: index(items)).map(\.path) == ["/f/docs/deep/inner/thread.txt"])
+    }
+
+    /// Selected on its own, a context folder acts as a folder (spec §16).
+    @Test func aContextFolderAloneIsAnOperand() {
+        let items = filtered()
+        #expect(Tree.operands(of: [url("/f/docs")], in: items, index: index(items)).map(\.path) == ["/f/docs"])
+        #expect(Tree.operands(of: [url("/f/docs/deep"), url("/f/readme.md")], in: items, index: index(items))
+            .map(\.path) == ["/f/docs/deep", "/f/readme.md"])
+    }
+
+    /// The status bar counts what is selected as the operations take it:
+    /// context rows only when they act as folders.
+    @Test func theSelectedCountLeavesOutContextRowsThatAreNoOperands() {
+        let items = filtered()
+        let all = Array(items.indices.filter { if case .row = items[$0] { true } else { false } })
+        #expect(Tree.selectedCount(all, in: items) == 5)
+        #expect(Tree.selectedCount([0], in: items) == 1)
+        // Outside a filter a folder and a file inside it are two selected, as before.
+        let plain = Tree.items(filterTree(filter: ""))
+        let docs = rowURLs(plain).firstIndex(of: url("/f/docs"))!
+        #expect(Tree.selectedCount([docs, docs + 1], in: plain) == 2)
+    }
+
     /// Without a filter the set means nothing: the folder is closed as any.
     @Test func withoutAFilterAFolderClosedUnderOneIsClosedAsUsual() {
         var cleared = closedUnderRead("/f/docs/deep", remembered: true)
@@ -324,7 +401,7 @@ import Testing
         var plain = cleared
         plain.closedUnderFilter = []
         #expect(Tree.items(cleared) == Tree.items(plain))
-        #expect(lines(Tree.items(cleared)).contains("  deep"))
+        #expect(lines(Tree.items(cleared)).contains("  deep >"))
     }
 
     @Test func everyWordMustMatchCaseAndAccentsIgnored() {

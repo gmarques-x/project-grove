@@ -82,16 +82,33 @@ extension Tree {
         let chosen = Set(places)
         var taken: [Int] = []
         var takenDepth: Int?
+        var next = 0
         for place in first...last {
+            while next < places.count, places[next] <= place { next += 1 }
             guard case .row(let row) = items[place] else { continue }
             if let depth = takenDepth, row.depth > depth { continue }
             takenDepth = nil
-            if chosen.contains(place) {
-                taken.append(place)
-                takenDepth = row.depth
-            }
+            guard chosen.contains(place) else { continue }
+            // A context folder with a selected row inside it gives that row.
+            if row.isContext, next < places.count, isInside(places[next], below: place, in: items) { continue }
+            taken.append(place)
+            takenDepth = row.depth
         }
         return taken
+    }
+
+    /// Whether the row at `inner` is inside the folder row at `outer` (above it).
+    private static func isInside(_ inner: Int, below outer: Int, in items: [TreeItem]) -> Bool {
+        guard case .row(let folder) = items[outer] else { return false }
+        for place in (outer + 1)...inner {
+            let depth: Int
+            switch items[place] {
+            case .row(let row): depth = row.depth
+            case .loading(_, let level): depth = level
+            }
+            if depth <= folder.depth { return false }
+        }
+        return true
     }
 
     // MARK: The fold keys (→ ← ⌥→ ⌥←)
@@ -173,11 +190,13 @@ extension Tree {
     }
 
     /// The selection once `folder` closes: what was selected inside it is
-    /// no row any more, and the folder is selected in its stead.
-    public static func selection(_ selection: Set<URL>, closing folder: URL) -> Set<URL> {
+    /// no row any more, and the folder is selected in its stead (Finder's
+    /// rule), unless it is a folder kept as context under a filter
+    /// (`asContext`): it holds what the user can't see, so it is not.
+    public static func selection(_ selection: Set<URL>, closing folder: URL, asContext: Bool = false) -> Set<URL> {
         let inside = folder.standardizedPath + "/"
         let kept = selection.filter { !$0.standardizedPath.hasPrefix(inside) }
-        return kept.count == selection.count ? selection : kept.union([folder])
+        return kept.count == selection.count || asContext ? kept : kept.union([folder])
     }
 
     /// How many rows `items` has outside `folder`'s contents (its own row

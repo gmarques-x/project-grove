@@ -200,6 +200,9 @@ import Testing
         let selection: Set<URL> = [url("/t/a/x", folder: false), url("/t/a/b/y", folder: false), url("/t/c")]
         #expect(paths(Tree.selection(selection, closing: url("/t/a"))) == ["/t/a", "/t/c"])
         #expect(Tree.selection([url("/t/c")], closing: url("/t/a")) == [url("/t/c")])
+        // A context folder under a filter is not selected in their stead
+        // (final review A3): ⌘⌫ would take everything in it.
+        #expect(paths(Tree.selection(selection, closing: url("/t/a"), asContext: true)) == ["/t/c"])
     }
 
     @Test func theRowsOutsideAFolderCountNothingOfItsContents() {

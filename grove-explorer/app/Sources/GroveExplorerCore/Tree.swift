@@ -115,8 +115,9 @@ public enum Tree {
     /// beneath it does; a matching open folder keeps only its matching
     /// descendants. A folder being read shows (with its loading line) only
     /// if it matches itself. Nothing beneath a closed folder ever shows; a
-    /// folder of `closedUnderFilter` stays as a row whatever is beneath it,
-    /// as context unless it matches: closed, or opened again and being read
+    /// folder of `closedUnderFilter` stays as a row, as context unless it
+    /// matches: closed (its chevron by `hasContents`), or opened again and
+    /// being read; once read it shows only if something in it matches
     /// (the user closed it under this filter: spec §16).
     public static func items(_ input: TreeInput) -> [TreeItem] {
         itemsAndUnfilteredCount(input).items
@@ -147,23 +148,35 @@ public enum Tree {
     /// The URLs an operation should take: the selection minus anything whose ancestor is also selected.
     /// In row order, spelled as the rows spell them; a selected URL that is
     /// no row of `items` (inside a folder being read, gone, filtered out)
-    /// is dropped.
+    /// is dropped. Under a filter, a folder kept as context that is
+    /// selected together with rows inside it gives those rows, not itself
+    /// (it holds what the user can't see); selected alone it is taken.
     public static func operands(of selection: Set<URL>, in items: [TreeItem]) -> [URL] {
         guard !selection.isEmpty else { return [] }
         let wanted = Set(selection.map(\.standardizedPath))
-        var operands: [URL] = []
-        // The depth of the last row taken: rows deeper than it, until one
-        // that isn't, are inside it.
-        var takenDepth: Int?
-        for case .row(let row) in items {
-            if let depth = takenDepth, row.depth > depth { continue }
-            takenDepth = nil
-            if wanted.contains(row.entry.url.standardizedPath) {
-                operands.append(row.entry.url)
-                takenDepth = row.depth
-            }
+        let places = items.indices.filter {
+            if case .row(let row) = items[$0] { wanted.contains(row.entry.url.standardizedPath) } else { false }
         }
-        return operands
+        return operandPlaces(places, in: items).compactMap {
+            if case .row(let row) = items[$0] { row.entry.url } else { nil }
+        }
+    }
+
+    /// ⌘A: every row that shows, but under a filter not the folders kept
+    /// as context, which are no matches (and hold what doesn't match).
+    public static func selectAll(in items: [TreeItem]) -> [URL] {
+        items.compactMap { if case .row(let row) = $0, !row.isContext { row.entry.url } else { nil } }
+    }
+
+    /// How many are selected, as the status bar counts them, of the rows at
+    /// `places` (in order): every row but a context one that is no operand
+    /// (it gives the rows selected inside it instead).
+    public static func selectedCount(_ places: [Int], in items: [TreeItem]) -> Int {
+        let taken = Set(operandPlaces(places, in: items))
+        return places.filter { place in
+            guard items.indices.contains(place), case .row(let row) = items[place] else { return false }
+            return !row.isContext || taken.contains(place)
+        }.count
     }
 
     /// The folders to open for ⌥→ on `folder`, breadth first, stopping before `items` would pass `rowLimit`.
@@ -314,8 +327,9 @@ public enum Tree {
                     if matches {
                         kept.append(entry)
                     } else if closedUnderFilter.contains(path) {
+                        // Its chevron as any closed folder's: none once it has nothing that would show.
                         kept.append(entry)
-                        opened[entry.url] = Opened(fold: .closed, items: [], isContext: true)
+                        opened[entry.url] = Opened(fold: closedFold(entry), items: [], isContext: true)
                     }
                     continue
                 }
@@ -332,8 +346,9 @@ public enum Tree {
                     below = [.loading(under: entry.url, depth: depth + 1)]
                 }
                 let keepsMatch = !matches && below.contains { if case .row = $0 { true } else { false } }
-                // Closed under the filter and opened again: a row still, being read or not.
-                guard matches || keepsMatch || closedUnderFilter.contains(path) else { continue }
+                // Closed under the filter and opened again: a row still while it
+                // is read; read, it follows the filter as any open folder.
+                guard matches || keepsMatch || fold == .loading && closedUnderFilter.contains(path) else { continue }
                 kept.append(entry)
                 opened[entry.url] = Opened(fold: fold, items: below, isContext: !matches)
             }

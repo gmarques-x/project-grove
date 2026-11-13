@@ -122,10 +122,12 @@ extension AppModel {
         {
             trees[side]?.openingAll = nil
         }
-        // A row kept as context under the filter stays, closed, while the filter lasts (spec §16).
-        if listing.row(of: url)?.isContext == true { filter.tabs[tab.id]?.close(url) }
+        // A row kept as context under the filter stays, closed, while the
+        // filter lasts (spec §16); it is not selected for what was inside it.
+        let isContext = listing.row(of: url)?.isContext == true
+        if isContext { filter.tabs[tab.id]?.close(url) }
         let chosen = selections[tab.id] ?? []
-        let selection = Tree.selection(chosen, closing: url)
+        let selection = Tree.selection(chosen, closing: url, asContext: isContext)
         if selection != chosen { selections[tab.id] = selection }
         // What it has in it is known: its chevron says so at once.
         let peek = listing.childEntries(of: url).map { entries in

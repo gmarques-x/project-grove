@@ -29,8 +29,13 @@ extension AppModel {
         for url in selection(for: side) {
             if let place = listing.rows[url] { places.append(place) }
         }
-        let count = places.count
-        if listing.counts.foldersOpen > 0 { places = Tree.operandPlaces(places.sorted(), in: listing.items) }
+        var count = places.count
+        if listing.counts.foldersOpen > 0 {
+            places.sort()
+            // As the operations take them: a context folder with rows selected inside it is not counted.
+            if listing.filteredFrom != nil { count = Tree.selectedCount(places, in: listing.items) }
+            places = Tree.operandPlaces(places, in: listing.items)
+        }
         var bytes: Int64? = 0
         for place in places {
             guard case .row(let row) = listing.items[place] else { continue }

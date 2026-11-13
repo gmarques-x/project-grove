@@ -87,9 +87,11 @@ extension AppModel {
         for folder in folders { open(folder, inNewTab: folders.count > 1) }
     }
 
+    /// ⌘A: every row that shows; under a filter the matches, not the
+    /// folders kept as context (`Tree.selectAll`).
     func selectAll() {
         let side = browser.active
-        select(Set(entries(for: side).map(\.url)), in: side)
+        select(Set(Tree.selectAll(in: listing(for: side)?.items ?? [])), in: side)
     }
 
     func toggleHidden() {

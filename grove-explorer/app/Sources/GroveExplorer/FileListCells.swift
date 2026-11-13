@@ -326,18 +326,21 @@ final class FileTableView: NSTableView {
 
     // MARK: The system's Edit menu
 
-    // Undo, Redo, Copy and Paste stay the system's menu items (they act on
-    // a text field when one has the keyboard); with the list as the first
-    // responder they are sent here. Select All is the table's own.
+    // Undo, Redo, Copy, Paste and Select All stay the system's menu items
+    // (they act on a text field when one has the keyboard); with the list
+    // as the first responder they are sent here. Select All is the
+    // model's, not the table's: under a filter it leaves out the folders
+    // kept as context (`Tree.selectAll`).
 
     @objc func copy(_ sender: Any?) { onEdit?("copy") }
     @objc func paste(_ sender: Any?) { onEdit?("paste") }
     @objc func undo(_ sender: Any?) { onEdit?("undo") }
     @objc func redo(_ sender: Any?) { onEdit?("redo") }
+    override func selectAll(_ sender: Any?) { onEdit?("selectAll") }
 
     private static let edits: [Selector: String] = [
         #selector(copy(_:)): "copy", #selector(paste(_:)): "paste",
-        #selector(undo(_:)): "undo", #selector(redo(_:)): "redo",
+        #selector(undo(_:)): "undo", #selector(redo(_:)): "redo", #selector(selectAll(_:)): "selectAll",
     ]
 
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
