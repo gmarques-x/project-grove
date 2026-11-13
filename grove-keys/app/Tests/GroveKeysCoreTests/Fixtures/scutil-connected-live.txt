@@ -1,0 +1,24 @@
+Connected
+Extended Status <dictionary> {
+  ConnectionStatistics : <dictionary> {
+    MaxConnectTime : 122
+  }
+  IPv4 : <dictionary> {
+    Addresses : <array> {
+      0 : 10.0.0.2
+    }
+    InterfaceName : utun4
+    Router : 10.0.0.2
+  }
+  IPv6 : <dictionary> {
+  }
+  LastStatusChangeTime : 11/13/2026 22:40:15
+  NEStatus : 3
+  Proxies : <dictionary> {
+  }
+  Status : 2
+  VPN : <dictionary> {
+    ConnectTime : 186076
+    Status : 2
+  }
+}

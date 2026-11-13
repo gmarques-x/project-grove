@@ -22,6 +22,18 @@ struct LabVPNTests {
         #expect(LabVPNStatus.line(for: parsed, timeZone: utc) == "Connected · 10.0.0.2 · since 13:05")
     }
 
+    @Test func takesConnectTimeNeverMaxConnectTime() throws {
+        // The shape a live grove-lab tunnel printed (its addresses replaced):
+        // ConnectionStatistics' MaxConnectTime comes before VPN's ConnectTime.
+        let text = try fixture("scutil-connected-live.txt")
+        // 22:50:14 UTC, 600 s after ConnectTime 186076 on the uptime clock.
+        let now = Date(timeIntervalSince1970: 1_794_610_214)
+        let parsed = LabVPNStatus.parse(scutilStatus: text, uptime: 186_676, now: now)
+        #expect(parsed == .connected(address: "10.0.0.2", since: now.addingTimeInterval(-600)))
+        // 22:40:14, as LastStatusChangeTime (22:40:15) says.
+        #expect(LabVPNStatus.line(for: parsed, timeZone: utc) == "Connected · 10.0.0.2 · since 22:40")
+    }
+
     @Test func parsesDisconnected() throws {
         #expect(status(try fixture("scutil-disconnected.txt")) == .disconnected)
     }

@@ -8,8 +8,8 @@ import SwiftUI
 // The grove-lab VPN (spec 2026-11-13-bar-vpn-design): the tunnel to the lab,
 // a macOS VPN configuration the WireGuard app made, named `grove-lab`. A
 // header with the on/off switch (`scutil --nc start|stop`), one status
-// line, and "WireGuard…"; when there is no such configuration, how to make
-// it and a button opening WireGuard. What scutil's output means is
+// line, and "Manage Tunnels…" (WireGuard's tunnels window, WireGuardOpener);
+// when there is no such configuration, how to make it and the same button. What scutil's output means is
 // GroveKeysCore's (`LabVPNStatus`).
 
 /// The VPN panel's state. Open, it reads `scutil --nc status` at once and
@@ -24,12 +24,15 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// A start or stop that didn't happen ("Didn't start · see WireGuard"),
     /// in the status line's place until the next switch or opening.
     @Published private(set) var failure: LabVPNFailure?
+    /// "Manage Tunnels…" couldn't press WireGuard's menu: the panel says to
+    /// use its icon (`WireGuardMenu.fallbackLine`) until the next opening.
+    @Published private(set) var menuHint = false
+    /// The hint came while the panel was closed: it survives one opening.
+    private var hintFresh = false
     /// The zone "since 14:05" is told in.
     let timeZone: TimeZone
 
     nonisolated static let service = "grove-lab"
-    static let wireGuard = "com.wireguard.macos"
-    static let appStore = URL(string: "macappstore://apps.apple.com/app/id1451685025")!
     static let every: TimeInterval = 2
 
     private nonisolated static let log = Logger(subsystem: "com.projectgrove.keys", category: "vpn")
@@ -62,6 +65,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
             let name = ProcessInfo.processInfo.environment["GROVE_VPN_SAMPLE"] ?? "connected"
             status = Self.sample(name)
             if name == "refused" { failure = LabVPNFailure(on: true) }
+            menuHint = name == "nomenu"
         }
     }
 
@@ -75,6 +79,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
         // Not while its command still runs: its end sets the reading to wait for.
         if !commanding { pending = nil }
         failure = nil
+        if hintFresh { hintFresh = false } else { menuHint = false }
         refresh()
         let timer = Timer(timeInterval: Self.every, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -204,18 +209,38 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
         }
     }
 
+    // MARK: WireGuard
+
+    /// "Manage Tunnels…": WireGuard's tunnels window through its status
+    /// item's menu (`close` puts the panel away just before the press), or
+    /// its App Store page when it isn't installed. Live only.
+    func manageTunnels(close: @escaping @MainActor @Sendable () -> Void,
+                       open: @escaping @MainActor (URL) -> Void) {
+        guard live else { return }
+        guard let app = WireGuardOpener.appURL else {
+            open(WireGuardOpener.appStore)
+            return
+        }
+        WireGuardOpener.manageTunnels(app: app, close: close) { [weak self] outcome in
+            guard let self, outcome == .fallback else { return }
+            self.menuHint = true
+            self.hintFresh = !self.open
+        }
+    }
+
     // MARK: The sample
 
     /// GROVE_VPN_SAMPLE picks the state: `connected` (the default: 10.0.0.2,
     /// since 14:05 UTC), `connecting`, `disconnecting`, `disconnected`,
     /// `notsetup` (no grove-lab service), `refused` (disconnected, a start
-    /// that didn't happen). The address is the docs' stand-in,
+    /// that didn't happen), `nomenu` (disconnected, WireGuard's menu couldn't
+    /// be pressed). The address is the docs' stand-in,
     /// never the lab's (the repo is public).
     private static func sample(_ name: String) -> LabVPNStatus {
         switch name {
         case "connecting": return .connecting
         case "disconnecting": return .disconnecting
-        case "disconnected", "refused": return .disconnected
+        case "disconnected", "refused", "nomenu": return .disconnected
         case "notsetup": return .notSetUp
         default: return .connected(address: "10.0.0.2", since: Date(timeIntervalSince1970: 1_794_578_700))
         }
@@ -250,15 +275,17 @@ struct LabVPNPanel: View {
                         .foregroundStyle(theme.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if model.menuHint { theme.marked(WireGuardMenu.fallbackLine, theme.yellow) }
                 if status == .notSetUp {
-                    PanelButton("Open WireGuard", action: openWireGuard)
-                        .help("Opens WireGuard, or its App Store page when it isn't installed")
+                    PanelButton(WireGuardMenu.title, action: manageTunnels)
+                        .help("Opens WireGuard's tunnels window, or its App Store page when it isn't installed")
                 }
             }
-            // Not set up, the button above opens the same app.
+            // Not set up, the button above does the same.
             if status != .notSetUp {
                 PanelRule()
-                PanelFooter("WireGuard…", action: openWireGuard)
+                PanelFooter(WireGuardMenu.title, action: manageTunnels)
+                    .help("Opens WireGuard's tunnels window")
             }
         }
     }
@@ -272,16 +299,10 @@ struct LabVPNPanel: View {
         }
     }
 
-    /// WireGuard, or its App Store page when it isn't installed; the panel
-    /// is put away (nothing happens in a render).
-    private func openWireGuard() {
-        panel.leave {
-            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: LabVPNModel.wireGuard) {
-                NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration(),
-                                                   completionHandler: nil)
-            } else {
-                NSWorkspace.shared.open(LabVPNModel.appStore)
-            }
-        }
+    /// WireGuard's tunnels window (the panel goes just before WireGuard's
+    /// menu is pressed), or its App Store page; nothing in a render.
+    private func manageTunnels() {
+        let panel = panel
+        model.manageTunnels(close: { panel.leave {} }, open: { panel.open($0) })
     }
 }
