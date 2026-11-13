@@ -10,9 +10,8 @@ import Foundation
 public enum WireGuardMenu {
     /// The footer's and the not-set-up button's words.
     public static let title = "Manage Tunnels…"
-    /// Said in yellow when the item couldn't be pressed (WireGuard is
-    /// launched or brought forward anyway).
-    public static let fallbackLine = "Use WireGuard's icon in the menu bar"
+    /// System Settings ▸ Privacy & Security ▸ Accessibility.
+    public static let privacyURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 
     /// WireGuard's menu item: "Manage Tunnels", any case, with or without a
     /// trailing ellipsis ("…" or "...") and surrounding spaces. Nothing else.
@@ -31,12 +30,66 @@ public enum WireGuardMenu {
         titles.firstIndex(where: isManageTunnels)
     }
 
+    /// Why the menu couldn't be pressed, said in yellow in the dropdown
+    /// (WireGuard is brought forward anyway).
+    public enum Reason: Equatable, Sendable {
+        /// Grove Keys may not use Accessibility: with a Privacy Settings…
+        /// button, as the Bluetooth section's refusal.
+        case notTrusted
+        /// Anything else: not running after the launch, no status item, no
+        /// menu, no "Manage Tunnels", or the press didn't take.
+        case menuDidNotOpen
+
+        public var line: String {
+            switch self {
+            case .notTrusted: return "Grove Keys needs Accessibility permission"
+            case .menuDidNotOpen: return "WireGuard's menu didn't open"
+            }
+        }
+
+        public var offersPrivacySettings: Bool { self == .notTrusted }
+    }
+
     public enum Outcome: Equatable, Sendable {
         /// The item was pressed: WireGuard's tunnels window comes forward.
         case pressed
-        /// Anything failed: WireGuard is launched or activated, and the
-        /// dropdown says `fallbackLine`.
-        case fallback
+        /// Something failed: WireGuard is launched or activated, and the
+        /// dropdown says the reason's line.
+        case fallback(Reason)
+    }
+
+    /// The menu item's press took: its menu went away, or WireGuard has more
+    /// windows than before. (AXPress in a tracking menu can answer
+    /// kAXErrorCannotComplete although it worked, so its answer isn't used.)
+    public static func pressTook(menuGone: Bool, windowsBefore: Int, windowsAfter: Int) -> Bool {
+        menuGone || windowsAfter > windowsBefore
+    }
+
+    /// The dropdown's line after a fallback. It outlives the panel closing
+    /// (the fallback brings WireGuard forward, which puts the panel away):
+    /// the next opening shows it, the one after clears it, and so does a
+    /// new click on Manage Tunnels….
+    public struct Hint: Equatable, Sendable {
+        public private(set) var reason: Reason?
+        private var seen = false
+
+        public init() {}
+
+        public mutating func set(_ reason: Reason) {
+            self.reason = reason
+            seen = false
+        }
+
+        public mutating func clear() {
+            reason = nil
+            seen = false
+        }
+
+        /// The panel opened.
+        public mutating func opened() {
+            guard reason != nil else { return }
+            if seen { clear() } else { seen = true }
+        }
     }
 
     /// How far the press got. Every step defaults to failed.
@@ -51,7 +104,7 @@ public enum WireGuardMenu {
         public var menuOpened = false
         /// That menu has "Manage Tunnels".
         public var itemFound = false
-        /// Pressing it was accepted.
+        /// Its press took (`pressTook`).
         public var itemPressed = false
 
         public init(trusted: Bool = false, running: Bool = false, statusItems: Int = 0, menuOpened: Bool = false,
@@ -65,7 +118,9 @@ public enum WireGuardMenu {
         }
 
         public var outcome: Outcome {
-            trusted && running && statusItems > 0 && menuOpened && itemFound && itemPressed ? .pressed : .fallback
+            guard trusted else { return .fallback(.notTrusted) }
+            return running && statusItems > 0 && menuOpened && itemFound && itemPressed
+                ? .pressed : .fallback(.menuDidNotOpen)
         }
     }
 }

@@ -24,11 +24,9 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// A start or stop that didn't happen ("Didn't start · see WireGuard"),
     /// in the status line's place until the next switch or opening.
     @Published private(set) var failure: LabVPNFailure?
-    /// "Manage Tunnels…" couldn't press WireGuard's menu: the panel says to
-    /// use its icon (`WireGuardMenu.fallbackLine`) until the next opening.
-    @Published private(set) var menuHint = false
-    /// The hint came while the panel was closed: it survives one opening.
-    private var hintFresh = false
+    /// "Manage Tunnels…" couldn't press WireGuard's menu: why, in yellow,
+    /// until the opening after the one that showed it (`WireGuardMenu.Hint`).
+    @Published private(set) var menuHint = WireGuardMenu.Hint()
     /// The zone "since 14:05" is told in.
     let timeZone: TimeZone
 
@@ -65,7 +63,8 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
             let name = ProcessInfo.processInfo.environment["GROVE_VPN_SAMPLE"] ?? "connected"
             status = Self.sample(name)
             if name == "refused" { failure = LabVPNFailure(on: true) }
-            menuHint = name == "nomenu"
+            if name == "nomenu" { menuHint.set(.menuDidNotOpen) }
+            if name == "noaccess" { menuHint.set(.notTrusted) }
         }
     }
 
@@ -79,7 +78,7 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
         // Not while its command still runs: its end sets the reading to wait for.
         if !commanding { pending = nil }
         failure = nil
-        if hintFresh { hintFresh = false } else { menuHint = false }
+        menuHint.opened()
         refresh()
         let timer = Timer(timeInterval: Self.every, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -215,16 +214,16 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// item's menu (`close` puts the panel away just before the press), or
     /// its App Store page when it isn't installed. Live only.
     func manageTunnels(close: @escaping @MainActor @Sendable () -> Void,
-                       open: @escaping @MainActor (URL) -> Void) {
+                       openURL: @escaping @MainActor (URL) -> Void) {
         guard live else { return }
+        menuHint.clear()
         guard let app = WireGuardOpener.appURL else {
-            open(WireGuardOpener.appStore)
+            openURL(WireGuardOpener.appStore)
             return
         }
         WireGuardOpener.manageTunnels(app: app, close: close) { [weak self] outcome in
-            guard let self, outcome == .fallback else { return }
-            self.menuHint = true
-            self.hintFresh = !self.open
+            guard let self, case .fallback(let reason) = outcome else { return }
+            self.menuHint.set(reason)
         }
     }
 
@@ -233,14 +232,14 @@ final class LabVPNModel: ObservableObject, BarPanelModel {
     /// GROVE_VPN_SAMPLE picks the state: `connected` (the default: 10.0.0.2,
     /// since 14:05 UTC), `connecting`, `disconnecting`, `disconnected`,
     /// `notsetup` (no grove-lab service), `refused` (disconnected, a start
-    /// that didn't happen), `nomenu` (disconnected, WireGuard's menu couldn't
-    /// be pressed). The address is the docs' stand-in,
+    /// that didn't happen), `nomenu` (disconnected, WireGuard's menu didn't
+    /// open), `noaccess` (disconnected, no Accessibility permission). The address is the docs' stand-in,
     /// never the lab's (the repo is public).
     private static func sample(_ name: String) -> LabVPNStatus {
         switch name {
         case "connecting": return .connecting
         case "disconnecting": return .disconnecting
-        case "disconnected", "refused", "nomenu": return .disconnected
+        case "disconnected", "refused", "nomenu", "noaccess": return .disconnected
         case "notsetup": return .notSetUp
         default: return .connected(address: "10.0.0.2", since: Date(timeIntervalSince1970: 1_794_578_700))
         }
@@ -275,7 +274,15 @@ struct LabVPNPanel: View {
                         .foregroundStyle(theme.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if model.menuHint { theme.marked(WireGuardMenu.fallbackLine, theme.yellow) }
+                if let reason = model.menuHint.reason {
+                    theme.marked(reason.line, theme.yellow)
+                    if reason.offersPrivacySettings {
+                        PanelButton("Privacy Settings…") {
+                            if let url = URL(string: WireGuardMenu.privacyURL) { panel.open(url) }
+                        }
+                        .help("Allow Grove Keys to use Accessibility")
+                    }
+                }
                 if status == .notSetUp {
                     PanelButton(WireGuardMenu.title, action: manageTunnels)
                         .help("Opens WireGuard's tunnels window, or its App Store page when it isn't installed")
@@ -303,6 +310,6 @@ struct LabVPNPanel: View {
     /// menu is pressed), or its App Store page; nothing in a render.
     private func manageTunnels() {
         let panel = panel
-        model.manageTunnels(close: { panel.leave {} }, open: { panel.open($0) })
+        model.manageTunnels(close: { panel.leave {} }, openURL: { panel.open($0) })
     }
 }
