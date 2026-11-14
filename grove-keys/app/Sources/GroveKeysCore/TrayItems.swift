@@ -14,12 +14,12 @@ public struct TrayItem: Equatable, Sendable {
     public var title: String?
     public var description: String?
     public var help: String?
-    /// The item's left edge on screen: the order. `TrayItems.unplaced`
-    /// when it can't be read.
-    public var x: Double
+    /// The item's left edge on screen: the order. Nil when it can't be
+    /// read (the item goes last).
+    public var x: Double?
 
     public init(bundleID: String, appName: String, pid: pid_t, identifier: String? = nil, title: String? = nil,
-                description: String? = nil, help: String? = nil, x: Double) {
+                description: String? = nil, help: String? = nil, x: Double?) {
         self.bundleID = bundleID
         self.appName = appName
         self.pid = pid
@@ -41,28 +41,29 @@ public enum TrayItems {
     /// Hidden by default: Grove's own apps and AeroSpace.
     public static let defaultHidden: Set<String> = ["com.projectgrove.keys", "com.projectgrove.themes", "bobko.aerospace"]
 
-    /// The place of an item whose `AXPosition` can't be read: after the
-    /// others (any x that isn't finite sorts so).
-    public static let unplaced = Double.nan
-
     /// An item with an owner to go by: its app was still running when the
     /// bar was read (a bundle id, or a tool's name, and a name).
     public static func listable(_ item: TrayItem) -> Bool {
         present(item.bundleID) != nil && present(item.appName) != nil
     }
 
-    /// Left to right; items without a place last, and items at one place,
-    /// in the order given (the tree's).
-    public static func ordered(_ items: [TrayItem]) -> [TrayItem] {
-        items.enumerated().sorted { a, b in
-            let (ax, bx) = (a.element.x, b.element.x)
-            switch (ax.isFinite, bx.isFinite) {
-            case (true, true): return ax != bx ? ax < bx : a.offset < b.offset
-            case (true, false): return true
-            case (false, true): return false
-            case (false, false): return a.offset < b.offset
+    /// The left-to-right order of places, as indices into `xs`: places
+    /// without an x last, and equal places in the order given (the tree's).
+    /// A permutation, so a caller can line other lists up by it.
+    public static func order(_ xs: [Double?]) -> [Int] {
+        xs.indices.sorted { a, b in
+            switch (xs[a], xs[b]) {
+            case let (ax?, bx?): return ax != bx ? ax < bx : a < b
+            case (.some, nil): return true
+            case (nil, .some): return false
+            case (nil, nil): return a < b
             }
-        }.map(\.element)
+        }
+    }
+
+    /// The items left to right (`order`).
+    public static func ordered(_ items: [TrayItem]) -> [TrayItem] {
+        order(items.map(\.x)).map { items[$0] }
     }
 
     /// Every item except those of MenuBarAgent itself, any `com.apple.`
@@ -85,13 +86,17 @@ public enum TrayItems {
     /// app's items, left to right.
     public static func key(_ item: TrayItem, among: [TrayItem]) -> String {
         var mine = among.filter { $0.bundleID == item.bundleID }
-        if !mine.contains(where: { same($0, item) }) { mine.append(item) }
-        mine = ordered(mine)
+        // Where the item is among them (added when it isn't), then its
+        // place in their order: always found, as `order` is a permutation.
+        let at = mine.firstIndex { same($0, item) } ?? {
+            mine.append(item)
+            return mine.count - 1
+        }()
         if let id = present(item.identifier), id != present(item.title), id != present(item.description),
            mine.count(where: { present($0.identifier) == id }) == 1 {
             return "\(item.bundleID)#\(id)"
         }
-        let index = mine.firstIndex { same($0, item) }!
+        let index = order(mine.map(\.x)).firstIndex(of: at) ?? 0
         return "\(item.bundleID)#\(index)"
     }
 

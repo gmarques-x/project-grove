@@ -5,7 +5,7 @@ import Testing
 // Invented apps only (the repo is public).
 private func item(_ bundle: String, _ name: String = "App", pid: pid_t = 100, id: String? = nil,
                   title: String? = nil, description: String? = nil, help: String? = nil,
-                  x: Double = 0) -> TrayItem {
+                  x: Double? = 0) -> TrayItem {
     TrayItem(bundleID: bundle, appName: name, pid: pid, identifier: id, title: title,
              description: description, help: help, x: x)
 }
@@ -33,13 +33,39 @@ struct TrayItemsTests {
 
     @Test func anUnreadablePlaceSortsLastInTheTreesOrder() {
         let items = [
-            item("com.example.u1", x: .nan), item("com.example.b", x: 20), item("com.example.u2", x: .infinity),
-            item("com.example.a", x: 10), item("com.example.u3", x: .nan),
+            item("com.example.u1", x: nil), item("com.example.b", x: 20), item("com.example.u2", x: nil),
+            item("com.example.a", x: 10), item("com.example.u3", x: nil),
         ]
         let order = ["com.example.a", "com.example.b", "com.example.u1", "com.example.u2", "com.example.u3"]
         #expect(TrayItems.ordered(items).map(\.bundleID) == order)
         #expect(TrayItems.shown(items).map(\.bundleID) == order)
-        #expect(TrayItems.unplaced.isNaN)
+    }
+
+    @Test func theOrderIsAPermutationThatKeepsUnplacedItems() {
+        // What allItems realigns its elements by: indices, never equality.
+        #expect(TrayItems.order([nil, 20, nil, 10, nil]) == [3, 1, 0, 2, 4])
+        #expect(TrayItems.order([5, 5, 1]) == [2, 0, 1])
+        #expect(TrayItems.order([nil]) == [0])
+        #expect(TrayItems.order([]).isEmpty)
+        let twins = [item("com.example.a", x: nil), item("com.example.a", x: nil)]
+        #expect(TrayItems.order(twins.map(\.x)).sorted() == [0, 1])
+    }
+
+    @Test func anUnplacedItemIsEqualToItself() {
+        let a = item("com.example.a", x: nil)
+        #expect(a == a)
+        #expect(a != item("com.example.a", x: 0))
+    }
+
+    @Test func keysOfUnplacedItemsDontTrap() {
+        let alone = item("com.example.a", x: nil)
+        #expect(TrayItems.key(alone, among: [alone]) == "com.example.a#0")
+        #expect(TrayItems.key(alone, among: []) == "com.example.a#0")
+        let placed = item("com.example.a", title: "P", x: 10)
+        let unplaced = item("com.example.a", title: "U", x: nil)
+        #expect(TrayItems.key(placed, among: [unplaced, placed]) == "com.example.a#0")
+        #expect(TrayItems.key(unplaced, among: [unplaced, placed]) == "com.example.a#1")
+        #expect(TrayItems.split([unplaced, placed], hidden: ["com.example.a#1"]).hidden == [unplaced])
     }
 
     @Test func orderIsLeftToRight() {

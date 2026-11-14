@@ -42,8 +42,8 @@ enum StatusItemLocator {
 
     /// Every item in the bar, whoever owns it, left to right by `x`
     /// (`TrayItems.ordered`: the tree's own order isn't the bar's, as
-    /// MenuBarAgent lists Apple's extras first; an unreadable place goes
-    /// last), from one walk of MenuBarAgent's windows: the owner's bundle
+    /// MenuBarAgent lists Apple's extras first; an item whose place
+    /// can't be read goes last), from one walk of MenuBarAgent's windows: the owner's bundle
     /// id and name from `NSRunningApplication`, the place from the item's
     /// `AXPosition`, and the row's texts (title, description, help) read
     /// only for an item the tray can show (`TrayItems.shown`; not Apple's,
@@ -67,7 +67,7 @@ enum StatusItemLocator {
             guard let app else { return nil }
             var tray = TrayItem(bundleID: app.bundleID, appName: app.name, pid: owner,
                                 identifier: node.identifier,
-                                x: AX.position(item.element).map { Double($0.x) } ?? TrayItems.unplaced)
+                                x: AX.position(item.element).map { Double($0.x) })
             guard TrayItems.listable(tray) else { return nil }
             if !TrayItems.shown([tray]).isEmpty {
                 tray.title = AX.string(item.element, kAXTitleAttribute)
@@ -76,13 +76,8 @@ enum StatusItemLocator {
             }
             return (tray, item)
         }
-        // `ordered` is stable: the same order for the elements alongside.
-        let order = TrayItems.ordered(all.map(\.0))
-        var left = all
-        return order.compactMap { tray in
-            guard let at = left.firstIndex(where: { $0.0 == tray }) else { return nil }
-            return left.remove(at: at)
-        }
+        // By index: the items and their elements stay together.
+        return TrayItems.order(all.map(\.0.x)).map { all[$0] }
     }
 
     /// The owner as the tray names it; a process without a bundle (a
