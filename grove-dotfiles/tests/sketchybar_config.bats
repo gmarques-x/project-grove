@@ -123,6 +123,7 @@ argb() {
 icon_names() {
   local i
   echo wifi-off eth vpn vol-mute cpu mem bt-off bt-on bt-connected vpn-off vpn-connecting vpn-on
+  echo cloud-checking cloud-synced cloud-syncing cloud-problem cloud-off
   for i in 1 2 3; do echo "wifi-$i"; done
   for i in 0 1 2 3 4 5 6 7 8 9 10; do echo "vol-$i bolt-$i"; done
   for i in 0 1 2; do echo "bolt-low-$i"; done
@@ -153,9 +154,9 @@ icon_names() {
     esac
     grep -qF "to: \"$file\"" "$gen" || { echo "$name"; false; }
   done
-  # And nothing the bar doesn't use: sixteen families.
-  drawn="$(grep -oE 'to: "[a-z-]+' "$gen" | sed -e 's/to: "//' -e 's/-$//' | sort -u | tr '\n' ' ')"
-  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cpu eth mem vol vol-mute vpn vpn-connecting vpn-off vpn-on wifi wifi-off " ] || { echo "$drawn"; false; }
+  # And nothing the bar doesn't use: twenty-one families.
+  drawn="$(grep -oE 'to: "[a-z-]+' "$gen" | sed -e 's/to: "//' -e 's/-$//' | LC_ALL=C sort -u | tr '\n' ' ')"
+  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cloud-checking cloud-off cloud-problem cloud-synced cloud-syncing cpu eth mem vol vol-mute vpn vpn-connecting vpn-off vpn-on wifi wifi-off " ] || { echo "$drawn"; false; }
   # The levels it loops over are the ones the plugins ask for.
   grep -q 'for step in 0...10' "$gen"
   grep -q 'if step <= 2' "$gen"
@@ -182,9 +183,9 @@ rc() {
   for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end gap.ws.$n "; done
   [ "$left" = "${want}front_app " ] || { echo "$left"; false; }
   # The first added is the rightmost: left to right, CPU and memory, the
-  # grove-lab VPN, Wi-Fi and Bluetooth, sound, power, the clock.
-  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 vpn.lab gap.r5 mem cpu " ] || { echo "$right"; false; }
-  [ "$(printf '%s' "$right" | tr ' ' '\n' | grep -v '^gap' | tr '\n' ' ')" = "clock battery volume bt wifi vpn.lab mem cpu " ]
+  # cloud, the grove-lab VPN, Wi-Fi and Bluetooth, sound, power, the clock.
+  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 vpn.lab gap.r5 cloud gap.r6 mem cpu " ] || { echo "$right"; false; }
+  [ "$(printf '%s' "$right" | tr ' ' '\n' | grep -v '^gap' | tr '\n' ' ')" = "clock battery volume bt wifi vpn.lab cloud mem cpu " ]
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
   # A gap is empty room of a fixed width.
@@ -212,7 +213,7 @@ pills() {
   [ "$status" -eq 0 ]
   want="pill.grove grove"$'\n'
   for n in 1 2 3 4 5 6 7 8 9; do want+="pill.ws.$n ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end"$'\n'; done
-  want+="pill.sys cpu mem"$'\n'"pill.vpn vpn.lab"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
+  want+="pill.sys cpu mem"$'\n'"pill.cloud cloud"$'\n'"pill.vpn vpn.lab"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
   [ "$(pills)" = "$want" ] || { pills; false; }
   . "$CFG/colors.sh"
   [ "$TRANSPARENT" = 0x00000000 ]
@@ -251,16 +252,19 @@ pills() {
   rc
   local pair item width
   # JetBrains Mono 13 is 7.8 pt a character: each width fits the item's longest value.
-  for pair in cpu:32 mem:32 clock:134; do
+  for pair in cpu:32 mem:32 cloud:39 clock:134; do
     item="${pair%%:*}"; width="${pair#*:}"
     calls | grep -qE -- "--set $item .*label.width=$width( |\$)" || { echo "$item"; false; }
   done
   for item in cpu mem; do
     calls | grep -qE -- "--set $item .*label.align=right" || { echo "$item align"; false; }
   done
+  # The cloud's count, "2000+" at most, sits beside its icon, hidden until
+  # there is one (cloud.sh): the pill is still while the count changes.
+  calls | grep -qE -- "--set cloud .*label.drawing=off( |\$)"
   # The icons are images in a 22 pt slot, whatever the state; five items are an icon alone
   # (battery, wifi, bt, vpn.lab, volume).
-  for item in cpu mem battery wifi bt vpn.lab volume; do
+  for item in cpu mem cloud battery wifi bt vpn.lab volume; do
     calls | grep -qE -- "--set $item icon.background.image=[^ ]+ icon.background.image.scale=0.5 icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0\$" || { echo "$item icon"; false; }
   done
   for item in battery wifi bt vpn.lab volume; do
@@ -289,7 +293,9 @@ prop() {
   # bar, where the right side measured 434 pt with the old ends, 4 + the
   # bar's 8; the end is now one 5 pt gap and no bar padding: 427; Bluetooth
   # beside Wi-Fi, the two padded as CPU and memory are: 32 more, 459; the
-  # VPN's pill, an icon padded as the volume's, and its gap: 44 more, 503).
+  # VPN's pill, an icon padded as the volume's, and its gap: 44 more, 503;
+  # the cloud's, the same with its count hidden: 44 more, 547; with the
+  # count, its 39 pt label, 586).
   local item total=0 w
   [ "$(prop cpu padding_right 5)" = 5 ]
   for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}'); do
@@ -302,7 +308,8 @@ prop() {
     fi
     total=$((total + w))
   done
-  [ "$total" -eq 503 ] || { echo "$total"; false; }
+  [ "$total" -eq 547 ] || { echo "$total"; false; }
+  [ $((total + 39)) -le 860 ]
   # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle:
   # the right side has ~860 pt.
   [ "$total" -le 860 ]
@@ -321,13 +328,13 @@ prop() {
 @test "sketchybar: clickable items subscribe to hover; only the app's name, in no pill, has a fill of its own" {
   rc
   local item
-  for item in grove front_app clock volume wifi bt vpn.lab battery cpu mem; do
+  for item in grove front_app clock volume wifi bt vpn.lab cloud battery cpu mem; do
     calls | grep -qE -- "--subscribe $item .*mouse.entered mouse.exited" || { echo "$item"; false; }
     calls | grep -qE -- "--set $item .*script=[^ ]*/plugins/[a-z_]+\\.sh" || { echo "$item script"; false; }
   done
   # An item's own background would be drawn over its pill's outline: the pill
   # itself is what fills (sb_hover).
-  for item in grove clock wifi bt vpn.lab battery cpu mem volume; do
+  for item in grove clock wifi bt vpn.lab cloud battery cpu mem volume; do
     ! calls | grep -qE -- "--set $item (.* )?background\\.(height|corner_radius|drawing|color)=" || { echo "$item has a background"; false; }
   done
   calls | grep -qE -- "--set front_app .*background.height=24 background.corner_radius=12 background.drawing=off"
@@ -351,7 +358,7 @@ hover() {
     gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
     if [ "$s" = dark-medium ]; then fill="$(argb "$s" bg1)"; else fill="$(argb "$s" bg3)"; fi
     # CPU and memory share a pill: either lights the whole of it.
-    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi vpn.lab:pill.vpn battery:pill.battery cpu:pill.sys mem:pill.sys; do
+    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi vpn.lab:pill.vpn cloud:pill.cloud battery:pill.battery cpu:pill.sys mem:pill.sys; do
       item="${pair%%:*}"; pill="${pair#*:}"
       hover "$item" mouse.entered
       [ "$status" -eq 0 ]
@@ -383,7 +390,7 @@ hover() {
 @test "hover: one helper in lib.sh, called only by the plugins of items that subscribe to the pointer" {
   local f
   ! grep -n 'mouse\.entered' "$SB"/plugins/*.sh
-  for f in hover front_app clock volume wifi bluetooth vpn battery cpu; do
+  for f in hover front_app clock volume wifi bluetooth vpn cloud battery cpu; do
     grep -qx 'sb_hover && exit 0' "$SB/plugins/$f.sh" || { echo "$f"; false; }
   done
   ! grep -q 'sb_hover' "$SB/plugins/workspaces.sh"
@@ -406,6 +413,11 @@ hover() {
   hover vpn.lab mouse.entered
   [ "$status" -eq 0 ]
   [ "$(calls)" = "--set pill.vpn background.color=$(argb dark-medium bg1)" ]
+  # The cloud's hover lights the pill and sets no icon.
+  echo "syncing 4" > "$GROVE_STATE/cloud"
+  hover cloud mouse.entered
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "--set pill.cloud background.color=$(argb dark-medium bg1)" ]
   [ ! -e "$BATS_TEST_TMPDIR/reads" ]
   [ -z "$(opens)" ]
 }
@@ -466,6 +478,14 @@ hover() {
   [ "$status" -eq 0 ]
   [ "$(calls | tail -2 | head -1)" = "--set pill.vpn background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
   calls | grep -q -- "--add bracket pill.vpn vpn.lab --set"
+  # The cloud's dropdown open: its own pill.
+  : > "$CALLS"
+  echo pill.cloud > "$PANEL"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" \
+    GROVE_STATE="$GROVE_STATE" /bin/bash "$CFG/sketchybarrc"
+  [ "$status" -eq 0 ]
+  [ "$(calls | tail -2 | head -1)" = "--set pill.cloud background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
+  calls | grep -q -- "--add bracket pill.cloud cloud --set"
 }
 
 @test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar, nothing drawn around it" {
@@ -791,6 +811,55 @@ bt_icon() {
   calls | grep -qE -- "--set bt icon.background.image=$CFG/icons/bt-off-dark.png "
 }
 
+# cloud_set [LINE]: the call cloud.sh makes with $GROVE_STATE/cloud holding
+# LINE (no file without one).
+cloud_set() {
+  : > "$CALLS"
+  if [ "$#" -gt 0 ]; then printf '%s\n' "$1" > "$GROVE_STATE/cloud"; else rm -f "$GROVE_STATE/cloud"; fi
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME=cloud SENDER=cloud_change \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" GROVE_STATE="$GROVE_STATE" \
+    /bin/bash "$CFG/plugins/cloud.sh"
+  calls
+}
+
+@test "cloud: the icon and count for Grove Keys' line; a grey cloud without the file" {
+  local s set
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    [ "$(cloud_set checking)" = "--set cloud icon.background.image=$CFG/icons/cloud-checking-$set.png label= label.drawing=off" ] || { calls; false; }
+    [ "$(cloud_set synced)" = "--set cloud icon.background.image=$CFG/icons/cloud-synced-$set.png label= label.drawing=off" ]
+    [ "$(cloud_set problem)" = "--set cloud icon.background.image=$CFG/icons/cloud-problem-$set.png label= label.drawing=off" ]
+    [ "$(cloud_set "syncing 12")" = "--set cloud icon.background.image=$CFG/icons/cloud-syncing-$set.png label=12 label.drawing=on" ]
+    [ "$(cloud_set "syncing 2000+")" = "--set cloud icon.background.image=$CFG/icons/cloud-syncing-$set.png label=2000+ label.drawing=on" ]
+    # Grove Keys not running (no file), or anything else in it: grey, no count.
+    [ "$(cloud_set)" = "--set cloud icon.background.image=$CFG/icons/cloud-off-$set.png label= label.drawing=off" ]
+    [ "$(cloud_set "syncing 3; rm -rf x")" = "--set cloud icon.background.image=$CFG/icons/cloud-off-$set.png label= label.drawing=off" ]
+    [ "$(cloud_set "")" = "--set cloud icon.background.image=$CFG/icons/cloud-off-$set.png label= label.drawing=off" ]
+  done
+}
+
+@test "cloud: the cloud item in its own pill between CPU and memory and the VPN, redrawn on Grove Keys' cloud_change and nothing timed" {
+  rc
+  calls | grep -qx -- '--add event cloud_change'
+  calls | grep -qE -- '--subscribe cloud cloud_change mouse.entered mouse.exited$'
+  calls | grep -qE -- '--set cloud .*script=[^ ]*/plugins/cloud.sh '
+  calls | grep -qE -- '--set cloud .*click_script=open -g grovekeys://panel/cloud( |$)'
+  # Grove Keys follows the files; the bar never polls them or looks at them.
+  [ -z "$(calls | grep -E -- '--set cloud .*update_freq=')" ]
+  [ -z "$(grep -v '^ *#' "$SB/plugins/cloud.sh" | grep -nE 'CloudStorage|Mobile Documents|brctl|fileproviderctl|(^|[^a-z_])(find|ls|stat|xattr) ')" ]
+  # Grey until Grove Keys says otherwise.
+  calls | grep -qE -- "--set cloud icon.background.image=$CFG/icons/cloud-off-dark.png "
+  # Coloured by meaning: grey checking and off, green synced, yellow syncing, red a problem.
+  local gen="$SB/icons/make.swift"
+  grep -qF 'to: "cloud-checking-\(appearance).png")' "$gen"
+  grep -qE 'draw\("[a-z0-9.]+", color: off, to: "cloud-checking-' "$gen"
+  grep -qE 'draw\("[a-z0-9.]+", color: green, to: "cloud-synced-' "$gen"
+  grep -qE 'draw\("[a-z0-9.]+", color: yellow, to: "cloud-syncing-' "$gen"
+  grep -qE 'draw\("[a-z0-9.]+", color: red, to: "cloud-problem-' "$gen"
+  grep -qE 'draw\("[a-z0-9.]+", color: off, to: "cloud-off-' "$gen"
+}
+
 # vpn_icon [FIRST_LINE]: the call vpn.sh makes when `scutil --nc status
 # "grove-lab"` prints FIRST_LINE (and an extended status after a connected
 # one); scutil fails without an argument. "No service" goes to standard
@@ -910,7 +979,7 @@ vpn_icon() {
   # CPU and memory share one panel; the volume's is the sound panel; the
   # pine's is the Grove menu.
   # Wi-Fi and Bluetooth share one too: a click on either opens it.
-  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi vpn.lab:vpn battery:battery cpu:system mem:system; do
+  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi vpn.lab:vpn cloud:cloud battery:battery cpu:system mem:system; do
     item="${pair%%:*}"; name="${pair#*:}"
     calls | grep -qE -- "--set $item .*click_script=open -g grovekeys://panel/$name( |\$)" || { echo "$item"; false; }
     : > "$OPENS"

@@ -22,6 +22,7 @@ TEXT="JetBrains Mono:Regular:13.0"
 # Fixed label widths keep the pills still as values change: JetBrains Mono 13
 # is 7.8 pt a character, each width fits the item's longest value.
 W4=32     # "100%"
+W5=39     # "2000+"
 W17=134   # "Wed 11 Nov  15:24"
 # Hover: under the pointer a clickable item's pill fills softly, its outline
 # untouched (sb_hover in lib.sh, called by the item's plugin). The app's name
@@ -100,7 +101,7 @@ sketchybar --add item front_app left \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
 # Right (the first added is the rightmost): clock, power, volume, Bluetooth
-# and Wi-Fi, the grove-lab VPN, memory and CPU, each group in its own pill
+# and Wi-Fi, the grove-lab VPN, the cloud, memory and CPU, each group in its own pill
 # with a gap between.
 # Volume, Wi-Fi, Bluetooth, the VPN and power are an icon alone that changes
 # with the level, the signal, the state and the charge; CPU and memory are an
@@ -162,6 +163,19 @@ symbol vpn.lab vpn-off
 
 gap gap.r5 right 6
 
+# The cloud: whether iCloud Drive and the CloudStorage providers have
+# finished syncing, with the count of files pending beside it (hidden at 0).
+# Grove Keys follows the folders and sends cloud_change when the state
+# changes; the bar never polls them. Grey until it does.
+sketchybar --add event cloud_change
+sketchybar --add item cloud right \
+  --set cloud label.width=$W5 label.align=left label.padding_left=4 label.drawing=off padding_left=8 padding_right=8 \
+    script="$P/cloud.sh" click_script="$(panel cloud)" \
+  --subscribe cloud cloud_change mouse.entered mouse.exited
+symbol cloud cloud-off
+
+gap gap.r6 right 6
+
 # CPU and memory share one panel: a click on either opens it.
 sketchybar --add item mem right \
   --set mem label.width=$W4 label.align=right label.padding_left=4 padding_right=8 \
@@ -187,6 +201,7 @@ for n in 1 2 3 4 5 6 7 8 9; do
   pill "pill.ws.$n" "ws.$n" "ws.$n.1" "ws.$n.2" "ws.$n.3" "ws.$n.4" "ws.$n.5" "ws.$n.6" "ws.$n.end"
 done
 pill pill.sys cpu mem
+pill pill.cloud cloud
 pill pill.vpn vpn.lab
 pill pill.wifi wifi bt
 pill pill.volume volume

@@ -114,6 +114,7 @@ setup() {
   [ "$(sb_pill wifi)" = pill.wifi ]
   [ "$(sb_pill bt)" = pill.wifi ]
   [ "$(sb_pill vpn.lab)" = pill.vpn ]
+  [ "$(sb_pill cloud)" = pill.cloud ]
   [ "$(sb_pill volume)" = pill.volume ]
   [ "$(sb_pill clock)" = pill.clock ]
   [ "$(sb_pill ws.3)" = pill.ws.3 ]
@@ -211,6 +212,44 @@ setup() {
   local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
   [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /Users/someone/.local/state/grove/bluetooth ]
   [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_BLUETOOTH"' _ "$lib")" = /tmp/state/bluetooth ]
+}
+
+@test "sb_cloud: the icon and the count for the line Grove Keys keeps; a grey cloud without the file or with anything else" {
+  SB_CLOUD="$BATS_TEST_TMPDIR/cloud"
+  # No file: Grove Keys isn't running.
+  [ "$(sb_cloud)" = cloud-off ]
+  echo checking > "$SB_CLOUD"
+  [ "$(sb_cloud)" = cloud-checking ]
+  echo synced > "$SB_CLOUD"
+  [ "$(sb_cloud)" = cloud-synced ]
+  echo problem > "$SB_CLOUD"
+  [ "$(sb_cloud)" = cloud-problem ]
+  echo "syncing 3" > "$SB_CLOUD"
+  [ "$(sb_cloud)" = "cloud-syncing 3" ]
+  echo "syncing 1999" > "$SB_CLOUD"
+  [ "$(sb_cloud)" = "cloud-syncing 1999" ]
+  echo "syncing 2000+" > "$SB_CLOUD"
+  [ "$(sb_cloud)" = "cloud-syncing 2000+" ]
+  # Only the first line counts.
+  printf 'synced\nproblem\n' > "$SB_CLOUD"
+  [ "$(sb_cloud)" = cloud-synced ]
+  # Anything else is no state: grey.
+  local bad
+  for bad in "" "syncing" "syncing 0" "syncing x" "syncing 3; rm -rf y" "syncing 12345678" "SYNCED" "synced now" "problem 2" "syncing  3" "syncing 03"; do
+    printf '%s\n' "$bad" > "$SB_CLOUD"
+    [ "$(sb_cloud)" = cloud-off ] || { echo "$bad: $(sb_cloud)"; false; }
+  done
+  # Unreadable: grey.
+  echo synced > "$SB_CLOUD"
+  chmod 000 "$SB_CLOUD"
+  if [ ! -r "$SB_CLOUD" ]; then [ "$(sb_cloud)" = cloud-off ]; fi
+  chmod 600 "$SB_CLOUD"
+}
+
+@test "sb_cloud: the file is Grove Keys', beside the theme state" {
+  local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
+  [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_CLOUD"' _ "$lib")" = /Users/someone/.local/state/grove/cloud ]
+  [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_CLOUD"' _ "$lib")" = /tmp/state/cloud ]
 }
 
 @test "sb_vpn_icon: scutil's first line as the VPN icon: on, connecting, or off for anything else" {

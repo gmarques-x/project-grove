@@ -21,6 +21,9 @@ export LC_NUMERIC=C LC_TIME=C
 SB_PANEL="${GROVE_STATE:-$HOME/.local/state/grove}/bar-panel"
 # Bluetooth, as Grove Keys reads it: off, on or connected (missing: off).
 SB_BLUETOOTH="${GROVE_STATE:-$HOME/.local/state/grove}/bluetooth"
+# The cloud, as Grove Keys follows the synced folders: checking, synced,
+# syncing <n> or problem (missing: Grove Keys isn't running).
+SB_CLOUD="${GROVE_STATE:-$HOME/.local/state/grove}/cloud"
 
 # sb_cpu < `iostat -n 0 -c 2 -w 1`: used percentage (100 − idle) from the last
 # sample, which covers a whole second (top's single sample includes its own
@@ -101,6 +104,22 @@ sb_bluetooth() {
   case "$word" in on | connected) echo "bt-$word" ;; *) echo bt-off ;; esac
 }
 
+# sb_cloud: the cloud's icon for the line Grove Keys keeps in $SB_CLOUD (its
+# first line), and the count after it while syncing: "cloud-checking",
+# "cloud-synced", "cloud-problem", "cloud-syncing 12" ("2000+" over the cap);
+# cloud-off (grey) for no file, one it can't read, or anything else.
+sb_cloud() {
+  local line=""
+  [ -f "$SB_CLOUD" ] && [ -r "$SB_CLOUD" ] && IFS= read -r line < "$SB_CLOUD"
+  case "$line" in
+    checking | synced | problem) echo "cloud-$line" ;;
+    "syncing 2000+") echo "cloud-syncing 2000+" ;;
+    "syncing "[1-9] | "syncing "[1-9][0-9] | "syncing "[1-9][0-9][0-9] | "syncing "[1-9][0-9][0-9][0-9])
+      echo "cloud-syncing ${line#syncing }" ;;
+    *) echo cloud-off ;;
+  esac
+}
+
 # sb_vpn_icon < `scutil --nc status "grove-lab"`: the VPN pill's icon for
 # the status on scutil's first line: vpn-on (Connected), vpn-connecting
 # (Connecting, Disconnecting), or vpn-off for Disconnected, no output (a
@@ -146,6 +165,7 @@ sb_pill() {
     grove | battery | wifi | volume | clock) echo "pill.$1" ;;
     bt) echo pill.wifi ;;
     vpn.lab) echo pill.vpn ;;
+    cloud) echo pill.cloud ;;
     cpu | mem) echo pill.sys ;;
     ws.[1-9] | ws.[1-9].*) n="${1#ws.}"; echo "pill.ws.${n%%.*}" ;;
   esac

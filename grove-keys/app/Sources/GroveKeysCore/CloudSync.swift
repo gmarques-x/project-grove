@@ -213,6 +213,8 @@ public struct CloudPending: Sendable {
     public var entries: [Entry] { items.keys.sorted().map { items[$0]! } }
     public var count: Int { items.count }
     public var isEmpty: Bool { items.isEmpty }
+    /// Whether `url` is kept (a re-walk tells a drop at the cap by it).
+    public func contains(_ url: URL) -> Bool { items[Self.key(url)] != nil }
     /// Some item was dropped at the cap and its root not yet re-walked.
     public var overflowed: Bool { !overflow.isEmpty }
     /// The roots to re-walk (once there's room), in path order.

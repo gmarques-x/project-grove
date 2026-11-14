@@ -148,6 +148,14 @@ for appearance in ["dark", "light"] {
                   color: green, to: "vol-\(step)-\(appearance).png")
     }
     draw("speaker.slash.fill", color: off, to: "vol-mute-\(appearance).png")
+    // The cloud, its own pill, coloured by meaning: grey while Grove Keys
+    // checks (and when it isn't running), green synced, yellow syncing,
+    // red a problem.
+    draw("icloud", color: off, to: "cloud-checking-\(appearance).png")
+    draw("checkmark.icloud", color: green, to: "cloud-synced-\(appearance).png")
+    draw("arrow.triangle.2.circlepath.icloud", color: yellow, to: "cloud-syncing-\(appearance).png")
+    draw("exclamationmark.icloud", color: red, to: "cloud-problem-\(appearance).png")
+    draw("icloud.slash", color: off, to: "cloud-off-\(appearance).png")
     draw("cpu", color: aqua, to: "cpu-\(appearance).png")
     draw("memorychip", color: aqua, to: "mem-\(appearance).png")
 }
