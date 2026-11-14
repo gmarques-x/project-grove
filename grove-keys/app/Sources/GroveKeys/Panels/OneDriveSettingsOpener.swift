@@ -33,8 +33,6 @@ enum OneDriveSettingsOpener {
     /// press to take.
     private static let openWait: TimeInterval = 1.5
     private static let pressWait: TimeInterval = 1.5
-    /// Each Accessibility call waits at most this: a stuck app can't hang us.
-    private static let messaging: Float = 0.5
     /// How far into the activity window the settings button is looked for.
     private static let searchLimit = 400
     private static let searchDepth = 12
@@ -69,7 +67,7 @@ enum OneDriveSettingsOpener {
             .first(where: { !$0.isTerminated }) {
             running.activate()
         } else {
-            open(url, activates: true)
+            AX.open(url, activates: true)
         }
     }
 
@@ -80,21 +78,21 @@ enum OneDriveSettingsOpener {
     {
         var steps = OneDriveSettings.Steps()
         // Without Accessibility nothing below can work: no launch, no wait.
-        steps.trusted = AXIsProcessTrusted()
+        steps.trusted = AX.trusted
         guard steps.trusted else { return steps.outcome }
-        var pid = runningPID()
+        var pid = AX.runningPID(bundleID: bundleID)
         let launched = pid == nil
         if launched {
-            open(url, activates: false)
-            pid = wait(launchWait) { runningPID() }
+            AX.open(url, activates: false)
+            pid = AX.wait(launchWait) { AX.runningPID(bundleID: bundleID) }
         }
         guard let pid else { return steps.outcome }
         steps.running = true
 
-        let app = timed(AXUIElementCreateApplication(pid))
+        let app = AX.app(pid)
         // A OneDrive that just started may not have its status item yet.
         // On macOS 27 the items are found through MenuBarAgent.
-        let items = wait(launched ? statusItemWait : 0) { () -> [StatusItemLocator.Item]? in
+        let items = AX.wait(launched ? statusItemWait : 0) { () -> [StatusItemLocator.Item]? in
             let items = StatusItemLocator.items(pid: pid)
             return items.isEmpty ? nil : items
         } ?? []
@@ -113,11 +111,11 @@ enum OneDriveSettingsOpener {
             // The app's element first, then the MenuBarAgent group around it.
             for item in found.presses {
                 let menuOpen = { statusMenu(of: item, app: app) }
-                let before = windows(app)
+                let before = AX.windows(app)
                 // A status item's press can report a time-out while its menu
                 // is up: look for what opened whatever it answers.
-                _ = AXUIElementPerformAction(item, kAXPressAction as CFString)
-                let opened = wait(openWait) { () -> Opened? in
+                AX.press(item)
+                let opened = AX.wait(openWait) { () -> Opened? in
                     if let menu = menuOpen() { return .menu(menu) }
                     if let window = newWindow(app, before: before) { return .window(window) }
                     return nil
@@ -127,7 +125,7 @@ enum OneDriveSettingsOpener {
                     steps.opened = true
                     if pressSettings(in: menu, menuOpen: menuOpen, app: app, steps: &steps) { return steps.outcome }
                     // Not this item's menu: put it away and try the next item.
-                    if let still = menuOpen() { cancel(still) }
+                    if let still = menuOpen() { AX.cancel(still) }
                 case .window(let window)?:
                     // OneDrive's activity window: its settings button. The
                     // window is left up for the fallback's line to point at.
@@ -137,7 +135,7 @@ enum OneDriveSettingsOpener {
                 case nil:
                     // A menu that opened just too late is put away too; then
                     // the wrapper is pressed.
-                    if let late = menuOpen() { cancel(late) }
+                    if let late = menuOpen() { AX.cancel(late) }
                     continue
                 }
                 break
@@ -157,12 +155,12 @@ enum OneDriveSettingsOpener {
     /// `menuOpen`: the menu pressed from while it is still open.
     private static func pressSettings(in menu: AXUIElement, menuOpen: () -> AXUIElement?, app: AXUIElement,
                                       steps: inout OneDriveSettings.Steps) -> Bool {
-        let entries = children(menu).map(timed)
-        switch OneDriveSettings.menuChoice(in: entries.map { string($0, kAXTitleAttribute) }) {
+        let entries = AX.children(menu)
+        switch OneDriveSettings.menuChoice(in: entries.map { AX.string($0, kAXTitleAttribute) }) {
         case .press(let index)?:
             steps.found = true
             steps.pressed = press(entries[index], app: app) { menuOpen() == nil }
-            if !steps.pressed, let still = menuOpen() { cancel(still) }
+            if !steps.pressed, let still = menuOpen() { AX.cancel(still) }
             return true
         case .open(let index)?:
             let help = entries[index]
@@ -170,16 +168,16 @@ enum OneDriveSettingsOpener {
             // it opens; else it is opened.
             var submenu = openMenu(under: help)
             if submenu == nil {
-                _ = AXUIElementPerformAction(help, kAXPressAction as CFString)
-                submenu = wait(openWait) { openMenu(under: help) }
+                AX.press(help)
+                submenu = AX.wait(openWait) { openMenu(under: help) }
             }
             guard let submenu else { return false }
-            let inner = children(submenu).map(timed)
-            guard case .press(let at)? = OneDriveSettings.menuChoice(in: inner.map { string($0, kAXTitleAttribute) })
+            let inner = AX.children(submenu)
+            guard case .press(let at)? = OneDriveSettings.menuChoice(in: inner.map { AX.string($0, kAXTitleAttribute) })
             else { return false }
             steps.found = true
             steps.pressed = press(inner[at], app: app) { menuOpen() == nil }
-            if !steps.pressed, let still = menuOpen() { cancel(still) }
+            if !steps.pressed, let still = menuOpen() { AX.cancel(still) }
             return true
         case nil:
             return false
@@ -192,37 +190,37 @@ enum OneDriveSettingsOpener {
                                       steps: inout OneDriveSettings.Steps) {
         let elements = descendants(of: window)
         let described = elements.map { element in
-            OneDriveSettings.Element(role: string(element, kAXRoleAttribute), texts: [
-                string(element, kAXTitleAttribute), string(element, kAXDescriptionAttribute),
-                string(element, kAXHelpAttribute), string(element, kAXIdentifierAttribute),
+            OneDriveSettings.Element(role: AX.string(element, kAXRoleAttribute), texts: [
+                AX.string(element, kAXTitleAttribute), AX.string(element, kAXDescriptionAttribute),
+                AX.string(element, kAXHelpAttribute), AX.string(element, kAXIdentifierAttribute),
             ])
         }
         guard let index = OneDriveSettings.settingsButtonIndex(in: described) else { return }
         let button = elements[index]
-        let before = windows(app)
-        _ = AXUIElementPerformAction(button, kAXPressAction as CFString)
+        let before = AX.windows(app)
+        AX.press(button)
         let menuOpen = { statusMenu(of: button, app: app) }
-        if let menu = wait(pressWait, menuOpen) {
+        if let menu = AX.wait(pressWait, menuOpen) {
             // The button's menu: Settings in it, as a status item's.
-            if !pressSettings(in: menu, menuOpen: menuOpen, app: app, steps: &steps) { cancel(menu) }
+            if !pressSettings(in: menu, menuOpen: menuOpen, app: app, steps: &steps) { AX.cancel(menu) }
             return
         }
         steps.found = true
         steps.pressed = OneDriveSettings.pressTook(
-            windowsBefore: before.count, windowsAfter: windows(app).count,
-            titles: windows(app).map { string($0, kAXTitleAttribute) })
+            windowsBefore: before.count, windowsAfter: AX.windows(app).count,
+            titles: AX.windows(app).map { AX.string($0, kAXTitleAttribute) })
     }
 
     /// Presses `element` and waits for it to take (`OneDriveSettings.pressTook`).
     private static func press(_ element: AXUIElement, app: AXUIElement, menuGone: () -> Bool) -> Bool {
-        let before = windows(app).count
+        let before = AX.windows(app).count
         // Its answer isn't trusted (see `pressTook`).
-        _ = AXUIElementPerformAction(element, kAXPressAction as CFString)
-        return wait(pressWait) { () -> Bool? in
-            let after = windows(app)
+        AX.press(element)
+        return AX.wait(pressWait) { () -> Bool? in
+            let after = AX.windows(app)
             let took = OneDriveSettings.pressTook(menuGone: menuGone(), windowsBefore: before,
                                                   windowsAfter: after.count,
-                                                  titles: after.map { string($0, kAXTitleAttribute) })
+                                                  titles: after.map { AX.string($0, kAXTitleAttribute) })
             return took ? true : nil
         } ?? false
     }
@@ -236,7 +234,7 @@ enum OneDriveSettingsOpener {
         while !level.isEmpty, depth < searchDepth, found.count < searchLimit {
             var next: [AXUIElement] = []
             for element in level {
-                for child in children(element).map(timed) {
+                for child in AX.children(element) {
                     guard found.count < searchLimit else { break }
                     found.append(child)
                     next.append(child)
@@ -250,7 +248,7 @@ enum OneDriveSettingsOpener {
 
     /// The menu under an element (a status item, a menu item, a button) while it is open.
     private static func openMenu(under element: AXUIElement) -> AXUIElement? {
-        children(element).map(timed).first { string($0, kAXRoleAttribute) == kAXMenuRole }
+        AX.children(element).first { AX.string($0, kAXRoleAttribute) == kAXMenuRole }
     }
 
     /// The menu an item or button opened: its child, or (an item reached
@@ -261,55 +259,6 @@ enum OneDriveSettingsOpener {
 
     /// A window of OneDrive's that wasn't there before.
     private static func newWindow(_ app: AXUIElement, before: [AXUIElement]) -> AXUIElement? {
-        windows(app).first { window in !before.contains { CFEqual($0, window) } }.map(timed)
-    }
-
-    private static func cancel(_ menu: AXUIElement) {
-        _ = AXUIElementPerformAction(menu, kAXCancelAction as CFString)
-    }
-
-    private static func windows(_ app: AXUIElement) -> [AXUIElement] {
-        ((value(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).map(timed)
-    }
-
-    /// The element, each message to it limited to `messaging` seconds.
-    private static func timed(_ element: AXUIElement) -> AXUIElement {
-        AXUIElementSetMessagingTimeout(element, messaging)
-        return element
-    }
-
-    private static func runningPID() -> pid_t? {
-        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first { !$0.isTerminated }?
-            .processIdentifier
-    }
-
-    private static func open(_ url: URL, activates: Bool) {
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = activates
-        NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
-    }
-
-    /// `probe` every 0.1 s until it gives a value or `limit` seconds pass;
-    /// once at least.
-    private static func wait<T>(_ limit: TimeInterval, _ probe: () -> T?) -> T? {
-        let end = Date().addingTimeInterval(limit)
-        while true {
-            if let value = probe() { return value }
-            if Date() >= end { return nil }
-            usleep(100_000)
-        }
-    }
-
-    private static func value(_ element: AXUIElement, _ name: String) -> AnyObject? {
-        var v: AnyObject?
-        return AXUIElementCopyAttributeValue(element, name as CFString, &v) == .success ? v : nil
-    }
-
-    private static func string(_ element: AXUIElement, _ name: String) -> String? {
-        value(element, name) as? String
-    }
-
-    private static func children(_ element: AXUIElement) -> [AXUIElement] {
-        (value(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+        AX.windows(app).first { window in !before.contains { CFEqual($0, window) } }
     }
 }

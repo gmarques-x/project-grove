@@ -15,7 +15,7 @@ public enum StatusItems {
     /// MenuBarAgent's empty window over the bar; never holds items.
     public static let revealShield = "MenuBarRevealShield"
     /// The roles an app's item has: the element pressed.
-    static let itemRoles: Set<String> = ["AXButton", "AXMenuBarItem", "AXMenuExtra"]
+    public static let itemRoles: Set<String> = ["AXButton", "AXMenuBarItem", "AXMenuExtra"]
     /// How deep below a window an item may sit.
     public static let depth = 6
 
@@ -72,5 +72,37 @@ public enum StatusItems {
             }
         }
         return found
+    }
+
+    /// Every item in MenuBarAgent's windows, whoever owns it, in the bar's
+    /// order: an element with an item's role, not gone into, at most `depth`
+    /// below a window; `owner` is its pid. The wrapper is the MenuBarAgent
+    /// group around an app's item (as `find`). The reveal shield is skipped.
+    public static func findAll(in windows: [Node]) -> [(owner: pid_t, found: Found)] {
+        var found: [(owner: pid_t, found: Found)] = []
+        func walk(_ node: Node, path: [Int], parentPath: [Int]?, parent: Node?, level: Int) {
+            if let role = node.role, itemRoles.contains(role) {
+                let wrapped = parent.map { $0.pid != node.pid && $0.role == "AXGroup" } ?? false
+                found.append((node.pid, Found(item: path, wrapper: wrapped ? parentPath : nil)))
+                return
+            }
+            guard level < depth else { return }
+            for (index, child) in node.children.enumerated() {
+                walk(child, path: path + [index], parentPath: path, parent: node, level: level + 1)
+            }
+        }
+        for (index, window) in windows.enumerated() where window.identifier != revealShield {
+            for (at, child) in window.children.enumerated() {
+                walk(child, path: [index, at], parentPath: [index], parent: nil, level: 1)
+            }
+        }
+        return found
+    }
+
+    /// Whether an element's subrole and identifier are read: MenuBarAgent's
+    /// own (the windows, the groups) and another app's item candidates. Any
+    /// other app's element stays at its role and pid.
+    public static func readsDetails(pid: pid_t, agent: pid_t, role: String?) -> Bool {
+        pid == agent || role.map(itemRoles.contains) == true
     }
 }

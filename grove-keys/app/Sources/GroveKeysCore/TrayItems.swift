@@ -113,6 +113,65 @@ public enum TrayItems {
 
     /// The bar's number: the visible items.
     public static func count(visible: [TrayItem]) -> Int { visible.count }
+
+    /// A press opened something: among the ids of the app's windows and
+    /// menus after it, one that wasn't there before (a press's answer isn't
+    /// proof; something new is).
+    public static func opened(before: [Int], after: [Int]) -> Bool {
+        let old = Set(before)
+        return after.contains { !old.contains($0) }
+    }
+}
+
+/// Pressing a tray item, the Opened rule (spec 2026-11-14-bar-tray-design):
+/// the app's element is pressed; "opened" is a new menu or window of the
+/// item's pid within a second; else the MenuBarAgent wrapper is pressed
+/// once, the same test; else the app is brought forward. What the presser
+/// (Grove Keys' `TrayPresser`) does is injected, so the order is tested here.
+public enum TrayPress {
+    public enum Outcome: Equatable, Sendable {
+        /// The element's press opened a menu or window.
+        case opened
+        /// The wrapper's did.
+        case wrapperOpened
+        /// Nothing opened (or no Accessibility): the app goes to the front.
+        case broughtForward
+        /// Its app isn't running any more: nothing pressed.
+        case gone
+    }
+
+    /// - Parameters:
+    ///   - wrapper: the item has a MenuBarAgent group around it.
+    ///   - trusted: Grove Keys has Accessibility; without it nothing is
+    ///     pressed or read.
+    ///   - isRunning: the item's app is still running; asked first, before
+    ///     any Accessibility call.
+    ///   - snapshot: the ids of the pid's windows and menus now.
+    ///   - press: presses the element (false) or the wrapper (true).
+    ///   - within: polls a probe until it is true or the second is up.
+    public static func run(wrapper: Bool, trusted: Bool, isRunning: () -> Bool, snapshot: () -> [Int],
+                           press: (_ wrapper: Bool) -> Void, within: (() -> Bool) -> Bool) -> Outcome {
+        guard isRunning() else { return .gone }
+        guard trusted else { return .broughtForward }
+        return withoutActuallyEscaping(snapshot) { snapshot in
+            pressing(wrapper: wrapper, snapshot: snapshot, press: press, within: within)
+        }
+    }
+
+    private static func pressing(wrapper: Bool, snapshot: @escaping () -> [Int], press: (_ wrapper: Bool) -> Void,
+                                 within: (() -> Bool) -> Bool) -> Outcome {
+        let before = snapshot()
+        press(false)
+        if within({ TrayItems.opened(before: before, after: snapshot()) }) { return .opened }
+        guard wrapper else { return .broughtForward }
+        // Something that opened just after the wait counts: pressing the
+        // wrapper now would only close it.
+        if TrayItems.opened(before: before, after: snapshot()) { return .opened }
+        let again = snapshot()
+        press(true)
+        if within({ TrayItems.opened(before: again, after: snapshot()) }) { return .wrapperOpened }
+        return .broughtForward
+    }
 }
 
 /// `$GROVE_STATE/tray-hidden`: one key per line. Grove Keys writes it.

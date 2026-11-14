@@ -25,8 +25,6 @@ enum WireGuardOpener {
     /// menu item's press to take.
     private static let menuWait: TimeInterval = 1
     private static let pressWait: TimeInterval = 1
-    /// Each Accessibility call waits at most this: a stuck app can't hang us.
-    private static let messaging: Float = 0.5
 
     /// WireGuard's app on this Mac; nil when it isn't installed.
     @MainActor static var appURL: URL? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) }
@@ -60,7 +58,7 @@ enum WireGuardOpener {
             .first(where: { !$0.isTerminated }) {
             running.activate()
         } else {
-            open(url, activates: true)
+            AX.open(url, activates: true)
         }
     }
 
@@ -69,21 +67,21 @@ enum WireGuardOpener {
     private static func run(app url: URL, close: @escaping @MainActor @Sendable () -> Void) -> WireGuardMenu.Outcome {
         var steps = WireGuardMenu.Steps()
         // Without Accessibility nothing below can work: no launch, no wait.
-        steps.trusted = AXIsProcessTrusted()
+        steps.trusted = AX.trusted
         guard steps.trusted else { return steps.outcome }
-        var pid = runningPID()
+        var pid = AX.runningPID(bundleID: bundleID)
         let launched = pid == nil
         if launched {
-            open(url, activates: false)
-            pid = wait(launchWait) { runningPID() }
+            AX.open(url, activates: false)
+            pid = AX.wait(launchWait) { AX.runningPID(bundleID: bundleID) }
         }
         guard let pid else { return steps.outcome }
         steps.running = true
 
-        let app = timed(AXUIElementCreateApplication(pid))
+        let app = AX.app(pid)
         // A WireGuard that just started may not have its status item yet.
         // On macOS 27 the items are found through MenuBarAgent.
-        let items = wait(launched ? statusItemWait : 0) { () -> [StatusItemLocator.Item]? in
+        let items = AX.wait(launched ? statusItemWait : 0) { () -> [StatusItemLocator.Item]? in
             let items = StatusItemLocator.items(pid: pid)
             return items.isEmpty ? nil : items
         } ?? []
@@ -105,34 +103,34 @@ enum WireGuardOpener {
             // MenuBarAgent group around it.
             var opened: (item: AXUIElement, menu: AXUIElement)?
             for item in found.presses where opened == nil {
-                _ = AXUIElementPerformAction(item, kAXPressAction as CFString)
-                if let menu = wait(menuWait, { openMenu(of: item, app: app) }) {
+                AX.press(item)
+                if let menu = AX.wait(menuWait, { openMenu(of: item, app: app) }) {
                     opened = (item, menu)
                 } else if let late = openMenu(of: item, app: app) {
                     // One that opened just too late is put away too.
-                    cancel(late)
+                    AX.cancel(late)
                 }
             }
             guard let (item, menu) = opened else { continue }
             steps.menuOpened = true
-            let entries = children(menu).map(timed)
-            guard let index = WireGuardMenu.manageTunnelsIndex(in: entries.map { string($0, kAXTitleAttribute) })
+            let entries = AX.children(menu)
+            guard let index = WireGuardMenu.manageTunnelsIndex(in: entries.map { AX.string($0, kAXTitleAttribute) })
             else {
                 // Not this item's menu: put it away and try the next one.
-                cancel(menu)
+                AX.cancel(menu)
                 continue
             }
             steps.itemFound = true
             let before = windowCount(app)
             // Its answer isn't trusted (see `WireGuardMenu.pressTook`).
-            _ = AXUIElementPerformAction(entries[index], kAXPressAction as CFString)
-            steps.itemPressed = wait(pressWait) { () -> Bool? in
+            AX.press(entries[index])
+            steps.itemPressed = AX.wait(pressWait) { () -> Bool? in
                 let took = WireGuardMenu.pressTook(menuGone: openMenu(of: item, app: app) == nil, windowsBefore: before,
                                                    windowsAfter: windowCount(app))
                 return took ? true : nil
             } ?? false
             // A press that didn't take leaves the menu up: put it away.
-            if !steps.itemPressed, let still = openMenu(of: item, app: app) { cancel(still) }
+            if !steps.itemPressed, let still = openMenu(of: item, app: app) { AX.cancel(still) }
             break
         }
         return steps.outcome
@@ -141,55 +139,10 @@ enum WireGuardOpener {
     /// The menu under a status item while it is open: the item's child, or
     /// (an item reached through MenuBarAgent) the app's.
     private static func openMenu(of item: AXUIElement, app: AXUIElement) -> AXUIElement? {
-        (children(item) + children(app)).map(timed).first { string($0, kAXRoleAttribute) == kAXMenuRole }
-    }
-
-    private static func cancel(_ menu: AXUIElement) {
-        _ = AXUIElementPerformAction(menu, kAXCancelAction as CFString)
+        (AX.children(item) + AX.children(app)).first { AX.string($0, kAXRoleAttribute) == kAXMenuRole }
     }
 
     private static func windowCount(_ app: AXUIElement) -> Int {
-        (value(app, kAXWindowsAttribute) as? [AXUIElement])?.count ?? 0
-    }
-
-    /// The element, each message to it limited to `messaging` seconds.
-    private static func timed(_ element: AXUIElement) -> AXUIElement {
-        AXUIElementSetMessagingTimeout(element, messaging)
-        return element
-    }
-
-    private static func runningPID() -> pid_t? {
-        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first { !$0.isTerminated }?
-            .processIdentifier
-    }
-
-    private static func open(_ url: URL, activates: Bool) {
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = activates
-        NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
-    }
-
-    /// `probe` every 0.1 s until it gives a value or `limit` seconds pass;
-    /// once at least.
-    private static func wait<T>(_ limit: TimeInterval, _ probe: () -> T?) -> T? {
-        let end = Date().addingTimeInterval(limit)
-        while true {
-            if let value = probe() { return value }
-            if Date() >= end { return nil }
-            usleep(100_000)
-        }
-    }
-
-    private static func value(_ element: AXUIElement, _ name: String) -> AnyObject? {
-        var v: AnyObject?
-        return AXUIElementCopyAttributeValue(element, name as CFString, &v) == .success ? v : nil
-    }
-
-    private static func string(_ element: AXUIElement, _ name: String) -> String? {
-        value(element, name) as? String
-    }
-
-    private static func children(_ element: AXUIElement) -> [AXUIElement] {
-        (value(element, kAXChildrenAttribute) as? [AXUIElement]) ?? []
+        AX.windows(app).count
     }
 }

@@ -77,6 +77,38 @@ struct StatusItemsTests {
         #expect(found.map(\.wrapper) == [nil])
     }
 
+    @Test func everyItemInOneWalkInTheBarsOrder() {
+        let all = StatusItems.findAll(in: windows)
+        #expect(all.map(\.owner) == [wireGuard, oneDrive, other, oneDrive, agent])
+        #expect(all.map(\.found.item) == [[1, 0, 0], [1, 1, 0], [1, 2, 0], [1, 3, 0], [1, 4, 0]])
+        #expect(all.map(\.found.wrapper) == [[1, 0], [1, 1], [1, 2], [1, 3], nil])
+        // The same as asking owner by owner.
+        for pid in [wireGuard, oneDrive, other, agent] {
+            #expect(all.filter { $0.owner == pid }.map(\.found) == StatusItems.find(owner: pid, in: windows))
+        }
+        #expect(StatusItems.findAll(in: []).isEmpty)
+    }
+
+    @Test func findAllSkipsTheShieldAndUnpressableElements() {
+        let odd = [
+            Item(role: "AXWindow", identifier: StatusItems.revealShield, pid: agent, children: [group([item(oneDrive)])]),
+            Item(role: "AXWindow", subrole: "AXDialog", pid: agent, children: [
+                group([item(oneDrive, role: "AXStaticText"), item(other, role: "AXMenuBarItem")]),
+            ]),
+        ]
+        let all = StatusItems.findAll(in: odd)
+        #expect(all.map(\.owner) == [other])
+        #expect(all.map(\.found.item) == [[1, 0, 1]])
+    }
+
+    @Test func onlyAgentElementsAndCandidatesAreReadInFull() {
+        #expect(StatusItems.readsDetails(pid: agent, agent: agent, role: "AXGroup"))
+        #expect(StatusItems.readsDetails(pid: oneDrive, agent: agent, role: "AXButton"))
+        #expect(StatusItems.readsDetails(pid: oneDrive, agent: agent, role: "AXMenuExtra"))
+        #expect(!StatusItems.readsDetails(pid: oneDrive, agent: agent, role: "AXStaticText"))
+        #expect(!StatusItems.readsDetails(pid: oneDrive, agent: agent, role: nil))
+    }
+
     @Test func theAgent() {
         #expect(StatusItems.agentBundleID == "com.apple.MenuBarAgent")
         #expect(StatusItems.revealShield == "MenuBarRevealShield")
