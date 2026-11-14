@@ -210,6 +210,17 @@ struct CloudPendingTests {
         #expect(pending.entries.map(\.url) == [b])
     }
 
+    @Test func aStuckDownloadSaysNotDownloading() {
+        var pending = CloudPending()
+        let d = file(iCloud, "d.txt"), n = file(iCloud, "n.txt")
+        pending.update(d, root: iCloud.url, state: .downloading, at: t0)
+        pending.update(n, root: iCloud.url, state: .notUploaded, at: t0)
+        #expect(expired(&pending, t0 + 1800))
+        #expect(pending.entries.map(\.state)
+            == [.problem("not downloading for 30 min"), .problem("not uploading for 30 min")])
+        #expect(CloudPending.stuckDownloadMessage == "not downloading for 30 min")
+    }
+
     @Test func aFileEventIsAChange() {
         var pending = CloudPending()
         let a = file(oneDrive, "a.txt")
@@ -244,11 +255,38 @@ struct CloudPendingTests {
         // Ones already in still update.
         pending.update(file(oneDrive, "f0.txt"), root: oneDrive.url, state: .notUploaded, at: t0 + 1)
         #expect(pending.entries.first(where: { $0.url.lastPathComponent == "f0.txt" })?.state == .notUploaded)
-        // Room again: no longer over.
+        // Room again: still over, the dropped file was never kept; only a
+        // re-walk of its root clears it.
         pending.update(file(oneDrive, "f0.txt"), root: oneDrive.url, state: .settled, at: t0 + 2)
+        #expect(pending.overflowed)
+        #expect(pending.rootsNeedingRescan == [oneDrive.url])
+        #expect(pending.hasRoom)
+        pending.rescanned(root: oneDrive.url)
         #expect(!pending.overflowed)
+        #expect(pending.rootsNeedingRescan.isEmpty)
         #expect(CloudPillState.syncing(CloudPending.cap + 1).countText == "2000+")
         #expect(CloudPillState.syncing(2000).countText == "2000")
+    }
+
+    @Test func overflowIsKeptPerRoot() {
+        var pending = CloudPending()
+        for n in 0..<CloudPending.cap {
+            pending.update(file(oneDrive, "f\(n).txt"), root: oneDrive.url, state: .uploading, at: t0)
+        }
+        pending.update(file(iCloud, "dropped.txt"), root: iCloud.url, state: .uploading, at: t0)
+        #expect(pending.rootsNeedingRescan == [iCloud.url])
+        #expect(pending.needsRescan(iCloud.url))
+        #expect(!pending.needsRescan(oneDrive.url))
+        #expect(!pending.hasRoom)
+        // Re-walking another root clears nothing.
+        pending.rescanned(root: oneDrive.url)
+        #expect(pending.rootsNeedingRescan == [iCloud.url])
+        // A vanished root takes its flag with it.
+        pending.removeRoot(iCloud.url)
+        #expect(pending.rootsNeedingRescan.isEmpty)
+        pending.update(file(iCloud, "dropped.txt"), root: iCloud.url, state: .uploading, at: t0)
+        pending.retainRoots([oneDrive.url])
+        #expect(pending.rootsNeedingRescan.isEmpty)
     }
 
     @Test func aVanishedProviderDropsItsItems() {
@@ -309,6 +347,43 @@ struct CloudSummaryTests {
         let s = summary(pending)
         #expect(s.pill == .syncing(2001))
         #expect(s.pill.line == "syncing 2000+")
+    }
+
+    @Test func afterAnOverflowItIsNeverSyncedUntilRescanned() {
+        var pending = CloudPending()
+        for n in 0...CloudPending.cap {
+            pending.update(file(oneDrive, "f\(n).txt"), root: oneDrive.url, state: .uploading, at: t0)
+        }
+        // Draining below the cap: the dropped one may still be pending.
+        pending.settle(file(oneDrive, "f0.txt"))
+        #expect(summary(pending).pill == .checking)
+        #expect(summary(pending).providers.last?.needsRescan == true)
+        // Drained to nothing: still not synced.
+        for n in 1..<CloudPending.cap { pending.settle(file(oneDrive, "f\(n).txt")) }
+        #expect(pending.isEmpty)
+        #expect(summary(pending).pill == .checking)
+        // The root re-walked: synced.
+        pending.rescanned(root: oneDrive.url)
+        #expect(summary(pending).pill == .synced)
+        #expect(summary(pending).providers.last?.needsRescan == false)
+    }
+
+    @Test func aProviderItCantSeeDoesntHoldThePillOverTheCap() {
+        var pending = CloudPending()
+        for n in 0...CloudPending.cap {
+            pending.update(file(oneDrive, "f\(n).txt"), root: oneDrive.url, state: .uploading, at: t0)
+        }
+        let s = summary(pending, access: [oneDrive.url.path: .cantSee])
+        #expect(s.pill == .synced)
+        #expect(s.pill.line == "synced")
+        // A visible root over the cap while the set is under it: checking.
+        var other = CloudPending()
+        for n in 0..<CloudPending.cap {
+            other.update(file(oneDrive, "f\(n).txt"), root: oneDrive.url, state: .uploading, at: t0)
+        }
+        other.update(file(iCloud, "dropped.txt"), root: iCloud.url, state: .uploading, at: t0)
+        #expect(summary(other).pill == .syncing(2001))
+        #expect(summary(other, access: [oneDrive.url.path: .cantSee]).pill == .checking)
     }
 
     @Test func aProblemAnywhereIsAProblem() {
@@ -375,9 +450,17 @@ struct CloudSummaryTests {
         #expect(rows.first?.id == file(oneDrive, "y.txt").path)
         #expect(CloudProviderSummary.rowLimit == 5)
 
-        // A re-read that changes nothing doesn't move them.
+        // A shown row changing state (and its problem's words changing)
+        // doesn't move any row, nor does a hidden one changing pull it in.
         pending.update(file(oneDrive, "Docs/e.txt"), root: oneDrive.url, state: .notUploaded, at: t0 + 100)
-        #expect(summary(pending).providers.last!.rows.map(\.name) == rows.map(\.name))
+        pending.update(file(oneDrive, "Docs/a.txt"), root: oneDrive.url, state: .notUploaded, at: t0 + 100)
+        pending.update(file(oneDrive, "Docs/b.txt"), root: oneDrive.url, state: .downloading, at: t0 + 100,
+                       touched: true)
+        pending.update(file(oneDrive, "z.txt"), root: oneDrive.url, state: .problem("Disk full"), at: t0 + 100)
+        let after = summary(pending).providers.last!.rows
+        #expect(after.map(\.id) == rows.map(\.id))
+        #expect(after.map(\.state)
+            == [.problem("Upload failed"), .problem("Disk full"), .notUploaded, .downloading, .uploading])
     }
 
     @Test func aStuckRowSaysSo() {
@@ -394,6 +477,18 @@ struct CloudSummaryTests {
         #expect(CloudProviderSummary.bundleID(for: oneDrive) == "com.microsoft.OneDrive")
         #expect(CloudProviderSummary.bundleID(for: iCloud) == nil)
         #expect(CloudProviderSummary.bundleID(for: dropbox) == nil)
+        let work = CloudProviders.place(
+            "OneDrive-Contoso", CloudProviders.provider(folderName: "OneDrive-Contoso")!, home: home)
+        #expect(CloudProviderSummary.bundleID(for: work) == "com.microsoft.OneDrive")
+        // The folder says who the provider is, not the words shown.
+        let renamed = CloudProviders.CloudPlace(
+            url: home.appendingPathComponent("Library/CloudStorage/Box-OneDrive"), title: "OneDrive",
+            kind: .provider("OneDrive"))
+        #expect(CloudProviderSummary.bundleID(for: renamed) == nil)
+        let elsewhere = CloudProviders.CloudPlace(
+            url: home.appendingPathComponent("Documents/OneDrive-Personal"), title: "OneDrive",
+            kind: .provider("OneDrive"))
+        #expect(CloudProviderSummary.bundleID(for: elsewhere) == nil)
         #expect(CloudProviderSummary.hasSettings(oneDrive))
         #expect(CloudProviderSummary.hasSettings(iCloud))
         #expect(!CloudProviderSummary.hasSettings(dropbox))

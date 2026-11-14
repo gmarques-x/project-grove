@@ -82,7 +82,7 @@ public struct CloudItemValues: Equatable, Sendable {
 public enum CloudItemState: Equatable, Sendable {
     case settled, uploading, notUploaded, downloading
     /// An upload/download error (its message), an unresolved conflict, or
-    /// stuck (`CloudPending.stuckMessage`).
+    /// stuck (`CloudPending.stuckMessage` / `stuckDownloadMessage`).
     case problem(String)
 
     /// Pending: uploading, or ubiquitous and not uploaded, or a download
@@ -168,6 +168,7 @@ public struct CloudPending: Sendable {
     /// Pending this long without a change: a problem.
     public static let stuckAfter: TimeInterval = 30 * 60
     public static let stuckMessage = "not uploading for 30 min"
+    public static let stuckDownloadMessage = "not downloading for 30 min"
     /// The most items kept; past it the count reads "2000+".
     public static let cap = 2000
 
@@ -185,8 +186,11 @@ public struct CloudPending: Sendable {
         /// Pending past `stuckAfter` with no change.
         public fileprivate(set) var stuck: Bool
 
-        /// What it shows: stuck is a problem.
-        public var state: CloudItemState { stuck ? .problem(CloudPending.stuckMessage) : read }
+        /// What it shows: stuck is a problem, a download's in its own words.
+        public var state: CloudItemState {
+            guard stuck else { return read }
+            return .problem(read == .downloading ? CloudPending.stuckDownloadMessage : CloudPending.stuckMessage)
+        }
 
         public var nextRead: Date {
             let fast = lastRead.timeIntervalSince(changed) < CloudPending.fastPeriod
@@ -195,9 +199,11 @@ public struct CloudPending: Sendable {
     }
 
     private var items: [String: Entry] = [:]
-    /// An item couldn't join because the set was full; cleared when there's
-    /// room again.
-    public private(set) var overflowed = false
+    /// The roots (by path) an item of which couldn't join because the set
+    /// was full. Kept until the caller says it re-walked the root
+    /// (`rescanned(root:)`): the dropped items were never kept, so room
+    /// again says nothing about them.
+    private var overflow: [String: URL] = [:]
 
     public init() {}
 
@@ -207,6 +213,18 @@ public struct CloudPending: Sendable {
     public var entries: [Entry] { items.keys.sorted().map { items[$0]! } }
     public var count: Int { items.count }
     public var isEmpty: Bool { items.isEmpty }
+    /// Some item was dropped at the cap and its root not yet re-walked.
+    public var overflowed: Bool { !overflow.isEmpty }
+    /// The roots to re-walk (once there's room), in path order.
+    public var rootsNeedingRescan: [URL] { overflow.keys.sorted().map { overflow[$0]! } }
+    public func needsRescan(_ root: URL) -> Bool { overflow[Self.key(root)] != nil }
+    /// Under the cap: a re-walk can add items.
+    public var hasRoom: Bool { items.count < Self.cap }
+
+    /// The caller re-walked `root` (reading every item into the set): its
+    /// dropped items are accounted for.
+    public mutating func rescanned(root: URL) { overflow[Self.key(root)] = nil }
+
     /// Items pending (not problems, not stuck).
     public var pendingCount: Int { items.values.count { $0.state.isPending } }
 
@@ -222,7 +240,7 @@ public struct CloudPending: Sendable {
         }
         guard var entry = items[key] else {
             guard items.count < Self.cap else {
-                overflowed = true
+                overflow[Self.key(root)] = root
                 return
             }
             items[key] = Entry(url: url, root: root, read: state, added: now, changed: now, lastRead: now, stuck: false)
@@ -240,7 +258,6 @@ public struct CloudPending: Sendable {
     /// The item left: settled, deleted or now ignored.
     public mutating func settle(_ url: URL) {
         items[Self.key(url)] = nil
-        if items.count < Self.cap { overflowed = false }
     }
 
     /// Pending items unchanged for 30 minutes become problems. True when one did.
@@ -267,14 +284,14 @@ public struct CloudPending: Sendable {
     public mutating func removeRoot(_ root: URL) {
         let key = Self.key(root)
         items = items.filter { Self.key($0.value.root) != key }
-        if items.count < Self.cap { overflowed = false }
+        overflow[key] = nil
     }
 
     /// Keeps only the items of these providers' folders.
     public mutating func retainRoots(_ roots: [URL]) {
         let keys = Set(roots.map(Self.key))
         items = items.filter { keys.contains(Self.key($0.value.root)) }
-        if items.count < Self.cap { overflowed = false }
+        overflow = overflow.filter { keys.contains($0.key) }
     }
 }
 
@@ -337,6 +354,9 @@ public struct CloudProviderSummary: Equatable, Sendable, Identifiable {
     /// Up to five: problems first, then the most recently pending; within
     /// each, by id (so rows don't jump while counts change).
     public let rows: [CloudRow]
+    /// Items were dropped at the cap and the folder not re-walked yet: its
+    /// counts may be short (the pill is never synced meanwhile).
+    public let needsRescan: Bool
 
     public var id: String { place.url.path }
 
@@ -353,8 +373,19 @@ public struct CloudProviderSummary: Equatable, Sendable, Identifiable {
     /// The app whose process says the provider is running; nil for iCloud
     /// (always running) and the providers without a known app.
     public static func bundleID(for place: CloudProviders.CloudPlace) -> String? {
-        name(of: place) == "OneDrive" && place.kind != .iCloudDrive ? "com.microsoft.OneDrive" : nil
+        guard place.kind != .iCloudDrive else { return nil }
+        // Who the provider is comes from its folder in CloudStorage
+        // ("OneDrive-…"), by the shared rule, not from the words shown.
+        let folder = place.url.standardizedFileURL
+        guard folder.deletingLastPathComponent().path.hasSuffix("/" + CloudProviders.cloudStorage),
+              let provider = CloudProviders.provider(folderName: folder.lastPathComponent)
+        else { return nil }
+        return provider.name == oneDriveFolder ? oneDriveBundleID : nil
     }
+
+    /// OneDrive's folders in CloudStorage start "OneDrive" ("OneDrive-Personal").
+    static let oneDriveFolder = "OneDrive"
+    public static let oneDriveBundleID = "com.microsoft.OneDrive"
 
     /// iCloud and OneDrive have "Settings…"; others only "Open in Grove Explorer".
     public static func hasSettings(_ place: CloudProviders.CloudPlace) -> Bool {
@@ -373,9 +404,13 @@ public struct CloudProviderSummary: Equatable, Sendable, Identifiable {
     public var isProblem: Bool { access == .notRunning || (access == .ok && problems > 0) }
     public var pending: Int { access == .cantSee ? 0 : uploading + downloading }
 
-    public init(place: CloudProviders.CloudPlace, access: CloudProviderAccess, entries: [CloudPending.Entry]) {
+    public init(
+        place: CloudProviders.CloudPlace, access: CloudProviderAccess, entries: [CloudPending.Entry],
+        needsRescan: Bool = false
+    ) {
         self.place = place
         self.access = access
+        self.needsRescan = access != .cantSee && needsRescan
         let entries = access == .cantSee ? [] : entries
         uploading = entries.count { $0.state == .uploading || $0.state == .notUploaded }
         downloading = entries.count { $0.state == .downloading }
@@ -433,7 +468,7 @@ public struct CloudSummary: Equatable, Sendable {
     public let pill: CloudPillState
 
     /// The pending files of the providers it can see (`CloudPending.cap + 1`
-    /// when the set overflowed).
+    /// when over the cap).
     public var count: Int {
         guard case .syncing(let n) = pill else { return providers.reduce(0) { $0 + $1.pending } }
         return n
@@ -441,7 +476,9 @@ public struct CloudSummary: Equatable, Sendable {
 
     /// Only the places given get a section: items of a folder that's gone
     /// count nowhere. Checking until the first pass is done; then a problem
-    /// anywhere (or a provider not running); then the pending count.
+    /// anywhere (or a provider not running); then, while a provider it can
+    /// see awaits a re-walk after the cap, "2000+" at the cap else checking;
+    /// then the pending count.
     public init(
         places: [CloudProviders.CloudPlace], pending: CloudPending,
         access: (CloudProviders.CloudPlace) -> CloudProviderAccess, firstPassDone: Bool
@@ -450,15 +487,17 @@ public struct CloudSummary: Equatable, Sendable {
         for entry in pending.entries { byRoot[entry.root.standardizedFileURL.path, default: []].append(entry) }
         providers = places.map { place in
             CloudProviderSummary(place: place, access: access(place),
-                                 entries: byRoot[place.url.standardizedFileURL.path] ?? [])
+                                 entries: byRoot[place.url.standardizedFileURL.path] ?? [],
+                                 needsRescan: pending.needsRescan(place.url))
         }
         let total = providers.reduce(0) { $0 + $1.pending }
         if !firstPassDone {
             pill = .checking
         } else if providers.contains(where: \.isProblem) {
             pill = .problem
-        } else if pending.overflowed && total > 0 {
-            pill = .syncing(CloudPending.cap + 1)
+        } else if providers.contains(where: \.needsRescan) {
+            // Dropped items may still be pending: never synced until re-walked.
+            pill = total >= CloudPending.cap ? .syncing(CloudPending.cap + 1) : .checking
         } else {
             pill = total > 0 ? .syncing(total) : .synced
         }
