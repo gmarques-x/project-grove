@@ -82,6 +82,43 @@ struct TrayItemsTests {
         #expect(byKey.hidden == [vpn])
     }
 
+    @Test func aBareIdHidesEveryItemOfAnApp() {
+        let a = item("com.projectgrove.keys", x: 1), b = item("com.projectgrove.keys", x: 2)
+        let split = TrayItems.split([a, b], hidden: TrayItems.defaultHidden)
+        #expect(split.visible.isEmpty)
+        #expect(split.hidden == [a, b])
+    }
+
+    @Test func showingOneOfTwoItemsOfAHiddenAppKeepsTheOtherHidden() {
+        let a = item("com.projectgrove.keys", x: 1), b = item("com.projectgrove.keys", x: 2)
+        let hidden = TrayItems.unhide(a, hidden: TrayItems.defaultHidden, among: [a, b])
+        #expect(!hidden.contains("com.projectgrove.keys"))
+        #expect(hidden.contains("com.projectgrove.keys#1"))
+        let split = TrayItems.split([a, b], hidden: hidden)
+        #expect(split.visible == [a])
+        #expect(split.hidden == [b])
+    }
+
+    @Test func showingTheOnlyItemDropsTheBareId() {
+        let a = item("com.projectgrove.keys", x: 1)
+        #expect(TrayItems.unhide(a, hidden: TrayItems.defaultHidden, among: [a])
+            == TrayItems.defaultHidden.subtracting(["com.projectgrove.keys"]))
+    }
+
+    @Test func hideThenUnhideRoundTrips() {
+        let a = item("com.example.vpn", id: "main", x: 1), b = item("com.example.vpn", x: 2)
+        let start: Set<String> = ["other#0"]
+        let hid = TrayItems.hide(a, hidden: start, among: [a, b])
+        #expect(hid == ["other#0", "com.example.vpn#main"])
+        #expect(TrayItems.unhide(a, hidden: hid, among: [a, b]) == start)
+    }
+
+    @Test func sharedIdentifiersFallBackToIndexKeys() {
+        let a = item("com.example.vpn", id: "same", x: 1), b = item("com.example.vpn", id: "same", x: 2)
+        #expect(TrayItems.key(a, among: [a, b]) == "com.example.vpn#0")
+        #expect(TrayItems.key(b, among: [a, b]) == "com.example.vpn#1")
+    }
+
     @Test func countIgnoresHidden() {
         let vpn = item("com.example.vpn", x: 2)
         let sync = item("com.example.sync", x: 3)
@@ -112,6 +149,15 @@ struct TrayFilesTests {
         #expect(TrayHiddenFile.read(url) == ["a#0", "b#1"])
         try TrayHiddenFile.write([], to: url)
         #expect(TrayHiddenFile.read(url) == [])
+    }
+
+    @Test func hiddenFileToleratesBlankLinesCRLFAndSpaces() throws {
+        let d = dir()
+        defer { try? FileManager.default.removeItem(at: d) }
+        let url = d.appendingPathComponent("tray-hidden")
+        try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        try "a#0\r\n\n  b#1  \r\n\t\n\nc#x y\n".write(to: url, atomically: true, encoding: .utf8)
+        #expect(TrayHiddenFile.read(url) == ["a#0", "b#1", "c#x y"])
     }
 
     @Test func barFileWrittenOnlyOnChangeAndRemovedOnNil() throws {

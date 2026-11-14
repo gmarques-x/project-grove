@@ -37,7 +37,7 @@ public struct TrayItem: Equatable, Sendable {
 }
 
 public enum TrayItems {
-    /// Never hidden by default: Grove's own apps and AeroSpace.
+    /// Hidden by default: Grove's own apps and AeroSpace.
     public static let defaultHidden: Set<String> = ["com.projectgrove.keys", "com.projectgrove.themes", "bobko.aerospace"]
 
     /// Every item except those of MenuBarAgent itself, any `com.apple.`
@@ -58,12 +58,38 @@ public enum TrayItems {
     /// identifier changes with it); else `<bundleID>#<index>` among that
     /// app's items, left to right.
     public static func key(_ item: TrayItem, among: [TrayItem]) -> String {
-        if let id = present(item.identifier), id != present(item.title), id != present(item.description) {
+        var mine = among.filter { $0.bundleID == item.bundleID }
+        if !mine.contains(where: { same($0, item) }) { mine.append(item) }
+        mine.sort { $0.x < $1.x }
+        if let id = present(item.identifier), id != present(item.title), id != present(item.description),
+           mine.count(where: { present($0.identifier) == id }) == 1 {
             return "\(item.bundleID)#\(id)"
         }
-        let mine = among.filter { $0.bundleID == item.bundleID }.sorted { $0.x < $1.x }
-        let index = mine.firstIndex { $0.pid == item.pid && $0.x == item.x } ?? 0
+        let index = mine.firstIndex { same($0, item) }!
         return "\(item.bundleID)#\(index)"
+    }
+
+    /// The same item: by pid, place, identifier and title.
+    private static func same(_ a: TrayItem, _ b: TrayItem) -> Bool {
+        a.pid == b.pid && a.x == b.x && a.identifier == b.identifier && a.title == b.title
+    }
+
+    /// Hides one item: its key joins the set.
+    public static func hide(_ item: TrayItem, hidden: Set<String>, among: [TrayItem]) -> Set<String> {
+        hidden.union([key(item, among: among)])
+    }
+
+    /// Shows one item. When its whole app is hidden by the bare bundle id,
+    /// the id goes and the app's other items are hidden by their keys.
+    public static func unhide(_ item: TrayItem, hidden: Set<String>, among: [TrayItem]) -> Set<String> {
+        var result = hidden
+        if result.remove(item.bundleID) != nil {
+            for other in among where other.bundleID == item.bundleID && !same(other, item) {
+                result.insert(key(other, among: among))
+            }
+        }
+        result.remove(key(item, among: among))
+        return result
     }
 
     /// The row's text: title, then description, then help; the first that
