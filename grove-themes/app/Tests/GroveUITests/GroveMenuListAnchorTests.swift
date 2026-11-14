@@ -4,9 +4,10 @@ import Testing
 @testable import GroveUI
 
 /// A view's Grove menu: the right-click that opens it (and what doesn't),
-/// where it opens, and GroveSelect's rows. On a host whose panels are never
-/// put on screen.
-@MainActor @Suite(.serialized) struct GroveMenuListAnchorTests {
+/// where it opens, a dropdown's pop-up button to VoiceOver, and
+/// GroveSelect's rows. On a host whose panels are never put on screen; each
+/// test's window is closed when it ends.
+@MainActor @Suite(.serialized) final class GroveMenuListAnchorTests {
     let host = GroveMenuListHost(showsPanels: false, isActive: { true }, activate: {})
     let window: NSWindow
     let anchor = GroveMenuListAnchorView(frame: NSRect(x: 40, y: 60, width: 200, height: 24))
@@ -21,6 +22,25 @@ import Testing
         anchor.rows = { [GroveMenuListRow(id: "record", title: "Record shortcut"),
                          GroveMenuListRow(id: "remove", title: "Remove")] }
         window.contentView!.addSubview(anchor)
+    }
+
+    isolated deinit {
+        host.close()
+        window.close()
+    }
+
+    func key(_ code: UInt16, _ characters: String) -> NSEvent {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                         windowNumber: window.windowNumber, context: nil, characters: characters,
+                         charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+    }
+
+    /// The anchor as GroveSelect sets it up.
+    func dropdown() {
+        anchor.rightClick = false
+        anchor.rows = { [GroveMenuListRow(id: "0", title: "Escape", checked: true),
+                         GroveMenuListRow(id: "1", title: "None")] }
+        anchor.popUp = .init(label: "Tap alone sends", value: "Escape", gap: 4)
     }
 
     /// A click at `point` in the window's coordinates.
@@ -59,6 +79,7 @@ import Testing
                              backing: .buffered, defer: false)
         other.isReleasedWhenClosed = false
         #expect(!anchor.rightClicked(click(.rightMouseDown, at: middle, in: other)))
+        other.close()
         anchor.isHidden = true
         #expect(!anchor.rightClicked(click(.rightMouseDown, at: middle)))
         #expect(!host.isOpen)
@@ -96,19 +117,68 @@ import Testing
 
     @Test func underTheViewIsWhereADropdownOpens() throws {
         var chosen: [String] = []
-        anchor.showUnder(gap: 4, rows: [GroveMenuListRow(id: "0", title: "Escape")], onChoose: { chosen.append($0) })
+        dropdown()
+        anchor.onChoose = { chosen.append($0) }
+        anchor.showUnder()
         let open = try #require(host.current)
         // Its top at the view's bottom, 4 pt lower; its left at the view's.
         let bottomLeft = window.convertPoint(toScreen: NSPoint(x: anchor.frame.minX, y: anchor.frame.minY))
         #expect(Double(open.panels[0].frame.maxY) == Double(bottomLeft.y - 4))
         #expect(Double(open.panels[0].frame.minX) == Double(bottomLeft.x))
-        _ = host.handle(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                                         windowNumber: window.windowNumber, context: nil, characters: "\r",
-                                         charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 125)!)
-        _ = host.handle(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                                         windowNumber: window.windowNumber, context: nil, characters: "\r",
-                                         charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!)
+        // ↓ (the arrow's own character), then Return.
+        _ = host.handle(key(125, "\u{F701}"))
+        _ = host.handle(key(36, "\r"))
         #expect(chosen == ["0"])
+    }
+
+    // MARK: To VoiceOver
+
+    @Test func aDropdownIsAPopUpButtonWithItsNameAndValue() {
+        #expect(!anchor.isAccessibilityElement())
+        dropdown()
+        #expect(anchor.isAccessibilityElement())
+        #expect(anchor.accessibilityRole() == .popUpButton)
+        #expect(anchor.accessibilityLabel() == "Tap alone sends")
+        #expect(anchor.accessibilityValue() as? String == "Escape")
+        #expect(!anchor.isAccessibilityExpanded())
+    }
+
+    @Test func pressAndShowMenuOpenTheListAndItIsExpandedWhileUp() throws {
+        dropdown()
+        #expect(anchor.accessibilityPerformPress())
+        let open = try #require(host.current)
+        #expect(open.model.levels.first?.rows.map(\.title) == ["Escape", "None"])
+        #expect(open.model.checked == ["0"])
+        #expect(anchor.isAccessibilityExpanded())
+        host.close()
+        #expect(!anchor.isAccessibilityExpanded())
+        #expect(anchor.accessibilityPerformShowMenu())
+        #expect(host.isOpen)
+        #expect(anchor.isAccessibilityExpanded())
+        host.close()
+    }
+
+    @Test func aRightClickMenusAnchorIsNoPopUpButton() {
+        #expect(!anchor.isAccessibilityElement())
+        #expect(anchor.accessibilityRole() == nil)
+        #expect(!anchor.accessibilityPerformPress())
+        #expect(!host.isOpen)
+    }
+
+    // MARK: Text fields
+
+    @Test func aFieldBeingTypedInKeepsItsMenuAndOneThatIsntGetsTheRows() {
+        let field = NSTextField(frame: anchor.frame)
+        field.isEditable = true
+        window.contentView!.addSubview(field)
+        // Not being edited: the row's text; the row's menu.
+        #expect(anchor.rightClicked(click(.rightMouseDown, at: middle)))
+        host.close()
+        // Being typed in: the field editor (a text view) is under the click.
+        let editor = NSTextView(frame: anchor.frame)
+        window.contentView!.addSubview(editor)
+        #expect(!anchor.rightClicked(click(.rightMouseDown, at: middle)))
+        #expect(!host.isOpen)
     }
 
     // MARK: GroveSelect

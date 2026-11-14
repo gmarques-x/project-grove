@@ -18,8 +18,12 @@ public struct GroveSelectOption<Value: Hashable>: Identifiable {
 /// label is the standard pill, the value and a chevron (`GroveSelectPill`),
 /// or the caller's own (a Monitors cell). A plain button: a click opens the
 /// list, and so does Space when it has the keyboard focus; in the list the
-/// keys are the menu's (↑↓, Return, Esc, a letter). VoiceOver reads a button
-/// named `name` whose value is the current one; the chevron is not read.
+/// keys are the menu's (↑↓, Return, Esc, a letter). VoiceOver reads a pop-up
+/// button named `name` whose value is the current one, expanded while its
+/// list is up; its press (VO-Space) and Show Menu open the list. That
+/// button is the AppKit view behind the label (`GroveMenuListAnchorView`):
+/// SwiftUI has no pop-up role, and a represented `Picker` would open the
+/// native menu. The chevron is not read.
 ///
 /// Not `Picker(.menu)` or `Menu`, on purpose: the native pop-up button
 /// draws its label in the system font whatever `.font` says, and at its
@@ -55,22 +59,17 @@ public struct GroveSelect<Value: Hashable, Label: View>: View {
     }
 
     public var body: some View {
-        Button(action: open) { label }
+        let options = options, selection = selection, onSelect = onSelect
+        Button { anchor.wrappedValue.view?.showUnder() } label: { label }
             .buttonStyle(.plain)
-            .background(GroveMenuListAnchor(box: anchor.wrappedValue, theme: theme, rightClick: false,
-                                            rows: { [] }, onChoose: { _ in }))
-            .accessibilityLabel(name)
-            .accessibilityValue(valueText ?? selectedTitle)
-    }
-
-    /// The list, its top-left a little under the label's bottom-left.
-    private func open() {
-        let options = options, onSelect = onSelect
-        anchor.wrappedValue.view?.showUnder(
-            gap: GroveSpace.s4, rows: GroveSelectOption.menuRows(options, selection: selection),
-            onChoose: { id in
-                if let value = GroveSelectOption.value(of: id, in: options) { onSelect(value) }
-            })
+            // VoiceOver reads the view behind instead: a pop-up button.
+            .accessibilityHidden(true)
+            .background(GroveMenuListAnchor(
+                box: anchor.wrappedValue, theme: theme, rightClick: false,
+                rows: { GroveSelectOption.menuRows(options, selection: selection) },
+                onChoose: { id in if let value = GroveSelectOption.value(of: id, in: options) { onSelect(value) } },
+                // The list's top-left a little under the label's bottom-left.
+                popUp: .init(label: name, value: valueText ?? selectedTitle, gap: GroveSpace.s4)))
     }
 }
 

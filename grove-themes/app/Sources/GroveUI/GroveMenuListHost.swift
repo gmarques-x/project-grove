@@ -48,7 +48,35 @@ public enum GroveMenuList {
                              opening: NSEvent? = NSApp.currentEvent,
                              onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
         host.popUp(rows: rows, at: point, in: view, theme: theme, opening: opening, onChoose: onChoose,
-                   onClose: onClose)
+                   onClosed: { _ in onClose() })
+    }
+
+    /// The same, told why the menu closed: for a caller whose after-work
+    /// depends on it (the Grove menu at the pointer gives the keyboard back
+    /// to the app that was in front, but not when the user went to another).
+    public static func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
+                             opening: NSEvent? = NSApp.currentEvent,
+                             onChoose: @escaping (String) -> Void,
+                             onClosed: @escaping (CloseReason) -> Void) {
+        host.popUp(rows: rows, at: point, in: view, theme: theme, opening: opening, onChoose: onChoose,
+                   onClosed: onClosed)
+    }
+
+    /// Why a menu closed.
+    public enum CloseReason: Equatable, Sendable {
+        /// A row was chosen (`onChoose` ran just before).
+        case chosen
+        /// Esc, Return with nothing highlighted, or `close()`.
+        case dismissed
+        /// A click outside the menu, in one of the app's windows.
+        case clickedOutside
+        /// A click in another app, on the desktop or a status item.
+        case clickedInAnotherApp
+        /// The app went to the background.
+        case appDeactivated
+        /// Its window closed or lost the keyboard, its view left the window,
+        /// the screens or the Space changed, or another menu replaced it.
+        case ownerGone
     }
 
     /// Closes the open menu without choosing (its `onClose` runs).
@@ -61,10 +89,6 @@ public enum GroveMenuList {
     /// known only after the menu opened (the Grove menu's `checked` tests).
     public static func check(_ id: String) { host.check(id) }
 
-    /// Whether `window` is one of the open menu's panels: for another
-    /// host's monitor (a bar panel's), so a click in the menu isn't a click
-    /// outside that host's window.
-    public static func owns(_ window: NSWindow?) -> Bool { host.owns(window) }
 }
 
 /// What `GroveMenuList` runs on. Its own type so tests can make one whose
@@ -98,7 +122,7 @@ final class GroveMenuListHost {
         var press: (time: TimeInterval, point: CGPoint)?
         let theme: ThemeColors
         let onChoose: (String) -> Void
-        let onClose: () -> Void
+        let onClose: (GroveMenuList.CloseReason) -> Void
         /// What the panels may cover: the screen's visible frame, y down.
         let screen: CGRect
         /// Per level (0: the menu), its panel and frame (y down).
@@ -110,7 +134,7 @@ final class GroveMenuListHost {
         var refreshPending = false
 
         init(model: GroveMenuListModel, owner: NSWindow, view: NSView, theme: ThemeColors, screen: CGRect,
-             onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
+             onChoose: @escaping (String) -> Void, onClose: @escaping (GroveMenuList.CloseReason) -> Void) {
             self.model = model
             self.owner = owner
             self.view = view
@@ -134,21 +158,18 @@ final class GroveMenuListHost {
         current?.model.checked.insert(id)
     }
 
-    func owns(_ window: NSWindow?) -> Bool {
-        guard let window, let open = current else { return false }
-        return open.owns(window)
-    }
 
     /// `opening`: the event that asked for the menu (the right-click), whose
     /// release must not choose a row unless it was held (`MenuPress`).
     func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
                opening: NSEvent? = NSApp.currentEvent,
-               onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
+               onChoose: @escaping (String) -> Void,
+               onClosed onClose: @escaping (GroveMenuList.CloseReason) -> Void) {
         // The open menu's `onClose` may pop up another: this, the newest
         // call, closes that one too. Never two at once.
-        for _ in 0..<8 where current != nil { close() }
+        for _ in 0..<8 where current != nil { close(.ownerGone) }
         guard current == nil, !rows.isEmpty, let owner = view.window else {
-            onClose()
+            onClose(.dismissed)
             return
         }
         let onScreen = owner.convertPoint(toScreen: view.convert(point, to: nil))
@@ -199,19 +220,30 @@ final class GroveMenuListHost {
         post(panel, Self.menuOpened)
     }
 
-    func close() {
+    func close(_ reason: GroveMenuList.CloseReason = .dismissed) {
         guard let open = current else { return }
         tearDown(open)
-        open.onClose()
+        open.onClose(reason)
     }
+
+    /// `popUp` for a caller that doesn't need to know why it closed.
+    func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
+               opening: NSEvent? = NSApp.currentEvent,
+               onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
+        popUp(rows: rows, at: point, in: view, theme: theme, opening: opening, onChoose: onChoose,
+              onClosed: { _ in onClose() })
+    }
+
+    /// The global monitor's: a click in another app.
+    func clickedInAnotherApp() { close(.clickedInAnotherApp) }
 
     private func choose(_ id: String) {
         guard let open = current else { return }
         // Chosen from a view that is gone: nothing to do it for.
-        if open.viewLeft { return close() }
+        if open.viewLeft { return close(.ownerGone) }
         tearDown(open)
         open.onChoose(id)
-        open.onClose()
+        open.onClose(.chosen)
     }
 
     private func tearDown(_ open: Open) {
@@ -312,12 +344,13 @@ final class GroveMenuListHost {
     // MARK: Events
 
     private func watch(_ open: Open) {
-        func observe(_ center: NotificationCenter, _ name: Notification.Name, object: Any? = nil) {
+        func observe(_ center: NotificationCenter, _ name: Notification.Name, object: Any? = nil,
+                     _ reason: GroveMenuList.CloseReason = .ownerGone) {
             // Posted on the main thread: handled there, at once.
             let token = center.addObserver(forName: name, object: object, queue: nil) { [weak self, weak open] _ in
                 MainActor.assumeIsolated {
                     guard let self, let open, self.current === open else { return }
-                    self.close()
+                    self.close(reason)
                 }
             }
             open.observers.append((center, token))
@@ -326,7 +359,7 @@ final class GroveMenuListHost {
             observe(.default, NSWindow.willCloseNotification, object: owner)
             observe(.default, NSWindow.didResignKeyNotification, object: owner)
         }
-        observe(.default, NSApplication.didResignActiveNotification)
+        observe(.default, NSApplication.didResignActiveNotification, .appDeactivated)
         observe(.default, NSApplication.didChangeScreenParametersNotification)
         observe(NSWorkspace.shared.notificationCenter, NSWorkspace.activeSpaceDidChangeNotification)
 
@@ -344,7 +377,7 @@ final class GroveMenuListHost {
         // A click in another app, the desktop, a status item.
         if let monitor = NSEvent.addGlobalMonitorForEvents(
             matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self] _ in
-                MainActor.assumeIsolated { self?.close() }
+                MainActor.assumeIsolated { self?.clickedInAnotherApp() }
             }) {
             open.monitors.append(monitor)
         }
@@ -359,7 +392,7 @@ final class GroveMenuListHost {
     func handle(_ event: NSEvent) -> Bool {
         guard let open = current else { return true }
         if open.viewLeft {
-            close()
+            close(.ownerGone)
             return true
         }
         switch event.type {
@@ -368,7 +401,7 @@ final class GroveMenuListHost {
             return false
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
             if open.owns(event.window) { return true }
-            close()
+            close(.clickedOutside)
             return event.type == .rightMouseDown
         case .leftMouseUp, .rightMouseUp:
             // A left click in a panel is its pointer view's.

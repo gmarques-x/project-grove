@@ -10,11 +10,13 @@ import SwiftUI
 extension View {
     /// A right-click menu drawn as the Grove menu (`GroveMenuList`), in
     /// place of `.contextMenu`: a right-click or ⌃-click on the view opens
-    /// `rows()` at the pointer, and VoiceOver's "Show Menu" action opens them
-    /// under the view. `rows` is asked at each opening; when it gives none
-    /// there is no menu and the click goes on, as with an empty
-    /// `.contextMenu`, and a disabled view has none. A click in a text field
-    /// keeps the field's own menu (Cut, Copy, Paste).
+    /// `rows()` at the pointer, and a "Show Menu" accessibility action opens
+    /// them under the view (offered only while there are rows: SwiftUI has
+    /// no standard AXShowMenu kind for a view, so it is a named action).
+    /// `rows` is asked at each opening; when it gives none there is no menu
+    /// and the click goes on, as with an empty `.contextMenu`, and a
+    /// disabled view has none. A text field being typed in keeps its own
+    /// menu (Cut, Copy, Paste).
     public func groveContextMenu(rows: @escaping () -> [GroveMenuListRow],
                                  onChoose: @escaping (String) -> Void) -> some View {
         modifier(GroveContextMenu(rows: rows, onChoose: onChoose))
@@ -32,10 +34,15 @@ private struct GroveContextMenu: ViewModifier {
     func body(content: Content) -> some View {
         // A disabled view (`.disabled`) has no menu.
         let rows = isEnabled ? rows : { [] }
+        let hasRows = !rows().isEmpty
         return content
             .background(GroveMenuListAnchor(box: anchor.wrappedValue, theme: theme, rightClick: true,
                                             rows: rows, onChoose: onChoose))
-            .accessibilityAction(named: "Show Menu") { anchor.wrappedValue.view?.showUnder() }
+            .accessibilityActions {
+                if hasRows {
+                    Button("Show Menu") { anchor.wrappedValue.view?.showUnder() }
+                }
+            }
     }
 }
 
@@ -53,6 +60,8 @@ struct GroveMenuListAnchor: NSViewRepresentable {
     let rightClick: Bool
     let rows: () -> [GroveMenuListRow]
     let onChoose: (String) -> Void
+    /// A dropdown's: the view is its pop-up button to VoiceOver.
+    var popUp: GroveMenuListAnchorView.PopUp? = nil
 
     func makeNSView(context: Context) -> GroveMenuListAnchorView {
         let view = GroveMenuListAnchorView()
@@ -65,18 +74,32 @@ struct GroveMenuListAnchor: NSViewRepresentable {
         view.rightClick = rightClick
         view.rows = rows
         view.onChoose = onChoose
+        view.popUp = popUp
         box.view = view
     }
 }
 
 /// An empty, flipped view that opens a Grove menu: at the pointer for a
 /// right-click on it (watched with a local monitor while it is in a window,
-/// so the SwiftUI views over it keep their clicks), or under itself.
+/// so the SwiftUI views over it keep their clicks), or under itself. For a
+/// dropdown (`popUp`) it is also the control VoiceOver reads: a pop-up
+/// button with its name and value, which the press and AXShowMenu open,
+/// expanded while its list is up.
 final class GroveMenuListAnchorView: NSView {
+    /// What a dropdown's pop-up button says, and how far under it its list opens.
+    struct PopUp: Equatable {
+        var label: String
+        var value: String
+        var gap: CGFloat
+    }
+
     var theme: ThemeColors = .fallback
     var rightClick = false
     var rows: () -> [GroveMenuListRow] = { [] }
     var onChoose: (String) -> Void = { _ in }
+    var popUp: PopUp?
+    /// This view's menu is up (not another view's).
+    private(set) var menuOpen = false
     /// What the menu is popped up on (tests give one whose panels are never shown).
     var host: GroveMenuListHost = GroveMenuList.host
     // `nonisolated(unsafe)` for `deinit` only, which runs on the main thread
@@ -86,7 +109,20 @@ final class GroveMenuListAnchorView: NSView {
     override var isFlipped: Bool { true }
     // Nothing to click or read: the view in front speaks for itself.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    override func isAccessibilityElement() -> Bool { false }
+    override func isAccessibilityElement() -> Bool { popUp != nil }
+    override func accessibilityRole() -> NSAccessibility.Role? { popUp != nil ? .popUpButton : nil }
+    override func accessibilityLabel() -> String? { popUp?.label }
+    override func accessibilityValue() -> Any? { popUp?.value }
+    override func isAccessibilityExpanded() -> Bool { menuOpen }
+    override func accessibilityPerformPress() -> Bool { openList() }
+    override func accessibilityPerformShowMenu() -> Bool { openList() }
+
+    /// A dropdown's list, opened by VoiceOver.
+    private func openList() -> Bool {
+        guard popUp != nil, !rows().isEmpty else { return false }
+        showUnder()
+        return true
+    }
 
     deinit {
         if let monitor { NSEvent.removeMonitor(monitor) }
@@ -122,23 +158,29 @@ final class GroveMenuListAnchorView: NSView {
         guard bounds.intersection(visibleRect).contains(point), !Self.inTextField(window, event.locationInWindow) else { return false }
         let rows = rows()
         guard !rows.isEmpty else { return false }
-        host.popUp(rows: rows, at: point, in: self, theme: theme, opening: event, onChoose: onChoose, onClose: {})
+        open(rows, at: point, opening: event)
         return true
     }
 
-    /// Opens the menu with its top-left corner `gap` under this view's
-    /// bottom-left (a dropdown's list, VoiceOver's "Show Menu").
-    func showUnder(gap: CGFloat = 0, rows: [GroveMenuListRow]? = nil, onChoose: ((String) -> Void)? = nil) {
-        host.popUp(rows: rows ?? self.rows(), at: NSPoint(x: 0, y: bounds.height + gap), in: self, theme: theme,
-                   opening: nil, onChoose: onChoose ?? self.onChoose, onClose: {})
+    /// Opens the menu with its top-left corner under this view's
+    /// bottom-left, a dropdown's `gap` lower (a dropdown's list, "Show Menu").
+    func showUnder() {
+        open(rows(), at: NSPoint(x: 0, y: bounds.height + (popUp?.gap ?? 0)), opening: nil)
     }
 
-    /// The click is on a text field being typed in, or one that can be.
+    private func open(_ rows: [GroveMenuListRow], at point: NSPoint, opening: NSEvent?) {
+        host.popUp(rows: rows, at: point, in: self, theme: theme, opening: opening, onChoose: onChoose,
+                   onClosed: { [weak self] _ in self?.menuOpen = false })
+        // No rows, or no window: closed already.
+        menuOpen = host.isOpen
+    }
+
+    /// The click is on a text field being typed in (its field editor, a
+    /// text view): it keeps its own menu. A field not being edited is the
+    /// row's text, and gets the row's menu.
     private static func inTextField(_ window: NSWindow, _ point: NSPoint) -> Bool {
         guard let content = window.contentView,
               let hit = content.hitTest(content.superview?.convert(point, from: nil) ?? point) else { return false }
-        if hit is NSTextView { return true }
-        if let field = hit as? NSTextField { return field.isEditable }
-        return false
+        return hit is NSTextView
     }
 }

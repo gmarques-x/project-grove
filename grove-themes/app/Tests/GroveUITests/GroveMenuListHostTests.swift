@@ -23,6 +23,7 @@ import Testing
         var chosen: [String] = []
         var closed = 0
         var order: [String] = []
+        var reasons: [GroveMenuList.CloseReason] = []
     }
 
     /// In front, as when a menu is right-clicked open: tests of a menu
@@ -43,7 +44,7 @@ import Testing
         let calls = calls
         host.popUp(rows: rows, at: point, in: view ?? window.contentView!, theme: .fallback, opening: opening,
                    onChoose: { calls.chosen.append($0); calls.order.append("choose") },
-                   onClose: { calls.closed += 1; calls.order.append("close") })
+                   onClosed: { calls.closed += 1; calls.order.append("close"); calls.reasons.append($0) })
     }
 
     func key(_ code: UInt16, _ characters: String = "") -> NSEvent {
@@ -372,6 +373,49 @@ import Testing
         #expect(background.isOpen)
         #expect(asked == 0)
         background.close()
+        panel.close()
+    }
+
+    // MARK: Why it closed
+
+    @Test func itSaysWhyItClosed() throws {
+        // Chosen: Return on a highlighted row.
+        popUp()
+        _ = host.handle(key(125))
+        _ = host.handle(key(36, "\r"))
+        // Esc.
+        popUp()
+        _ = host.handle(key(53, "\u{1b}"))
+        // Return with nothing highlighted.
+        popUp()
+        _ = host.handle(key(36, "\r"))
+        // A click in another of the app's windows.
+        let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 200), styleMask: [.titled],
+                             backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        popUp()
+        _ = host.handle(click(.leftMouseDown, in: other))
+        other.close()
+        // A click in another app (the global monitor's).
+        popUp()
+        host.clickedInAnotherApp()
+        // The app going to the background.
+        popUp()
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        // The window losing the keyboard; another menu replacing it.
+        popUp()
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        popUp()
+        popUp()
+        host.close()
+        #expect(calls.reasons == [.chosen, .dismissed, .dismissed, .clickedOutside, .clickedInAnotherApp,
+                                  .appDeactivated, .ownerGone, .ownerGone, .dismissed])
+        #expect(calls.closed == calls.reasons.count)
+    }
+
+    @Test func aMenuThatCanNotOpenClosesAsDismissed() {
+        popUp([])
+        #expect(calls.reasons == [.dismissed])
     }
 
     @Test func aTickKnownLaterIsAddedToTheOpenMenu() {
@@ -383,17 +427,6 @@ import Testing
         // No menu: nothing to tick, nothing breaks.
         host.check("open")
         #expect(!host.isOpen)
-    }
-
-    @Test func itKnowsItsOwnPanels() throws {
-        #expect(!host.owns(window))
-        popUp()
-        let panel = try #require(host.current?.panels.first)
-        #expect(host.owns(panel))
-        #expect(!host.owns(window))
-        #expect(!host.owns(nil))
-        host.close()
-        #expect(!host.owns(panel))
     }
 
     // MARK: Odd cases

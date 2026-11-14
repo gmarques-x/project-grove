@@ -131,7 +131,7 @@ final class PointerMenu: NSObject {
     /// once it is up, all at once, and tick their rows as they pass. When
     /// it closes, the app that was in front gets the keyboard back, unless
     /// the chosen row brings something forward itself, or the menu closed
-    /// because another app came forward.
+    /// because the user went elsewhere (`handsBack(after:)`).
     private func popUpGroveMenu(_ rows: [GroveMenuRow]) {
         let point = NSEvent.mouseLocation
         let menu = GroveMenu(rows: rows)
@@ -156,16 +156,33 @@ final class PointerMenu: NSObject {
                         MenuRunner.run(action, title: row.title)
                     }
                 },
-                onClose: { [self] in
+                onClosed: { [self] reason in
                     self.opening += 1
-                    guard handsBack, NSApp.isActive, let previous else { return }
-                    NSRunningApplication(processIdentifier: previous)?.activate()
+                    guard handsBack, Self.handsBack(after: reason), let previous else { return }
+                    // One turn later, and only if Grove Keys is still in
+                    // front: the user may have gone elsewhere meanwhile.
+                    DispatchQueue.main.async {
+                        guard NSApp.isActive else { return }
+                        NSRunningApplication(processIdentifier: previous)?.activate()
+                    }
                 })
             let tests = Self.checkedTests(rows)
             CheckedTests.run(tests) { [self] id in
                 guard self.opening == opening else { return }
                 GroveMenuList.check(id)
             }
+        }
+    }
+
+    /// Whether the app that was in front gets the keyboard back after the
+    /// menu closed this way: after a choice (one that brings nothing
+    /// forward) or Esc, yes. Not when the user clicked another app or a
+    /// window of Grove Keys', or Grove Keys went to the background: the
+    /// keyboard is where they put it.
+    static func handsBack(after reason: GroveMenuList.CloseReason) -> Bool {
+        switch reason {
+        case .chosen, .dismissed, .ownerGone: true
+        case .clickedOutside, .clickedInAnotherApp, .appDeactivated: false
         }
     }
 
