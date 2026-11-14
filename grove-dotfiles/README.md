@@ -1,6 +1,8 @@
-# Project Grove: grove-dotfiles
+# grove-dotfiles
 
-Project Grove is a personal macOS overhaul built on the [Everforest](https://github.com/sainnhe/everforest) color scheme by sainnhe, in six schemes (dark or light, each hard, medium or soft). Its principal font is JetBrains Mono, with SF Pro as the companion. This folder, `grove-dotfiles`, holds the `grove` installer and the configs it manages. One command sets up a fresh Mac: tools, fonts, shell, git, GitHub, Finder, the terminal, VS Code, the tiling desktop (AeroSpace), the Grove bar (SketchyBar) with the Grove menu, and the Grove Keys, Grove Themes and Grove Explorer apps. Run it again any time; anything already done is left alone.
+The `grove` installer and every config it manages.
+
+Project Grove is a personal macOS overhaul built on the [Everforest](https://github.com/sainnhe/everforest) colour scheme by sainnhe, in six schemes (dark or light, each hard, medium or soft). Its principal font is JetBrains Mono, with SF Pro as the companion. This folder, `grove-dotfiles`, holds the `grove` installer and the configs it manages. One command sets up a fresh Mac: tools, fonts, shell, git, GitHub, Finder, the terminal, VS Code, the tiling desktop (AeroSpace), the Grove bar (SketchyBar) with the Grove menu, the Grove Keys, Grove Themes and Grove Explorer apps, and the grove mod for Claude Code. Run it again any time; anything already done is left alone.
 
 How to use the result is in the [manual](../docs/manual/README.md). This page is about the installer.
 
@@ -18,9 +20,11 @@ It waits for Apple's Command Line Tools (finish the dialog that appears), clones
 
 - your name, email and GitHub username (nothing is suggested; type each one)
 - your Mac password, for Homebrew's first install
+- where `~/.ssh` should live, only if a OneDrive folder is found: in it (as `dot-ssh`, with `~/.ssh` a link to it) or on this Mac; asked once
 - an SSH key passphrase, only if you don't have a key yet
 - a browser login for GitHub
 - permissions in System Settings › Privacy & Security: Accessibility and Input Monitoring for Grove Keys, Accessibility for AeroSpace, and Automation (System Events) for the terminal, which sets the wallpaper
+- later, from Grove Keys itself: Location once at its first start (optional; only for the Wi-Fi name in the bar), Bluetooth the first time you open the bar's network panel, and access to files managed by OneDrive when the cloud pill first looks
 - Always Allow, when macOS asks whether `codesign` may use the Grove Code Signing key
 
 The manual's [Getting started](../docs/manual/01-getting-started.md) lists everything the installer changes and the steps left to do by hand.
@@ -40,12 +44,13 @@ Your personal values (name, email, GitHub username) live in `~/.config/grove/loc
 
 There is no uninstaller. Files are linked or moved aside, never deleted, so the setup can be undone by hand; the manual's [Updates and undo](../docs/manual/07-updates-and-undo.md) has the steps in order. What the modules create:
 
-- **Links:** `~/.config`, `~/.zshenv`, `~/.ssh/config`, `~/.local/bin/grove`, `~/.local/bin/grove-themes`, and VS Code's `~/Library/Application Support/Code/User/settings.json` (`rm` on a link removes only the link).
+- **Links:** `~/.config`, `~/.zshenv`, `~/.ssh/config`, `~/.ssh` itself if you chose a OneDrive folder for it (the old folder is in the backup), `~/.local/bin/grove`, `~/.local/bin/grove-themes`, and VS Code's `~/Library/Application Support/Code/User/settings.json` (`rm` on a link removes only the link).
 - **Backups:** what those links and the shell setup replaced (`~/.zshrc`, `~/.zprofile`, `~/.gitconfig`, `~/.zsh_history`, `~/.zsh_sessions`, a Ghostty config in Application Support) is in `~/.local/state/grove/backup/<run>/`. Paths inside a run folder are relative to `$HOME` (`<run>/.zshrc` goes back to `~/.zshrc`).
 - **Apps and login items:** `~/Applications/Grove Keys.app`, `Grove Themes.app` and `Grove Explorer.app` (no login item), with the LaunchAgents `com.projectgrove.keys` and `com.projectgrove.themes` in `~/Library/LaunchAgents`; AeroSpace starts at login by its own setting; SketchyBar runs as a Homebrew service.
 - **Keychain:** the "Grove Code Signing" certificate and key in the login keychain, and the SSH key's passphrase.
 - **macOS settings:** the menu bar set to hide (`NSGlobalDomain _HIHideMenuBar`), "Displays have separate Spaces" off (`com.apple.spaces spans-displays`), the Finder settings in `modules/80-macos-finder/settings.txt`, Ghostty's tile in the Dock, the wallpaper, and from the theme switcher the appearance, accent and highlight colours. None of these has a backup.
 - **Installed:** Homebrew, the Brewfile's packages and SketchyBar; fonts in `~/Library/Fonts`; two VS Code extensions; an SSH key in `~/.ssh` (if you had none) and its copy on GitHub as a signing key.
+- **Claude Code:** the `grove` marketplace (this repo's `config/grove-claude`) and the `grove@grove` plugin, recorded by Claude Code in `~/.claude/settings.json`. Remove them with `claude plugin uninstall grove@grove` and `claude plugin marketplace remove grove`.
 - **State:** `~/.local/state/grove/` (logs, backups, the current scheme) and `~/.local/state/zsh/`.
 
 Caps Lock is mapped to Hyper only while Grove Keys runs; quitting it gives Caps Lock back.
@@ -81,6 +86,7 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 | `80-macos-finder` | Finder settings (the sidebar is a manual step) |
 | `85-macos-wallpaper` | Desktop wallpaper: `grove-wallpapers/wallpaper-<set>-<scheme>.png` for the current scheme on every screen (other Spaces are a manual step); the set is `project-grove`, or `avatar` after `grove-themes wallpaper avatar` |
 | `90-terminal` | Ghostty in the Dock (in Terminal's place), its config, and fastfetch |
+| `93-claude-mod` | Claude Code: adds `config/grove-claude` as a local marketplace named `grove` and installs the grove mod from it (the Agents pane, the status line and the Grove look; see [its README](config/grove-claude/grove/README.md)). Needs you when Claude Code isn't installed |
 | `94-explorer-app` | Grove Explorer, the file browser: builds the app and installs it to ~/Applications (it is opened like any app; nothing starts it at login) |
 | `95-vscode` | VS Code: Everforest, Grove Icons and JetBrains Mono, settings linked from the tracked config |
 | `96-keys-app` | Grove Keys in the menu bar: Caps Lock as Hyper, the keyboard window, and the AeroSpace config it renders; builds the app, installs it to ~/Applications and starts it at login |
@@ -96,16 +102,16 @@ Options: `--yes` asks nothing and skips anything that needs you (including your 
 
 ## Fonts
 
-| Role | Font | Used for | License |
+| Role | Font | Used for | Licence |
 | --- | --- | --- | --- |
 | Principal | **JetBrains Mono** and **JetBrains Mono NL** (2.304, 32 static TTFs) | Code and app text: the terminal, the editor, the Grove bar and the Grove apps | SIL Open Font License 1.1 |
-| Companion | **SF Pro**, **SF Pro Text**, **SF Pro Display**, **SF Pro Rounded** (47 files) | Where macOS draws it: menus, dialogs and other system text | Apple font license |
+| Companion | **SF Pro**, **SF Pro Text**, **SF Pro Display**, **SF Pro Rounded** (47 files) | Where macOS draws it: menus, dialogs and other system text | Apple font licence |
 
 `grove install fonts` copies them to `~/Library/Fonts` (no admin password) and registers them with macOS, which this version of macOS needs before apps can use a font. Downloads are cached in `~/Library/Caches/grove/fonts` and fetched again only when the server has a newer file.
 
 - JetBrains Mono is checked against a fixed SHA-256. The variable and web fonts in the release are left out, so font menus don't show duplicates.
 - SF Pro is unpacked from Apple's installer without running it, after checking that the package is signed by Apple. Apple updates the download in place, so a fixed checksum wouldn't last.
-- Font files are never committed, because of their licenses.
+- Font files are never committed, because of their licences.
 
 To add a font:
 
@@ -140,7 +146,7 @@ The shell has completions (menu selection, case-insensitive), suggestions from y
 
 `rg` is ripgrep. `grep` is unchanged.
 
-**yazi** lists like `ls` (folders first, A→Z, hidden files off; `.` shows them) in the same colors as eza. Its top bar is drawn like the prompt (`config/yazi/init.lua`), with a line under it, and the hovered row is a rounded pill. Its config is `config/yazi/`. It previews images in Ghostty, plus PDFs, archives and SVGs. Video thumbnails and HEIC/RAW images are left out, since they need ffmpeg and ImageMagick. Terminal.app shows plain previews and can't draw the file icons.
+**yazi** lists like `ls` (folders first, A→Z, hidden files off; `.` shows them) in the same colours as eza. Its top bar is drawn like the prompt (`config/yazi/init.lua`), with a line under it, and the hovered row is a rounded pill. Its config is `config/yazi/`. It previews images in Ghostty, plus PDFs, archives and SVGs. Video thumbnails and HEIC/RAW images are left out, since they need ffmpeg and ImageMagick. Terminal.app shows plain previews and can't draw the file icons.
 
 ## Adding a module
 
@@ -155,5 +161,5 @@ The number sets the order modules run in.
 ## Credits
 
 - [Everforest](https://github.com/sainnhe/everforest) by sainnhe (MIT)
-- Prompt colors come from the Everforest zsh port
+- Prompt colours come from the Everforest zsh port
 - [Starship](https://starship.rs) for the prompt
