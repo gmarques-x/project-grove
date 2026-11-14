@@ -23,6 +23,9 @@
 /grove/*
 !/grove/menu.toml
 !/grove-explorer/
+!/grove-claude/
+# The declarations Claude Code lays beside the mod each load (generated).
+/grove-claude/grove/.claude-plugin/types/
 /grove-explorer/*
 !/grove-explorer/explorer.toml
 !/starship.toml.tmpl

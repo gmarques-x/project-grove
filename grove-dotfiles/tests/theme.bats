@@ -292,6 +292,15 @@ scheme_hexes() {
   [ -z "$missing" ] || { echo "icon theme, not in Dark Medium or Light Medium: $missing"; false; }
 }
 
+# The grove mod for Claude Code: its built-in fallback palette must be Dark
+# Medium. hooks/motd.ts is left out on purpose: it keeps grove-lab's MOTD
+# seasonal colors (the owner's choice, like the fastfetch art).
+@test "the Claude Code mod's fallback palette is Dark Medium" {
+  local missing
+  missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/grove-claude/grove/hooks/logic.ts") <(palette_hexes))"
+  [ -z "$missing" ] || { echo "logic.ts, not in Dark Medium: $missing"; false; }
+}
+
 # ghostty_value KEY: values of KEY in the Ghostty config, one per line.
 ghostty_value() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GROVE_RENDERED/ghostty/config"

@@ -1,0 +1,11 @@
+{
+  "name": "grove",
+  "owner": { "name": "Project Grove" },
+  "plugins": [
+    {
+      "name": "grove",
+      "source": "./grove",
+      "description": "Project Grove for Claude Code: a live Agents pane in the grove-lab MOTD look, colored by the current Everforest scheme"
+    }
+  ]
+}

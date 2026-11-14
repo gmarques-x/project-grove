@@ -1,0 +1,6 @@
+{
+  "name": "grove",
+  "version": "0.1.0",
+  "description": "Project Grove for Claude Code: a live Agents pane and status line in the current Everforest scheme",
+  "types": "./types/index.d.ts"
+}
