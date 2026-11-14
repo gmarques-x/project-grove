@@ -87,7 +87,9 @@ import Testing
                 "chevron.up", "xmark", "eject.fill", "trash", "icloud", "cloud", "rectangle", "rectangle.split.2x1",
                 "magnifyingglass", "exclamationmark.triangle.fill", "server.rack",
                 // Bluetooth devices.
-                "computermouse", "rectangle.and.hand.point.up.left", "dot.radiowaves.left.and.right"])
+                "computermouse", "rectangle.and.hand.point.up.left", "dot.radiowaves.left.and.right",
+                // The cloud dropdown.
+                "checkmark.icloud", "arrow.triangle.2.circlepath.icloud", "exclamationmark.icloud", "icloud.slash"])
     }
 
     /// The bar panels' outline is the palette's orange, in every scheme.

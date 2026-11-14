@@ -65,32 +65,9 @@ public enum WireGuardMenu {
         menuGone || windowsAfter > windowsBefore
     }
 
-    /// The dropdown's line after a fallback. It outlives the panel closing
-    /// (the fallback brings WireGuard forward, which puts the panel away):
-    /// the next opening shows it, the one after clears it, and so does a
-    /// new click on Manage Tunnels….
-    public struct Hint: Equatable, Sendable {
-        public private(set) var reason: Reason?
-        private var seen = false
-
-        public init() {}
-
-        public mutating func set(_ reason: Reason) {
-            self.reason = reason
-            seen = false
-        }
-
-        public mutating func clear() {
-            reason = nil
-            seen = false
-        }
-
-        /// The panel opened.
-        public mutating func opened() {
-            guard reason != nil else { return }
-            if seen { clear() } else { seen = true }
-        }
-    }
+    /// The dropdown's line after a fallback: the next opening shows it,
+    /// the one after clears it, and so does a new click on Manage Tunnels….
+    public typealias Hint = FallbackHint<Reason>
 
     /// How far the press got. Every step defaults to failed.
     public struct Steps: Equatable, Sendable {

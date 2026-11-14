@@ -145,6 +145,17 @@ public struct GroveIcon: View {
         /// A Bluetooth device of no kind Grove knows.
         case wireless = "dot.radiowaves.left.and.right"
 
+        // The cloud dropdown (spec 2026-11-14-bar-cloud): a provider's state,
+        // the bar's cloud icons' symbols; still looking is `cloud`.
+        /// Up to date (green).
+        case cloudSynced = "checkmark.icloud"
+        /// Files on their way (yellow).
+        case cloudSyncing = "arrow.triangle.2.circlepath.icloud"
+        /// A problem, or the provider's app not running (red).
+        case cloudProblem = "exclamationmark.icloud"
+        /// Grove Keys can't see the provider's files.
+        case cloudUnseen = "icloud.slash"
+
         /// The SF Symbol's name.
         public var symbol: String { rawValue }
     }

@@ -221,6 +221,7 @@ enum BarPanels {
     static let all: [BarPanelRegistration] = [
         ClockPanel.registration,
         SystemPanel.registration,
+        CloudPanel.registration,
         BatteryPanel.registration,
         WifiPanel.registration,
         LabVPNPanel.registration,
