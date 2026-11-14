@@ -101,7 +101,7 @@ public enum LabVPNStatus: Equatable, Sendable {
     /// "Disconnecting…", "Not connected", or how to set it up.
     public static func line(for status: LabVPNStatus, timeZone: TimeZone) -> String {
         switch status {
-        case .notSetUp: return "Import warden-air.conf into WireGuard as grove-lab"
+        case .notSetUp: return "Import the lab's tunnel profile into WireGuard as grove-lab"
         case .disconnected: return "Not connected"
         case .connecting: return "Connecting…"
         case .disconnecting: return "Disconnecting…"

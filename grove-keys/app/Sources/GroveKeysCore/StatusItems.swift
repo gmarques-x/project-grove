@@ -5,8 +5,8 @@ import Foundation
 // menu-bar tray to come. On macOS 27 every app's `kAXExtrasMenuBarAttribute`
 // is empty: the whole menu bar is drawn by one process, MenuBarAgent, whose
 // dialog window holds one group per item; inside each group is the owning
-// app's own element (its pid is the app's) that takes AXPress (research
-// 2026-11-14, artifacts/menu-bar-tray). What is pure about finding them is
+// app's own element (its pid is the app's) that takes AXPress (private
+// research notes, 2026-11-14). What is pure about finding them is
 // here; reading the tree is Grove Keys' (`StatusItemLocator`).
 
 public enum StatusItems {

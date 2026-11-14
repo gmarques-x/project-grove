@@ -112,7 +112,7 @@ struct LabVPNTests {
         #expect(line(.connecting) == "Connecting…")
         #expect(line(.disconnecting) == "Disconnecting…")
         #expect(line(.disconnected) == "Not connected")
-        #expect(line(.notSetUp) == "Import warden-air.conf into WireGuard as grove-lab")
+        #expect(line(.notSetUp) == "Import the lab's tunnel profile into WireGuard as grove-lab")
     }
 
     @Test func theSwitch() {
