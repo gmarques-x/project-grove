@@ -40,7 +40,7 @@ All chosen by the owner on 2026-11-12, from options put to him.
 | Active pane | The 1 pt line over its tab strip is green; the other pane's selection is quieter | One line, no new shape. A green outline round the pane would read as the focus box. |
 | Sidebar | Sections with fine-print captions (Favourites, iCloud, Locations); folders in one colour | Colour per place would be colour without a meaning. |
 | Rows | 24 pt, as a sidebar row and a tab; name at 12 pt, the other columns at 11 pt in the quiet colour | One rhythm in the window (drawn as the recommended option; not picked apart from the others). |
-| Folder icon | Solid, in the palette's blue | The colour a terminal lists directories in (drawn as the recommended option). |
+| Folder icon | Solid, in the palette's orange (was blue; the owner's change, 2026-11-14) | `FolderInk` in GroveExplorerCore; the list, sidebar and path bar all use it. |
 | Kind of app | An ordinary app that is opened and quit, in ⌘Tab like any other; no menu-bar item, no login agent | It has nothing to do while closed. |
 
 Taken from the owner's recorded Finder setup (`artifacts/finder-changes.md`) as the defaults: new windows on Home; folders on top; all extensions shown; folder sizes calculated; path bar and status bar always there; the filter looks in the current folder; sidebar favourites Applications, Home, Developer, Documents, Downloads; iCloud Drive; disks.
@@ -243,7 +243,7 @@ Links: `groveexplorer://open?path=<percent-encoded path>` opens that folder in a
 ## 10. Icons
 
 `IconKind` decides, in this order:
-1. A folder: the Grove folder, one solid shape in the palette's blue (a `Shape`, as `PineShape` is), with a small mark cut out of it for the known ones (Home, Developer, Documents, Downloads, Applications, Desktop). In the mock-ups the marks for Developer and Documents were blobs at 16 pt: each mark is redrawn as a few strokes on the pixel grid and accepted only when it reads at list size in a render. A package is not a folder.
+1. A folder: the Grove folder, one solid shape in the palette's orange (`FolderInk`; blue until 2026-11-14) (a `Shape`, as `PineShape` is), with a small mark cut out of it for the known ones (Home, Developer, Documents, Downloads, Applications, Desktop). In the mock-ups the marks for Developer and Documents were blobs at 16 pt: each mark is redrawn as a few strokes on the pixel grid and accepted only when it reads at list size in a render. A package is not a folder.
 2. An app, a volume, an alias to one, or a file with its own custom icon: the macOS icon (`NSWorkspace.icon(forFile:)`), cached per path.
 3. A name or extension Grove Icons knows: its glyph in its colour, dark or light set by the scheme. One rule of Grove Explorer's own on top of the set: a file's extension wins over its name, so README.md, CHANGELOG.md and notes.md all get the Markdown glyph (the set gives each a different one by name, which reads as noise in a list). A disk image keeps its macOS icon. The map and the font are the ones the VS Code theme uses (`grove-dotfiles/config/vscode/grove-icons/`); the module copies them into the app's resources, and the font is registered for the process only.
 4. Anything else: the macOS icon for its type, cached per extension.

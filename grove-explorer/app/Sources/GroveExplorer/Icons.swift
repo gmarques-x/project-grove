@@ -170,13 +170,13 @@ struct FolderShape: Shape {
     func path(in rect: CGRect) -> Path { Path(FolderPath.path(mark: mark, in: rect)) }
 }
 
-/// The Grove folder in the palette's blue, in an icon cell.
+/// The Grove folder in its ink (`FolderInk`: the scheme's orange), in an icon cell.
 struct FolderIcon: View {
     var mark = FolderMark.none
     @Environment(\.theme) private var theme
 
     var body: some View {
-        FolderShape(mark: mark).fill(Color(theme.blue))
+        FolderShape(mark: mark).fill(Color(FolderInk.color(in: theme)))
             .frame(width: IconMetrics.cell, height: IconMetrics.cell)
             .accessibilityHidden(true)
     }
@@ -199,7 +199,7 @@ enum EntryIcon {
         case .folder(let mark):
             guard let context = NSGraphicsContext.current?.cgContext else { return }
             context.addPath(FolderPath.path(mark: mark, in: rect))
-            context.setFillColor(NSColor(theme.blue).withAlphaComponent(opacity).cgColor)
+            context.setFillColor(NSColor(FolderInk.color(in: theme)).withAlphaComponent(opacity).cgColor)
             context.fillPath()
         case .glyph(let glyph):
             FileGlyph.draw(glyph, in: rect, opacity: dimmed ? IconMetrics.hiddenGlyphOpacity : 1)

@@ -1,4 +1,5 @@
 import Foundation
+import GroveThemesCore
 
 /// One character of the Grove Icons font and the colour it is drawn in.
 public struct Glyph: Equatable, Sendable {
@@ -209,4 +210,11 @@ private struct Theme: Decodable {
         light = try container.decodeIfPresent(Tables.self, forKey: .light)
         tables = try Tables(from: decoder)
     }
+}
+
+/// The Grove folder's colour: the scheme's orange (the owner's pick,
+/// 2026-11-14; it was the palette's blue). The list, the sidebar and the path
+/// bar all draw folders in it.
+public enum FolderInk {
+    public static func color(in theme: ThemeColors) -> RGB { theme.orange }
 }
