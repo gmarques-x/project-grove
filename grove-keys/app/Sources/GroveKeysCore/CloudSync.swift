@@ -103,7 +103,8 @@ public enum CloudItemState: Equatable, Sendable {
             self = .uploading
         } else if values.isDownloading {
             self = .downloading
-        } else if values.isUbiquitous && !values.isUploaded {
+        } else if values.isUbiquitous && !values.isUploaded && values.downloadingStatus != .notDownloaded {
+            // An online-only file can't hold a local edit waiting to upload.
             self = .notUploaded
         } else {
             self = .settled
@@ -262,6 +263,16 @@ public struct CloudPending: Sendable {
     /// The item left: settled, deleted or now ignored.
     public mutating func settle(_ url: URL) {
         items[Self.key(url)] = nil
+    }
+
+    /// The item left, and anything that was in it (a folder removed). An
+    /// item in the set is a file, so it ends there; otherwise one pass over
+    /// the set, unsorted.
+    public mutating func settle(under url: URL) {
+        let key = Self.key(url)
+        guard items.removeValue(forKey: key) == nil else { return }
+        let prefix = key.hasSuffix("/") ? key : key + "/"
+        items = items.filter { !$0.key.hasPrefix(prefix) }
     }
 
     /// Pending items unchanged for 30 minutes become problems. True when one did.

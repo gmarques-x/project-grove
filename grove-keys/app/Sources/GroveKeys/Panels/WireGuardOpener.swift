@@ -141,7 +141,7 @@ enum WireGuardOpener {
     /// The menu under a status item while it is open: the item's child, or
     /// (an item reached through MenuBarAgent) the app's.
     private static func openMenu(of item: AXUIElement, app: AXUIElement) -> AXUIElement? {
-        (children(item) + children(app)).first { string($0, kAXRoleAttribute) == kAXMenuRole }.map(timed)
+        (children(item) + children(app)).map(timed).first { string($0, kAXRoleAttribute) == kAXMenuRole }
     }
 
     private static func cancel(_ menu: AXUIElement) {

@@ -250,7 +250,7 @@ enum OneDriveSettingsOpener {
 
     /// The menu under an element (a status item, a menu item, a button) while it is open.
     private static func openMenu(under element: AXUIElement) -> AXUIElement? {
-        children(element).first { string($0, kAXRoleAttribute) == kAXMenuRole }.map(timed)
+        children(element).map(timed).first { string($0, kAXRoleAttribute) == kAXMenuRole }
     }
 
     /// The menu an item or button opened: its child, or (an item reached
@@ -269,7 +269,7 @@ enum OneDriveSettingsOpener {
     }
 
     private static func windows(_ app: AXUIElement) -> [AXUIElement] {
-        (value(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []
+        ((value(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []).map(timed)
     }
 
     /// The element, each message to it limited to `messaging` seconds.

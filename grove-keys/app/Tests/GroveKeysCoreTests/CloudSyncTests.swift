@@ -51,6 +51,21 @@ struct CloudItemStateTests {
         #expect(CloudItemState(values(status: .downloaded)) == .settled)
     }
 
+    @Test func anOnlineOnlyFileIsNeverNotUploaded() {
+        // A dataless file can't hold a local edit waiting to upload, whatever
+        // "uploaded" says.
+        #expect(CloudItemState(values(uploaded: false, status: .notDownloaded)) == .settled)
+        #expect(!CloudItemState(values(uploaded: false, status: .notDownloaded)).isPending)
+        // Unknown status (nil) or a local copy still counts.
+        #expect(CloudItemState(values(uploaded: false, status: nil)) == .notUploaded)
+        #expect(CloudItemState(values(uploaded: false, status: .downloaded)) == .notUploaded)
+        // Its errors and conflicts are still problems; an upload under way still counts.
+        #expect(CloudItemState(values(uploaded: false, status: .notDownloaded, uploadError: "Upload failed"))
+            == .problem("Upload failed"))
+        #expect(CloudItemState(values(uploaded: false, status: .notDownloaded, conflicts: true)).isProblem)
+        #expect(CloudItemState(values(uploading: true, uploaded: false, status: .notDownloaded)) == .uploading)
+    }
+
     @Test func errorsAndConflictsAreProblems() {
         #expect(CloudItemState(values(uploading: true, uploadError: "Upload failed")) == .problem("Upload failed"))
         #expect(CloudItemState(values(downloadError: "Download failed")) == .problem("Download failed"))
@@ -121,6 +136,22 @@ struct CloudIgnoreTests {
 private func expired(_ pending: inout CloudPending, _ now: Date) -> Bool { pending.expire(at: now) }
 
 struct CloudPendingTests {
+    @Test func settleUnderTakesTheItemAndWhatWasInIt() {
+        var pending = CloudPending()
+        for path in ["Docs/a.txt", "Docs/Sub/b.txt", "Docs2/c.txt", "d.txt"] {
+            pending.update(file(oneDrive, path), root: oneDrive.url, state: .uploading, at: t0)
+        }
+        // A file: just itself.
+        pending.settle(under: file(oneDrive, "d.txt"))
+        #expect(Set(pending.entries.map(\.url.lastPathComponent)) == ["a.txt", "b.txt", "c.txt"])
+        // A folder not in the set: everything below it, not a sibling sharing its prefix.
+        pending.settle(under: file(oneDrive, "Docs"))
+        #expect(pending.entries.map(\.url.lastPathComponent) == ["c.txt"])
+        // Nothing there: nothing changes.
+        pending.settle(under: file(oneDrive, "Gone"))
+        #expect(pending.count == 1)
+    }
+
     @Test func settledItemsNeverJoinAndLeaveWhenTheySettle() {
         var pending = CloudPending()
         let a = file(oneDrive, "Docs/a.txt")

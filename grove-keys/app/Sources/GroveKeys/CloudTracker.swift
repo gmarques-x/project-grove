@@ -560,11 +560,7 @@ final class CloudEngine: @unchecked Sendable {
 
     /// The item, and anything that was in it, left the set.
     private func settle(under url: URL) {
-        let path = url.standardizedFileURL.path
-        pending.settle(url)
-        for entry in pending.entries where entry.url.standardizedFileURL.path.hasPrefix(path + "/") {
-            pending.settle(entry.url)
-        }
+        pending.settle(under: url)
     }
 
     private func access(_ place: CloudProviders.CloudPlace, running: Set<String>) -> CloudProviderAccess {

@@ -337,7 +337,7 @@ public enum OneDriveSettings {
         public var trusted = false
         /// OneDrive was running (after a launch and a short wait).
         public var running = false
-        /// Items in OneDrive's status bar (`kAXExtrasMenuBarAttribute`).
+        /// OneDrive's status items (`StatusItemLocator`: on macOS 27 through MenuBarAgent).
         public var statusItems = 0
         /// One of them opened a menu or a window.
         public var opened = false

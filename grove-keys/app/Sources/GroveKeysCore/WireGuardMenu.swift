@@ -75,7 +75,7 @@ public enum WireGuardMenu {
         public var trusted = false
         /// WireGuard was running (after a launch and a short wait).
         public var running = false
-        /// Items in WireGuard's status bar (`kAXExtrasMenuBarAttribute`).
+        /// WireGuard's status items (`StatusItemLocator`: on macOS 27 through MenuBarAgent).
         public var statusItems = 0
         /// One of them opened a menu.
         public var menuOpened = false
