@@ -1,0 +1,139 @@
+import Foundation
+import GroveThemesCore
+
+// The bar's tray (spec 2026-11-14-bar-tray-design): other apps' menu-bar
+// items, listed in a panel, with a count on the bar. The rules live here;
+// reading the tree and pressing items is Grove Keys' (`StatusItemLocator`).
+
+/// One status item, as read from MenuBarAgent's tree.
+public struct TrayItem: Equatable, Sendable {
+    public var bundleID: String
+    public var appName: String
+    public var pid: pid_t
+    public var identifier: String?
+    public var title: String?
+    public var description: String?
+    public var help: String?
+    /// The item's left edge on screen: the order.
+    public var x: Double
+
+    public init(bundleID: String, appName: String, pid: pid_t, identifier: String? = nil, title: String? = nil,
+                description: String? = nil, help: String? = nil, x: Double) {
+        self.bundleID = bundleID
+        self.appName = appName
+        self.pid = pid
+        self.identifier = identifier
+        self.title = title
+        self.description = description
+        self.help = help
+        self.x = x
+    }
+
+    /// SketchyBar is a command-line tool: no bundle id to go by, so its
+    /// process name.
+    public var isSketchyBar: Bool {
+        appName.lowercased() == "sketchybar" || bundleID.lowercased().contains("sketchybar")
+    }
+}
+
+public enum TrayItems {
+    /// Never hidden by default: Grove's own apps and AeroSpace.
+    public static let defaultHidden: Set<String> = ["com.projectgrove.keys", "com.projectgrove.themes", "bobko.aerospace"]
+
+    /// Every item except those of MenuBarAgent itself, any `com.apple.`
+    /// app and SketchyBar, left to right.
+    public static func shown(_ items: [TrayItem]) -> [TrayItem] {
+        items.filter {
+            $0.bundleID != StatusItems.agentBundleID && !$0.bundleID.hasPrefix("com.apple.") && !$0.isSketchyBar
+        }.sorted { $0.x < $1.x }
+    }
+
+    private static func present(_ text: String?) -> String? {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return text
+    }
+
+    /// `<bundleID>#<AXIdentifier>` when the identifier is non-empty and
+    /// differs from the item's title and description (a status text as the
+    /// identifier changes with it); else `<bundleID>#<index>` among that
+    /// app's items, left to right.
+    public static func key(_ item: TrayItem, among: [TrayItem]) -> String {
+        if let id = present(item.identifier), id != present(item.title), id != present(item.description) {
+            return "\(item.bundleID)#\(id)"
+        }
+        let mine = among.filter { $0.bundleID == item.bundleID }.sorted { $0.x < $1.x }
+        let index = mine.firstIndex { $0.pid == item.pid && $0.x == item.x } ?? 0
+        return "\(item.bundleID)#\(index)"
+    }
+
+    /// The row's text: title, then description, then help; the first that
+    /// is there and isn't the app's name.
+    public static func text(_ item: TrayItem) -> String? {
+        let name = item.appName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return [item.title, item.description, item.help].lazy.compactMap(present).first { $0.lowercased() != name }
+    }
+
+    /// Visible and hidden: an item is hidden by its key, or by its bare
+    /// bundle id (the defaults are whole apps). Keys are worked out among
+    /// all the items.
+    public static func split(_ items: [TrayItem], hidden: Set<String>) -> (visible: [TrayItem], hidden: [TrayItem]) {
+        var visible: [TrayItem] = []
+        var away: [TrayItem] = []
+        for item in items {
+            if hidden.contains(item.bundleID) || hidden.contains(key(item, among: items)) { away.append(item) } else { visible.append(item) }
+        }
+        return (visible, away)
+    }
+
+    /// The bar's number: the visible items.
+    public static func count(visible: [TrayItem]) -> Int { visible.count }
+}
+
+/// `$GROVE_STATE/tray-hidden`: one key per line. Grove Keys writes it.
+public enum TrayHiddenFile {
+    public static func url(environment: [String: String], home: URL) -> URL {
+        StatePath.url(environment: environment, home: home)
+            .deletingLastPathComponent().appendingPathComponent("tray-hidden")
+    }
+
+    /// Missing (or unreadable): the defaults.
+    public static func read(_ url: URL) -> Set<String> {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return TrayItems.defaultHidden }
+        return Set(text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty })
+    }
+
+    /// Sorted, one per line.
+    public static func write(_ keys: Set<String>, to url: URL) throws {
+        let text = keys.sorted().map { $0 + "\n" }.joined()
+        try writeAtomically(Data(text.utf8), to: url)
+    }
+}
+
+/// The bar's tray: `$GROVE_STATE/tray`, one line, the count. The bar's
+/// `tray` item reads it; no file shows the symbol without a count.
+public enum TrayBarFile {
+    public static func url(environment: [String: String], home: URL) -> URL {
+        StatePath.url(environment: environment, home: home)
+            .deletingLastPathComponent().appendingPathComponent("tray")
+    }
+
+    /// Writes the count unless the file holds it; nil removes the file.
+    /// True when the file changed, so the bar is told only then.
+    @discardableResult
+    public static func update(_ count: Int?, at url: URL) throws -> Bool {
+        guard let count else {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch CocoaError.fileNoSuchFile {
+                return false
+            }
+            return true
+        }
+        let line = "\(count)\n"
+        guard (try? String(contentsOf: url, encoding: .utf8)) != line else { return false }
+        try writeAtomically(Data(line.utf8), to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return true
+    }
+}
