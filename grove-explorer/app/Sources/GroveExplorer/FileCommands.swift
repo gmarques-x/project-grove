@@ -269,7 +269,7 @@ extension AppModel {
     /// Every AppleScript is made and run on this one queue, never on the
     /// main thread: the window doesn't wait for Finder, nor for macOS's
     /// question about controlling it.
-    private static let scripts = DispatchQueue(label: "com.projectgrove.explorer.scripts")
+    private static let scripts = AppleScriptFinderTrash.queue
 
     /// ⌘I: Finder's information windows for the selected items, ten at
     /// most, by one script; for the folder itself with nothing selected.

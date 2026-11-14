@@ -221,7 +221,7 @@ The shares are kept in `~/.config/grove-explorer/explorer.local.toml` as `[serve
 
 ## What macOS will ask
 
-The first time you open each of these, macOS asks whether Grove Explorer may read it: **Desktop**, **Documents**, **Downloads**, **iCloud Drive**, **a disk you plugged in**, and **a network disk**. Allow each one you want to browse; each is asked once. The first ⌘I asks whether Grove Explorer may control Finder, which is how Get Info is shown.
+The first time you open each of these, macOS asks whether Grove Explorer may read it: **Desktop**, **Documents**, **Downloads**, **iCloud Drive**, **a disk you plugged in**, and **a network disk**. Allow each one you want to browse; each is asked once. The first ⌘I asks whether Grove Explorer may control Finder, which is how Get Info is shown. Items in iCloud Drive and other cloud folders go to the Trash through Finder, so the first ⌘⌫ there asks whether Grove Explorer may control Finder, if ⌘I hasn't asked already.
 
 If you refuse, that folder says which permission is missing; press ↩ there (or click the button) for Privacy Settings, where you can change your mind under Privacy & Security › Files and Folders. Grove Explorer does not ask for Full Disk Access; without it, a few protected folders (Mail, Safari, the Trash) cannot be read.
 

@@ -56,7 +56,7 @@ The signature matters for the same reason as Grove Keys': macOS ties the folders
 
 ## Permissions
 
-Grove Explorer asks for no permission up front. macOS asks once for each protected place the first time you open it (Desktop, Documents, Downloads, iCloud Drive, a disk you plug in, a network disk), and the first ⌘I asks whether Grove Explorer may control Finder, which shows Get Info. A refused folder says which permission is missing, with a button for Privacy Settings. It does not ask for Full Disk Access.
+Grove Explorer asks for no permission up front. macOS asks once for each protected place the first time you open it (Desktop, Documents, Downloads, iCloud Drive, a disk you plug in, a network disk), and the first ⌘I asks whether Grove Explorer may control Finder, which shows Get Info. Items in iCloud Drive and other cloud folders go to the Trash through Finder, so the first ⌘⌫ there asks whether Grove Explorer may control Finder, if ⌘I hasn't asked already. A refused folder says which permission is missing, with a button for Privacy Settings. It does not ask for Full Disk Access.
 
 ## The package
 

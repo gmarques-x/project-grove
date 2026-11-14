@@ -1219,6 +1219,122 @@ private final class Sandbox: @unchecked Sendable {
         #expect(box.text(file) == "new")
     }
 
+    // MARK: Cloud items, through Finder
+
+    /// A file manager whose Trash refuses, as macOS refuses an app without
+    /// the File Provider permission.
+    private final class NoPermissionTrash: FileManager, @unchecked Sendable {
+        override func trashItem(
+            at url: URL, resultingItemURL outResultingURL: AutoreleasingUnsafeMutablePointer<NSURL?>?
+        ) throws {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+    }
+
+    /// Finder, as the tests have it: it records what it is asked about and
+    /// gives `answer`. On success it moves the item to the answer's URL, as
+    /// Finder moves it to the Trash.
+    private final class FakeFinder: FinderTrash, @unchecked Sendable {
+        let answer: Result<URL, FinderTrashError>
+        let asked = Locked<[URL]>([])
+
+        init(_ answer: Result<URL, FinderTrashError>) { self.answer = answer }
+
+        func trash(_ url: URL) -> Result<URL, FinderTrashError> {
+            asked.change { $0.append(url) }
+            if case let .success(inTrash) = answer {
+                try? FileManager.default.createDirectory(
+                    at: inTrash.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? FileManager.default.moveItem(at: url, to: inTrash)
+            }
+            return answer
+        }
+    }
+
+    /// A home of the box's own, with an iCloud Drive folder in it.
+    private func cloudHome() throws -> (home: URL, drive: URL) {
+        let home = box.path("home")
+        let drive = try box.makeFolder(at: home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs"))
+        return (home, drive)
+    }
+
+    private func cloudRunner(_ finder: FakeFinder, home: URL) -> OperationRunner {
+        OperationRunner(fileManager: NoPermissionTrash(), finder: finder, home: home)
+    }
+
+    @Test func cloudItemGoesToTheTrashThroughFinder() async throws {
+        let (home, drive) = try cloudHome()
+        let file = try box.makeFile(at: drive.appendingPathComponent("notes.md"), Data("cloud".utf8))
+        let trashURL = box.path("Trash/notes.md")
+        let finder = FakeFinder(.success(trashURL))
+
+        let outcome = await box.run(.trash(items: [file]), on: cloudRunner(finder, home: home))
+
+        #expect(outcome.changes == [.trashed(original: file, inTrash: trashURL)])
+        #expect(outcome.failures == [])
+        #expect(finder.asked.value == [file])
+        #expect(box.text(trashURL) == "cloud")
+    }
+
+    @Test func localPermissionErrorDoesNotAskFinder() async throws {
+        let (home, _) = try cloudHome()
+        let file = try box.makeFile("src/notes.md", "local")
+        let finder = FakeFinder(.success(box.path("Trash/notes.md")))
+
+        let outcome = await box.run(.trash(items: [file]), on: cloudRunner(finder, home: home))
+
+        #expect(outcome.changes == [])
+        #expect(outcome.failures == [ItemFailure(url: file, reason: "you don't have permission")])
+        #expect(finder.asked.value == [])
+        #expect(box.text(file) == "local")
+    }
+
+    /// The reason a cloud item fails with, when Finder answers `answer`.
+    private func cloudFailure(_ answer: FinderTrashError) async throws -> [ItemFailure] {
+        let (home, drive) = try cloudHome()
+        let file = try box.makeFile(at: drive.appendingPathComponent("notes.md"), Data("cloud".utf8))
+        let finder = FakeFinder(.failure(answer))
+        let outcome = await box.run(.trash(items: [file]), on: cloudRunner(finder, home: home))
+        #expect(outcome.changes == [])
+        #expect(finder.asked.value == [file])
+        #expect(outcome.failures.map(\.url) == [file])
+        #expect(box.text(file) == "cloud")
+        return outcome.failures
+    }
+
+    @Test func finderNotAllowedSaysSo() async throws {
+        let failures = try await cloudFailure(.notAllowed)
+        #expect(failures.map(\.reason) == [CloudTrash.notAllowed])
+    }
+
+    @Test func finderOtherErrorSaysSo() async throws {
+        let failures = try await cloudFailure(.failed("boom"))
+        #expect(failures.map(\.reason) == [CloudTrash.finderFailed("boom")])
+    }
+
+    @Test func finderUnknownLocation() async throws {
+        let failures = try await cloudFailure(.unknownLocation)
+        #expect(failures.map(\.reason) == ["it is in the Trash, but where there is not known"])
+    }
+
+    @Test func replaceInCloudFolderUsesFinder() async throws {
+        let (home, drive) = try cloudHome()
+        let file = try box.makeFile("src/notes.md", "new")
+        let old = try box.makeFile(at: drive.appendingPathComponent("notes.md"), Data("old".utf8))
+        let trashURL = box.path("Trash/notes.md")
+        let finder = FakeFinder(.success(trashURL))
+
+        let outcome = await box.run(
+            .copy(items: [file], to: drive), on: cloudRunner(finder, home: home), choice: .replace)
+
+        #expect(outcome.failures == [])
+        #expect(outcome.changes == [.replaced(original: old, inTrash: trashURL), .created(old)])
+        #expect(finder.asked.value == [old])
+        #expect(box.text(trashURL) == "old")
+        #expect(box.text(old) == "new")
+        #expect(box.text(file) == "new")
+    }
+
     // MARK: The source of a move to another volume, and the app's partial copies
 
     /// A tree and a copy of it, made as a move to another volume makes
