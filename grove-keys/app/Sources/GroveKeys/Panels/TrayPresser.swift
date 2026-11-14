@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import GroveKeysCore
+import os
 
 /// Opens a tray item (spec 2026-11-14-bar-tray-design): `AXPress` on the
 /// app's element; "opened" is a new menu or window of the item's pid within
@@ -15,11 +16,20 @@ enum TrayPresser {
 
     /// How long a press gets to open something.
     private static let openWait: TimeInterval = 1
+    private static let log = Logger(subsystem: "com.projectgrove.keys", category: "tray")
 
     /// Presses `item` of `pid`'s app. `.broughtForward` also activates the
     /// app (on the main actor, after this returns); `.gone` touches nothing.
+    /// Called on the main thread by mistake: a debug build stops; a
+    /// release build logs it and brings the app forward without pressing
+    /// (up to two seconds of waits mustn't freeze Grove Keys).
     static func press(_ item: StatusItemLocator.Item, pid: pid_t) -> Outcome {
-        dispatchPrecondition(condition: .notOnQueue(.main))
+        assert(!Thread.isMainThread, "TrayPresser.press on the main thread")
+        if Thread.isMainThread {
+            log.error("press called on the main thread; brought forward without pressing")
+            MainActor.assumeIsolated { bringForward(pid) }
+            return .broughtForward
+        }
         let app = AX.app(pid)
         let outcome = TrayPress.run(
             wrapper: item.wrapper != nil, trusted: AX.trusted,
@@ -45,14 +55,14 @@ enum TrayPresser {
         NSRunningApplication(processIdentifier: pid).map { !$0.isTerminated } ?? false
     }
 
-    /// The ids of what `pid` has open now: its Accessibility windows, the
-    /// menus under the item or the app (a status item's menu shows as
-    /// either), and its on-screen windows as the window server lists them
-    /// (a popover that isn't in `AXWindows`).
-    private static func opened(app: AXUIElement, item: AXUIElement, pid: pid_t) -> [Int] {
+    /// What `pid` has open now: its Accessibility windows and the menus
+    /// under the item or the app (a status item's menu shows as either), by
+    /// element id; and apart from those, its on-screen windows as the window
+    /// server lists them (a popover that isn't in `AXWindows`).
+    private static func opened(app: AXUIElement, item: AXUIElement, pid: pid_t) -> TrayPress.Snapshot {
         let menus = (AX.children(item) + AX.children(app)).filter { AX.string($0, kAXRoleAttribute) == kAXMenuRole }
         let elements = (AX.windows(app) + menus).map { Int(bitPattern: UInt(CFHash($0))) }
-        return elements + serverWindows(pid)
+        return TrayPress.Snapshot(elements: elements, windows: serverWindows(pid))
     }
 
     /// `pid`'s on-screen window numbers; no Screen Recording needed for

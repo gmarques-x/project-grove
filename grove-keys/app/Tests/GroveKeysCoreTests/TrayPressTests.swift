@@ -7,6 +7,9 @@ import Testing
 private final class Pretend {
     var running = true
     var open: [Int] = [1, 2]
+    var windows: [Int] = [40]
+    /// A window server window the element's press adds.
+    var windowOnElement: [Int] = []
     /// What pressing the element, then the wrapper, adds.
     var opensOnElement: [Int] = []
     var opensOnWrapper: [Int] = []
@@ -18,11 +21,12 @@ private final class Pretend {
             wrapper: wrapper, trusted: trusted, isRunning: { self.running },
             snapshot: {
                 self.snapshots += 1
-                return self.open
+                return TrayPress.Snapshot(elements: self.open, windows: self.windows)
             },
             press: { onWrapper in
                 self.presses.append(onWrapper)
                 self.open += onWrapper ? self.opensOnWrapper : self.opensOnElement
+                if !onWrapper { self.windows += self.windowOnElement }
             },
             within: { probe in probe() })
     }
@@ -42,6 +46,23 @@ struct TrayPressTests {
         #expect(!TrayItems.opened(before: [1, 2], after: [1]))
         #expect(!TrayItems.opened(before: [], after: []))
         #expect(!TrayItems.opened(before: [3], after: [3, 3]))
+    }
+
+    @Test func elementIdsAndWindowNumbersAreKeptApart() {
+        // A new window whose number equals an element id already open is
+        // still new; so is a new menu whose id equals a window's number.
+        let before = TrayPress.Snapshot(elements: [7], windows: [9])
+        #expect(TrayItems.opened(before: before, after: TrayPress.Snapshot(elements: [7], windows: [9, 7])))
+        #expect(TrayItems.opened(before: before, after: TrayPress.Snapshot(elements: [7, 9], windows: [9])))
+        #expect(!TrayItems.opened(before: before, after: TrayPress.Snapshot(elements: [7], windows: [9])))
+        #expect(!TrayItems.opened(before: before, after: TrayPress.Snapshot(elements: [], windows: [])))
+    }
+
+    @Test func aNewServerWindowCountsAsOpened() {
+        let app = Pretend()
+        app.windowOnElement = [1]
+        #expect(app.run() == .opened)
+        #expect(app.presses == [false])
     }
 
     @Test func pressOfAGoneItemFails() {
@@ -93,7 +114,7 @@ struct TrayPressTests {
             snapshot: {
                 probes += 1
                 // The first read is "before"; the menu shows from the third.
-                return probes >= 3 ? [1, 2, 5] : [1, 2]
+                return TrayPress.Snapshot(elements: probes >= 3 ? [1, 2, 5] : [1, 2], windows: [])
             },
             press: { app.presses.append($0) },
             within: { probe in probe() })

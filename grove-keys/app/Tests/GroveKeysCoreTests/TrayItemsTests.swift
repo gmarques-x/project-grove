@@ -22,6 +22,26 @@ struct TrayItemsTests {
         #expect(TrayItems.shown(items).map(\.bundleID) == ["com.example.vpn"])
     }
 
+    @Test func anItemWithoutAnOwnerIsLeftOut() {
+        // Its app quit while the bar was read: no bundle id to go by.
+        let gone = item("", "", x: 5)
+        #expect(TrayItems.shown([gone, item("com.example.a", x: 9)]).map(\.bundleID) == ["com.example.a"])
+        #expect(!TrayItems.listable(gone))
+        #expect(!TrayItems.listable(item("com.example.b", "")))
+        #expect(TrayItems.listable(item("com.example.b", "B")))
+    }
+
+    @Test func anUnreadablePlaceSortsLastInTheTreesOrder() {
+        let items = [
+            item("com.example.u1", x: .nan), item("com.example.b", x: 20), item("com.example.u2", x: .infinity),
+            item("com.example.a", x: 10), item("com.example.u3", x: .nan),
+        ]
+        let order = ["com.example.a", "com.example.b", "com.example.u1", "com.example.u2", "com.example.u3"]
+        #expect(TrayItems.ordered(items).map(\.bundleID) == order)
+        #expect(TrayItems.shown(items).map(\.bundleID) == order)
+        #expect(TrayItems.unplaced.isNaN)
+    }
+
     @Test func orderIsLeftToRight() {
         let items = [item("com.example.c", x: 30), item("com.example.a", x: 10), item("com.example.b", x: 20)]
         #expect(TrayItems.shown(items).map(\.x) == [10, 20, 30])

@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import GroveKeysCore
+import os
 
 /// Another app's status items (menu-bar extras), as Accessibility elements
 /// to press: WireGuard's for "Manage Tunnels…", OneDrive's for its
@@ -25,6 +26,7 @@ enum StatusItemLocator {
 
     /// The most elements read from MenuBarAgent's windows.
     private static let readLimit = 600
+    private static let log = Logger(subsystem: "com.projectgrove.keys", category: "tray")
 
     /// `pid`'s items in the bar's order (left to right); empty when it has
     /// none, or Accessibility can't see them.
@@ -38,27 +40,35 @@ enum StatusItemLocator {
         return StatusItems.find(owner: pid, in: trees.map(\.node)).compactMap { item($0, in: trees) }
     }
 
-    /// Every item in the bar, whoever owns it, left to right by `x` (the
-    /// tree's own order isn't the bar's: MenuBarAgent lists Apple's extras
-    /// first), from one walk of MenuBarAgent's windows: the owner's bundle
+    /// Every item in the bar, whoever owns it, left to right by `x`
+    /// (`TrayItems.ordered`: the tree's own order isn't the bar's, as
+    /// MenuBarAgent lists Apple's extras first; an unreadable place goes
+    /// last), from one walk of MenuBarAgent's windows: the owner's bundle
     /// id and name from `NSRunningApplication`, the place from the item's
     /// `AXPosition`, and the row's texts (title, description, help) read
     /// only for an item the tray can show (`TrayItems.shown`; not Apple's,
     /// MenuBarAgent's or SketchyBar's). Empty when MenuBarAgent isn't
-    /// running (before macOS 27) or Accessibility can't see it. Never on
-    /// the main thread.
+    /// running (before macOS 27) or Accessibility can't see it. An item
+    /// whose app quit during the walk is left out. Never on the main thread:
+    /// a debug build stops there; a release build logs it and lists nothing.
     static func allItems() -> [(TrayItem, Item)] {
-        dispatchPrecondition(condition: .notOnQueue(.main))
+        assert(!Thread.isMainThread, "StatusItemLocator.allItems on the main thread")
+        if Thread.isMainThread {
+            log.error("allItems called on the main thread; nothing listed")
+            return []
+        }
         guard let trees = agentTrees() else { return [] }
-        var owners: [pid_t: (bundleID: String, name: String)] = [:]
+        var owners: [pid_t: (bundleID: String, name: String)?] = [:]
         let all = StatusItems.findAll(in: trees.map(\.node)).compactMap { owner, found -> (TrayItem, Item)? in
             guard let item = item(found, in: trees), let node = resolve(found.item, in: trees)?.node
             else { return nil }
             let app = owners[owner] ?? describe(owner)
             owners[owner] = app
+            guard let app else { return nil }
             var tray = TrayItem(bundleID: app.bundleID, appName: app.name, pid: owner,
                                 identifier: node.identifier,
-                                x: Double(AX.position(item.element)?.x ?? 0))
+                                x: AX.position(item.element).map { Double($0.x) } ?? TrayItems.unplaced)
+            guard TrayItems.listable(tray) else { return nil }
             if !TrayItems.shown([tray]).isEmpty {
                 tray.title = AX.string(item.element, kAXTitleAttribute)
                 tray.description = AX.string(item.element, kAXDescriptionAttribute)
@@ -66,18 +76,22 @@ enum StatusItemLocator {
             }
             return (tray, item)
         }
-        // Stable: two items at one place keep the tree's order.
-        return all.enumerated().sorted { ($0.element.0.x, $0.offset) < ($1.element.0.x, $1.offset) }
-            .map { $0.element }
+        // `ordered` is stable: the same order for the elements alongside.
+        let order = TrayItems.ordered(all.map(\.0))
+        var left = all
+        return order.compactMap { tray in
+            guard let at = left.firstIndex(where: { $0.0 == tray }) else { return nil }
+            return left.remove(at: at)
+        }
     }
 
     /// The owner as the tray names it; a process without a bundle (a
-    /// command-line tool) by its executable's name.
-    private static func describe(_ pid: pid_t) -> (bundleID: String, name: String) {
-        let app = NSRunningApplication(processIdentifier: pid)
-        let tool = app?.executableURL?.lastPathComponent ?? ""
-        let bundleID = app?.bundleIdentifier ?? tool
-        return (bundleID, app?.localizedName ?? (tool.isEmpty ? bundleID : tool))
+    /// command-line tool) by its executable's name. Nil when it has gone.
+    private static func describe(_ pid: pid_t) -> (bundleID: String, name: String)? {
+        guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return nil }
+        let tool = app.executableURL?.lastPathComponent ?? ""
+        let bundleID = app.bundleIdentifier ?? tool
+        return (bundleID, app.localizedName ?? (tool.isEmpty ? bundleID : tool))
     }
 
     private static func item(_ found: StatusItems.Found, in trees: [Tree]) -> Item? {

@@ -14,7 +14,8 @@ public struct TrayItem: Equatable, Sendable {
     public var title: String?
     public var description: String?
     public var help: String?
-    /// The item's left edge on screen: the order.
+    /// The item's left edge on screen: the order. `TrayItems.unplaced`
+    /// when it can't be read.
     public var x: Double
 
     public init(bundleID: String, appName: String, pid: pid_t, identifier: String? = nil, title: String? = nil,
@@ -40,12 +41,37 @@ public enum TrayItems {
     /// Hidden by default: Grove's own apps and AeroSpace.
     public static let defaultHidden: Set<String> = ["com.projectgrove.keys", "com.projectgrove.themes", "bobko.aerospace"]
 
+    /// The place of an item whose `AXPosition` can't be read: after the
+    /// others (any x that isn't finite sorts so).
+    public static let unplaced = Double.nan
+
+    /// An item with an owner to go by: its app was still running when the
+    /// bar was read (a bundle id, or a tool's name, and a name).
+    public static func listable(_ item: TrayItem) -> Bool {
+        present(item.bundleID) != nil && present(item.appName) != nil
+    }
+
+    /// Left to right; items without a place last, and items at one place,
+    /// in the order given (the tree's).
+    public static func ordered(_ items: [TrayItem]) -> [TrayItem] {
+        items.enumerated().sorted { a, b in
+            let (ax, bx) = (a.element.x, b.element.x)
+            switch (ax.isFinite, bx.isFinite) {
+            case (true, true): return ax != bx ? ax < bx : a.offset < b.offset
+            case (true, false): return true
+            case (false, true): return false
+            case (false, false): return a.offset < b.offset
+            }
+        }.map(\.element)
+    }
+
     /// Every item except those of MenuBarAgent itself, any `com.apple.`
-    /// app and SketchyBar, left to right.
+    /// app, SketchyBar, and any whose owner is gone, left to right.
     public static func shown(_ items: [TrayItem]) -> [TrayItem] {
-        items.filter {
-            $0.bundleID != StatusItems.agentBundleID && !$0.bundleID.hasPrefix("com.apple.") && !$0.isSketchyBar
-        }.sorted { $0.x < $1.x }
+        ordered(items.filter {
+            listable($0) && $0.bundleID != StatusItems.agentBundleID && !$0.bundleID.hasPrefix("com.apple.")
+                && !$0.isSketchyBar
+        })
     }
 
     private static func present(_ text: String?) -> String? {
@@ -60,7 +86,7 @@ public enum TrayItems {
     public static func key(_ item: TrayItem, among: [TrayItem]) -> String {
         var mine = among.filter { $0.bundleID == item.bundleID }
         if !mine.contains(where: { same($0, item) }) { mine.append(item) }
-        mine.sort { $0.x < $1.x }
+        mine = ordered(mine)
         if let id = present(item.identifier), id != present(item.title), id != present(item.description),
            mine.count(where: { present($0.identifier) == id }) == 1 {
             return "\(item.bundleID)#\(id)"
@@ -121,6 +147,12 @@ public enum TrayItems {
         let old = Set(before)
         return after.contains { !old.contains($0) }
     }
+
+    /// The same over a snapshot: element ids and window numbers each
+    /// against their own kind, so one can't hide the other.
+    public static func opened(before: TrayPress.Snapshot, after: TrayPress.Snapshot) -> Bool {
+        opened(before: before.elements, after: after.elements) || opened(before: before.windows, after: after.windows)
+    }
 }
 
 /// Pressing a tray item, the Opened rule (spec 2026-11-14-bar-tray-design):
@@ -129,6 +161,18 @@ public enum TrayItems {
 /// once, the same test; else the app is brought forward. What the presser
 /// (Grove Keys' `TrayPresser`) does is injected, so the order is tested here.
 public enum TrayPress {
+    /// What the item's app has open: ids of its Accessibility windows and
+    /// menus (`elements`), and its window server window numbers (`windows`).
+    public struct Snapshot: Equatable, Sendable {
+        public var elements: [Int]
+        public var windows: [Int]
+
+        public init(elements: [Int], windows: [Int]) {
+            self.elements = elements
+            self.windows = windows
+        }
+    }
+
     public enum Outcome: Equatable, Sendable {
         /// The element's press opened a menu or window.
         case opened
@@ -146,10 +190,10 @@ public enum TrayPress {
     ///     pressed or read.
     ///   - isRunning: the item's app is still running; asked first, before
     ///     any Accessibility call.
-    ///   - snapshot: the ids of the pid's windows and menus now.
+    ///   - snapshot: what the pid has open now.
     ///   - press: presses the element (false) or the wrapper (true).
     ///   - within: polls a probe until it is true or the second is up.
-    public static func run(wrapper: Bool, trusted: Bool, isRunning: () -> Bool, snapshot: () -> [Int],
+    public static func run(wrapper: Bool, trusted: Bool, isRunning: () -> Bool, snapshot: () -> TrayPress.Snapshot,
                            press: (_ wrapper: Bool) -> Void, within: (() -> Bool) -> Bool) -> Outcome {
         guard isRunning() else { return .gone }
         guard trusted else { return .broughtForward }
@@ -158,7 +202,7 @@ public enum TrayPress {
         }
     }
 
-    private static func pressing(wrapper: Bool, snapshot: @escaping () -> [Int], press: (_ wrapper: Bool) -> Void,
+    private static func pressing(wrapper: Bool, snapshot: @escaping () -> TrayPress.Snapshot, press: (_ wrapper: Bool) -> Void,
                                  within: (() -> Bool) -> Bool) -> Outcome {
         let before = snapshot()
         press(false)
