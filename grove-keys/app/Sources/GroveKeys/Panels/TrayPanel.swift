@@ -114,7 +114,7 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
     /// nothing opens, its app comes forward (`TrayPresser`). Live only.
     func open(_ id: String) {
         guard live, let row = list?.row(id), let listing, listing.items.indices.contains(row.index) else { return }
-        let target = Target(item: listing.items[row.index].1, pid: row.item.pid)
+        let target = Target(item: listing.items[row.index].1, pid: row.item.pid, bundleID: row.item.bundleID)
         let name = row.item.appName
         link.actions.leave {}
         let free = Self.pressing.withLock { busy -> Bool in
@@ -127,7 +127,7 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
             return
         }
         Self.pressQueue.async {
-            let outcome = TrayPresser.press(target.item, pid: target.pid)
+            let outcome = TrayPresser.press(target.item, pid: target.pid, bundleID: target.bundleID)
             Self.pressing.withLock { $0 = false }
             Self.log.info("pressed \(name, privacy: .public)'s item: \(String(describing: outcome), privacy: .public)")
         }
@@ -198,6 +198,7 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
     private struct Target: @unchecked Sendable {
         let item: StatusItemLocator.Item
         let pid: pid_t
+        let bundleID: String
     }
 
     // MARK: The sample

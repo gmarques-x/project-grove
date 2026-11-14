@@ -10,7 +10,6 @@ right_option = "characters" # the right ⌥ types @ € and the layout's other c
 launcher = "cmd-space" # ⌘Space opens the Grove Launcher (apps and the Grove menu), not Spotlight; "none" = no key
 
 [launch] # Hyper + key → app bundle ID, e.g. t = "com.mitchellh.ghostty"
-enter = "com.mitchellh.ghostty"
 
 [aerospace.main] # AeroSpace syntax; "hyper-" means cmd-ctrl-alt-shift-
 alt-slash = "layout tiles horizontal vertical"

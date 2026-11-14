@@ -228,6 +228,8 @@ public enum TrayPress {
         case opened
         /// The wrapper's did.
         case wrapperOpened
+        /// A real click on the item did (`StatusItemClick`).
+        case clicked
         /// Nothing opened (or no Accessibility): the app goes to the front.
         case broughtForward
         /// Its app isn't running any more: nothing pressed.
@@ -243,13 +245,30 @@ public enum TrayPress {
     ///   - snapshot: what the pid has open now.
     ///   - press: presses the element (false) or the wrapper (true).
     ///   - within: polls a probe until it is true or the second is up.
+    ///   - click: a real click on the item, the last try after both presses
+    ///     (`StatusItemClick`); false when it couldn't be made. Nil: none.
+    ///   - clickFirst: this app is known to open only on a click (it did
+    ///     before): the click goes first, so the presses' waits aren't
+    ///     spent; when it opens nothing the presses follow as usual.
     public static func run(wrapper: Bool, trusted: Bool, isRunning: () -> Bool, snapshot: () -> TrayPress.Snapshot,
-                           press: (_ wrapper: Bool) -> Void, within: (() -> Bool) -> Bool) -> Outcome {
+                           press: (_ wrapper: Bool) -> Void, within: (() -> Bool) -> Bool,
+                           click: (() -> Bool)? = nil, clickFirst: Bool = false) -> Outcome {
         guard isRunning() else { return .gone }
         guard trusted else { return .broughtForward }
         return withoutActuallyEscaping(snapshot) { snapshot in
-            pressing(wrapper: wrapper, snapshot: snapshot, press: press, within: within)
+            if clickFirst, let click, clicking(click, snapshot: snapshot, within: within) { return .clicked }
+            let pressed = pressing(wrapper: wrapper, snapshot: snapshot, press: press, within: within)
+            guard pressed == .broughtForward, !clickFirst, let click else { return pressed }
+            return clicking(click, snapshot: snapshot, within: within) ? .clicked : .broughtForward
         }
+    }
+
+    /// The click made and something opened within the wait.
+    private static func clicking(_ click: () -> Bool, snapshot: @escaping () -> TrayPress.Snapshot,
+                                 within: (() -> Bool) -> Bool) -> Bool {
+        let before = snapshot()
+        guard click() else { return false }
+        return within { TrayItems.opened(before: before, after: snapshot()) }
     }
 
     private static func pressing(wrapper: Bool, snapshot: @escaping () -> TrayPress.Snapshot, press: (_ wrapper: Bool) -> Void,
@@ -257,13 +276,14 @@ public enum TrayPress {
         let before = snapshot()
         press(false)
         if within({ TrayItems.opened(before: before, after: snapshot()) }) { return .opened }
-        guard wrapper else { return .broughtForward }
         // Something that opened just after the wait counts: pressing the
-        // wrapper now would only close it.
+        // wrapper (or clicking) now would only close it.
         if TrayItems.opened(before: before, after: snapshot()) { return .opened }
+        guard wrapper else { return .broughtForward }
         let again = snapshot()
         press(true)
         if within({ TrayItems.opened(before: again, after: snapshot()) }) { return .wrapperOpened }
+        if TrayItems.opened(before: again, after: snapshot()) { return .wrapperOpened }
         return .broughtForward
     }
 }
