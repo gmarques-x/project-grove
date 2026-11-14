@@ -361,6 +361,22 @@ final class GroveMenuListHost {
             observe(.default, NSWindow.willCloseNotification, object: owner)
             observe(.default, NSWindow.didResignKeyNotification, object: owner)
         }
+        // Another of the app's windows taking the keyboard (the launcher, a
+        // bar panel over a menu whose window never takes it): the keys are
+        // that window's now. Not the window that was key or main when the
+        // menu opened, which the app coming forward makes key again.
+        let wasKey = NSApp.keyWindow, wasMain = NSApp.mainWindow
+        let becameKey = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: nil
+        ) { [weak self, weak open, weak wasKey, weak wasMain] note in
+            nonisolated(unsafe) let window = note.object as? NSWindow
+            MainActor.assumeIsolated {
+                guard let self, let open, self.current === open, let window, window !== open.owner,
+                      window !== wasKey, window !== wasMain, !open.owns(window) else { return }
+                self.close(.ownerGone)
+            }
+        }
+        open.observers.append((.default, becameKey))
         observe(.default, NSApplication.didResignActiveNotification, .appDeactivated)
         observe(.default, NSApplication.didChangeScreenParametersNotification)
         observe(NSWorkspace.shared.notificationCenter, NSWorkspace.activeSpaceDidChangeNotification)

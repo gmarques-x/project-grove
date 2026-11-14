@@ -145,6 +145,9 @@ import Testing
 
     @Test func pressAndShowMenuOpenTheListAndItIsExpandedWhileUp() throws {
         dropdown()
+        var posted = 0
+        anchor.onPost = { if $0 == .valueChanged { posted += 1 } }
+        defer { #expect(posted == 4) }  // open, close, open, close
         #expect(anchor.accessibilityPerformPress())
         let open = try #require(host.current)
         #expect(open.model.levels.first?.rows.map(\.title) == ["Escape", "None"])

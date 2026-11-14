@@ -298,6 +298,22 @@ import Testing
         #expect(!host.isOpen && calls.closed == 1)
     }
 
+    @Test func anotherWindowTakingTheKeyboardClosesIt() throws {
+        let launcher = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 200), styleMask: [.titled],
+                                backing: .buffered, defer: false)
+        launcher.isReleasedWhenClosed = false
+        defer { launcher.close() }
+        popUp()
+        // Its own panels and its window becoming key close nothing.
+        let panel = try #require(host.current?.panels.first)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: panel)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        #expect(host.isOpen)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: launcher)
+        #expect(!host.isOpen)
+        #expect(calls.reasons == [.ownerGone])
+    }
+
     @Test func anotherWindowClosingLeavesItOpen() {
         popUp()
         let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled],

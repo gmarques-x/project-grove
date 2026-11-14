@@ -375,8 +375,9 @@ extension AccessibilityLive {
                 switch row.action {
                 case let .command(id):
                     return (row.title, row.enabled && (CommandTable.command(id)?.isEnabled(model) ?? false), false)
-                case .openWith: return (row.title, row.enabled, true)
-                case .showInFinder: return (row.title, row.enabled, false)
+                // As `ListMenu.row` has them: nothing to open, nothing to show.
+                case .openWith: return (row.title, row.enabled && !model.chosenItems.isEmpty, true)
+                case .showInFinder: return (row.title, row.enabled && !model.chosenItems.isEmpty, false)
                 }
             }
         let open = menus()
@@ -421,11 +422,100 @@ extension AccessibilityLive {
         if apps.contains(where: { text($0, "AXRole") != "AXMenuItem" }) { problem("an app of Open With is no menu item") }
         if menus().count != 2 { problem("with Open With open the server gives \(menus().count) menus, not 2") }
 
-        // Closed: nothing of it is left, and a key may open the next.
+        // Closed: nothing of it is left, a key may open the next, and the
+        // keyboard is where it was, in the list.
         GroveMenuList.close()
         settle()
         if GroveMenuList.isOpen || model.reach.menuIsUp { problem("closed, it is still up") }
         if !menus().isEmpty { problem("closed, the server still gives \(menus().count) menus") }
+        let table = checkFocus(after: "the menu", in: window, list: nil, app: app, problem)
+
+        // The menu of the list's empty space, with Show Hidden Items ticked:
+        // nothing selected, hidden items shown; both put back after.
+        let side = model.browser.active, selection = model.selection(for: side), hidden = model.browser.showHidden
+        defer {
+            if model.browser.showHidden != hidden { model.toggleHidden() }
+            model.select(selection, in: side)
+            settle()
+        }
+        model.select([], in: side)
+        if !hidden { model.toggleHidden() }
+        settle()
+        model.showContextMenu()
+        settle()
+        guard let empty = menus().first, menus().count == 1 else {
+            problem("⌃Return with nothing selected opened \(menus().count) menus, not 1")
+            return result
+        }
+        let emptyRows = GroveExplorerCore.ContextMenu.items(selected: 0, showsHidden: true).compactMap { item in
+            if case let .row(row) = item { row } else { nil }
+        }
+        let emptyItems = list(empty)
+        if emptyItems.map({ text($0, "AXTitle") }) != emptyRows.map(\.title) {
+            problem("the empty space's items are \(emptyItems.map { text($0, "AXTitle") }), not \(emptyRows.map(\.title))")
+        }
+        for (item, row) in zip(emptyItems, emptyRows) {
+            let mark = text(item, "AXMenuItemMarkChar")
+            if mark != (row.checked ? "✓" : "") {
+                problem("“\(row.title)” has the mark “\(mark)”, not “\(row.checked ? "✓" : "")”")
+            }
+        }
+        if !emptyRows.contains(where: \.checked) { problem("the empty space's menu has no ticked row to check") }
+        GroveMenuList.close()
+        settle()
+        if !menus().isEmpty { problem("closed, the empty space's menu is still there") }
+        checkFocus(after: "the empty space's menu", in: window, list: table, app: app, problem)
         return result
     }
-}
+
+    /// After a menu closed: the keyboard is in the list it was opened
+    /// from (the window's first responder is that table, `list` the first
+    /// time), and the accessibility server's list is that same table (its
+    /// frame). The server's `AXFocusedUIElement` is checked when it gives
+    /// one: offscreen, in an app that isn't in front (the audit never
+    /// brings it there), the window can't be key, so it gives none.
+    @discardableResult
+    private static func checkFocus(after name: String, in window: NSWindow, list: NSTableView?,
+                                   app: AXUIElement, _ problem: (String) -> Void) -> NSTableView? {
+        func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
+            var value: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+            return value
+        }
+        func role(_ element: AXUIElement) -> String { (value(element, "AXRole") as? String) ?? "" }
+        guard let table = window.firstResponder as? NSTableView, list == nil || table === list else {
+            problem("after \(name) closed, the keyboard is in \(String(describing: window.firstResponder)), "
+                    + "not the list it was opened from")
+            return list
+        }
+        // The table's frame as the server gives frames: points from the main
+        // display's top-left corner.
+        let onScreen = window.convertToScreen(table.convert(table.bounds, to: nil))
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        let expected = CGRect(x: onScreen.minX, y: top - onScreen.maxY, width: onScreen.width, height: onScreen.height)
+        func lists(_ element: AXUIElement) -> [AXUIElement] {
+            if ["AXTable", "AXOutline"].contains(role(element)) { return [element] }
+            return ((value(element, "AXChildren") as? [AXUIElement]) ?? []).flatMap(lists)
+        }
+        let frames: [CGRect] = ((value(app, "AXWindows") as? [AXUIElement]) ?? []).flatMap(lists).compactMap { list in
+            var point = CGPoint.zero, size = CGSize.zero
+            guard let position = value(list, "AXPosition"), let extent = value(list, "AXSize"),
+                  AXValueGetValue(position as! AXValue, .cgPoint, &point),
+                  AXValueGetValue(extent as! AXValue, .cgSize, &size) else { return nil }
+            return CGRect(origin: point, size: size)
+        }
+        // The same column of the window: the server's frame and the view's
+        // differ by a few points in height (the server's is the clipped
+        // table's, with its edge), so the left, the width and an overlap.
+        let close = { (a: CGRect) in
+            abs(a.minX - expected.minX) <= 1 && abs(a.width - expected.width) <= 1 && a.intersects(expected)
+        }
+        if !frames.contains(where: close) {
+            problem("after \(name) closed, the server has no list where the focused table is (\(expected)); it has \(frames)")
+        }
+        if let focused = value(app, "AXFocusedUIElement"), CFGetTypeID(focused) == AXUIElementGetTypeID(),
+           !["AXTable", "AXOutline"].contains(role(focused as! AXUIElement)) {
+            problem("after \(name) closed, the server's focused element is \(role(focused as! AXUIElement)), not the list")
+        }
+        return table
+    }}

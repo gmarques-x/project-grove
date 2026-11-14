@@ -98,8 +98,19 @@ final class GroveMenuListAnchorView: NSView {
     var rows: () -> [GroveMenuListRow] = { [] }
     var onChoose: (String) -> Void = { _ in }
     var popUp: PopUp?
-    /// This view's menu is up (not another view's).
-    private(set) var menuOpen = false
+    /// This view's menu is up (not another view's). A dropdown tells
+    /// VoiceOver when that changes: AppKit has no expanded-changed
+    /// notification outside outline rows, so it is the value changing,
+    /// after which the expanded state is read again.
+    private(set) var menuOpen = false {
+        didSet {
+            guard menuOpen != oldValue, popUp != nil else { return }
+            NSAccessibility.post(element: self, notification: .valueChanged)
+            onPost?(.valueChanged)
+        }
+    }
+    /// Each notification posted (for tests).
+    var onPost: ((NSAccessibility.Notification) -> Void)?
     /// What the menu is popped up on (tests give one whose panels are never shown).
     var host: GroveMenuListHost = GroveMenuList.host
     // `nonisolated(unsafe)` for `deinit` only, which runs on the main thread

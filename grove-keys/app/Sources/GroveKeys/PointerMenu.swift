@@ -160,9 +160,11 @@ final class PointerMenu: NSObject {
                     self.opening += 1
                     guard handsBack, Self.handsBack(after: reason), let previous else { return }
                     // One turn later, and only if Grove Keys is still in
-                    // front: the user may have gone elsewhere meanwhile.
+                    // front and no other menu is up (one that replaced this
+                    // one would close as the app went back): the user may
+                    // have gone elsewhere meanwhile.
                     DispatchQueue.main.async {
-                        guard NSApp.isActive else { return }
+                        guard NSApp.isActive, !GroveMenuList.isOpen else { return }
                         NSRunningApplication(processIdentifier: previous)?.activate()
                     }
                 })
