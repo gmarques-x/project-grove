@@ -19,7 +19,7 @@
 ## Global Constraints
 - Work only in the worktree `~/Developer/project-grove-followups` (branch `followups`). The banner task is the exception: it works in the grove-lab clone named in Task 4. Never touch `~/Developer/project-grove`, because `~/.config` links into it. Never push.
 - Signed commits. If signing hangs, run `ssh-add --apple-load-keychain`. End each message with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Never write private paths into tracked files: `~/Developer/artifacts`, `/Users/<name>`, claude.ai links, or lab file names. Renders for the owner go to `~/Developer/artifacts/github-review/followups/`.
+- Never write private paths into tracked files: the owner's review folder, home-directory paths, claude.ai links, or lab file names. Renders for the owner go to the owner's review folder (outside the repo).
 - Every colour comes from the Everforest theme files, and the grove-ui skill applies to UI work.
 - The GroveKeys binary is never run. No task needs it.
 - Copy is fixed by the spec. The user-facing strings are:
@@ -111,22 +111,20 @@
   - build a `ThemesModel(client: GroveThemesClient(runner: SampleRunner(...)))` and await its first `list`;
   - host `GalleryView` at `GalleryView.width × GalleryView.height`, or `DropdownView` at the app's dropdown width, with the model in the environment;
   - write the PNG.
-- [ ] **Step 3: Build and render** both states in dark-medium and light-medium into `~/Developer/artifacts/github-review/followups/`. Then look at each PNG. Expected: the cards are filled, there's no error line, and nothing is cut off. Check that `--render bogus x.png` exits 1 with the usage line, and that no window or menu-bar item appeared during any of it.
+- [ ] **Step 3: Build and render** both states in dark-medium and light-medium into the owner's review folder (outside the repo). Then look at each PNG. Expected: the cards are filled, there's no error line, and nothing is cut off. Check that `--render bogus x.png` exits 1 with the usage line, and that no window or menu-bar item appeared during any of it.
 - [ ] **Step 4: Run** the full `swift test` for grove-themes/app. Expected: everything passes.
 - [ ] **Step 5: Copy** the two gallery PNGs into `assets/screenshots/`. Add the gallery to the Grove Themes README and as a third picture in the root README's Screenshots section, with a caption in the existing style.
 - [ ] **Step 6: Commit** `themes: --render draws the gallery and the dropdown from sample data; screenshots in the READMEs`.
 
 ### Task 4: grove-lab banner tree (separate repo, delivered as a patch)
 
-**Files:** in the clone `/private/tmp/claude-501/-Users-gmarques/83361b19-f217-44e8-9dfe-b8474091684b/scratchpad/review/grove-lab`, on its local branch `github-review`. That branch already has 4 commits, and you add the 5th.
+**Files:** in a read-only clone of the private grove-lab repo, outside this repo, on its local branch `github-review`. That branch already has 4 commits, and you add the 5th.
 - Modify: `assets/make-banner.swift` (the tree labels around :610, :667 and :750-752) and `assets/grove-lab-banner.png`
 
 - [ ] **Step 1: Get the fonts.** Courier Prime (SIL OFL) from Google Fonts' GitHub (`google/fonts`, `ofl/courierprime`) into a new, empty folder under the scratchpad. These are downloaded files: run no scripts from that folder.
 - [ ] **Step 2: Re-render the current banner unchanged** with `SRC=~/Developer/project-grove/assets/project-grove-banner.png ./make-banner.sh <fonts>`. That path is read-only for you. Compare it with the committed PNG, pixel-identical or near it. This proves the toolchain before anything is edited.
 - [ ] **Step 3: Edit the tree:**
-  - add **Forester** beside Canopy and Seedvault;
-  - split **DDI** into NIOS-X (ns1, ns2, dhcp1, dhcp2) and NIOS (nios1, nios2), keeping the hand-drawn style and spacing;
-  - add a **clients** leaf (client1-5).
+  - update the banner's topology tree to show every host in the lab today, keeping the hand-drawn style and spacing.
   - Don't change anything else on the banner. Re-render and look at it. It must be legible at GitHub's README width, so check a downscale to 900 px wide.
-- [ ] **Step 4: Commit** unsigned (`git -c commit.gpgsign=false`) as `assets: the banner's tree shows Forester, NIOS-X, NIOS and the clients`.
-- [ ] **Step 5: Re-export** with `git format-patch main..github-review -o ~/Developer/artifacts/github-review/grove-lab-patch/` (overwrite). Add a line to `APPLY.md`, and save before and after PNGs to `~/Developer/artifacts/github-review/followups/`.
+- [ ] **Step 4: Commit** unsigned (`git -c commit.gpgsign=false`) as `assets: the banner's tree shows every host`.
+- [ ] **Step 5: Re-export** with `git format-patch main..github-review -o <a patch folder in the owner's review folder>` (overwrite). Add a line to `APPLY.md`, and save before and after PNGs to the owner's review folder (outside the repo).

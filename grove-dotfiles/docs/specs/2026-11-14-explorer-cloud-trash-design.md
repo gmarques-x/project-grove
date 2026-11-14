@@ -7,7 +7,7 @@ Grove Explorer can't move any item in iCloud Drive to the Trash: it fails with "
 
 ## Root cause (measured on macOS 27.2)
 - Moving an item inside a File Provider domain (iCloud Drive in `~/Library/Mobile Documents`, and the `~/Library/CloudStorage` providers such as OneDrive) to the Trash needs the `kTCCServiceFileProviderDomain` permission. The system log says: `sandboxd rejected approval request from GroveExplorer for kTCCServiceFileProviderDomain (…): would require prompt`. The Trash call may not prompt, so the permission is never asked for and the call fails with `NSFileWriteNoPermissionError` (513).
-- The file's mode, whether it is downloaded, Intune tags and Full Disk Access make no difference. `FileManager.trashItem` and `NSWorkspace.recycle` both fail. A process started from a terminal works, because the terminal holds the permission.
+- The file's mode, whether it is downloaded, management tags and Full Disk Access make no difference. `FileManager.trashItem` and `NSWorkspace.recycle` both fail. A process started from a terminal works, because the terminal holds the permission.
 - Finder can do it: `tell application "Finder" to delete (POSIX file "…")` moves the item and returns the item in the Trash, whose POSIX path is known.
 - Moving the item back out of the Trash (Undo) and renaming items in iCloud Drive work from Explorer as they are. Only the move into the Trash is refused.
 - Another developer found the same refusal and the same fix: github.com/fum1h1ro/miata pull request 39.
