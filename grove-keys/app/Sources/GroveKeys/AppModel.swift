@@ -172,6 +172,9 @@ final class AppModel: ObservableObject {
         // Whether the cloud folders have finished syncing, for the bar's cloud
         // (FSEvents on each, a paced first pass on a thread of its own).
         CloudTracker.shared.start()
+        // The menu-bar tray's items and the bar's count of them (listed on
+        // launches, quits and the tray's opening; never on a timer).
+        TrayWatcher.shared.start()
         // The apps for the Grove Launcher, so its first opening has them.
         LauncherPanel.shared.refreshApps()
         // The window borders, hidden while Mission Control is up.
@@ -191,6 +194,7 @@ final class AppModel: ObservableObject {
         WifiNameWriter.shared.stop()
         BluetoothWriter.shared.stop()
         CloudTracker.shared.stop()
+        TrayWatcher.shared.stop()
         // Borders hidden for an overview come back before the app goes.
         BordersWatcher.shared.shutdown()
     }

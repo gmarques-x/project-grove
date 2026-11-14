@@ -24,6 +24,9 @@ SB_BLUETOOTH="${GROVE_STATE:-$HOME/.local/state/grove}/bluetooth"
 # The cloud, as Grove Keys follows the synced folders: checking, synced,
 # syncing <n> or problem (missing: Grove Keys isn't running).
 SB_CLOUD="${GROVE_STATE:-$HOME/.local/state/grove}/cloud"
+# The menu-bar tray, as Grove Keys lists the other apps' items: how many it
+# shows, one line (missing: Grove Keys isn't running or can't see them).
+SB_TRAY="${GROVE_STATE:-$HOME/.local/state/grove}/tray"
 
 # sb_cpu < `iostat -n 0 -c 2 -w 1`: used percentage (100 − idle) from the last
 # sample, which covers a whole second (top's single sample includes its own
@@ -120,6 +123,18 @@ sb_cloud() {
   esac
 }
 
+# sb_tray: the tray's count for the number Grove Keys keeps in $SB_TRAY (its
+# first line): "1" to "99", "99+" past that; nothing (the symbol alone) at
+# 0, for no file, one it can't read, or anything else.
+sb_tray() {
+  local line=""
+  [ -f "$SB_TRAY" ] && [ -r "$SB_TRAY" ] && IFS= read -r line < "$SB_TRAY"
+  case "$line" in
+    [1-9] | [1-9][0-9]) echo "$line" ;;
+    [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9][0-9]) echo "99+" ;;
+  esac
+}
+
 # sb_vpn_icon < `scutil --nc status "grove-lab"`: the VPN pill's icon for
 # the status on scutil's first line: vpn-on (Connected), vpn-connecting
 # (Connecting, Disconnecting), or vpn-off for Disconnected, no output (a
@@ -166,6 +181,7 @@ sb_pill() {
     bt) echo pill.wifi ;;
     vpn.lab) echo pill.vpn ;;
     cloud) echo pill.cloud ;;
+    tray) echo pill.tray ;;
     cpu | mem) echo pill.sys ;;
     ws.[1-9] | ws.[1-9].*) n="${1#ws.}"; echo "pill.ws.${n%%.*}" ;;
   esac

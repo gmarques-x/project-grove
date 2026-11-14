@@ -117,7 +117,7 @@ func drawRune(color: NSColor, connected: Bool = false, struck: Bool = false, to 
 for appearance in ["dark", "light"] {
     let c = palette("\(appearance)-medium")
     let blue = c["blue"]!, yellow = c["yellow"]!, green = c["green"]!, red = c["red"]!, aqua = c["aqua"]!, purple = c["purple"]!
-    let off = c["grey2"]!
+    let off = c["grey2"]!, fg = c["fg"]!
     // Wi-Fi: one, two or three arcs by signal; other ways of being online; off.
     for (level, value) in [(1, 0.2), (2, 0.5), (3, 1.0)] {
         draw("wifi", value: value, color: blue, to: "wifi-\(level)-\(appearance).png")
@@ -156,6 +156,8 @@ for appearance in ["dark", "light"] {
     draw("arrow.triangle.2.circlepath.icloud", color: yellow, to: "cloud-syncing-\(appearance).png")
     draw("exclamationmark.icloud", color: red, to: "cloud-problem-\(appearance).png")
     draw("icloud.slash", color: off, to: "cloud-off-\(appearance).png")
+    // The menu-bar tray: one symbol in the text's colour, no state.
+    draw("menubar.arrow.up.rectangle", color: fg, to: "tray-\(appearance).png")
     draw("cpu", color: aqua, to: "cpu-\(appearance).png")
     draw("memorychip", color: aqua, to: "mem-\(appearance).png")
 }

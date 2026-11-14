@@ -123,7 +123,7 @@ argb() {
 icon_names() {
   local i
   echo wifi-off eth vpn vol-mute cpu mem bt-off bt-on bt-connected vpn-off vpn-connecting vpn-on
-  echo cloud-checking cloud-synced cloud-syncing cloud-problem cloud-off
+  echo cloud-checking cloud-synced cloud-syncing cloud-problem cloud-off tray
   for i in 1 2 3; do echo "wifi-$i"; done
   for i in 0 1 2 3 4 5 6 7 8 9 10; do echo "vol-$i bolt-$i"; done
   for i in 0 1 2; do echo "bolt-low-$i"; done
@@ -154,9 +154,9 @@ icon_names() {
     esac
     grep -qF "to: \"$file\"" "$gen" || { echo "$name"; false; }
   done
-  # And nothing the bar doesn't use: twenty-one families.
+  # And nothing the bar doesn't use: twenty-two families.
   drawn="$(grep -oE 'to: "[a-z-]+' "$gen" | sed -e 's/to: "//' -e 's/-$//' | LC_ALL=C sort -u | tr '\n' ' ')"
-  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cloud-checking cloud-off cloud-problem cloud-synced cloud-syncing cpu eth mem vol vol-mute vpn vpn-connecting vpn-off vpn-on wifi wifi-off " ] || { echo "$drawn"; false; }
+  [ "$drawn" = "bolt bolt-low bt-connected bt-off bt-on cloud-checking cloud-off cloud-problem cloud-synced cloud-syncing cpu eth mem tray vol vol-mute vpn vpn-connecting vpn-off vpn-on wifi wifi-off " ] || { echo "$drawn"; false; }
   # The levels it loops over are the ones the plugins ask for.
   grep -q 'for step in 0...10' "$gen"
   grep -q 'if step <= 2' "$gen"
@@ -182,10 +182,11 @@ rc() {
   local want="gap.l0 grove gap.l1 " n
   for n in 1 2 3 4 5 6 7 8 9; do want+="ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end gap.ws.$n "; done
   [ "$left" = "${want}front_app " ] || { echo "$left"; false; }
-  # The first added is the rightmost: left to right, CPU and memory, the
-  # cloud, the grove-lab VPN, Wi-Fi and Bluetooth, sound, power, the clock.
-  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 vpn.lab gap.r5 cloud gap.r6 mem cpu " ] || { echo "$right"; false; }
-  [ "$(printf '%s' "$right" | tr ' ' '\n' | grep -v '^gap' | tr '\n' ' ')" = "clock battery volume bt wifi vpn.lab cloud mem cpu " ]
+  # The first added is the rightmost: left to right, the tray, CPU and
+  # memory, the cloud, the grove-lab VPN, Wi-Fi and Bluetooth, sound, power,
+  # the clock.
+  [ "$right" = "gap.r0 clock gap.r1 battery gap.r2 volume gap.r3 bt wifi gap.r4 vpn.lab gap.r5 cloud gap.r6 mem cpu gap.r7 tray " ] || { echo "$right"; false; }
+  [ "$(printf '%s' "$right" | tr ' ' '\n' | grep -v '^gap' | tr '\n' ' ')" = "clock battery volume bt wifi vpn.lab cloud mem cpu tray " ]
   calls | grep -q -- '--add event aerospace_workspace_change'
   calls | grep -q -- '--subscribe ws.1 aerospace_workspace_change'
   # A gap is empty room of a fixed width.
@@ -213,7 +214,7 @@ pills() {
   [ "$status" -eq 0 ]
   want="pill.grove grove"$'\n'
   for n in 1 2 3 4 5 6 7 8 9; do want+="pill.ws.$n ws.$n ws.$n.1 ws.$n.2 ws.$n.3 ws.$n.4 ws.$n.5 ws.$n.6 ws.$n.end"$'\n'; done
-  want+="pill.sys cpu mem"$'\n'"pill.cloud cloud"$'\n'"pill.vpn vpn.lab"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
+  want+="pill.tray tray"$'\n'"pill.sys cpu mem"$'\n'"pill.cloud cloud"$'\n'"pill.vpn vpn.lab"$'\n'"pill.wifi wifi bt"$'\n'"pill.volume volume"$'\n'"pill.battery battery"$'\n'"pill.clock clock"
   [ "$(pills)" = "$want" ] || { pills; false; }
   . "$CFG/colors.sh"
   [ "$TRANSPARENT" = 0x00000000 ]
@@ -252,7 +253,7 @@ pills() {
   rc
   local pair item width
   # JetBrains Mono 13 is 7.8 pt a character: each width fits the item's longest value.
-  for pair in cpu:32 mem:32 cloud:39 clock:134; do
+  for pair in cpu:32 mem:32 cloud:39 tray:24 clock:134; do
     item="${pair%%:*}"; width="${pair#*:}"
     calls | grep -qE -- "--set $item .*label.width=$width( |\$)" || { echo "$item"; false; }
   done
@@ -262,9 +263,11 @@ pills() {
   # The cloud's count, "2000+" at most, sits beside its icon, hidden until
   # there is one (cloud.sh): the pill is still while the count changes.
   calls | grep -qE -- "--set cloud .*label.drawing=off( |\$)"
+  # The tray's count, "99+" at most, the same way (tray.sh).
+  calls | grep -qE -- "--set tray .*label.drawing=off( |\$)"
   # The icons are images in a 22 pt slot, whatever the state; five items are an icon alone
   # (battery, wifi, bt, vpn.lab, volume).
-  for item in cpu mem cloud battery wifi bt vpn.lab volume; do
+  for item in cpu mem cloud tray battery wifi bt vpn.lab volume; do
     calls | grep -qE -- "--set $item icon.background.image=[^ ]+ icon.background.image.scale=0.5 icon.background.drawing=on icon.width=22 icon.padding_left=0 icon.padding_right=0\$" || { echo "$item icon"; false; }
   done
   for item in battery wifi bt vpn.lab volume; do
@@ -295,7 +298,8 @@ prop() {
   # beside Wi-Fi, the two padded as CPU and memory are: 32 more, 459; the
   # VPN's pill, an icon padded as the volume's, and its gap: 44 more, 503;
   # the cloud's, the same with its count hidden: 44 more, 547; with the
-  # count, its 39 pt label, 586).
+  # count, its 39 pt label, 586; the tray's, the same again: 44 more, 591;
+  # with both counts, its 24 pt label too, 654).
   local item total=0 w
   [ "$(prop cpu padding_right 5)" = 5 ]
   for item in $(calls | grep -oE -- '--add item [a-z_.0-9]+ right' | awk '{print $3}'); do
@@ -308,8 +312,8 @@ prop() {
     fi
     total=$((total + w))
   done
-  [ "$total" -eq 547 ] || { echo "$total"; false; }
-  [ $((total + 39)) -le 860 ]
+  [ "$total" -eq 591 ] || { echo "$total"; false; }
+  [ $((total + 39 + 24)) -le 860 ]
   # The built-in screen is 1920 pt wide with a ~200 pt notch in the middle:
   # the right side has ~860 pt.
   [ "$total" -le 860 ]
@@ -328,13 +332,13 @@ prop() {
 @test "sketchybar: clickable items subscribe to hover; only the app's name, in no pill, has a fill of its own" {
   rc
   local item
-  for item in grove front_app clock volume wifi bt vpn.lab cloud battery cpu mem; do
+  for item in grove front_app clock volume wifi bt vpn.lab cloud tray battery cpu mem; do
     calls | grep -qE -- "--subscribe $item .*mouse.entered mouse.exited" || { echo "$item"; false; }
     calls | grep -qE -- "--set $item .*script=[^ ]*/plugins/[a-z_]+\\.sh" || { echo "$item script"; false; }
   done
   # An item's own background would be drawn over its pill's outline: the pill
   # itself is what fills (sb_hover).
-  for item in grove clock wifi bt vpn.lab cloud battery cpu mem volume; do
+  for item in grove clock wifi bt vpn.lab cloud tray battery cpu mem volume; do
     ! calls | grep -qE -- "--set $item (.* )?background\\.(height|corner_radius|drawing|color)=" || { echo "$item has a background"; false; }
   done
   calls | grep -qE -- "--set front_app .*background.height=24 background.corner_radius=12 background.drawing=off"
@@ -358,7 +362,7 @@ hover() {
     gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
     if [ "$s" = dark-medium ]; then fill="$(argb "$s" bg1)"; else fill="$(argb "$s" bg3)"; fi
     # CPU and memory share a pill: either lights the whole of it.
-    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi vpn.lab:pill.vpn cloud:pill.cloud battery:pill.battery cpu:pill.sys mem:pill.sys; do
+    for pair in grove:pill.grove clock:pill.clock volume:pill.volume wifi:pill.wifi bt:pill.wifi vpn.lab:pill.vpn cloud:pill.cloud tray:pill.tray battery:pill.battery cpu:pill.sys mem:pill.sys; do
       item="${pair%%:*}"; pill="${pair#*:}"
       hover "$item" mouse.entered
       [ "$status" -eq 0 ]
@@ -390,7 +394,7 @@ hover() {
 @test "hover: one helper in lib.sh, called only by the plugins of items that subscribe to the pointer" {
   local f
   ! grep -n 'mouse\.entered' "$SB"/plugins/*.sh
-  for f in hover front_app clock volume wifi bluetooth vpn cloud battery cpu; do
+  for f in hover front_app clock volume wifi bluetooth vpn cloud tray battery cpu; do
     grep -qx 'sb_hover && exit 0' "$SB/plugins/$f.sh" || { echo "$f"; false; }
   done
   ! grep -q 'sb_hover' "$SB/plugins/workspaces.sh"
@@ -418,6 +422,11 @@ hover() {
   hover cloud mouse.entered
   [ "$status" -eq 0 ]
   [ "$(calls)" = "--set pill.cloud background.color=$(argb dark-medium bg1)" ]
+  # The tray's too.
+  echo 3 > "$GROVE_STATE/tray"
+  hover tray mouse.entered
+  [ "$status" -eq 0 ]
+  [ "$(calls)" = "--set pill.tray background.color=$(argb dark-medium bg1)" ]
   [ ! -e "$BATS_TEST_TMPDIR/reads" ]
   [ -z "$(opens)" ]
 }
@@ -486,6 +495,14 @@ hover() {
   [ "$status" -eq 0 ]
   [ "$(calls | tail -2 | head -1)" = "--set pill.cloud background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
   calls | grep -q -- "--add bracket pill.cloud cloud --set"
+  # The tray's dropdown open: its own pill.
+  : > "$CALLS"
+  echo pill.tray > "$PANEL"
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" SB_PATH="$FAKES:/usr/bin:/bin" \
+    GROVE_STATE="$GROVE_STATE" /bin/bash "$CFG/sketchybarrc"
+  [ "$status" -eq 0 ]
+  [ "$(calls | tail -2 | head -1)" = "--set pill.tray background.color=$(argb dark-medium bg1)" ] || { calls | tail -3; false; }
+  calls | grep -q -- "--add bracket pill.tray tray --set"
 }
 
 @test "sketchybar: the bar is a 48 pt bg0 strip above the menu bar, nothing drawn around it" {
@@ -860,6 +877,51 @@ cloud_set() {
   grep -qE 'draw\("[a-z0-9.]+", color: off, to: "cloud-off-' "$gen"
 }
 
+# tray_set [CONTENT]: the call tray.sh makes with $GROVE_STATE/tray holding
+# CONTENT (no file without one).
+tray_set() {
+  : > "$CALLS"
+  if [ "$#" -gt 0 ]; then printf '%s\n' "$1" > "$GROVE_STATE/tray"; else rm -f "$GROVE_STATE/tray"; fi
+  run env -i HOME="$HOME" TMPDIR="$BATS_TEST_TMPDIR" CONFIG_DIR="$CFG" NAME=tray SENDER=tray_change \
+    SB_PATH="$FAKES:/usr/bin:/bin" SKETCHYBAR_BIN="$FAKES/sketchybar" GROVE_STATE="$GROVE_STATE" \
+    /bin/bash "$CFG/plugins/tray.sh"
+  calls
+}
+
+@test "tray: the symbol and Grove Keys' count beside it; the symbol alone at 0, without the file or with anything else" {
+  local s set bad
+  for s in dark-medium light-medium; do
+    gt_render_file "$s" "$GROVE_ROOT/theme" "$SB/colors.sh.tmpl" "$CFG/colors.sh"
+    set="${s%%-*}"
+    [ "$(tray_set 3)" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label=3 label.drawing=on" ] || { calls; false; }
+    [ "$(tray_set 42)" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label=42 label.drawing=on" ]
+    [ "$(tray_set 120)" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label=99+ label.drawing=on" ]
+    [ "$(tray_set 0)" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label= label.drawing=off" ]
+    # Grove Keys not running (no file), or anything else in it: no count.
+    [ "$(tray_set)" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label= label.drawing=off" ]
+    for bad in "" "x" "3; rm -rf x" "-1" "03" " 3" "3 4"; do
+      [ "$(tray_set "$bad")" = "--set tray icon.background.image=$CFG/icons/tray-$set.png label= label.drawing=off" ] || { echo "$bad: $(calls)"; false; }
+    done
+  done
+}
+
+@test "tray: the tray item in its own pill left of CPU and memory, redrawn on Grove Keys' tray_change and nothing timed" {
+  rc
+  calls | grep -qx -- '--add event tray_change'
+  calls | grep -qE -- '--subscribe tray tray_change mouse.entered mouse.exited$'
+  calls | grep -qE -- '--set tray .*script=[^ ]*/plugins/tray.sh '
+  calls | grep -qE -- '--set tray .*click_script=open -g grovekeys://panel/tray( |$)'
+  # Grove Keys watches the menu bar; the bar never polls or looks at it.
+  [ -z "$(calls | grep -E -- '--set tray .*update_freq=')" ]
+  [ -z "$(grep -v '^ *#' "$SB/plugins/tray.sh" | grep -nE 'osascript|MenuBarAgent|System Events|(^|[^a-z_])(ps|pgrep|lsappinfo) ')" ]
+  # The symbol alone until Grove Keys says how many.
+  calls | grep -qE -- "--set tray icon.background.image=$CFG/icons/tray-dark.png "
+  # One symbol in the foreground colour: no state colour.
+  local gen="$SB/icons/make.swift"
+  grep -qE 'draw\("[a-z0-9.]+", color: fg, to: "tray-\\\(appearance\)\.png"\)' "$gen"
+  [ "$(grep -c 'to: "tray-' "$gen")" -eq 1 ]
+}
+
 # vpn_icon [FIRST_LINE]: the call vpn.sh makes when `scutil --nc status
 # "grove-lab"` prints FIRST_LINE (and an extended status after a connected
 # one); scutil fails without an argument. "No service" goes to standard
@@ -979,7 +1041,7 @@ vpn_icon() {
   # CPU and memory share one panel; the volume's is the sound panel; the
   # pine's is the Grove menu.
   # Wi-Fi and Bluetooth share one too: a click on either opens it.
-  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi vpn.lab:vpn cloud:cloud battery:battery cpu:system mem:system; do
+  for pair in grove:grove clock:clock volume:sound wifi:wifi bt:wifi vpn.lab:vpn cloud:cloud tray:tray battery:battery cpu:system mem:system; do
     item="${pair%%:*}"; name="${pair#*:}"
     calls | grep -qE -- "--set $item .*click_script=open -g grovekeys://panel/$name( |\$)" || { echo "$item"; false; }
     : > "$OPENS"

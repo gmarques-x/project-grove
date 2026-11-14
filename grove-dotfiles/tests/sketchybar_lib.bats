@@ -115,6 +115,7 @@ setup() {
   [ "$(sb_pill bt)" = pill.wifi ]
   [ "$(sb_pill vpn.lab)" = pill.vpn ]
   [ "$(sb_pill cloud)" = pill.cloud ]
+  [ "$(sb_pill tray)" = pill.tray ]
   [ "$(sb_pill volume)" = pill.volume ]
   [ "$(sb_pill clock)" = pill.clock ]
   [ "$(sb_pill ws.3)" = pill.ws.3 ]
@@ -250,6 +251,43 @@ setup() {
   local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
   [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_CLOUD"' _ "$lib")" = /Users/someone/.local/state/grove/cloud ]
   [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_CLOUD"' _ "$lib")" = /tmp/state/cloud ]
+}
+
+@test "sb_tray: the count for the bar from the line Grove Keys keeps; nothing at 0, without the file or with anything else" {
+  SB_TRAY="$BATS_TEST_TMPDIR/tray"
+  # No file: Grove Keys isn't running (or can't see the menu bar).
+  [ "$(sb_tray)" = "" ]
+  echo 1 > "$SB_TRAY"
+  [ "$(sb_tray)" = 1 ]
+  echo 7 > "$SB_TRAY"
+  [ "$(sb_tray)" = 7 ]
+  echo 99 > "$SB_TRAY"
+  [ "$(sb_tray)" = 99 ]
+  # Past what the fixed width holds.
+  echo 100 > "$SB_TRAY"
+  [ "$(sb_tray)" = 99+ ]
+  echo 123456 > "$SB_TRAY"
+  [ "$(sb_tray)" = 99+ ]
+  # Only the first line counts.
+  printf '4\n9\n' > "$SB_TRAY"
+  [ "$(sb_tray)" = 4 ]
+  # 0, and anything else, is no count.
+  local bad
+  for bad in 0 "" x "-2" "3; rm -rf y" "03" " 3" "3 " "3x" "1e3" "1234567890123"; do
+    printf '%s\n' "$bad" > "$SB_TRAY"
+    [ "$(sb_tray)" = "" ] || { echo "$bad: $(sb_tray)"; false; }
+  done
+  # Unreadable: no count.
+  echo 5 > "$SB_TRAY"
+  chmod 000 "$SB_TRAY"
+  if [ ! -r "$SB_TRAY" ]; then [ "$(sb_tray)" = "" ]; fi
+  chmod 600 "$SB_TRAY"
+}
+
+@test "sb_tray: the file is Grove Keys', beside the theme state" {
+  local lib="$GROVE_ROOT/config/sketchybar/lib.sh"
+  [ "$(env -i HOME=/Users/someone /bin/bash -c '. "$1"; echo "$SB_TRAY"' _ "$lib")" = /Users/someone/.local/state/grove/tray ]
+  [ "$(env -i HOME=/Users/someone GROVE_STATE=/tmp/state /bin/bash -c '. "$1"; echo "$SB_TRAY"' _ "$lib")" = /tmp/state/tray ]
 }
 
 @test "sb_vpn_icon: scutil's first line as the VPN icon: on, connecting, or off for anything else" {

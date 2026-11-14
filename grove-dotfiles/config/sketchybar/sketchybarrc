@@ -22,6 +22,7 @@ TEXT="JetBrains Mono:Regular:13.0"
 # Fixed label widths keep the pills still as values change: JetBrains Mono 13
 # is 7.8 pt a character, each width fits the item's longest value.
 W4=32     # "100%"
+W3=24     # "99+"
 W5=39     # "2000+"
 W17=134   # "Wed 11 Nov  15:24"
 # Hover: under the pointer a clickable item's pill fills softly, its outline
@@ -101,8 +102,8 @@ sketchybar --add item front_app left \
   --subscribe front_app front_app_switched mouse.entered mouse.exited
 
 # Right (the first added is the rightmost): clock, power, volume, Bluetooth
-# and Wi-Fi, the grove-lab VPN, the cloud, memory and CPU, each group in its own pill
-# with a gap between.
+# and Wi-Fi, the grove-lab VPN, the cloud, memory and CPU, the tray, each
+# group in its own pill with a gap between.
 # Volume, Wi-Fi, Bluetooth, the VPN and power are an icon alone that changes
 # with the level, the signal, the state and the charge; CPU and memory are an
 # icon and a value.
@@ -189,6 +190,19 @@ sketchybar --add item cpu right \
   --subscribe cpu mouse.entered mouse.exited
 symbol cpu cpu
 
+gap gap.r7 right 6
+
+# The tray: the other apps' menu-bar items, which the bar covers, with how
+# many beside it (hidden at 0); a click lists them in Grove Keys' dropdown.
+# Grove Keys lists them and sends tray_change when the count changes; the
+# bar never looks. The symbol alone until it does.
+sketchybar --add event tray_change
+sketchybar --add item tray right \
+  --set tray label.width=$W3 label.align=left label.padding_left=4 label.drawing=off padding_left=8 padding_right=8 \
+    script="$P/tray.sh" click_script="$(panel tray)" \
+  --subscribe tray tray_change mouse.entered mouse.exited
+symbol tray tray
+
 # pill NAME ITEM…: an orange outline around a group of items, nothing filled.
 pill() {
   local name="$1"; shift
@@ -200,6 +214,7 @@ pill pill.grove grove
 for n in 1 2 3 4 5 6 7 8 9; do
   pill "pill.ws.$n" "ws.$n" "ws.$n.1" "ws.$n.2" "ws.$n.3" "ws.$n.4" "ws.$n.5" "ws.$n.6" "ws.$n.end"
 done
+pill pill.tray tray
 pill pill.sys cpu mem
 pill pill.cloud cloud
 pill pill.vpn vpn.lab
