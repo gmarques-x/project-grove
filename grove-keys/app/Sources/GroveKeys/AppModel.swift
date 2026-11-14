@@ -453,6 +453,8 @@ final class AppModel: ObservableObject {
         reconcile()
         // Once Accessibility is granted, and again if the Dock restarted.
         BordersWatcher.shared.ensure()
+        // Accessibility granted or taken away: the tray's count follows.
+        TrayWatcher.shared.ensure()
     }
 
     static let cannotStart = "Grove Keys can't watch the keyboard yet · grant the permissions, then choose Restart Grove Keys in its menu"

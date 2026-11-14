@@ -3,12 +3,14 @@ import Foundation
 /// When the tray's watcher lists the menu bar again (spec
 /// 2026-11-14-bar-tray-design, "Count freshness"): after an app launches or
 /// quits, once things have settled for 2 s; after MenuBarAgent says its
-/// bar changed, for half a second. Events that come before the listing
-/// push it back, so a burst (a login's launches) is one listing; never more
-/// than `longest` after the first event waiting, so a burst that never
-/// settles still lists. No timer polls: the watcher sets one for `due`
-/// each time an event moves it, and `fire` says whether that timer's time
-/// has come. The clock is passed in.
+/// bar changed, for half a second, but never sooner than 5 s after the last
+/// listing (an item whose width ticks every second mustn't become a walk of
+/// the bar every second). Events that come before the listing push it
+/// back, so a burst (a login's launches) is one listing; never more than
+/// `longest` after the first event waiting, so a burst that never settles
+/// still lists. A launch or quit is never held by the bar's gap. No timer
+/// polls: the watcher sets one for `due` each time an event moves it, and
+/// `fire` says whether that timer's time has come. The clock is passed in.
 public struct TraySettle: Sendable {
     public enum Event: Sendable {
         case launched, quit, barChanged
@@ -18,11 +20,19 @@ public struct TraySettle: Sendable {
     public static let appDelay: TimeInterval = 2
     /// The settle after MenuBarAgent's bar changes.
     public static let barDelay: TimeInterval = 0.5
+    /// A listing for bar changes alone comes at least this long after the last listing.
+    public static let barGap: TimeInterval = 5
     /// The longest a listing waits after the first event it is for.
     public static let longest: TimeInterval = 10
 
     /// The first event the pending listing is for.
     private var first: Date?
+    /// The pending listing's time by the settles alone (no gap).
+    private var settled: Date?
+    /// A launch or quit is among the events pending.
+    private var forApp = false
+    /// The last listing, whatever asked for it.
+    private var last: Date?
     /// When the pending listing runs; nil when none is pending.
     public private(set) var due: Date?
 
@@ -35,14 +45,17 @@ public struct TraySettle: Sendable {
         }
     }
 
-    /// An event at `time`: when the listing now runs. It never comes sooner
-    /// than before (a short settle doesn't cut a longer one short).
+    /// An event at `time`: when the listing now runs. Settles only ever push
+    /// it later; a launch or quit lifts the bar's gap.
     @discardableResult
     public mutating func note(_ event: Event, at time: Date) -> Date {
         let first = self.first ?? time
         self.first = first
-        let settled = max(due ?? time, time.addingTimeInterval(Self.delay(event)))
-        let next = min(settled, first.addingTimeInterval(Self.longest))
+        if event != .barChanged { forApp = true }
+        let settled = max(self.settled ?? time, time.addingTimeInterval(Self.delay(event)))
+        self.settled = settled
+        var next = min(settled, first.addingTimeInterval(Self.longest))
+        if !forApp, let last { next = max(next, last.addingTimeInterval(Self.barGap)) }
         due = next
         return next
     }
@@ -52,20 +65,23 @@ public struct TraySettle: Sendable {
     /// pending or a later event moved it on.
     public mutating func fire(at time: Date) -> Bool {
         guard let due, time >= due else { return false }
-        listed()
+        listed(at: time)
         return true
     }
 
-    /// The bar was listed for another reason (the panel opened): what was
-    /// pending is covered.
-    public mutating func listed() {
+    /// The bar was listed at `time`, for this or another reason (the panel
+    /// opened): what was pending is covered, and the bar's gap counts from it.
+    public mutating func listed(at time: Date) {
+        last = time
         first = nil
+        settled = nil
+        forApp = false
         due = nil
     }
 
     /// The times `events` (in time order) list at, as a watcher whose timer
     /// goes off exactly at `due` would.
-    public static func listings(_ events: [(Event, Date)]) -> [Date] {
+    static func listings(_ events: [(Event, Date)]) -> [Date] {
         var settle = TraySettle()
         var times: [Date] = []
         for (event, time) in events {

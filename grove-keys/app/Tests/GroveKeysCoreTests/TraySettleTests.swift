@@ -71,9 +71,38 @@ struct TraySettleTests {
         // The panel opened and listed: the settle's own listing isn't needed.
         var settle = TraySettle()
         _ = settle.note(.launched, at: at(0))
-        settle.listed()
+        settle.listed(at: at(1))
         #expect(settle.due == nil)
         let r7 = settle.fire(at: at(2))
         #expect(!r7)
+    }
+
+    @Test func barChangesEverySecondListAtMostEveryFiveSeconds() {
+        // An item whose width ticks every second: never more than one walk
+        // of the bar in five seconds.
+        #expect(TraySettle.barGap == 5)
+        let ticking = (0..<30).map { (TraySettle.Event.barChanged, Double($0)) }
+        let times = listings(ticking)
+        #expect(times == [0.5, 5.5, 10.5, 15.5, 20.5, 25.5, 30.5])
+        for (a, b) in zip(times, times.dropFirst()) { #expect(b - a >= TraySettle.barGap) }
+    }
+
+    @Test func launchesAndQuitsAreNotHeldByTheBarsGap() {
+        // A bar change just listed; a launch a second later still lists 2 s after it.
+        #expect(listings([(.barChanged, 0), (.launched, 1)]) == [0.5, 3])
+        // A bar change waiting out the gap; a launch meanwhile lists on its own settle.
+        #expect(listings([(.launched, 0), (.barChanged, 3), (.launched, 4)]) == [2, 6])
+        // Without the launch, that bar change waits for the gap.
+        #expect(listings([(.launched, 0), (.barChanged, 3)]) == [2, 7])
+    }
+
+    @Test func thePanelsListingCountsForTheGap() {
+        var settle = TraySettle()
+        settle.listed(at: at(0))
+        let due = settle.note(.barChanged, at: at(1))
+        #expect(due == at(5))
+        // A quit isn't held by it.
+        let quit = settle.note(.quit, at: at(1))
+        #expect(quit == at(3))
     }
 }

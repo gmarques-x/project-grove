@@ -30,11 +30,12 @@ final class TrayWatcher: ObservableObject {
     private nonisolated static let log = Logger(subsystem: "com.projectgrove.keys", category: "tray")
     private nonisolated static let sketchybar = ["/opt/homebrew/bin/sketchybar", "/usr/local/bin/sketchybar"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
-    /// What MenuBarAgent is asked to announce; it may send none of them
-    /// (then the count waits for the next launch, quit or opening).
+    /// What MenuBarAgent is asked to announce (the spec's created,
+    /// destroyed, children changed); it may send none of them (then the
+    /// count waits for the next launch, quit or opening).
     private nonisolated static let notifications = [
         kAXCreatedNotification, kAXUIElementDestroyedNotification, kAXWindowCreatedNotification,
-        "AXChildrenChanged", kAXLayoutChangedNotification,
+        "AXChildrenChanged",
     ]
 
     /// One listing: the items the tray shows (`TrayItems.shown`, left to
@@ -106,7 +107,7 @@ final class TrayWatcher: ObservableObject {
     /// `start` (a render lists nothing).
     func refresh() {
         guard mode.withLock({ $0 == .running }) else { return }
-        settle.listed()
+        settle.listed(at: Date())
         settleTimer?.invalidate()
         settleTimer = nil
         guard !listing else {
@@ -122,9 +123,15 @@ final class TrayWatcher: ObservableObject {
     }
 
     /// Hide or show items (the dropdown's menu): the hidden file is
-    /// written and the count follows, from the latest listing.
+    /// written and the count follows, from the latest listing (before the
+    /// first listing, from that listing, which reads the file after this).
     func setHidden(_ hidden: Set<String>) {
-        guard mode.withLock({ $0 == .running }), let latest else { return }
+        guard mode.withLock({ $0 == .running }) else { return }
+        guard let latest else {
+            if listing { again = true }
+            queue.async { [self] in writeHidden(hidden) }
+            return
+        }
         let changed = Listing(items: latest.items, hidden: hidden, accessible: latest.accessible)
         self.latest = changed
         hiddenChanges += 1
@@ -133,13 +140,17 @@ final class TrayWatcher: ObservableObject {
         // After any listing under way (the queue is serial): its count, from
         // the old set, is replaced.
         queue.async { [self] in
-            do {
-                try TrayHiddenFile.write(hidden, to: hiddenURL)
-            } catch {
-                Self.log.error("cannot write \(self.hiddenURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            }
+            writeHidden(hidden)
             write(changed.accessible ? changed.count : nil)
         }
+    }
+
+    /// The permission poll (every 2 s, AppModel): Accessibility granted or
+    /// taken away since the last listing lists again, so the count comes, or
+    /// goes from the bar, without waiting for a launch or the panel.
+    func ensure() {
+        guard let latest, latest.accessible != AX.trusted else { return }
+        refresh()
     }
 
     /// Every exit path: the observers go, and the file, so the bar never
@@ -149,7 +160,7 @@ final class TrayWatcher: ObservableObject {
         workspace = []
         settleTimer?.invalidate()
         settleTimer = nil
-        settle.listed()
+        settle.listed(at: Date())
         install(nil)
         observedPID.withLock { $0 = nil }
         let removed = mode.withLock { mode -> Bool in
@@ -202,6 +213,14 @@ final class TrayWatcher: ObservableObject {
 
     // MARK: - The queue
 
+    private nonisolated func writeHidden(_ hidden: Set<String>) {
+        do {
+            try TrayHiddenFile.write(hidden, to: hiddenURL)
+        } catch {
+            Self.log.error("cannot write \(self.hiddenURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     /// On the queue: the bar read, the hidden set, the count written, and
     /// the observer re-made if MenuBarAgent's pid changed.
     private nonisolated func list() -> Listing {
@@ -229,14 +248,24 @@ final class TrayWatcher: ObservableObject {
 
     /// On the queue: an observer for MenuBarAgent's pid when it isn't the
     /// one watched (it restarted, or this is the first listing), handed to
-    /// the main run loop. Its messages are timed like every other.
+    /// the main run loop. Its messages are timed like every other. One that
+    /// can't be made leaves none, and the next listing tries again.
     private nonisolated func watchAgent(accessible: Bool) {
         let pid = accessible ? AX.runningPID(bundleID: StatusItems.agentBundleID) : nil
-        guard observedPID.withLock({ $0 }) != pid else { return }
-        observedPID.withLock { $0 = pid }
+        let changed = observedPID.withLock { observed -> Bool in
+            guard observed != pid else { return false }
+            observed = pid
+            return true
+        }
+        guard changed else { return }
         guard let pid else {
             DispatchQueue.main.async { MainActor.assumeIsolated { TrayWatcher.shared.install(nil) } }
             return
+        }
+        /// No observer for `pid`: the old one goes, and the next listing retries.
+        let failed = { [self] in
+            observedPID.withLock { if $0 == pid { $0 = nil } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { TrayWatcher.shared.install(nil) } }
         }
         var created: AXObserver?
         let callback: AXObserverCallback = { _, _, _, _ in
@@ -245,6 +274,7 @@ final class TrayWatcher: ObservableObject {
         }
         guard AXObserverCreate(pid, callback, &created) == .success, let created else {
             Self.log.error("no Accessibility observer for MenuBarAgent (pid \(pid))")
+            failed()
             return
         }
         let app = AX.app(pid)
@@ -252,13 +282,21 @@ final class TrayWatcher: ObservableObject {
             AXObserverAddNotification(created, app, $0 as CFString, nil) == .success
         }
         Self.log.info("MenuBarAgent (pid \(pid)) observer took \(taken.joined(separator: ", "), privacy: .public)")
-        guard !taken.isEmpty else { return }
+        guard !taken.isEmpty else {
+            failed()
+            return
+        }
         let box = ObserverBox(observer: created)
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
-                // Stopped meanwhile, or a newer pid's on its way: dropped.
-                guard TrayWatcher.shared.mode.withLock({ $0 == .running }),
-                      TrayWatcher.shared.observedPID.withLock({ $0 }) == pid else { return }
+                // Stopped meanwhile, or a newer pid's on its way: dropped,
+                // and (stopped) the pid forgotten, so a start makes one again.
+                let watcher = TrayWatcher.shared
+                guard watcher.mode.withLock({ $0 == .running }),
+                      watcher.observedPID.withLock({ $0 }) == pid else {
+                    watcher.observedPID.withLock { if $0 == pid { $0 = nil } }
+                    return
+                }
                 TrayWatcher.shared.install(box.observer)
             }
         }
