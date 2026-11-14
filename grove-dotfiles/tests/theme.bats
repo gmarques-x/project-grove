@@ -301,6 +301,16 @@ scheme_hexes() {
   [ -z "$missing" ] || { echo "logic.ts, not in Dark Medium: $missing"; false; }
 }
 
+# The desktop look and its forest backdrop fall back to Dark and Light Medium.
+@test "the Claude Code mod's desktop look falls back to Dark and Light Medium" {
+  local f missing
+  for f in look.ts forest.ts; do
+    missing="$(comm -23 <(config_hexes "$GROVE_ROOT/config/grove-claude/grove/hooks/$f") \
+        <({ palette_hexes; scheme_hexes light-medium; } | sort -u))"
+    [ -z "$missing" ] || { echo "$f, not in Dark or Light Medium: $missing"; false; }
+  done
+}
+
 # ghostty_value KEY: values of KEY in the Ghostty config, one per line.
 ghostty_value() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$GROVE_RENDERED/ghostty/config"

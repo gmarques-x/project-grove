@@ -164,3 +164,13 @@ cm_ready() {
   HOME="/Users/$(id -un)" run "$real" plugin test "$GROVE_ROOT/config/grove-claude/grove"
   [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
+
+@test "claude-mod: the look's palette fixture matches theme/ for all six schemes" {
+  local s fixture="$GROVE_ROOT/config/grove-claude/grove/hooks/palettes.fixture.ts" want got
+  for s in dark-hard dark-medium dark-soft light-hard light-medium light-soft; do
+    want="$(sed -nE 's/^[[:space:]]*([a-z_0-9]+)[[:space:]]*=[[:space:]]*(#[0-9A-Fa-f]{6}).*/\1=\2/p' "$GROVE_ROOT/theme/everforest-$s" | tr '[:lower:]' '[:upper:]' | sort)"
+    got="$(awk -v s="'$s': {" '$0 ~ s {on=1; next} on && /^  },/ {on=0} on' "$fixture" \
+      | sed -nE "s/^[[:space:]]*([a-z_0-9]+): '(#[0-9A-Fa-f]{6})',/\1=\2/p" | tr '[:lower:]' '[:upper:]' | sort)"
+    [ -n "$got" ] && [ "$got" = "$want" ] || { echo "$s differs:"; diff <(echo "$want") <(echo "$got"); false; }
+  done
+}

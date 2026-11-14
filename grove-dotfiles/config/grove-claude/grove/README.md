@@ -19,6 +19,16 @@ Project Grove.
   the MOTD's own seasonal colors. `GROVE_STATE` and `GROVE_DOTFILES` override the
   two places.
 
+- **Desktop and mobile look.** In the Claude desktop and mobile apps (the
+  terminal draws no look) the whole interface takes the current scheme and its
+  partner of the other mode at the same contrast (dark-medium ↔ light-medium),
+  built with the plugin kit's `makeColors` (`hooks/make-colors.js`, copied as
+  it is; copy it again when Claude Code updates). Behind it is an animated
+  pine forest (`hooks/forest.ts`): stands of pines at the edges, drifting
+  mist and the season's particles (petals, fireflies, leaves, snow) in the
+  MOTD's colors. It's CSS only, follows light/dark by itself, and keeps the
+  middle clear on any screen shape. A scheme switch sets it all again.
+
 Installed by grove-dotfiles' `93-claude-mod` module: this folder's parent is a
 local marketplace named `grove`, and Claude Code reads the plugin straight from
 here, so an edit plus `/reload-plugins` takes effect.

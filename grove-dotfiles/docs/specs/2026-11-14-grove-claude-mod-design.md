@@ -111,3 +111,34 @@ has run.
   reports one) with % and reset time, amber from 75 %, red from 90 %. Then the
   context fill and the session's cost. When no Fable window is reported, the
   row says so rather than guessing.
+
+## The desktop look (2026-11-14, owner's ask: "build the desktop look")
+
+- `hooks/look.ts`: `lookFor(dark, light)` builds both modes with the kit's
+  `makeColors`. The halves are the scheme and its partner at the same contrast.
+  - Dark: page bg0 (Ghostty's background); cards, panels and menus bg1.
+  - Light: page bg1; cards, panels and menus bg0. Light mode wants the page darkest.
+  - Text is fg / grey2. Light secondary and muted text lean from grey2 toward fg
+    (35 % and 60 %), because Everforest's light greys are under Desktop's floor.
+  - Roles: accent green, danger red, success aqua, warning yellow, pro purple.
+    Dark warning fills use stop 300 and dark success text is pinned to aqua,
+    so dark-hard and dark-soft paint.
+  - Tests: no "Desktop won't paint" line for any of the six schemes, from
+    `makeColors` or `checkColors`.
+- `hooks/forest.ts`: the backdrop scene `grove-forest`.
+  - Stands of pines (three depths, the near one swaying), drifting mist, and
+    the season's particles, in the MOTD's colors (`particlesOf`).
+  - One SVG with both modes' colors via `prefers-color-scheme`. It honours
+    `prefers-reduced-motion`.
+  - Aspect media rules slide and shrink the stands so a phone or a square
+    window crops sky, not trees, and the middle stays clear.
+  - Checked in headless Chrome at 1600×1000, 1000×1000 and 600×1200, dark and light.
+  - Tests: under 131,072 characters, with the viewBox and slice, no script,
+    nothing loaded.
+- Set at `session.start` and again from the 3 s check when the scheme or the
+  season changes. A "won't paint" line or an undrawn look goes to the debug
+  log, never the status line. The terminal says `isDrawn: false`, as expected.
+- `hooks/palettes.fixture.ts`: the six palettes for the tests (mod tests can't
+  read files). A bats test keeps it equal to `theme/`.
+- Not checked here: the real desktop app. The owner looks at it in both modes,
+  with a long code block and at a larger text size.

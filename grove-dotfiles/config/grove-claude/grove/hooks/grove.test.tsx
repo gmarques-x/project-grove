@@ -33,6 +33,7 @@ muted  = #829181
 const status: Array<string | undefined> = []
 const opened: Array<{ backgroundColor?: string }> = []
 const reads: string[] = []
+const looks: Array<{ colors?: unknown; backdrop?: { scene?: string } }> = []
 let env: Record<string, string> = {}
 
 function engine(on: any, files: Record<string, string>, listed: () => unknown[] = () => []) {
@@ -49,6 +50,12 @@ function engine(on: any, files: Record<string, string>, listed: () => unknown[] 
     return { value: { isPlaced: true } }
   })
   on('ui.panes', () => ({ value: [] }))
+  on('theme.set', (_: unknown, e: { colors?: unknown; backdrop?: { scene?: string } }) => {
+    looks.push(e)
+    return { value: { isDrawn: true, requestId: 'look' } }
+  })
+  on('ui.invalidate', () => ({ value: undefined }))
+  on('ui.log', () => ({ value: undefined }))
   on('env.get', (_: unknown, e: { name: string }) => ({
     value: e.name === 'HOME' ? '/home/t' : env[e.name],
   }))
@@ -285,4 +292,79 @@ test('an agent box shows its model and kind; the head shows the main model and u
   expect((await ui.find({ type: 'Text', text: /fable\s+no Fable window reported/ }))?.text).toBeTruthy()
   expect((await ui.find({ type: 'Text', text: /cost\s+\$1\.50/ }))?.text).toBeTruthy()
   await ui.unmount()
+})
+
+import { checkColors } from './make-colors.js'
+import { forestSvg } from './forest'
+import { lookFor, unpainted } from './look'
+import { PALETTES } from './palettes.fixture'
+import { partnerOf } from './logic'
+
+test('the desktop look paints for every scheme, both modes', () => {
+  for (const scheme of Object.keys(PALETTES)) {
+    const partner = partnerOf(scheme)
+    const own = PALETTES[scheme]!
+    const other = PALETTES[partner]!
+    const [dark, light] = scheme.startsWith('dark') ? [own, other] : [other, own]
+    const { theme, problems } = lookFor(dark, light, scheme)
+    const bad = unpainted(problems)
+    if (bad.length) (globalThis as { console?: { log: (s: string) => void } }).console?.log(`LOOK ${scheme}\n${bad.join('\n')}`)
+    expect(bad).toEqual([])
+    const checked = unpainted(checkColors(theme))
+    if (checked.length) (globalThis as { console?: { log: (s: string) => void } }).console?.log(`CHECK ${scheme}: ${checked.length}`)
+    expect(checked).toEqual([])
+  }
+  expect(partnerOf('dark-hard')).toBe('light-hard')
+  expect(partnerOf('light-soft')).toBe('dark-soft')
+})
+
+test('the forest backdrop: a fitting SVG, no script, nothing loaded, under the size limit', () => {
+  for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
+    const svg = forestSvg(PALETTES['dark-medium']!, PALETTES['light-medium']!, season)
+    expect(svg.length).toBeLessThan(131_072)
+    expect(svg).toContain('viewBox="0 0 1600 1000"')
+    expect(svg).toContain('preserveAspectRatio="xMidYMid slice"')
+    expect(svg).toContain('prefers-color-scheme: dark')
+    expect(svg).toContain('prefers-reduced-motion')
+    expect(svg).not.toMatch(/<script|href=|url\((?!#)/)
+  }
+})
+
+test('session start sets the look with the forest; a scheme switch sets it again', async ($, on) => {
+  looks.length = 0
+  const files: Record<string, string> = {
+    '/home/t/.local/state/grove/theme': 'light-soft\n',
+    '*/grove-dotfiles/theme/everforest-light-soft': Object.entries(PALETTES['light-soft']!).map(([k, v]) => `${k} = ${v}`).join('\n'),
+    '*/grove-dotfiles/theme/everforest-dark-soft': Object.entries(PALETTES['dark-soft']!).map(([k, v]) => `${k} = ${v}`).join('\n'),
+  }
+  engine(on, files)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(looks.length).toBe(1)
+  expect(looks[0]?.backdrop?.scene).toBe('grove-forest')
+  expect(JSON.stringify(looks[0]?.colors)).toContain(PALETTES['dark-soft']!.fg!.toLowerCase())
+
+  files['/home/t/.local/state/grove/theme'] = 'dark-soft\n'
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(looks.length).toBe(2)
+})
+
+test('the backdrop draws on the desktop and leaves the terminal alone', async ($, on) => {
+  engine(on, {})
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const props = { scene: 'grove-forest', plugin: 'grove', glass: { blur: 18, opacity: 0.7 } }
+  const desk = await $.ui.mount({ plugin: 'grove', component: 'Backdrop', surface: 'desktop', props } as any)
+  expect(await desk.find({ type: 'Svg' })).toBeTruthy()
+  await desk.unmount()
+  const other = await $.ui.mount({ plugin: 'grove', component: 'Backdrop', surface: 'desktop', props: { ...props, plugin: 'someone-else' } } as any)
+  expect((await other.find({ type: 'Text', text: /engine/ }))?.text).toBe('engine')
+  await other.unmount()
+})
+
+test('forest preview', () => {
+  const svg = forestSvg(PALETTES['dark-medium']!, PALETTES['light-medium']!, 'autumn')
+  ;(globalThis as { console?: { log: (s: string) => void } }).console?.log(`FOREST-START\n${svg}\nFOREST-END`)
 })

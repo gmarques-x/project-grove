@@ -6,7 +6,9 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { GroveAgent, GrovePalette, GroveTask, GroveUsage, GroveWorkflow } from '../types'
+import type { GroveAgent, GroveLook, GrovePalette, GroveTask, GroveUsage, GroveWorkflow } from '../types'
+import { forestSvg } from './forest'
+import { lookFor, unpainted } from './look'
 import {
   FALLBACK,
   capRows,
@@ -18,8 +20,10 @@ import {
   workflowName,
   kindAfterCall,
   kindAtStart,
+  partnerOf,
+  readNamed,
 } from './logic'
-import { drawPane } from './motd'
+import { drawPane, seasonOf } from './motd'
 import type { Line } from './motd'
 
 const PANE = 'grove-agents'
@@ -37,6 +41,13 @@ const tick = atom({ plugin: 'grove', key: 'tick' } as const, 0)
 const paneWanted = atom({ plugin: 'grove', key: 'paneWanted' } as const, true)
 const usage = atom({ plugin: 'grove', key: 'usage' } as const, { windows: [] } as GroveUsage, { shape: 'usage-1' })
 const mainModel = atom({ plugin: 'grove', key: 'mainModel' } as const, '')
+const look = atom({ plugin: 'grove', key: 'look' } as const, { scheme: '', dark: {}, light: {} } as GroveLook, {
+  shape: 'look-1',
+})
+
+const SCENE = 'grove-forest'
+// The look this process last set; a reload sets it again.
+let lookSet = ''
 
 type UsageFigures = {
   context: { percent?: number; window: number }
@@ -136,20 +147,23 @@ async function loadPalette($: EngineInterface): Promise<void> {
   // The mod lives at grove-dotfiles/config/grove-claude/grove: three folders up.
   const dotfiles =
     (await $.env.get('GROVE_DOTFILES')) ?? $.plugin.root.split('/').slice(0, -3).join('/')
+  // From the checkout the mod sits in; a copy elsewhere (a session's
+  // dev-mods folder) falls back to the usual checkout.
+  const readScheme = (scheme: string) =>
+    $.fs
+      .read(`${dotfiles}/theme/everforest-${scheme}`)
+      .catch(() => $.fs.read(`${home}/Developer/project-grove/grove-dotfiles/theme/everforest-${scheme}`))
   let next: GrovePalette = FALLBACK
+  let scheme = 'dark-medium'
+  let text: string | undefined
   try {
-    const scheme = cleanScheme(await $.fs.read(`${state}/theme`))
-    if (scheme) {
-      // From the checkout the mod sits in; a copy elsewhere (a session's
-      // dev-mods folder) falls back to the usual checkout.
-      const text = await $.fs
-        .read(`${dotfiles}/theme/everforest-${scheme}`)
-        .catch(() => $.fs.read(`${home}/Developer/project-grove/grove-dotfiles/theme/everforest-${scheme}`))
-      next = parsePalette(text, scheme)
-    }
+    scheme = cleanScheme(await $.fs.read(`${state}/theme`)) ?? 'dark-medium'
+    text = await readScheme(scheme)
+    next = parsePalette(text, scheme)
   } catch {
     next = FALLBACK
   }
+  await keepLook($, scheme, text, () => readScheme(partnerOf(scheme)))
   const was = await read($, palette)
   if (JSON.stringify(was) !== JSON.stringify(next)) {
     await update($, palette, () => next)
@@ -158,6 +172,34 @@ async function loadPalette($: EngineInterface): Promise<void> {
       void $.ui.open({ id: PANE, title: TITLE, backgroundColor: next.bg })
     }
   }
+}
+
+// The desktop and mobile apps' look: built from the scheme and its partner,
+// set again whenever the scheme (or the season of the backdrop) changes.
+async function keepLook(
+  $: EngineInterface,
+  scheme: string,
+  text: string | undefined,
+  readPartner: () => Promise<string>,
+): Promise<void> {
+  const season = seasonOf(new Date(await $.clock.now()).getMonth() + 1)
+  const key = `${scheme}:${season}`
+  if (key === lookSet) return
+  lookSet = key
+  const own = text ? readNamed(text) : {}
+  const partner = await readPartner().then(readNamed, () => ({}) as Record<string, string>)
+  const isDark = scheme.startsWith('dark')
+  const next: GroveLook = { scheme, dark: isDark ? own : partner, light: isDark ? partner : own }
+  await update($, look, () => next)
+  const { theme, problems } = lookFor(next.dark, next.light, `Grove · Everforest ${scheme}`)
+  const bad = unpainted(problems)
+  if (bad.length > 0) $.ui.log(`grove: ${bad[0]}`, { to: 'debug' })
+  const set = await $.theme.set({
+    colors: theme,
+    backdrop: { scene: SCENE, glass: { blur: 18, opacity: 0.7 } },
+  })
+  if (!set.isDrawn) $.ui.log(`grove: the desktop look isn't drawn here: ${set.reason}`, { to: 'debug' })
+  $.ui.invalidate('ui.render')
 }
 
 export const register: Register = on => {
@@ -330,6 +372,16 @@ export const register: Register = on => {
       }
     }
     return ran
+  })
+
+  // The backdrop scene: drawn on the desktop and mobile apps only.
+  on('ui.render', { component: 'Backdrop' }, async ($, e, next) => {
+    if (e.surface !== 'desktop' && e.surface !== 'mobile') return next(e)
+    if (e.props.plugin !== $.plugin.name || e.props.scene !== SCENE) return next(e)
+    const { Svg } = $.ui.resolve(e)
+    const l = await read($, look)
+    const season = seasonOf(new Date(await $.clock.now()).getMonth() + 1)
+    return <Svg source={forestSvg(l.dark, l.light, season)} alt={`A pine forest in ${season}, with drifting mist`} />
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

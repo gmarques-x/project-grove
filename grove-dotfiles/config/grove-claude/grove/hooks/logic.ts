@@ -249,3 +249,22 @@ export function resetText(iso: string | undefined, now: number): string {
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][at.getDay()]
   return `resets ${day} ${hm}`
 }
+
+// ── palettes for the desktop look ────────────────────────────────────────
+
+/** Every `name = #RRGGBB` line of a grove palette file. */
+export function readNamed(text: string): Record<string, string> {
+  const named: Record<string, string> = {}
+  for (const raw of text.split('\n')) {
+    const m = /^([a-z_0-9]+)\s*=\s*(#[0-9A-Fa-f]{6})\b/.exec(raw.trim())
+    const [, name, hex] = m ?? []
+    if (name && hex) named[name] = hex.toUpperCase()
+  }
+  return named
+}
+
+/** The scheme of the other mode at the same contrast: dark-medium ↔ light-medium. */
+export function partnerOf(scheme: string): string {
+  const [mode, contrast] = scheme.split('-')
+  return `${mode === 'dark' ? 'light' : 'dark'}-${contrast ?? 'medium'}`
+}

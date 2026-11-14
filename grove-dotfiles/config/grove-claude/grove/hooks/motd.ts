@@ -476,3 +476,8 @@ export function drawPane(s: Scene): Line[] {
   )
   return out.map(merge)
 }
+
+/** The season's particle colors, for the desktop backdrop's falling leaves, snow or fireflies. */
+export function particlesOf(season: Season): string[] {
+  return [...SEASONS[season].particle]
+}

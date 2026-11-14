@@ -61,6 +61,13 @@ export type GroveUsage = {
   costUsd?: number
 }
 
+/** The two palettes the desktop look is built from: the scheme and its partner. */
+export type GroveLook = {
+  scheme: string
+  dark: Record<string, string>
+  light: Record<string, string>
+}
+
 declare module 'claude-code' {
   interface PluginState {
     grove: {
@@ -72,6 +79,7 @@ declare module 'claude-code' {
       paneWanted: boolean
       usage: Shaped<GroveUsage>
       mainModel: string
+      look: Shaped<GroveLook>
     }
   }
 }
