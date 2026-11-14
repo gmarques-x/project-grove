@@ -8,11 +8,11 @@
 
 **Tech Stack:** Swift 6 (Command Line Tools, no Xcode), SwiftUI + AppKit, CoreGraphics event taps, IOKit HID, Swift Testing; bash + bats for the grove module.
 
-**Spec:** `grove-dotfiles/docs/specs/2026-11-10-grove-keys-design.md` (read it with this plan). Mockups: `artifacts/grove-keys/gui-mockups/window.html`.
+**Spec:** `grove-dotfiles/docs/specs/2026-11-10-grove-keys-design.md` (read it with this plan). Mockups: a private mock-up page.
 
 ## Global Constraints
 
-- Work on branch `grove-keys` in `~/Developer/project-grove`; merge only when the user says "merge it". Never commit or push `artifacts/` or `.recording/`.
+- Work on branch `grove-keys` in `~/Developer/project-grove`; merge only when the user says "merge it". Never commit or push the private working folders.
 - Bundle ID `com.projectgrove.keys`; app `~/Applications/Grove Keys.app`; executable `GroveKeys`; LaunchAgent label `com.projectgrove.keys`; `LSUIElement` true.
 - Package platform `.macOS(.v14)`, swift-tools 6.0, the same `-plugin-path` TestingMacros workaround as `grove-themes/app/Package.swift`. CLT Swift has no `@State` macro: use `State<Value>` as grove-themes does.
 - `GroveKeysCore` depends on `GroveThemesCore` via `.package(path: "../../grove-themes/app")` for `Palette`, `ThemeColors`, `StatePath` and the `grove-themes list --json` client. Do not copy those types.
@@ -42,7 +42,7 @@
 - [ ] **Step 2:** Add a temporary binding `cmd-ctrl-alt-shift-1 = 'workspace 1'` to the live AeroSpace config and run `aerospace reload-config`.
 - [ ] **Step 3:** Ask the user to run the script from Ghostty (`swiftc main.swift -o spike && ./spike`), grant what macOS asks for, and press Caps Lock+1 from workspace 2.
   Expected: AeroSpace switches to workspace 1. Note which permissions macOS asked for.
-- [ ] **Step 4:** Remove the temporary binding and reload. Record the result in `artifacts/grove-keys/spike.md`.
+- [ ] **Step 4:** Remove the temporary binding and reload. Record the result in the private notes.
   **If AeroSpace did not switch:** stop and bring the result to the user before Task 1.
 
 ### Task 1: Package and TOML subset parser
@@ -285,4 +285,4 @@
 
 - [ ] **Step 1:** `grove install keys-app` on this Mac; grant Accessibility and Input Monitoring; `grove check` → `96-keys-app ok`, `98-aerospace ok`.
 - [ ] **Step 2:** With the user, run the spec §11 by-hand list: tap, hold, cheat sheet, a launcher added in the window, a hand edit (from vim, to cover rename saves), a bad hand edit, Pause/Resume, sleep/wake, a password field (Hyper does nothing; Option shortcuts work), log out and in (app back, Caps Lock is Hyper).
-- [ ] **Step 3:** Copy the run ledger to `artifacts/grove-keys/sdd-ledger.md`; list deferred minors there. Tell the user it's ready to look at live and wait for "merge it".
+- [ ] **Step 3:** Copy the run ledger to the private notes; list deferred minors there. Tell the user it's ready to look at live and wait for "merge it".

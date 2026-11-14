@@ -1,7 +1,7 @@
 # Bar: the menu-bar tray
 
 Date: 2026-11-14. Status: approved in conversation; written up for the owner's review.
-Background: `~/Developer/artifacts/menu-bar-tray/research.md` (private; facts measured on macOS 27.2).
+Background: the private research notes (facts measured on macOS 27.2).
 
 ## Intent
 "A hidden items button": one pill in the Grove bar that lists the menu-bar items of other apps (WireGuard, OneDrive, Docker…) hidden behind the Grove bar, and opens them on click. The Grove bar covers the native menu bar (auto-hidden, SketchyBar `topmost`), so those items are unreachable today; on macOS 27 every status item is drawn by one process (`com.apple.MenuBarAgent`), so SketchyBar aliases and item-moving tools no longer work.
@@ -34,7 +34,7 @@ Success: one click on the pill shows every other app's item; one click on a row 
 **Where opened items appear.** A menu or popover opens at the item's native position (top right), above the Grove bar; Grove doesn't move it. Unverified until by hand: whether AXPress opens popovers (OneDrive's activity window, others) on macOS 27, and whether a short delay is needed after the panel closes.
 
 ## Constraints
-grove-ui rules (GroveMenuList for the row menu, PanelKit for the panel); JetBrains Mono; renders of the pill and the dropdown (items, hidden expanded, no access, empty) dark and light into `~/Developer/artifacts/sketchybar/renders/tray/`; invented app lists in samples and fixtures; reuse `StatusItemLocator` and extract the AX helpers it, WireGuardOpener and OneDriveSettingsOpener duplicate into one shared helper (the tray would be a fourth copy); the locator skips reading other apps' elements beyond what matching needs. GroveKeys binary only with its render/check flags; never press other apps' UI in tests or renders.
+grove-ui rules (GroveMenuList for the row menu, PanelKit for the panel); JetBrains Mono; renders of the pill and the dropdown (items, hidden expanded, no access, empty) dark and light into a private folder; invented app lists in samples and fixtures; reuse `StatusItemLocator` and extract the AX helpers it, WireGuardOpener and OneDriveSettingsOpener duplicate into one shared helper (the tray would be a fourth copy); the locator skips reading other apps' elements beyond what matching needs. GroveKeys binary only with its render/check flags; never press other apps' UI in tests or renders.
 
 **Rules settled after the builder check:**
 - *Opened or not:* after the press, "opened" means a new `AXMenu` or window owned by that app's pid appears within 1 s (AXPress returning success isn't proof). If nothing appears, the wrapper group is pressed once; if still nothing, the app is brought forward. The by-hand check of popovers isn't a gate: apps whose popovers AXPress can't open get "bring forward".

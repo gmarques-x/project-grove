@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work on branch `global-menu`; merge on "merge it". Never commit `artifacts/`, `.recording/` or `.superpowers/`.
+- Work on branch `global-menu`; merge on "merge it". Never commit the private working folders.
 - Links: `grovekeys://grove-menu`, `grovekeys://app-menu`, `grovethemes://gallery` (case-insensitive scheme and host; any extra path → ignored).
 - Each AX read has a 1 s messaging timeout (`AXUIElementSetMessagingTimeout`).
 - `AXMenuItemCmdModifiers` bits: 0 = ⌘; 1 = ⇧; 2 = ⌥; 4 = ⌃; 8 = no ⌘. Shown in the order ⌃⌥⇧⌘ + key.
@@ -33,7 +33,7 @@
 
 - [ ] **Step 1:** In a scratch Swift script (run from Ghostty, which has Accessibility), read Ghostty's `AXMenuBar`: print the top-level titles, then the File menu's items with `AXEnabled`, `AXMenuItemCmdChar`, `AXMenuItemCmdModifiers` and `AXMenuItemMarkChar`.
 - [ ] **Step 2:** Press `File › New Window` with `AXPress`, after a 1 s delay. Ask the user to watch: a new Ghostty window opens.
-- [ ] **Step 3:** Record the attributes seen and what worked in `artifacts/global-menu/spike.md`. If `AXPress` doesn't work for menu items, stop and bring the options to the user.
+- [ ] **Step 3:** Record the attributes seen and what worked in the private notes. If `AXPress` doesn't work for menu items, stop and bring the options to the user.
 
 ### Task 1: Links: `KeysURL` cases and `ThemesURL`
 
@@ -101,4 +101,4 @@
   - The Apple menu items.
   - The app-name shortcut.
   - Clicking the pine with the Grove Keys window in front.
-- [ ] **Step 3:** One fresh final review on the most capable model, then a fix pass. Copy the ledger to `artifacts/global-menu/sdd-ledger.md` and wait for "merge it".
+- [ ] **Step 3:** One fresh final review on the most capable model, then a fix pass. Copy the ledger to the private notes and wait for "merge it".

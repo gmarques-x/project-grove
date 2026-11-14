@@ -19,7 +19,7 @@
 - ISO key codes: `section` 10 (top left), `backtick` 50 (beside left Shift), `backslash` 42 (beside Return, row 3). `KeyNames` gains `("section", 10)`.
 - Row widths: every row adds up to 14.5 key units on both shapes; the board's outer size doesn't change.
 - UI per the grove-ui skill (`~/.claude/skills/grove-ui/SKILL.md`): GroveUI tokens and roles only, JetBrains Mono via `GroveFont`, `GroveSegmented` for the shape setting.
-- Never run the GroveKeys binary except `--check-menu`, `--render-aerospace`, `--render-panel` and the new `--render-keys` (a second running copy clears the Caps Lock mapping). Never commit `artifacts/`; never touch `grove-dotfiles/config/grove-keys/keys.toml` (the owner's uncommitted edit), `config/ssh/config`, `config/grove/local.env`.
+- Never run the GroveKeys binary except `--check-menu`, `--render-aerospace`, `--render-panel` and the new `--render-keys` (a second running copy clears the Caps Lock mapping). Never commit the private working folders; never touch `grove-dotfiles/config/grove-keys/keys.toml` (the owner's uncommitted edit), `config/ssh/config`, `config/grove/local.env`.
 - Commits: `area: summary` + body + `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, staged by explicit path.
 
 ## Review Focus
@@ -118,7 +118,7 @@
 - [ ] **Step 2: `AppModel`** holds `legends`, `detectedShape`, the setting from `KeysFile.keyboardShape`; refresh both on input-source change. Changing the shape (setting or detection) while `focused` names a key not in `KeyboardLayout.names(for: shape)` sets focus to `KeyboardLayout.firstKey` (Review Focus 4).
 - [ ] **Step 3: Drawing.** `KeyboardGrid` takes `shape` and `legends`, iterates `rows(for: shape)`; the ISO Return is one cap drawn as an inverted L (a GroveUI-radius `Shape` spanning the row-2 part and the row-3 part; the `.bottom` cap draws nothing of its own and isn't hit-tested separately). `KeyCapView` shows a two-line legend when `legend.shift != nil` (Shift above base, smaller: `GroveType.finePrint` for Shift, existing size for base), one line otherwise; caps without a legend keep their names. Extras ("not on the keyboard") use `names(for: shape)`; arrows use `neighbor(…shape:)`.
 - [ ] **Step 4: The setting.** On the Keyboard tab beside the layer picker: `GroveSegmented` "Keyboard" with "Automatic (ISO)"/"Automatic (ANSI)" (the detected one), "ISO", "ANSI" → `model.setKeyboardShape`.
-- [ ] **Step 5: `--render-keys`** in `KeysRender.swift`, wired in `main.swift` next to `--render-panel` and before anything that touches the HID mapping. Render keyboard and cheatsheet for `iso` + Portuguese ID and `ansi` + `com.apple.keylayout.US`, in `dark-medium` and `light-medium`, to `/Users/gmarques/Developer/project-grove/artifacts/grove-keys/renders/keyboard/{keyboard,cheatsheet}-{iso-pt,ansi-us}-{dark,light}.png`; look at every one. The ANSI US renders must look like today's apart from nothing.
+- [ ] **Step 5: `--render-keys`** in `KeysRender.swift`, wired in `main.swift` next to `--render-panel` and before anything that touches the HID mapping. Render keyboard and cheatsheet for `iso` + Portuguese ID and `ansi` + `com.apple.keylayout.US`, in `dark-medium` and `light-medium`, to a private folder as `{keyboard,cheatsheet}-{iso-pt,ansi-us}-{dark,light}.png`; look at every one. The ANSI US renders must look like today's apart from nothing.
 - [ ] **Step 6: Run** `swift build` and `swift test` in grove-keys/app and grove-themes/app — Expected: all pass.
 - [ ] **Step 7: Commit** by explicit path: `keys: the board in the keyboard's shape with its legends`.
 
@@ -137,7 +137,7 @@
 - [ ] **Step 2: Run** those tests — Expected: FAIL.
 - [ ] **Step 3: Implement** the parameter threading and the chevron rule (the `global-menu` builtin keeps kind `.link` and its behaviour; only the arrow goes).
 - [ ] **Step 4: Run** `swift test` (grove-keys) — Expected: PASS; `grep -rn "\.symbols\b" Sources` — Expected: no bare `.symbols`.
-- [ ] **Step 5: Renders:** `--render-panel grove-menu …` dark and light into `artifacts/grove-keys/renders/keyboard/grove-menu-{dark,light}.png` (Global Menu row without arrow); re-render Task 3's set; look at all.
+- [ ] **Step 5: Renders:** `--render-panel grove-menu …` dark and light into the same private folder as `grove-menu-{dark,light}.png` (Global Menu row without arrow); re-render Task 3's set; look at all.
 - [ ] **Step 6: Docs:** manual chapter: one paragraph "The keyboard you type on" (shape, legends, `[keyboard] shape`), and the `section` key name in the key-name list if the manual has one.
 - [ ] **Step 7: Installer check:** `cd grove-dotfiles && bats tests/modules_keys_app.bats` — Expected: all ok.
 - [ ] **Step 8: Commit** by explicit path: `keys: shortcut text with the layout's characters everywhere; Global Menu without an arrow`.

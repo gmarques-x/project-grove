@@ -136,7 +136,7 @@ theirs.
   - the shape setting: parse, absent, unknown value.
 - Renders (existing `--render-panel` path): the Keyboard tab and the Hyper cheat
   sheet in pt-PT ISO and US ANSI, dark and light, into
-  artifacts/grove-keys/renders/keyboard/. The owner reviews them before install.
+  a private folder. The owner reviews them before install.
 - Grove menu render showing the Global Menu row without its arrow.
 - `swift test` for grove-keys and grove-themes; the installer's bats for
   96-keys-app.

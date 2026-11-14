@@ -2,7 +2,7 @@
 
 **Status:** design for review, 2026-11-11
 **Builds on:** [2026-11-09-grove-fastfetch-design.md](2026-11-09-grove-fastfetch-design.md) (the logo, box and hook), [2026-11-10-grove-themes-design.md](2026-11-10-grove-themes-design.md) (templates, state, CLI, GUI)
-**Source image:** the GitHub avatar of gmarques-x (460×460, kept at `artifacts/avatar-logo/avatar.png`)
+**Source image:** the GitHub avatar of gmarques-x (460×460, kept privately)
 
 ## 1. Goal
 
@@ -33,7 +33,7 @@ New terminal windows can show the user's GitHub avatar (the tree-ring drawing) i
 
 ## 4. The images
 
-- **Generator:** `artifacts/avatar-logo/make.py` (private, like the lockup script; Pillow + numpy in a scratch venv). It reads `avatar.png` and finds the ink against the paper and grid (ink is darker and less saturated than the paper; the grid's thin light lines are dropped). Alpha comes from ink strength, with the lockup's ramp (t 0.2–0.45). The drawing is cropped to the ink's bounding box plus a small margin, upscaled with LANCZOS to about 4× for crisp cells, and written in the two tones.
+- **Generator:** a private script, `make.py` (like the lockup script; Pillow + numpy in a scratch venv). It reads `avatar.png` and finds the ink against the paper and grid (ink is darker and less saturated than the paper; the grid's thin light lines are dropped). Alpha comes from ink strength, with the lockup's ramp (t 0.2–0.45). The drawing is cropped to the ink's bounding box plus a small margin, upscaled with LANCZOS to about 4× for crisp cells, and written in the two tones.
 - **Outputs** in `grove-dotfiles/config/fastfetch/` (tracked):
   - `avatar.png`: #DAC7A2, for dark schemes.
   - `avatar-light-hard.png`, `avatar-light-medium.png`, `avatar-light-soft.png`: #27332A, made with the same treatment as the matching `grove-light-*.png`.

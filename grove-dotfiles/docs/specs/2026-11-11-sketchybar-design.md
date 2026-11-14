@@ -2,7 +2,7 @@
 
 **Status:** built 2026-11-11 (as shipped: §11 lists what changed from the first design)
 **Builds on:** [2026-11-10-aerospace-design.md](2026-11-10-aerospace-design.md) (workspaces, gaps), [2026-11-10-grove-themes-design.md](2026-11-10-grove-themes-design.md) (templates, switch steps), [2026-11-10-grove-keys-design.md](2026-11-10-grove-keys-design.md) (the Grove Keys menu)
-**Mockups:** `artifacts/sketchybar/mockups/` (private canvas https://claude.ai/artifact/6AgtzsESSmbThGs3CsqToE), style **B · Floating bar** chosen, on an opaque strip
+**Mockups:** a private mock-up page, style **B · Floating bar** chosen, on an opaque strip
 
 ## 1. Goal
 

@@ -3,7 +3,7 @@
 **Status:** design for review, 2026-11-12
 **Builds on:** [2026-11-10-grove-themes-gui-design.md](2026-11-10-grove-themes-gui-design.md) (the app pattern), the shared `GroveUI` library, [2026-11-11-grove-menu-design.md](2026-11-11-grove-menu-design.md) (its row in the Grove menu)
 **Comes before:** stages 3 to 5 of Grove Explorer (§3), each with its own spec
-**Mock-ups:** `artifacts/grove-explorer/mockups/` (private), dark-medium and light-medium; the owner chose from them on 2026-11-12 (§2)
+**Mock-ups:** private images, dark-medium and light-medium; the owner chose from them on 2026-11-12 (§2)
 
 ## 1. Goal
 
@@ -43,7 +43,7 @@ All chosen by the owner on 2026-11-12, from options put to him.
 | Folder icon | Solid, in the palette's orange (was blue; the owner's change, 2026-11-14) | `FolderInk` in GroveExplorerCore; the list, sidebar and path bar all use it. |
 | Kind of app | An ordinary app that is opened and quit, in ⌘Tab like any other; no menu-bar item, no login agent | It has nothing to do while closed. |
 
-Taken from the owner's recorded Finder setup (`artifacts/finder-changes.md`) as the defaults: new windows on Home; folders on top; all extensions shown; folder sizes calculated; path bar and status bar always there; the filter looks in the current folder; sidebar favourites Applications, Home, Developer, Documents, Downloads; iCloud Drive; disks.
+Taken from the owner's recorded Finder setup (in the private notes) as the defaults: new windows on Home; folders on top; all extensions shown; folder sizes calculated; path bar and status bar always there; the filter looks in the current folder; sidebar favourites Applications, Home, Developer, Documents, Downloads; iCloud Drive; disks.
 
 ## 3. Out of scope
 
@@ -291,7 +291,7 @@ For the plan: (1) Core reading, sorting and the list in one pane, read-only; (2)
 
 ## 16. Folders that open in place (added 2026-11-13)
 
-Asked for by the owner after the first live run, and chosen from options put to him: folders expand in place in the list, as in Finder's list view, and the arrows are always there (no mode, no switch). Mock-ups: `artifacts/grove-explorer/mockups/tree-*.png`.
+Asked for by the owner after the first live run, and chosen from options put to him: folders expand in place in the list, as in Finder's list view, and the arrows are always there (no mode, no switch). Mock-ups: private images.
 
 **Look** (chosen by the owner from the mock-ups, 2026-11-13). A folder that has something in it has a chevron before its icon (`GroveIcon`: chevron.right closed, chevron.down open; 12 pt, quiet colour, the text colour while the pointer is on it). The chevron sits in a gutter of its own, 16 pt wide (a 12 pt box and 4 pt), which every row keeps, so all icons are in one column and all names in another; the header's "Name" stays at the pane's edge. The chevron's hit area is the whole gutter cell (16 × 24 pt). A folder's contents are listed beneath it, the name indented 16 pt per level (the gutter's width, so a child's chevron sits under its parent's icon); the indent is never capped: a deep name in a narrow pane is cut in the middle like any long name. Size, Date Modified and Kind stay in their columns. Rows stay 24 pt; fills and the drop line run the row's whole width at every level.
 

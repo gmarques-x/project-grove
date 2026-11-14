@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work on branch `avatar-logo` in `~/Developer/project-grove`; merge only when the user says "merge it". Never commit `artifacts/`, `.recording/` or `.superpowers/`.
+- Work on branch `avatar-logo` in `~/Developer/project-grove`; merge only when the user says "merge it". Never commit the private working folders.
 - `~/.config` links into this checkout: rendered files there are live. Don't leave the live fastfetch config or hook broken.
 - Logo names exactly `grove` and `avatar`; state file `$GROVE_STATE/fetch-logo`; missing/unknown → `grove`.
 - Tones: dark `#DAC7A2`, light `#27332A`; alpha ramp t 0.2–0.45 (as the lockup). PNGs exempt from the palette rule, like `grove.png`.
@@ -34,11 +34,11 @@
 ### Task 1: The avatar images (review gate)
 
 **Files:**
-- Create: `artifacts/avatar-logo/make.py` (private), `grove-dotfiles/config/fastfetch/avatar.png`, `avatar-light-hard.png`, `avatar-light-medium.png`, `avatar-light-soft.png`
-- Read: `artifacts/avatar-logo/avatar.png`, `artifacts/fastfetch-spike/lockup.py` (the lockup's ink/alpha recipe), and the existing `grove.png` / `grove-light-*.png` (target look)
+- Create: a private script (`make.py`), `grove-dotfiles/config/fastfetch/avatar.png`, `avatar-light-hard.png`, `avatar-light-medium.png`, `avatar-light-soft.png`
+- Read: the avatar image and the private lockup script (the lockup's ink/alpha recipe), and the existing `grove.png` / `grove-light-*.png` (target look)
 
 - [ ] **Step 1:** Write `make.py` (venv in the scratchpad, `pip install pillow numpy`). Ink mask against paper + grid; alpha from ink strength with the t 0.2–0.45 ramp; remove the grid lines; crop to the ink bounding box + 2% margin; upscale ×4 LANCZOS; write the dark file in #DAC7A2 and the three light files in #27332A, each light one treated like its `grove-light-*` counterpart. Print each output's size and the cell width at 17 rows (`round(17 * 2 * w / h)`, terminal cells being about twice as tall as wide).
-- [ ] **Step 2:** Make previews: each PNG composited on its scheme's bg0 (dark medium #2D353B; light hard/medium/soft from `grove-dotfiles/theme/`), at `artifacts/avatar-logo/preview-*.png`.
+- [ ] **Step 2:** Make previews: each PNG composited on its scheme's bg0 (dark medium #2D353B; light hard/medium/soft from `grove-dotfiles/theme/`), kept privately.
 - [ ] **Step 3: Review gate.** Show the user the dark and light-medium previews. Iterate on the user's feedback. Don't start Task 2 until they approve the look.
 - [ ] **Step 4:** Commit the four PNGs: `grove-dotfiles: avatar fastfetch images`.
 
@@ -126,4 +126,4 @@
   - Open a 100-column window: avatar image; then `logo grove`: text art.
   - Open Terminal.app: text art.
   - Run `logo grove` and check that the output is today's.
-- [ ] **Step 3:** Copy the ledger to `artifacts/avatar-logo/sdd-ledger.md`. Wait for "merge it".
+- [ ] **Step 3:** Copy the ledger to the private notes. Wait for "merge it".

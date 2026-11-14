@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift 6 (Command Line Tools), SwiftUI + AppKit (`NSTableView`), Swift Testing. No new dependency.
 
-**Spec:** `grove-dotfiles/docs/specs/2026-11-12-grove-explorer-design.md`, §16 "Folders that open in place" (read it whole, and §6–§8). Mock-ups the owner chose from: `artifacts/grove-explorer/mockups/tree-*.png` (private; look, never copy). The mock program that drew them, whose tree drawing may be adapted: `$TMPDIR/tree-mock/` if it still exists.
+**Spec:** `grove-dotfiles/docs/specs/2026-11-12-grove-explorer-design.md`, §16 "Folders that open in place" (read it whole, and §6–§8). Mock-ups the owner chose from: private images (look, never copy). The mock program that drew them, whose tree drawing may be adapted: `$TMPDIR/tree-mock/` if it still exists.
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - The safety rules of the first build hold unchanged: commands act only on rows the user can see; a pane, and an opened folder, whose contents have not arrived has no rows; operations are values captured at the keypress; every change to files goes through the single run path (`perform`/`enqueue`); the app target has no file-moving code of its own; nothing `@Published` is written during a view update.
 - A row's state is one value: no flag beside the rows that can disagree with them (three defects in the first build came from that).
 - Build: Command Line Tools only; the `@State` macro is unavailable. Tests: Swift Testing. Core logic is tested; the app target has no tests, so decisions live in Core.
-- Commits: `area: summary` plus a short body; each ends with `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`. Branch `grove-explorer`. Never stage `grove-dotfiles/config/grove-keys/keys.toml`. Nothing under `artifacts/` is committed.
+- Commits: `area: summary` plus a short body; each ends with `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`. Branch `grove-explorer`. Never stage `grove-dotfiles/config/grove-keys/keys.toml`. Nothing from the private working folders is committed.
 - Live machine: Grove Explorer is installed and may be open. Workers never install, launch, quit or kill it; the built binary runs only with the offscreen one-shots (`--render`, `--time-list`, `--audit-accessibility`).
 
 ## Review Focus
@@ -152,7 +152,7 @@ docs/manual/09-files.md, the spec's §7
 - [ ] **Step 1: drawing.** The name cell draws, left to right: indent (16 pt × depth), the gutter (chevron or empty), the icon, the name. The header's "Name" stays at the pane's edge. The chevron takes the text colour while the pointer is in its gutter cell. The `.loading` item draws "···" in the quiet colour at the child's icon position, nothing in the other columns, no selection fill, no hover fill. Under a filter, context rows draw their name in the quiet colour, icon and chevron unchanged. Unreadable folders show "--" in Size. Fills and the drop line span the row.
 - [ ] **Step 2: hit testing.** A click in a row's gutter cell (16 × 24 pt at that row's indent) toggles the fold and does not change the selection; ⌥-click opens or closes everything inside. Double-click on the chevron does not navigate. The `.loading` item can't be selected, clicked, dragged or dropped on; arrow keys pass over it.
 - [ ] **Step 3: rename, drag, menu at depth.** The rename field starts at the indented name; a drop on a nested folder row goes into that folder (the existing rule, now with depth); a drag carries `Tree.operands`; the context menu for a nested row acts on that row.
-- [ ] **Step 4: renders.** `--render` states `tree`, `tree-filter`, `tree-rename`, `tree-drop`, `tree-narrow`, `tree-size-sort` from sample data matching the mock-ups; render dark-medium and light-medium into `artifacts/grove-explorer/renders/tree/` (private), open them with Read and compare with `artifacts/grove-explorer/mockups/tree-*.png` until they match in layout, sizes and colours. The existing 28 render states must be byte-identical except where every list row now has the 16 pt gutter: say which changed and look at them.
+- [ ] **Step 4: renders.** `--render` states `tree`, `tree-filter`, `tree-rename`, `tree-drop`, `tree-narrow`, `tree-size-sort` from sample data matching the mock-ups; render dark-medium and light-medium into a private folder, open them with Read and compare with the private tree mock-ups until they match in layout, sizes and colours. The existing 28 render states must be byte-identical except where every list row now has the 16 pt gutter: say which changed and look at them.
 - [ ] **Step 5:** build; commit.
 
 ### Task 5: VoiceOver, the audit, the manual, the whole check

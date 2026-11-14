@@ -17,7 +17,7 @@
 - Copy: header `Bluetooth`; `No devices connected`; `Bluetooth is off`; `Grove Keys needs Bluetooth permission`; usage string `Grove Keys shows your Bluetooth devices and their batteries in the Grove bar.`
 - Orange only on the CPU/memory middle line and the Wi-Fi/Bluetooth line inside the dropdowns.
 - No real device names or Bluetooth addresses in committed fixtures, tests, renders' sample data or docs (public repo).
-- grove-ui skill (`~/.claude/skills/grove-ui/SKILL.md`). GroveKeys binary only with `--render-panel`, `--check-menu`, `--render-aerospace`, `--render-keys`; never relaunch the installed apps; never install; never toggle the real Bluetooth. Never commit `artifacts/`; never touch `config/grove-keys/keys.toml`, `config/grove/local.env`.
+- grove-ui skill (`~/.claude/skills/grove-ui/SKILL.md`). GroveKeys binary only with `--render-panel`, `--check-menu`, `--render-aerospace`, `--render-keys`; never relaunch the installed apps; never install; never toggle the real Bluetooth. Never commit the private working folders; never touch `config/grove-keys/keys.toml`, `config/grove/local.env`.
 - Commits: `area: summary` + body + `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, by explicit path.
 
 ## Review Focus
@@ -59,6 +59,6 @@
 - [ ] **Step 2:** Wi-Fi panel: an orange line, then `BluetoothSection` (header with a native `Toggle` `.switch` tinted green; rows: kind icon via GroveIcon, name, battery % in quiet text; the empty and off texts). Data from `BluetoothState` read when the panel opens.
 - [ ] **Step 3:** `BluetoothPower.set(_ on: Bool) -> Bool` via `dlsym` of `IOBluetoothPreferenceSetControllerPowerState`; false → open `x-apple.systempreferences:com.apple.preference.Bluetooth`. Permission refused (`CBManager.authorization == .denied`) → the permission text and a button to the privacy pane; never re-asks (Review Focus 5).
 - [ ] **Step 4:** Usage string in the 96 module's Info.plist; bats for that module still pass.
-- [ ] **Step 5:** Sample data in `BarPanels` (anonymised devices); renders `--render-panel wifi` (on with devices, off, permission refused) and `system`, dark-medium and light-medium, into `/Users/gmarques/Developer/project-grove/artifacts/sketchybar/renders/bluetooth/`; look at each.
+- [ ] **Step 5:** Sample data in `BarPanels` (anonymised devices); renders `--render-panel wifi` (on with devices, off, permission refused) and `system`, dark-medium and light-medium, into a private folder; look at each.
 - [ ] **Step 6:** Manual: the bar chapter's pill list and a Bluetooth paragraph. `swift test`; commit `keys: Bluetooth under Wi-Fi in its dropdown; orange CPU/memory line`.
 - [ ] **Step 7: STOP.** Hand back renders and a by-hand list: macOS's Bluetooth prompt; the pill's icon on/off/connected; the switch turns Bluetooth off and on; device batteries; the new order; the orange lines. The controller installs (96 and 99-sketchybar) only on the owner's word.

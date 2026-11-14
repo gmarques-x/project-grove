@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Work on branch `avatar-wallpapers`; merge only on "merge it". Never commit `artifacts/`, `.recording/` or `.superpowers/`.
+- Work on branch `avatar-wallpapers`; merge only on "merge it". Never commit the private working folders.
 - Names exactly `grove` and `avatar`; state file `$GROVE_STATE/wallpaper`; missing, empty or unknown (after trimming whitespace) → `grove`.
 - Files: `grove-wallpapers/wallpaper-avatar-<scheme>.png`, 2880×1864, drawing ≈ 820 px tall, centred on the scheme's bg0 (from `grove-dotfiles/theme/everforest-<scheme>`).
 - With `grove` chosen, every existing behaviour and test result is unchanged.
@@ -31,9 +31,9 @@
 
 ### Task 1: The six avatar wallpapers (review gate)
 
-**Files:** Create `artifacts/avatar-logo/wallpapers.py` (private) and `grove-wallpapers/wallpaper-avatar-{dark,light}-{hard,medium,soft}.png`.
+**Files:** Create a private script (`wallpapers.py`) and `grove-wallpapers/wallpaper-avatar-{dark,light}-{hard,medium,soft}.png`.
 
-- [ ] **Step 1:** Write `wallpapers.py`. It imports `make.py`'s recipe and renders the drawing's alpha and tone at SCALE 6 (sharp at about 820 px tall). Light schemes get the light recolour toward each scheme's bg0. Each drawing is centred on a 2880×1864 bg0 canvas. Save the PNGs, plus small previews in `artifacts/avatar-logo/`.
+- [ ] **Step 1:** Write `wallpapers.py`. It imports `make.py`'s recipe and renders the drawing's alpha and tone at SCALE 6 (sharp at about 820 px tall). Light schemes get the light recolour toward each scheme's bg0. Each drawing is centred on a 2880×1864 bg0 canvas. Save the PNGs, plus small previews kept privately.
 - [ ] **Step 2: Review gate.** Show the user the dark-medium and light-medium previews and iterate. Don't start Task 2 until they approve.
 - [ ] **Step 3:** Commit the six PNGs: `grove-wallpapers: avatar wallpapers`.
 
@@ -106,4 +106,4 @@
   - The gallery and dropdown rows.
   - `grove check` with the avatar chosen.
   - `wallpaper grove` restores today's wallpapers.
-- [ ] **Step 3:** One fresh final review (most capable model), then a fix pass. Copy the ledger to `artifacts/avatar-logo/sdd-ledger-wallpapers.md` and wait for "merge it".
+- [ ] **Step 3:** One fresh final review (most capable model), then a fix pass. Copy the ledger to the private notes and wait for "merge it".

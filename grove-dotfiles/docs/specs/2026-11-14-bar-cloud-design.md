@@ -41,7 +41,7 @@ Success: one glance at the pill says "everything is synced" or not; one click op
 **Permission.** Reading file metadata under `~/Library/CloudStorage` may make macOS ask once whether Grove Keys may access files managed by OneDrive; that prompt is the owner's. Refused: the provider's section says "Grove Keys can't see OneDrive's files" with a button to the privacy setting; the pill ignores that provider.
 
 ## Constraints
-grove-ui rules; JetBrains Mono; renders of the pill states and the dropdown (synced, syncing with files, a problem, a provider not running) in dark and light into `~/Developer/artifacts/sketchybar/renders/cloud/`; no real file names or account names in committed samples, fixtures or docs (public repo); the GroveKeys binary only with its render/check flags; never move, open or download the owner's cloud files.
+grove-ui rules; JetBrains Mono; renders of the pill states and the dropdown (synced, syncing with files, a problem, a provider not running) in dark and light into a private folder; no real file names or account names in committed samples, fixtures or docs (public repo); the GroveKeys binary only with its render/check flags; never move, open or download the owner's cloud files.
 
 ## Calls made in writing this (for the owner to check)
 - Online-only files never count as "not synced"; only uploads, unfinished uploads and active downloads do.

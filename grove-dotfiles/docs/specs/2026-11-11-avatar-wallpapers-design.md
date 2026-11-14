@@ -32,7 +32,7 @@ The desktop can show the avatar's tree-ring drawing instead of the Project Grove
 
 ## 4. The images
 
-- **Generator:** `artifacts/avatar-logo/wallpapers.py` (private). It renders the avatar drawing at high resolution (`make.py`'s recipe at a larger scale, so the lines stay sharp at desktop size). It centres the drawing on each scheme's bg0 on a 2880×1864 canvas, about 820 px tall. Light schemes use the logo's light recolour toward that scheme's bg0.
+- **Generator:** a private script, `wallpapers.py`. It renders the avatar drawing at high resolution (`make.py`'s recipe at a larger scale, so the lines stay sharp at desktop size). It centres the drawing on each scheme's bg0 on a 2880×1864 canvas, about 820 px tall. Light schemes use the logo's light recolour toward that scheme's bg0.
 - **Outputs** in `grove-wallpapers/` (tracked): `wallpaper-avatar-<scheme>.png` for the six schemes. They're exempt from the palette rule, like the Grove wallpapers.
 - **Review gate:** a dark and a light draft go to the user before anything else is built.
 

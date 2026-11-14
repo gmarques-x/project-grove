@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift 6 (Command Line Tools, no Xcode), SwiftUI + AppKit, macOS 14+, Swift Testing, bats for the installer.
 
-**Spec:** `grove-dotfiles/docs/specs/2026-11-12-grove-explorer-design.md` (read it whole before any task). Mock-ups: `artifacts/grove-explorer/mockups/*.png` (private; look, never copy into tracked files). The mock-up program's views may be adapted: `<session scratchpad>/explorer-mock/`.
+**Spec:** `grove-dotfiles/docs/specs/2026-11-12-grove-explorer-design.md` (read it whole before any task). Mock-ups: private images (look, never copy into tracked files). The mock-up program's views may be adapted: `<session scratchpad>/explorer-mock/`.
 
 ## Global Constraints
 
@@ -21,7 +21,7 @@
 - Rows 24 pt; tab strip and path bar 32 pt each; icons 16 pt; Name column capped at 560 pt; pane-width thresholds 640 pt and 430 pt; sidebar rail 48 pt.
 - Bundle id `com.projectgrove.explorer`; URL scheme `groveexplorer`; app at `~/Applications/Grove Explorer.app`; signed with the "Grove Code Signing" identity as modules 96/97 do.
 - Number and date formatting: sizes pinned to `en_US_POSIX` (decimal point), dates in the user's locale.
-- Commits: `area: summary` plus a short body; each ends with `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`. Branch `grove-explorer`. Never stage `grove-dotfiles/config/grove-keys/keys.toml` (the owner's uncommitted edit). Nothing under `artifacts/` or `.recording/` is ever committed.
+- Commits: `area: summary` plus a short body; each ends with `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`. Branch `grove-explorer`. Never stage `grove-dotfiles/config/grove-keys/keys.toml` (the owner's uncommitted edit). Nothing from the private working folders is ever committed.
 - Live machine: never run the GroveKeys or GroveThemes binaries; the GroveExplorer binary may be run only with `--render` until Task 16 installs it; no simulated keys or clicks; no system-setting changes.
 
 ## Review Focus

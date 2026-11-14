@@ -21,7 +21,7 @@
 - ⌘K and File ▸ Connect to Server… open the sheet; ⌘K is added to main spec §7's table (a Core test parses §7 against `CommandList`).
 - Nothing about a password in logs, files, the status line or VoiceOver.
 - grove-ui skill (`~/.claude/skills/grove-ui/SKILL.md`): GroveIcon/SF Symbols (`server.rack` for a share row), theme roles only, JetBrains Mono.
-- The GroveExplorer binary runs only with `--render`, `--time-list`, `--audit-accessibility`; never launch, quit or kill the installed app; never install. Never commit `artifacts/`; never touch `grove-dotfiles/config/grove-keys/keys.toml`, `config/ssh/config`, `config/grove/local.env`.
+- The GroveExplorer binary runs only with `--render`, `--time-list`, `--audit-accessibility`; never launch, quit or kill the installed app; never install. Never commit the private working folders; never touch `grove-dotfiles/config/grove-keys/keys.toml`, `config/ssh/config`, `config/grove/local.env`.
 - Commits: `area: summary` + body + `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, by explicit path.
 
 ## Review Focus
@@ -92,7 +92,7 @@
 - Modify: `Sidebar.swift` (labels), `AccessibilityAudit.swift` / `AccessibilityLive.swift` (states), `RenderSamples.swift`, `grove-dotfiles/docs/manual/09-files.md`, the shared-folders spec only if something built differs
 
 - [ ] **Step 1: VoiceOver:** a share row's label is `<name> on <host>, shared folder, connected` / `not connected` / `connecting`; the + is `Connect to Server`; the sheet's field and buttons labelled. Add render/audit states `shared` (three rows: connected, not connected, connecting) and `connect-sheet` (with a failure sentence showing); `--audit-accessibility all` — Expected: exit 0, 0 problems.
-- [ ] **Step 2: Renders:** `shared` and `connect-sheet`, dark-medium and light-medium, into `/Users/gmarques/Developer/project-grove/artifacts/grove-explorer/renders/shared/`; look at each.
+- [ ] **Step 2: Renders:** `shared` and `connect-sheet`, dark-medium and light-medium, into a private folder; look at each.
 - [ ] **Step 3: Manual:** a "Shared folders" section in `09-files.md` (connect, ⌘K, states, Keychain, remove vs eject) and ⌘K in its keys table.
 - [ ] **Step 4:** `swift test` once; commit by path: `explorer: shared folders read aloud, rendered and in the manual`.
 - [ ] **Step 5: STOP.** Hand back render paths and a by-hand list: (1) ⌘K, `smb://grove-lab/<share>`, macOS's password sheet with "Remember in Keychain", the share opens and its row appears; (2) eject, then click the row: it reconnects without asking; (3) a wrong share name shows `There is no share called … on grove-lab` in the sheet; (4) cancel the password sheet: nothing shown; (5) quit and reopen: the row is still there; (6) a share mounted from Finder shows on its row, not in LOCATIONS; (7) Remove from Sidebar keeps it mounted under LOCATIONS. The controller installs only on the owner's word.

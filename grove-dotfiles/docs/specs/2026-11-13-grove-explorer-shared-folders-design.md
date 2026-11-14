@@ -4,7 +4,7 @@ Date: 2026-11-13. Status: design for the owner's review.
 
 ## Intent
 
-The owner keeps SMB shares on grove-lab, his Proxmox host. Today a share only
+The owner keeps SMB shares on grove-lab, the owner's Proxmox host. Today a share only
 appears in Grove Explorer if Finder mounted it, and it is gone from the sidebar
 the moment it unmounts. He wants Grove Explorer itself to connect to a share
 and keep it in the sidebar, so getting back to it is one click, without Finder.

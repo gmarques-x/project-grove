@@ -19,7 +19,7 @@
 - Rows: action / submenu / note / link, enabled or disabled, checked, icon or app icon at any level, submenus fillable when opened; no shortcut hints.
 - VoiceOver: `AXMenu` / `AXMenuItem` with checked, disabled and submenu states; rows that lose `.contextMenu` keep a "Show Menu" accessibility action.
 - Native stays: app menu-bar menus and the Global Menu.
-- grove-ui skill rules; renders dark-medium and light-medium into `/Users/gmarques/Developer/artifacts/<app>/renders/menus/` (files for the owner go under ~/Developer/artifacts). Never commit anything under artifacts.
+- grove-ui skill rules; renders dark-medium and light-medium into a private folder (files for the owner stay out of the repo). Never commit them.
 - Binaries only with their render/audit flags: GroveKeys `--render-panel|--render-keys|--render-aerospace|--check-menu` (anything else starts a second app and clears the owner's Caps Lock mapping); GroveExplorer `--render|--time-list|--audit-accessibility`. Never launch, quit or install the apps. Never touch `config/grove-keys/keys.toml`.
 - Commits: `area: summary` + body + `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, by explicit path.
 
@@ -51,11 +51,11 @@
 **Files:** Modify `grove-explorer/app/Sources/GroveExplorer/ContextMenu.swift` (`ListMenu` → rows, Open With as a `fill` submenu with app icons and "No Application Opens This" as a note), `KeyboardReach.swift` (`popUp`, `menuIsUp`, `showSidebarMenu` → `onClose`), `Sidebar.swift` (`.contextMenu` → right-click handler + "Show Menu" accessibility action), `FileListCells.swift` (`menu(for:)` → GroveMenuList), `AccessibilityAudit.swift` / `Render.swift` (a `menu` state with the list menu and Open With open offscreen).
 - [ ] Step 1: switch each site; keep every row, title, enablement and action exactly as today.
 - [ ] Step 2: the audit's `menu` state checks the menu through the accessibility server (roles, titles, the submenu); `--audit-accessibility all` exits 0.
-- [ ] Step 3: renders: the list menu with Open With open; the sidebar menu (a share row and a disk row), dark and light, into `/Users/gmarques/Developer/artifacts/grove-explorer/renders/menus/`; look at each. `swift test` — PASS. Commit `explorer: right-click menus are Grove menus`.
+- [ ] Step 3: renders: the list menu with Open With open; the sidebar menu (a share row and a disk row), dark and light, into a private folder; look at each. `swift test` — PASS. Commit `explorer: right-click menus are Grove menus`.
 
 ### Task 4: Grove Keys' menus, GroveSelect, the pointer menu, the rules
 **Files:** Modify `grove-keys/app/Sources/GroveKeys/BindingsView.swift` (row `.contextMenu` → GroveMenuList + "Show Menu" action), `grove-themes/app/Sources/GroveUI/GroveSelect.swift` (its list → GroveMenuList with a check on the current choice), `grove-keys/app/Sources/GroveKeys/PointerMenu.swift` (`grovekeys://menu` pops GroveMenuList with the Grove menu's rows; the Global Menu row still opens the native Global Menu), `~/.claude/skills/grove-ui/SKILL.md` (table rows: right-click menus and in-window dropdown lists use `GroveMenuList`; "Don't build by hand: context menus" reworded to "don't build another menu: use GroveMenuList"), manual chapters that describe these menus.
 - [ ] Step 1: switch the three sites; GroveSelect keeps its button look and keyboard behaviour; the pointer menu keeps its rows, checks and `--check-menu` results.
-- [ ] Step 2: renders (`--render-panel` / `--render-keys` paths, or a new render state if needed): a Bindings row menu, a GroveSelect list open, the pointer Grove menu, dark and light, into `/Users/gmarques/Developer/artifacts/grove-keys/renders/menus/`; look at each.
+- [ ] Step 2: renders (`--render-panel` / `--render-keys` paths, or a new render state if needed): a Bindings row menu, a GroveSelect list open, the pointer Grove menu, dark and light, into a private folder; look at each.
 - [ ] Step 3: `swift test` in grove-themes, grove-keys, grove-explorer; bats `modules_keys_app.bats`; commit `keys: Grove menus for Bindings, GroveSelect and the pointer menu; the UI rules`.
 - [ ] Step 4: STOP. Hand back the renders and a by-hand list: right-click in Explorer's list and sidebar (keys, Esc, outside click, Open With); context-menu key / Shift-F10; a Bindings row's menu; a GroveSelect list; the pointer Grove menu; VoiceOver reading a menu. The controller installs (94, 96, 97) only on the owner's word.

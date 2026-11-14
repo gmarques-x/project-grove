@@ -8,11 +8,11 @@
 
 **Tech Stack:** SketchyBar (`felixkratz/formulae`), bash, bats, shellcheck, Swift (Grove Keys).
 
-**Spec:** `grove-dotfiles/docs/specs/2026-11-11-sketchybar-design.md`. Mockups: `artifacts/sketchybar/mockups/` (style B).
+**Spec:** `grove-dotfiles/docs/specs/2026-11-11-sketchybar-design.md`. Mockups: a private mock-up page (style B).
 
 ## Global Constraints
 
-- Work on branch `sketchybar`; merge only on "merge it". Never commit `artifacts/`, `.recording/` or `.superpowers/`.
+- Work on branch `sketchybar`; merge only on "merge it". Never commit the private working folders.
 - Strip 48 pt, bg0, `topmost=window`, `sticky=on`. Bar 32 pt, inset 8 pt, radius 10, bg0 fill, 1 pt bg3 border. AeroSpace `gaps.outer.top = 56`.
 - Text JetBrains Mono 13. Icons from SF Pro's SF Symbols. Colours only from `colors.sh` (`0xffRRGGBB`, the `_argb` values).
 - Rates: `B/s` under 1 KB, `KB/s` with no decimals under 1 MB, `MB/s` with one decimal. Percentages are integers. A failed or garbled source shows `—`.
@@ -35,7 +35,7 @@
 - [ ] **Step 1: Confirm with the user** before touching the Mac. Then run `brew tap felixkratz/formulae`, `brew trust felixkratz/formulae` and `brew install sketchybar`. Don't start the service.
 - [ ] **Step 2:** Write a throwaway config in the scratchpad: the strip and bar per Global Constraints, with three dummy items left and three right. Try (a) one bracket background behind all items, and (b) bar margins with a bar background over the strip. Run `sketchybar --config <scratch>/sketchybarrc` for each, and ask the user to look.
 - [ ] **Step 3:** With menu bar auto-hide on (`defaults write NSGlobalDomain _HIHideMenuBar -bool true; killall SystemUIServer`), confirm the native menu bar's reveal stays hidden behind the strip.
-- [ ] **Step 4:** Record what worked in `artifacts/sketchybar/spike.md`. Quit the spike bar. If neither drawing works, stop and bring the options to the user.
+- [ ] **Step 4:** Record what worked in the private notes. Quit the spike bar. If neither drawing works, stop and bring the options to the user.
 
 ### Task 1: `lib.sh`, parsers and formatters
 
@@ -135,4 +135,4 @@
   - The notch area.
   - Ethernet or VPN, if available.
   - Logging out and back in.
-- [ ] **Step 3:** One fresh final review on the most capable model, then a fix pass. Copy the ledger to `artifacts/sketchybar/sdd-ledger.md` and wait for "merge it".
+- [ ] **Step 3:** One fresh final review on the most capable model, then a fix pass. Copy the ledger to the private notes and wait for "merge it".

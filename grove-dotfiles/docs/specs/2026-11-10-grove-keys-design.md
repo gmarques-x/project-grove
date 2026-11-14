@@ -3,7 +3,7 @@
 **Status:** design for review, 2026-11-10
 **Builds on:** [2026-11-10-aerospace-design.md](2026-11-10-aerospace-design.md) (the bindings it takes over), [2026-11-10-grove-themes-design.md](2026-11-10-grove-themes-design.md) (the app pattern and the Grove look)
 **Comes before:** the SketchyBar top bar
-**Mockups:** `artifacts/grove-keys/gui-mockups/window.html` (private page https://claude.ai/artifact/EtLGo8PSZYVqz4GeQxn3MT), approved 2026-11-10
+**Mockups:** a private mock-up page, approved 2026-11-10
 
 ## 1. Goal
 
