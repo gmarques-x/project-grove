@@ -35,8 +35,12 @@ public actor OperationRunner {
     }
 
     /// `FileManager` is safe to use from any thread; the type doesn't say so.
+    /// With it, what a worker needs to put a cloud item in the Trash when
+    /// `manager` is refused: Finder, and the home its cloud folders are in.
     fileprivate struct Files: @unchecked Sendable {
         let manager: FileManager
+        let finder: (any FinderTrash)?
+        let home: URL
     }
 
     private let files: Files
@@ -49,14 +53,24 @@ public actor OperationRunner {
     /// Runs waiting for the one in hand, oldest first.
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
-    public init(fileManager: FileManager = .default) {
-        files = Files(manager: fileManager)
+    /// `finder` puts an item in the Trash when `fileManager` is refused it
+    /// for want of permission, for items in the cloud folders of `home`
+    /// (see `CloudTrash`); with none, such an item fails as any other.
+    public init(
+        fileManager: FileManager = .default, finder: (any FinderTrash)? = nil,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) {
+        files = Files(manager: fileManager, finder: finder, home: home)
         watching = nil
     }
 
     /// `watching` is told each stage of the work, on the thread doing it.
-    init(fileManager: FileManager = .default, watching: @escaping @Sendable (Stage) -> Void) {
-        files = Files(manager: fileManager)
+    init(
+        fileManager: FileManager = .default, finder: (any FinderTrash)? = nil,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        watching: @escaping @Sendable (Stage) -> Void
+    ) {
+        files = Files(manager: fileManager, finder: finder, home: home)
         self.watching = watching
     }
 
@@ -156,7 +170,8 @@ public actor OperationRunner {
             }
             return Worker(
                 operation: operation, known: Set(asked.map(OperationRunner.key)), files: files.manager,
-                flag: flag, watching: watching, resolve: resolve, progress: { _ in }
+                finder: files.finder, home: files.home, flag: flag, watching: watching, resolve: resolve,
+                progress: { _ in }
             ).run()
         }
 
@@ -168,7 +183,8 @@ public actor OperationRunner {
         func put(_ item: URL, at place: URL) -> Outcome {
             Worker(
                 operation: .move(items: [item], to: place.deletingLastPathComponent()), known: [],
-                files: files.manager, flag: flag, watching: watching, resolve: { _ in .skip }, progress: { _ in }
+                files: files.manager, finder: files.finder, home: files.home, flag: flag, watching: watching,
+                resolve: { _ in .skip }, progress: { _ in }
             ).put(at: place)
         }
     }
@@ -213,8 +229,8 @@ public actor OperationRunner {
         withoutActuallyEscaping(resolve) { resolve in
             withoutActuallyEscaping(progress) { progress in
                 Worker(
-                    operation: operation, known: known, files: files.manager, flag: flag,
-                    watching: watching, resolve: resolve, progress: progress
+                    operation: operation, known: known, files: files.manager, finder: files.finder,
+                    home: files.home, flag: flag, watching: watching, resolve: resolve, progress: progress
                 ).run()
             }
         }

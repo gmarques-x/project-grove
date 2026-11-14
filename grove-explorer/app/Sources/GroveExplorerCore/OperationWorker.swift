@@ -22,6 +22,10 @@ final class Worker {
     /// The answers given, by target.
     private var answered: [String: Conflict.Choice] = [:]
     private let files: FileManager
+    /// Asked to put an item of `home`'s cloud folders in the Trash when
+    /// `files` is refused it for want of permission.
+    private let finder: (any FinderTrash)?
+    private let home: URL
     private let flag: CancelFlag
     private let watching: (@Sendable (OperationRunner.Stage) -> Void)?
     private let resolve: (URL) -> Conflict.Choice
@@ -36,13 +40,15 @@ final class Worker {
     private var shortage: Shortage?
 
     init(
-        operation: Operation, known: Set<String>, files: FileManager, flag: CancelFlag,
-        watching: (@Sendable (OperationRunner.Stage) -> Void)?,
+        operation: Operation, known: Set<String>, files: FileManager, finder: (any FinderTrash)?, home: URL,
+        flag: CancelFlag, watching: (@Sendable (OperationRunner.Stage) -> Void)?,
         resolve: @escaping (URL) -> Conflict.Choice, progress: @escaping (Progress) -> Void
     ) {
         self.operation = operation
         self.known = known
         self.files = files
+        self.finder = finder
+        self.home = home
         self.flag = flag
         self.watching = watching
         self.resolve = resolve
@@ -571,7 +577,7 @@ final class Worker {
             try files.trashItem(at: url, resultingItemURL: &inTrash)
             guard let inTrash = inTrash as URL? else {
                 // Gone to the Trash, but the system didn't say where.
-                return failed("it is in the Trash, but where there is not known")
+                return failed(Self.unknownPlace)
             }
             return inTrash
         } catch {
@@ -579,7 +585,16 @@ final class Worker {
             guard error.domain == NSCocoaErrorDomain else { return failed(error.localizedDescription) }
             switch error.code {
             case NSFileNoSuchFileError, NSFileReadNoSuchFileError: return failed(Self.reason(ENOENT))
-            case NSFileWriteNoPermissionError, NSFileReadNoPermissionError: return failed(Self.reason(EACCES))
+            case NSFileWriteNoPermissionError, NSFileReadNoPermissionError:
+                // macOS refuses it for an item of a File Provider domain;
+                // Finder may do it.
+                guard let finder, CloudTrash.isCloudItem(url, home: home) else { return failed(Self.reason(EACCES)) }
+                switch finder.trash(url) {
+                case let .success(inTrash): return inTrash
+                case .failure(.notAllowed): return failed(CloudTrash.notAllowed)
+                case let .failure(.failed(message)): return failed(CloudTrash.finderFailed(message))
+                case .failure(.unknownLocation): return failed(Self.unknownPlace)
+                }
             case NSFeatureUnsupportedError: return failed("its disk has no Trash")
             default: return failed(error.localizedDescription)
             }
@@ -618,6 +633,8 @@ final class Worker {
     }
 
     private static let appeared = "an item with that name appeared"
+
+    private static let unknownPlace = "it is in the Trash, but where there is not known"
 
     private static func alreadyThere(_ name: String) -> String {
         "an item named “\(name)” is already there"

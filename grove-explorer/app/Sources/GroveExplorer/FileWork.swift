@@ -135,7 +135,7 @@ final class FileWork: ObservableObject {
     var touched: [String: URL] = [:]
 
     init() {
-        runner = OperationRunner()
+        runner = OperationRunner(finder: AppleScriptFinderTrash())
         undo = UndoStack(runner: runner)
     }
 }
