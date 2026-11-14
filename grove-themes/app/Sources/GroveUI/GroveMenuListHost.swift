@@ -13,15 +13,19 @@ import SwiftUI
 /// Pops up the Grove menu (`GroveMenuListRow`s) at a point in a view.
 ///
 /// One menu is open at a time in the app: a new `popUp` closes the open one
-/// first (its `onClose` runs). While it is open every key-down of the app
-/// goes to the menu and nothing else gets it: ↑↓ (Home/End) move, → or
-/// Return opens a submenu, ← and Esc close one, Return and Space choose,
+/// first (its `onClose` runs). A menu popped up while the app is in the
+/// background brings the app forward (the panels still never take the
+/// keyboard), or no key would reach it. While it is open every key-down of
+/// the app goes to the menu and nothing else gets it: ↑↓ (Home/End) move, →
+/// or Return opens a submenu, ← and Esc close one, Return and Space choose,
 /// a letter jumps; Esc with no submenu open closes the menu, as does Return
-/// with no row highlighted. It closes without choosing on a click outside
-/// it (a right-click goes on to what it was on, so a second right-click
-/// opens a menu there instead), the window it was opened from closing or
-/// losing the keyboard, the app going to the background, a Space or screen
-/// change.
+/// with no row highlighted. A press held and released over a row chooses
+/// it; a plain click's release leaves the menu open (`MenuPress`).
+/// Scrolling outside the menu does nothing while it is open. It closes
+/// without choosing on a click outside it (a right-click goes on to what it
+/// was on, so a second right-click opens a menu there instead), the window
+/// it was opened from closing or losing the keyboard, the view leaving that
+/// window, the app going to the background, a Space or screen change.
 @MainActor
 public enum GroveMenuList {
     static let host = GroveMenuListHost()
@@ -55,9 +59,17 @@ public enum GroveMenuList {
 final class GroveMenuListHost {
     /// False in tests: the panels are made and placed, never shown.
     let showsPanels: Bool
+    /// Whether the app is in front, and bringing it there (tests replace them).
+    let isActive: @MainActor () -> Bool
+    let activate: @MainActor () -> Void
+    /// Each accessibility notification posted, with the level's depth (for tests).
+    var onPost: ((Int, NSAccessibility.Notification) -> Void)?
 
-    init(showsPanels: Bool = true) {
+    init(showsPanels: Bool = true, isActive: @escaping @MainActor () -> Bool = { NSApp.isActive },
+         activate: @escaping @MainActor () -> Void = { NSApp.activate() }) {
         self.showsPanels = showsPanels
+        self.isActive = isActive
+        self.activate = activate
     }
 
     /// One open menu.
@@ -65,6 +77,11 @@ final class GroveMenuListHost {
     final class Open {
         let model: GroveMenuListModel
         weak var owner: NSWindow?
+        /// The view it was popped up in: it leaving the window closes the menu.
+        weak var view: NSView?
+        /// The press that opened it (its time and place on screen, y down),
+        /// until its release comes.
+        var press: (time: TimeInterval, point: CGPoint)?
         let theme: ThemeColors
         let onChoose: (String) -> Void
         let onClose: () -> Void
@@ -78,10 +95,11 @@ final class GroveMenuListHost {
         var changes: AnyCancellable?
         var refreshPending = false
 
-        init(model: GroveMenuListModel, owner: NSWindow, theme: ThemeColors, screen: CGRect,
+        init(model: GroveMenuListModel, owner: NSWindow, view: NSView, theme: ThemeColors, screen: CGRect,
              onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
             self.model = model
             self.owner = owner
+            self.view = view
             self.theme = theme
             self.screen = screen
             self.onChoose = onChoose
@@ -89,15 +107,23 @@ final class GroveMenuListHost {
         }
 
         func owns(_ window: NSWindow?) -> Bool { panels.contains { $0 === window } }
+
+        /// The view is gone or in another window.
+        var viewLeft: Bool { view?.window == nil || view?.window !== owner }
     }
 
     private(set) var current: Open?
     var isOpen: Bool { current != nil }
 
+    /// `opening`: the event that asked for the menu (the right-click), whose
+    /// release must not choose a row unless it was held (`MenuPress`).
     func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
+               opening: NSEvent? = NSApp.currentEvent,
                onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
-        close()
-        guard !rows.isEmpty, let owner = view.window else {
+        // The open menu's `onClose` may pop up another: this, the newest
+        // call, closes that one too. Never two at once.
+        for _ in 0..<8 where current != nil { close() }
+        guard current == nil, !rows.isEmpty, let owner = view.window else {
             onClose()
             return
         }
@@ -107,7 +133,11 @@ final class GroveMenuListHost {
 
         let model = GroveMenuListModel(width: nil, icons: false)
         model.show(rows)
-        let open = Open(model: model, owner: owner, theme: theme, screen: bounds, onChoose: onChoose, onClose: onClose)
+        let open = Open(model: model, owner: owner, view: view, theme: theme, screen: bounds,
+                        onChoose: onChoose, onClose: onClose)
+        if let opening, [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(opening.type) {
+            open.press = (opening.timestamp, Self.yDown(Self.screenPoint(opening)))
+        }
         current = open
         model.onChoose = { [weak self, weak open] row in
             guard let self, let open, self.current === open else { return }
@@ -134,10 +164,13 @@ final class GroveMenuListHost {
         panel.setFrame(Self.appKit(frame), display: false)
         open.panels = [panel]
         open.frames = [frame]
+        // In the background no key would reach the menu: the app comes
+        // forward (its window keeps the keyboard; the panels never take it).
+        if !isActive() { activate() }
         if showsPanels { panel.orderFrontRegardless() }
         watch(open)
         refreshAccessibility()
-        Self.post(panel.levelMenu, Self.menuOpened)
+        post(panel, Self.menuOpened)
     }
 
     func close() {
@@ -148,6 +181,8 @@ final class GroveMenuListHost {
 
     private func choose(_ id: String) {
         guard let open = current else { return }
+        // Chosen from a view that is gone: nothing to do it for.
+        if open.viewLeft { return close() }
         tearDown(open)
         open.onChoose(id)
         open.onClose()
@@ -164,7 +199,7 @@ final class GroveMenuListHost {
         open.model.onLevels = {}
         open.model.clear()
         for panel in open.panels.reversed() {
-            Self.post(panel.levelMenu, Self.menuClosed)
+            post(panel, Self.menuClosed)
             panel.parent?.removeChildWindow(panel)
             panel.orderOut(nil)
         }
@@ -212,20 +247,29 @@ final class GroveMenuListHost {
             let frame = MenuPlacement.submenu(parent: parent, row: submenu.row, size: submenu.size,
                                               firstRow: submenu.firstRow, bounds: open.screen)
             let panel: GroveMenuListWindow
+            let rows = open.model.levels.indices.contains(depth) ? open.model.levels[depth].rows.map(\.id) : []
             if depth < open.panels.count {
                 panel = open.panels[depth]
                 open.frames[depth] = frame
+                // The panel now shows another row's submenu: to VoiceOver,
+                // one menu closed and another opened.
+                if panel.shownRows != rows {
+                    post(panel, Self.menuClosed)
+                    post(panel, Self.menuOpened)
+                }
             } else {
                 panel = makePanel(open, depth: depth)
                 open.panels.append(panel)
                 open.frames.append(frame)
+                post(panel, Self.menuOpened)
             }
+            panel.shownRows = rows
             let target = Self.appKit(frame)
             if panel.frame != target { panel.setFrame(target, display: true) }
-            // A child panel goes with the menu's and stays above it.
+            // A child panel goes with the menu's and stays above it. (Not
+            // in tests: a child is ordered in with its parent.)
             if showsPanels, panel.parent == nil {
                 open.panels[depth - 1].addChildWindow(panel, ordered: .above)
-                Self.post(panel.levelMenu, Self.menuOpened)
             }
             open.model.placed(depth, onLeft: frame.minX < parent.minX)
             count += 1
@@ -233,7 +277,7 @@ final class GroveMenuListHost {
         while open.panels.count > count {
             let panel = open.panels.removeLast()
             open.frames.removeLast()
-            Self.post(panel.levelMenu, Self.menuClosed)
+            post(panel, Self.menuClosed)
             panel.parent?.removeChildWindow(panel)
             panel.orderOut(nil)
         }
@@ -260,9 +304,11 @@ final class GroveMenuListHost {
         observe(.default, NSApplication.didChangeScreenParametersNotification)
         observe(NSWorkspace.shared.notificationCenter, NSWorkspace.activeSpaceDidChangeNotification)
 
-        // The keys, and a click in another of the app's windows.
+        // The keys, a click in another of the app's windows, a held press's
+        // release, scrolling.
         if let monitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown], handler: { [weak self] event in
+            matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp, .rightMouseUp,
+                       .scrollWheel], handler: { [weak self] event in
                 nonisolated(unsafe) let event = event
                 let passes = MainActor.assumeIsolated { self?.handle(event) ?? true }
                 return passes ? event : nil
@@ -281,9 +327,15 @@ final class GroveMenuListHost {
     /// An event of the app's while a menu is open: whether it goes on
     /// (false: the menu used it up). Every key-down is the menu's; a click
     /// in its panels goes to them; a click anywhere else closes it, and only
-    /// a right-click goes on.
+    /// a right-click goes on. A release over a row chooses it, unless it is
+    /// a plain click's (the press that opened the menu, not held). Scrolling
+    /// outside the menu is swallowed.
     func handle(_ event: NSEvent) -> Bool {
         guard let open = current else { return true }
+        if open.viewLeft {
+            close()
+            return true
+        }
         switch event.type {
         case .keyDown:
             key(event, open.model)
@@ -292,9 +344,40 @@ final class GroveMenuListHost {
             if open.owns(event.window) { return true }
             close()
             return event.type == .rightMouseDown
+        case .leftMouseUp, .rightMouseUp:
+            // A left click in a panel is its pointer view's.
+            if event.type == .leftMouseUp, open.owns(event.window) {
+                open.press = nil
+                return true
+            }
+            let point = Self.yDown(Self.screenPoint(event))
+            if let press = open.press {
+                open.press = nil
+                guard MenuPress.releaseChooses(pressedAt: press.time, at: press.point,
+                                               releasedAt: event.timestamp, at: point) else { return true }
+            }
+            return !release(at: point, open)
+        case .scrollWheel:
+            return open.owns(event.window)
         default:
             return true
         }
+    }
+
+    /// A release at `point` (screen, y down): over a row that can be chosen
+    /// it is that row's click. True when it was over a panel.
+    private func release(at point: CGPoint, _ open: Open) -> Bool {
+        for depth in open.frames.indices.reversed() where open.frames[depth].contains(point) {
+            let frame = open.frames[depth]
+            let local = CGPoint(x: point.x - frame.minX, y: point.y - frame.minY)
+            let model = open.model
+            if model.levels.indices.contains(depth), let row = model.levels[depth].layout.row(at: local),
+               model.levels[depth].rows[row].isSelectable {
+                model.click(depth, at: local)
+            }
+            return true
+        }
+        return false
     }
 
     private func key(_ event: NSEvent, _ model: GroveMenuListModel) {
@@ -308,6 +391,11 @@ final class GroveMenuListHost {
     }
 
     // MARK: Coordinates
+
+    /// Where an event happened, in AppKit's screen space.
+    static func screenPoint(_ event: NSEvent) -> NSPoint {
+        event.window.map { $0.convertPoint(toScreen: event.locationInWindow) } ?? event.locationInWindow
+    }
 
     /// The top of the main display, y 0 when y goes down.
     private static var top: CGFloat { NSScreen.screens.first?.frame.maxY ?? 0 }
@@ -330,9 +418,10 @@ final class GroveMenuListHost {
     static let menuClosed = NSAccessibility.Notification(rawValue: "AXMenuClosed")
     static let menuItemSelected = NSAccessibility.Notification(rawValue: "AXMenuItemSelected")
 
-    private static func post(_ menu: GroveMenuListAccessibleMenu?, _ notification: NSAccessibility.Notification) {
-        guard let menu else { return }
+    private func post(_ panel: GroveMenuListWindow, _ notification: NSAccessibility.Notification) {
+        guard let menu = panel.levelMenu else { return }
         NSAccessibility.post(element: menu, notification: notification)
+        onPost?(menu.depth, notification)
     }
 
     /// Makes each panel's `AXMenu` say what its level shows.
@@ -355,6 +444,9 @@ final class GroveMenuListHost {
 final class GroveMenuListWindow: NSPanel {
     /// Its content, the level's `AXMenu`.
     weak var levelMenu: GroveMenuListAccessibleMenu?
+    /// The ids of the rows it shows, to tell when a submenu's panel changes
+    /// to another row's submenu.
+    var shownRows: [String] = []
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -369,7 +461,8 @@ private struct GroveMenuListPopUpRoot: View {
 
     var body: some View {
         Color.clear.overlay(alignment: .topLeading) {
-            GroveMenuListPanel(model: model, level: level, surface: .panel)
+            // The bar's Grove menu's own card: bg0, its outline.
+            GroveMenuListPanel(model: model, level: level)
         }
         .environment(\.theme, theme)
     }
@@ -383,9 +476,7 @@ private struct GroveMenuListPopUpRoot: View {
 /// in for the SwiftUI rows drawn under it, which VoiceOver doesn't see.
 final class GroveMenuListAccessibleMenu: NSView {
     let depth: Int
-    // Read by the accessibility server's calls, which AppKit makes on the
-    // main thread; written only from the main actor.
-    nonisolated(unsafe) private(set) var items: [GroveMenuListAccessibleItem] = []
+    private(set) var items: [GroveMenuListAccessibleItem] = []
     /// The child a closed submenu's row has, so it reads as one.
     private var closedSubmenus: [String: NSAccessibilityElement] = [:]
 
@@ -402,8 +493,13 @@ final class GroveMenuListAccessibleMenu: NSView {
     override func accessibilityRole() -> NSAccessibility.Role? { .menu }
     override func accessibilityChildren() -> [Any]? { items }
 
+    // Not main-actor isolated in AppKit, but called on the main thread.
+    // Only the element found leaves the main actor's region, and it is
+    // read by the accessibility server on that same thread.
     override func accessibilityHitTest(_ point: NSPoint) -> Any? {
-        items.first { $0.accessibilityFrame().contains(point) } ?? self
+        nonisolated(unsafe) var hit: Any?
+        MainActor.assumeIsolated { hit = items.first { $0.accessibilityFrame().contains(point) } ?? self }
+        return hit
     }
 
     func update(level: GroveMenuListModel.Level, checked: Set<String>, openRow: Int?,

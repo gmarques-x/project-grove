@@ -372,6 +372,17 @@ import Testing
         #expect(huge.minX == 0 && huge.minY == 33)
     }
 
+    @Test func aPointOffTheVisibleFrameIsBroughtOntoIt() {
+        // Left of the screen and above its visible top (in the menu bar).
+        let above = MenuPlacement.menu(origin: CGPoint(x: -50, y: 10), size: Self.size, screen: Self.screen)
+        #expect(above == CGRect(x: 0, y: 33, width: 220, height: 161))
+        // Past the right edge and below the bottom: flipping alone would
+        // still leave it hanging off; it is pushed to the edges.
+        let past = MenuPlacement.menu(origin: CGPoint(x: 1600, y: 1100), size: Self.size, screen: Self.screen)
+        #expect(past == CGRect(x: 1292, y: 821, width: 220, height: 161))
+        #expect(Self.screen.contains(past))
+    }
+
     @Test func aSubmenuOpenedInTheBottomRightCornerStaysOnScreen() {
         // The menu flipped up and left; its last row's submenu has no room
         // at the right, so it goes to the menu's left, and it is moved up
@@ -392,6 +403,31 @@ import Testing
                                            firstRow: 8, bounds: Self.screen)
         #expect(beside.minX == roomy.maxX - 1)
         #expect(beside.minY + 8 == roomy.minY + layout.rows[2].minY)
+    }
+}
+
+/// Press, hold, release over a row: the release of the click that opened
+/// the menu chooses only after a hold and a move.
+@Suite struct MenuPressTests {
+    static let down = CGPoint(x: 400, y: 300)
+
+    @Test func aQuickClickLeavesTheMenuOpen() {
+        #expect(!MenuPress.releaseChooses(pressedAt: 10, at: Self.down, releasedAt: 10.1,
+                                          at: CGPoint(x: 440, y: 330)))
+    }
+
+    @Test func aHoldWithoutAMoveLeavesTheMenuOpen() {
+        #expect(!MenuPress.releaseChooses(pressedAt: 10, at: Self.down, releasedAt: 12, at: CGPoint(x: 402, y: 301)))
+    }
+
+    @Test func aHoldAndAMoveChooses() {
+        #expect(MenuPress.releaseChooses(pressedAt: 10, at: Self.down, releasedAt: 10 + MenuPress.hold,
+                                         at: CGPoint(x: 430, y: 340)))
+        // Just under the hold, or within the slop: not yet.
+        #expect(!MenuPress.releaseChooses(pressedAt: 10, at: Self.down, releasedAt: 10 + MenuPress.hold - 0.01,
+                                          at: CGPoint(x: 430, y: 340)))
+        #expect(!MenuPress.releaseChooses(pressedAt: 10, at: Self.down, releasedAt: 11,
+                                          at: CGPoint(x: 400 + MenuPress.slop - 1, y: 300)))
     }
 }
 

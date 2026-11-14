@@ -218,6 +218,25 @@ public struct MenuListLayout: Equatable, Sendable {
     }
 }
 
+/// A menu opened by a press (a right-click, a pill's click) that is held:
+/// releasing the button over a row chooses it, as in a native menu, but
+/// the release of a plain click doesn't, so a quick click leaves the menu
+/// open. Only the release of the press that opened the menu is asked about.
+public enum MenuPress {
+    /// How long the button must be held before its release chooses.
+    public static let hold: TimeInterval = 0.3
+    /// How far the pointer must have moved from the press (points, either
+    /// way): a release where it was pressed is a click, however slow.
+    public static let slop: Double = 4
+
+    /// Whether the release at `up` (at `upTime`) of the press at `down`
+    /// (at `downTime`) chooses the row under it. Times in seconds.
+    public static func releaseChooses(pressedAt downTime: TimeInterval, at down: CGPoint,
+                                      releasedAt upTime: TimeInterval, at up: CGPoint) -> Bool {
+        upTime - downTime >= hold && max(abs(up.x - down.x), abs(up.y - down.y)) >= slop
+    }
+}
+
 /// Where a menu's panels go.
 public enum MenuPlacement {
     /// The frame of a menu popped up at `origin` (`GroveMenuList.popUp`), in
@@ -227,16 +246,22 @@ public enum MenuPlacement {
     /// to the point's left (its right edge at the point); without room below,
     /// above the point (its bottom edge at the point), as a native menu.
     /// Where flipping doesn't fit either it is pushed back onto the screen:
-    /// against its right or bottom edge, and never past its left or top.
+    /// against its right or bottom edge, and never past its left or top. A
+    /// point off the visible frame (in the menu bar, past an edge) is
+    /// brought onto it the same way.
     ///
     /// - `size`: the menu panel's.
     /// - `screen`: what the menu may cover (the screen's visible frame).
     public static func menu(origin: CGPoint, size: CGSize, screen: CGRect) -> CGRect {
         let point = CGPoint(x: origin.x.rounded(.down), y: origin.y.rounded(.down))
         func place(_ start: Double, _ length: Double, _ low: Double, _ high: Double) -> Double {
-            guard start + length > high else { return start }
-            let flipped = start - length
-            return flipped >= low ? flipped : max(low, high - length)
+            var value = start
+            if start + length > high {
+                let flipped = start - length
+                value = flipped >= low ? flipped : high - length
+            }
+            // Inside [low, high - length]; the low edge wins when it doesn't fit.
+            return max(low, min(value, high - length))
         }
         return CGRect(x: place(point.x, size.width, screen.minX, screen.maxX),
                       y: place(point.y, size.height, screen.minY, screen.maxY),

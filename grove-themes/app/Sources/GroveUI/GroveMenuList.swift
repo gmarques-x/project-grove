@@ -215,6 +215,9 @@ public final class GroveMenuListModel: ObservableObject {
     /// The level the keys act on.
     private var focus = 0
     private var timer: Timer?
+    /// Per filled row (its id), the ticks its last fill added: a new fill
+    /// replaces them.
+    private var filledTicks: [String: Set<String>] = [:]
 
     /// - `width`: the menu's own panel; nil fits its titles, as submenus
     ///   always do.
@@ -232,6 +235,7 @@ public final class GroveMenuListModel: ObservableObject {
     public func show(_ rows: [GroveMenuListRow]) {
         cancelTimer()
         checked = Self.checkedIDs(rows)
+        filledTicks = [:]
         levels = [level(rows, depth: 0)]
         intents = [MenuHoverIntent()]
         pointers = [nil]
@@ -345,7 +349,11 @@ public final class GroveMenuListModel: ObservableObject {
             if let fill = levels[depth].rows[row].fill {
                 children = fill()
                 guard !children.isEmpty else { return }
-                checked.formUnion(Self.checkedIDs(children))
+                let id = levels[depth].rows[row].id
+                let ticks = Self.checkedIDs(children)
+                checked.subtract(filledTicks[id] ?? [])
+                checked.formUnion(ticks)
+                filledTicks[id] = ticks
             }
             truncate(to: depth)
             intents[depth].set(open: row)
@@ -558,20 +566,16 @@ public final class GroveMenuListModel: ObservableObject {
 public struct GroveMenuListPanel: View {
     @ObservedObject var model: GroveMenuListModel
     let level: Int
-    let surface: Surface
 
-    /// `surface`: the card's fill: `.base` (bg0) for the bar's Grove menu,
-    /// `.panel` (bg1) for a menu over a window (`GroveMenuList.popUp`).
-    public init(model: GroveMenuListModel, level: Int, surface: Surface = .base) {
+    public init(model: GroveMenuListModel, level: Int) {
         self.model = model
         self.level = level
-        self.surface = surface
     }
 
     public var body: some View {
         if model.levels.indices.contains(level) {
             let shown = model.levels[level]
-            BarPanel(width: shown.layout.width, surface: surface) {
+            BarPanel(width: shown.layout.width) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(shown.rows.enumerated()), id: \.element.id) { index, row in
                         if MenuListLayout.showsRule(index, separators: shown.rows.map(\.separator)) {

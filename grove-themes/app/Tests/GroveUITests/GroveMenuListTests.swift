@@ -124,6 +124,21 @@ import Testing
         #expect(model.levels.count == 1)
     }
 
+    @Test func aRefilledSubmenuKeepsNoTicksFromTheLastFill() {
+        var current = true
+        let rows = [GroveMenuListRow(id: "with", title: "Open With", kind: .submenu([]), fill: {
+            [GroveMenuListRow(id: "with.preview", title: "Preview", checked: current)]
+        })]
+        let model = GroveMenuListModel(width: nil, icons: false)
+        model.show(rows)
+        model.open(path: ["with"])
+        #expect(model.checked == ["with.preview"])
+        _ = model.key(.left)
+        current = false
+        model.open(path: ["with"])
+        #expect(model.checked.isEmpty)
+    }
+
     @Test func withoutAWidthTheMenuFitsItsTitles() {
         let model = GroveMenuListModel(width: nil, icons: false)
         model.show([GroveMenuListRow(id: "a", title: "A")])

@@ -25,7 +25,9 @@ import Testing
         var order: [String] = []
     }
 
-    let host = GroveMenuListHost(showsPanels: false)
+    /// In front, as when a menu is right-clicked open: tests of a menu
+    /// popped up in the background make their own.
+    let host = GroveMenuListHost(showsPanels: false, isActive: { true }, activate: {})
     let window: NSWindow
     let calls = Calls()
 
@@ -36,9 +38,10 @@ import Testing
         window.isReleasedWhenClosed = false
     }
 
-    func popUp(_ rows: [GroveMenuListRow] = Self.rows, at point: NSPoint = NSPoint(x: 50, y: 400)) {
+    func popUp(_ rows: [GroveMenuListRow] = Self.rows, at point: NSPoint = NSPoint(x: 50, y: 400),
+               in view: NSView? = nil, opening: NSEvent? = nil) {
         let calls = calls
-        host.popUp(rows: rows, at: point, in: window.contentView!, theme: .fallback,
+        host.popUp(rows: rows, at: point, in: view ?? window.contentView!, theme: .fallback, opening: opening,
                    onChoose: { calls.chosen.append($0); calls.order.append("choose") },
                    onClose: { calls.closed += 1; calls.order.append("close") })
     }
@@ -64,6 +67,26 @@ import Testing
 
     static func names(_ element: NSObject) -> [String] {
         (element.perform(NSSelectorFromString("accessibilityAttributeNames"))?.takeUnretainedValue() as? [String]) ?? []
+    }
+
+    /// A press or a release at `point` on the screen (AppKit's, y up), at `time`.
+    func mouse(_ type: NSEvent.EventType, at point: NSPoint, time: TimeInterval) -> NSEvent {
+        NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: time, windowNumber: 0,
+                           context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    /// The middle of a row of a level's panel, on the screen.
+    func middle(of row: Int, depth: Int = 0) throws -> NSPoint {
+        let open = try #require(host.current)
+        let frame = open.panels[depth].frame, rect = open.model.levels[depth].layout.rows[row]
+        return NSPoint(x: frame.minX + rect.midX, y: frame.maxY - rect.midY)
+    }
+
+    /// The right-click that opened the menu, at the window's point (50, 400).
+    func rightClick(at time: TimeInterval) -> NSEvent {
+        NSEvent.mouseEvent(with: .rightMouseDown, location: NSPoint(x: 50, y: 400), modifierFlags: [], timestamp: time,
+                           windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1,
+                           pressure: 1)!
     }
 
     static let escape: UInt16 = 53, down: UInt16 = 125, right: UInt16 = 124, enter: UInt16 = 36
@@ -235,7 +258,8 @@ import Testing
         window.close()
         #expect(!host.isOpen)
         #expect(calls.closed == 1)
-        #expect(panels.allSatisfy { !$0.isVisible && $0.parent == nil })
+        #expect(panels.allSatisfy { !$0.isVisible })
+        #expect(host.current == nil)
         // Nothing left watching: another close is nothing.
         host.close()
         NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
@@ -270,7 +294,148 @@ import Testing
         #expect(calls.closed == 1)
     }
 
+    // MARK: Press, hold, release
+
+    @Test func aPressHeldAndReleasedOverARowChoosesIt() throws {
+        popUp(opening: rightClick(at: 100))
+        // "Tagged": the release after a hold, and a move from the press.
+        let up = mouse(.rightMouseUp, at: try middle(of: 3), time: 101)
+        #expect(!host.handle(up))
+        #expect(calls.chosen == ["tag"])
+        #expect(calls.order == ["choose", "close"])
+    }
+
+    @Test func aQuickRightClickLeavesTheMenuOpen() throws {
+        popUp(opening: rightClick(at: 100))
+        // Released at once, even over a row: the click only opened it.
+        #expect(host.handle(mouse(.rightMouseUp, at: try middle(of: 0), time: 100.1)))
+        #expect(host.isOpen)
+        #expect(calls.chosen.isEmpty)
+        // A later press and release in the menu is a click on its row.
+        #expect(!host.handle(mouse(.rightMouseUp, at: try middle(of: 0), time: 103)))
+        #expect(calls.chosen == ["open"])
+    }
+
+    @Test func aReleaseOverADisabledRowOrOutsideChoosesNothing() throws {
+        popUp(opening: rightClick(at: 100))
+        // Over "Rename", disabled: used up, nothing chosen.
+        #expect(!host.handle(mouse(.rightMouseUp, at: try middle(of: 1), time: 101)))
+        #expect(host.isOpen && calls.chosen.isEmpty)
+        // Outside the panels: it goes on to what was pressed.
+        #expect(host.handle(mouse(.leftMouseUp, at: NSPoint(x: 1, y: 1), time: 102)))
+        #expect(host.isOpen && calls.chosen.isEmpty)
+    }
+
+    @Test func aReleaseInASubmenuChoosesItsRow() throws {
+        popUp(opening: rightClick(at: 100))
+        _ = host.handle(key(Self.down))
+        _ = host.handle(key(Self.down))
+        _ = host.handle(key(Self.right))
+        #expect(!host.handle(mouse(.rightMouseUp, at: try middle(of: 0, depth: 1), time: 102)))
+        #expect(calls.chosen == ["with.mail"])
+    }
+
+    // MARK: In the background
+
+    @Test func aMenuPoppedUpInTheBackgroundBringsTheAppForward() throws {
+        var asked = 0
+        let background = GroveMenuListHost(showsPanels: false, isActive: { false }, activate: { asked += 1 })
+        background.popUp(rows: Self.rows, at: NSPoint(x: 50, y: 400), in: window.contentView!, theme: .fallback,
+                         opening: nil, onChoose: { _ in }, onClose: {})
+        #expect(asked == 1)
+        // The panel still never takes the keyboard.
+        #expect(background.current?.panels.first?.canBecomeKey == false)
+        background.close()
+        // In front already: nothing to do.
+        popUp()
+        let front = GroveMenuListHost(showsPanels: false, isActive: { true }, activate: { asked += 1 })
+        front.popUp(rows: Self.rows, at: NSPoint(x: 50, y: 400), in: window.contentView!, theme: .fallback,
+                    opening: nil, onChoose: { _ in }, onClose: {})
+        #expect(asked == 1)
+        front.close()
+    }
+
+    // MARK: Odd cases
+
+    @Test func aPopUpFromTheOldMenusOnCloseLeavesOneMenu() {
+        let view = window.contentView!
+        var nested = 0
+        // The old menu's onClose pops up a menu of its own.
+        host.popUp(rows: Self.rows, at: NSPoint(x: 50, y: 400), in: view, theme: .fallback, opening: nil,
+                   onChoose: { _ in }, onClose: { [host] in
+                       host.popUp(rows: Self.rows, at: NSPoint(x: 60, y: 300), in: view, theme: .fallback,
+                                  opening: nil, onChoose: { _ in }, onClose: { nested += 1 })
+                   })
+        popUp()
+        // The nested one was closed by the newest call, once; one is open.
+        #expect(nested == 1)
+        #expect(host.isOpen)
+        #expect(host.current?.panels.count == 1)
+        host.close()
+        #expect(calls.closed == 1)
+    }
+
+    @Test func theViewLeavingItsWindowClosesTheMenu() {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 450))
+        window.contentView!.addSubview(view)
+        popUp(in: view)
+        _ = host.handle(key(Self.down))
+        view.removeFromSuperview()
+        // The next event finds it gone: closed, nothing chosen, the event goes on.
+        #expect(host.handle(key(Self.enter, "\r")))
+        #expect(!host.isOpen)
+        #expect(calls.chosen.isEmpty && calls.closed == 1)
+    }
+
+    @Test func aChoiceAfterTheViewLeftChoosesNothing() throws {
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 450))
+        window.contentView!.addSubview(view)
+        popUp(in: view)
+        let items = try #require(host.current?.panels[0].levelMenu?.items)
+        view.removeFromSuperview()
+        // VoiceOver's press doesn't go through `handle`.
+        _ = items[0].accessibilityPerformPress()
+        #expect(!host.isOpen)
+        #expect(calls.chosen.isEmpty && calls.closed == 1)
+    }
+
+    @Test func scrollingOutsideTheMenuIsSwallowed() throws {
+        popUp()
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: 3,
+                                      wheel2: 0, wheel3: 0))
+        let scroll = try #require(NSEvent(cgEvent: cg))
+        #expect(scroll.type == .scrollWheel)
+        #expect(!host.handle(scroll))
+        #expect(host.isOpen)
+    }
+
     // MARK: Accessibility
+
+    @Test func aSubmenuPanelShowingAnotherRowsSubmenuIsAnotherMenu() throws {
+        var rows = Self.rows
+        rows.append(GroveMenuListRow(id: "more", title: "More", kind: .submenu([
+            GroveMenuListRow(id: "more.a", title: "Alpha"),
+        ])))
+        popUp(rows)
+        var posts: [String] = []
+        host.onPost = { depth, note in posts.append("\(depth) \(note.rawValue)") }
+        _ = host.handle(key(Self.down))
+        _ = host.handle(key(Self.down))
+        _ = host.handle(key(Self.right))
+        #expect(posts == ["1 AXMenuOpened"])
+        // A click on "More" while "Open With" is open: the same panel, its
+        // rows another submenu's.
+        let open = try #require(host.current)
+        let more = open.model.levels[0].layout.rows[4]
+        posts = []
+        open.model.click(0, at: CGPoint(x: more.midX, y: more.midY))
+        #expect(open.panels.count == 2)
+        #expect(open.model.levels[1].rows.map(\.id) == ["more.a"])
+        #expect(posts == ["1 AXMenuClosed", "1 AXMenuOpened"])
+        posts = []
+        host.close()
+        #expect(posts == ["1 AXMenuClosed", "0 AXMenuClosed"])
+    }
 
     @Test func itIsAMenuOfMenuItemsToTheAccessibilityServer() throws {
         popUp()
