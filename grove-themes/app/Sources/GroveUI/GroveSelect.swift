@@ -13,16 +13,19 @@ public struct GroveSelectOption<Value: Hashable>: Identifiable {
     }
 }
 
-/// Grove's one select: a label in JetBrains Mono that opens a native menu
-/// of the values, the current one ticked by the system (an inline `Picker`
-/// inside the `Menu`). The label is the standard pill, the value and a
-/// chevron (`GroveSelectPill`), or the caller's own (a Monitors cell).
-/// VoiceOver reads a pop-up button named `name` whose value is the current
-/// one; the chevron is not read.
+/// Grove's one select: a label in JetBrains Mono that opens the Grove menu
+/// (`GroveMenuList`) of the values under it, the current one ticked. The
+/// label is the standard pill, the value and a chevron (`GroveSelectPill`),
+/// or the caller's own (a Monitors cell). A plain button: a click opens the
+/// list, and so does Space when it has the keyboard focus; in the list the
+/// keys are the menu's (↑↓, Return, Esc, a letter). VoiceOver reads a button
+/// named `name` whose value is the current one; the chevron is not read.
 ///
-/// Not `Picker(.menu)`, on purpose: the native pop-up button draws its label
-/// in the system font whatever `.font` says, and at its smallest is wider
-/// than the 38–40 pt Monitors cells. The menu itself is the system's.
+/// Not `Picker(.menu)` or `Menu`, on purpose: the native pop-up button
+/// draws its label in the system font whatever `.font` says, and at its
+/// smallest is wider than the 38–40 pt Monitors cells; and a native menu
+/// can't take the Grove menu's card, type or rows (spec
+/// 2026-11-13-grove-context-menus-design).
 public struct GroveSelect<Value: Hashable, Label: View>: View {
     let name: String
     let options: [GroveSelectOption<Value>]
@@ -30,6 +33,9 @@ public struct GroveSelect<Value: Hashable, Label: View>: View {
     let valueText: String?
     let onSelect: (Value) -> Void
     let label: Label
+    @Environment(\.theme) private var theme
+    // `State` used directly: no SwiftUI macros with the Command Line Tools.
+    private let anchor = State(initialValue: GroveMenuListAnchor.Box())
 
     /// `selection` nil: nothing is ticked. `valueText`: what VoiceOver reads
     /// as the value, when it isn't the selected option's title.
@@ -49,22 +55,38 @@ public struct GroveSelect<Value: Hashable, Label: View>: View {
     }
 
     public var body: some View {
-        Menu {
-            Picker(name, selection: Binding(get: { selection }, set: { if let value = $0 { onSelect(value) } })) {
-                ForEach(options) { option in
-                    Text(option.title).tag(Optional(option.value))
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            label
+        Button(action: open) { label }
+            .buttonStyle(.plain)
+            .background(GroveMenuListAnchor(box: anchor.wrappedValue, theme: theme, rightClick: false,
+                                            rows: { [] }, onChoose: { _ in }))
+            .accessibilityLabel(name)
+            .accessibilityValue(valueText ?? selectedTitle)
+    }
+
+    /// The list, its top-left a little under the label's bottom-left.
+    private func open() {
+        let options = options, onSelect = onSelect
+        anchor.wrappedValue.view?.showUnder(
+            gap: GroveSpace.s4, rows: GroveSelectOption.menuRows(options, selection: selection),
+            onChoose: { id in
+                if let value = GroveSelectOption.value(of: id, in: options) { onSelect(value) }
+            })
+    }
+}
+
+extension GroveSelectOption {
+    /// The options as the list's rows, in order, the selected one ticked. A
+    /// row's id is its option's place ("0", "1", …): a value needn't be text.
+    public static func menuRows(_ options: [GroveSelectOption], selection: Value?) -> [GroveMenuListRow] {
+        options.enumerated().map { index, option in
+            GroveMenuListRow(id: String(index), title: option.title, checked: option.value == selection)
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .accessibilityLabel(name)
-        .accessibilityValue(valueText ?? selectedTitle)
+    }
+
+    /// The value of the row `id` of `menuRows`; nil for an id it hasn't.
+    public static func value(of id: String, in options: [GroveSelectOption]) -> Value? {
+        guard let index = Int(id), options.indices.contains(index) else { return nil }
+        return options[index].value
     }
 }
 

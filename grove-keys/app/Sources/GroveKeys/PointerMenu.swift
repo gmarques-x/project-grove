@@ -1,13 +1,15 @@
 import AppKit
 import GroveKeysCore
+import GroveUI
 
-/// Grove Keys' native menus popped up at the pointer, for the `grovekeys://`
+/// Grove Keys' menus popped up at the pointer, for the `grovekeys://`
 /// links (the native menu bar is hidden behind the Grove bar): the bar's app
-/// name opens `app-menu` (the front app's menus, which only macOS can draw).
-/// Nothing in the bar opens `menu` any more; it still works, e.g.
-/// `open grovekeys://menu` from a terminal. The pine's Grove menu is no
-/// longer one of these: it is a bar panel (`GroveMenuPanel`), which reads
-/// the menu here (`groveMenu()`) and pops the Global Menu from its row
+/// name opens `app-menu` (the front app's menus, which only macOS can draw:
+/// a native menu). `menu` is Grove Keys' own menu drawn as the Grove menu
+/// (`GroveMenuList`); nothing in the bar opens it any more; it still works,
+/// e.g. `open grovekeys://menu` from a terminal. The pine's Grove menu is
+/// not one of these: it is a bar panel (`GroveMenuPanel`), which reads the
+/// menu here (`groveMenu()`) and pops the Global Menu from its row
 /// (`showAppMenu(at:)`).
 @MainActor
 final class PointerMenu: NSObject {
@@ -15,8 +17,6 @@ final class PointerMenu: NSObject {
     private let model = AppModel.shared
     /// The app the Global Menu is for: the last one in front that isn't Grove Keys.
     private var front = FrontAppTracker()
-    /// Set by a menu item that brings an app forward itself (a window, Settings).
-    private var staysFront = false
     private let menuPaths = MenuPaths.standard(
         home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment)
 
@@ -78,50 +78,13 @@ final class PointerMenu: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { once.run() }
     }
 
-    /// The rows as a native menu. The `checked` tests start now, all at once,
-    /// and tick their items as they succeed: by the time a submenu is opened
-    /// its ✓ is there, and a slow test delays nothing.
-    private func menu(of rows: [GroveMenuRow]) -> NSMenu {
-        var tests: [String: (item: NSMenuItem, command: String)] = [:]
-        let menu = menu(of: rows, tests: &tests)
-        let items = tests.mapValues(\.item)
-        CheckedTests.run(tests.map { (id: $0.key, command: $0.value.command) }) { id in
-            items[id]?.state = .on
-        }
-        return menu
-    }
-
-    private func menu(of rows: [GroveMenuRow], tests: inout [String: (item: NSMenuItem, command: String)]) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        for row in rows {
-            if row.separator, !menu.items.isEmpty { menu.addItem(.separator()) }
-            let entry: NSMenuItem
-            if !row.children.isEmpty {
-                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
-                entry.submenu = self.menu(of: row.children, tests: &tests)
-            } else if row.action == .builtin(.globalMenu) {
-                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
-                entry.submenu = appMenu()
-            } else if let action = row.action {
-                entry = item(row.title, handsBack: !action.takesFocus) {
-                    MenuRunner.run(action, title: row.title)
-                }
-                if let command = row.checked { tests[row.id] = (entry, command) }
-            } else {
-                entry = NSMenuItem(title: row.title, action: nil, keyEquivalent: "")
-                entry.isEnabled = false
-            }
-            menu.addItem(entry)
-        }
-        return menu
-    }
-
     /// The front app's menus directly (the bar's app name), at the pointer;
     /// or with their top-left corner at `point` (the screen's coordinates):
     /// the Grove menu's Global Menu row, where its panel was.
     func showAppMenu(at point: NSPoint? = nil) {
-        popUpAtPointer(appMenu(), at: point)
+        let point = point ?? NSEvent.mouseLocation
+        let previous = NSApp.isActive ? nil : front.current?.pid
+        whenInFront { [self] in popUpNative(appMenu(), at: point, handBackTo: previous) }
     }
 
     private func appMenu() -> NSMenu {
@@ -140,33 +103,87 @@ final class PointerMenu: NSObject {
     /// `grovekeys://menu`: Grove Keys' own menu at the pointer (the pine's
     /// Grove Keys ▸ submenu, on its own, whatever the menu file says).
     func show() {
-        popUpAtPointer(menu(of: KeysMenuItem.rows(model.keysMenuItems, under: "keys")))
+        popUpGroveMenu(KeysMenuItem.rows(model.keysMenuItems, under: "keys"))
     }
 
-    /// Pops `menu` up where the pointer was at the click (or at `place`). With another app in
-    /// front, Grove Keys comes forward first: a menu shown while that switch is
-    /// still under way closes again at once (the "second click" bug). When the
-    /// menu closes, the app that was in front gets the keyboard back, unless
-    /// the chosen item brought something forward itself.
-    private func popUpAtPointer(_ menu: NSMenu, at place: NSPoint? = nil) {
-        let point = place ?? NSEvent.mouseLocation
-        if NSApp.isActive {
-            // Grove Keys' own window is in front: nothing to hand back.
-            DispatchQueue.main.async { menu.popUp(positioning: nil, at: point, in: nil) }
-            return
-        }
-        let previous = front.current?.pid
-        let once = Once { [self] in
-            DispatchQueue.main.async { [self] in
-                staysFront = false
-                menu.popUp(positioning: nil, at: point, in: nil)
-                // After the chosen item's action, whichever side of popUp's return it runs on.
-                DispatchQueue.main.async { [self] in
-                    guard !staysFront, let previous else { return }
+    /// Which opening of the Grove menu at the pointer is the current one: a
+    /// `checked` test that passes after its menu closed ticks nothing.
+    private var opening = 0
+
+    /// What the Grove menu at the pointer is popped up in: `GroveMenuList`
+    /// needs a view in a window, and Grove Keys, in the background, has
+    /// none at the pointer. A 1×1 borderless, clear window moved to the
+    /// pointer each time and never shown: the menu's top-left corner is its
+    /// origin. Never shown, it can't take a click or the keyboard, or close.
+    private lazy var anchor: NSWindow = {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1, height: 1), styleMask: [.borderless],
+                              backing: .buffered, defer: true)
+        window.isReleasedWhenClosed = false
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.ignoresMouseEvents = true
+        return window
+    }()
+
+    /// Pops `rows` up as the Grove menu (`GroveMenuList`) where the pointer
+    /// is. Grove Keys comes forward first, so the keys reach the menu (it
+    /// never takes the keyboard from a window). The `checked` tests start
+    /// once it is up, all at once, and tick their rows as they pass. When
+    /// it closes, the app that was in front gets the keyboard back, unless
+    /// the chosen row brings something forward itself, or the menu closed
+    /// because another app came forward.
+    private func popUpGroveMenu(_ rows: [GroveMenuRow]) {
+        let point = NSEvent.mouseLocation
+        let menu = GroveMenu(rows: rows)
+        let previous = NSApp.isActive ? nil : front.current?.pid
+        whenInFront { [self] in
+            opening += 1
+            let opening = opening
+            var handsBack = true
+            anchor.setFrameOrigin(point)
+            GroveMenuList.popUp(
+                rows: GroveMenuModel.rows(rows), at: .zero, in: anchor.contentView!, theme: model.colors,
+                onChoose: { [self] id in
+                    guard let row = menu.row(id: id), let action = row.action else { return }
+                    if action == .builtin(.globalMenu) {
+                        // The front app's own menus: only macOS can draw
+                        // them. They open where this menu was, and give
+                        // the keyboard back when they close.
+                        handsBack = false
+                        DispatchQueue.main.async { [self] in popUpNative(appMenu(), at: point, handBackTo: previous) }
+                    } else {
+                        if action.takesFocus { handsBack = false }
+                        MenuRunner.run(action, title: row.title)
+                    }
+                },
+                onClose: { [self] in
+                    self.opening += 1
+                    guard handsBack, NSApp.isActive, let previous else { return }
                     NSRunningApplication(processIdentifier: previous)?.activate()
-                }
+                })
+            let tests = Self.checkedTests(rows)
+            CheckedTests.run(tests) { [self] id in
+                guard self.opening == opening else { return }
+                GroveMenuList.check(id)
             }
         }
+    }
+
+    /// Every row with a `checked` test, at any depth.
+    private static func checkedTests(_ rows: [GroveMenuRow]) -> [(id: String, command: String)] {
+        rows.flatMap { row in (row.checked.map { [(id: row.id, command: $0)] } ?? []) + checkedTests(row.children) }
+    }
+
+    /// Runs `show` once Grove Keys is in front. With another app in front,
+    /// Grove Keys comes forward first: a native menu shown while that switch
+    /// is still under way closes again at once (the "second click" bug).
+    private func whenInFront(_ show: @escaping @MainActor () -> Void) {
+        if NSApp.isActive {
+            // Grove Keys' own window is in front.
+            DispatchQueue.main.async { show() }
+            return
+        }
+        let once = Once { DispatchQueue.main.async { show() } }
         let center = NotificationCenter.default
         let token = center.addObserver(
             forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
@@ -177,25 +194,16 @@ final class PointerMenu: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { once.run() }
     }
 
-    /// `handsBack: false` for an item that brings an app forward itself.
-    private func item(_ title: String, handsBack: Bool = true, _ action: @escaping @MainActor () -> Void) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: #selector(MenuAction.run), keyEquivalent: "")
-        let target = MenuAction { [self] in
-            if !handsBack { staysFront = true }
-            action()
+    /// A native menu at `point` (it blocks until closed); then `previous`,
+    /// the app that was in front, gets the keyboard back.
+    private func popUpNative(_ menu: NSMenu, at point: NSPoint, handBackTo previous: pid_t?) {
+        menu.popUp(positioning: nil, at: point, in: nil)
+        // After the chosen item's action, whichever side of popUp's return it runs on.
+        DispatchQueue.main.async {
+            guard let previous else { return }
+            NSRunningApplication(processIdentifier: previous)?.activate()
         }
-        item.target = target
-        item.representedObject = target   // keeps the target alive with the item
-        return item
     }
-}
-
-/// An NSMenuItem target that runs a closure.
-@MainActor
-private final class MenuAction: NSObject {
-    let action: @MainActor () -> Void
-    init(_ action: @escaping @MainActor () -> Void) { self.action = action }
-    @objc func run() { action() }
 }
 
 /// Runs its action the first time `run()` is called, then cleans up.

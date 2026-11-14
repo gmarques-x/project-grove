@@ -535,6 +535,16 @@ struct BindingsGroup<Content: View>: View {
     }
 }
 
+/// A Bindings row's right-click menu (also what `--render-keys
+/// bindings-menu` draws): Record shortcut, disabled for a row that can't be
+/// recorded here (a run of 1…9 folded into one row), and Remove.
+enum BindingRowMenu {
+    static func rows(recordable: Bool) -> [GroveMenuListRow] {
+        [GroveMenuListRow(id: "record", title: "Record shortcut", enabled: recordable),
+         GroveMenuListRow(id: "remove", title: "Remove")]
+    }
+}
+
 /// One row: recorder pill (128 pt) · action · conflict mark · remove.
 private struct RowView<Action: View>: View {
     let shortcut: String
@@ -596,10 +606,13 @@ private struct RowView<Action: View>: View {
         // With the row's own controls, not instead of them: a click on the
         // recorder or the field selects the row too.
         .simultaneousGesture(TapGesture().onEnded { onSelect?() })
-        .contextMenu {
-            if onSelect != nil {
-                Button("Record shortcut", action: onRecord).disabled(!recordable)
-                Button("Remove", action: onRemove)
+        // The Grove menu, not the system's (`groveContextMenu`): a
+        // right-click, or VoiceOver's Show Menu. The draft row has none.
+        .groveContextMenu(rows: { onSelect == nil ? [] : BindingRowMenu.rows(recordable: recordable) }) { id in
+            switch id {
+            case "record": onRecord()
+            case "remove": onRemove()
+            default: break
             }
         }
         .accessibilityElement(children: .contain)

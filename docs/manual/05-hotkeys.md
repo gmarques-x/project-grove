@@ -71,7 +71,7 @@ More in [The terminal](06-the-terminal.md).
 
 ## Change a binding
 
-**In the Grove Keys window:** Pine › Grove Keys › Open Grove Keys. It has two tabs. **Keyboard** draws the keyboard with what each key does in the chosen layer; click a key to edit it. **Bindings** lists everything in groups: Hyper key, Launchers, one group for each AeroSpace mode, and Monitors; click a row to edit it, or use Add launcher or Add binding for a new one. Changes apply as soon as they are saved.
+**In the Grove Keys window:** Pine › Grove Keys › Open Grove Keys. It has two tabs. **Keyboard** draws the keyboard with what each key does in the chosen layer; click a key to edit it. **Bindings** lists everything in groups: Hyper key, Launchers, one group for each AeroSpace mode, and Monitors; click a row to edit it, or use Add launcher or Add binding for a new one. Right-click a row (or ⌃-click it) for Record shortcut and Remove. A value with ▾ (Tap alone sends, a workspace's monitor) opens its list under it, the current value ticked. Both menus are drawn like the pine's menu and work the same way: the arrow keys, Return, typing a letter, and Esc to leave without a change. Changes apply as soon as they are saved.
 
 **In the file:** edit `~/.config/grove-keys/keys.toml`. The window and the file are the same thing; use whichever you prefer.
 

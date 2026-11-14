@@ -342,9 +342,11 @@ final class BarPanelHost {
     }
 
     /// An event of Grove Keys' own while a panel is open. True: the panel
-    /// used it up (Escape, a key its model took).
+    /// used it up (Escape, a key its model took). While a Grove menu opened
+    /// from the panel is up (a `GroveSelect`'s list), its keys and clicks
+    /// are the menu's: a click outside it closes the menu, not the panel.
     private func used(_ event: NSEvent) -> Bool {
-        guard let open = current else { return false }
+        guard let open = current, !GroveMenuList.isOpen else { return false }
         if event.type != .keyDown {
             if !open.owns(event.window) { dismissFromOutside() }
             return false

@@ -36,14 +36,19 @@ public enum GroveMenuList {
     /// - `theme`: the colours it is drawn in (the window's). GroveUI has no
     ///   app-wide theme to read, and a menu in the wrong scheme is worse than
     ///   a parameter.
+    /// - `opening`: the event that asked for the menu (a right-click), when
+    ///   it isn't the app's current event (a caller in an event monitor):
+    ///   its release chooses a row only when the press was held (`MenuPress`).
     /// - `onChoose`: a row was chosen (its `id`), after the menu has gone.
     /// - `onClose`: the menu closed, chosen or not: exactly once per `popUp`,
     ///   after `onChoose`. The place for what a caller did after a blocking
     ///   `NSMenu.popUp`. A `popUp` with no rows, or from a view not in a
     ///   window, shows nothing and calls it at once.
     public static func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
+                             opening: NSEvent? = NSApp.currentEvent,
                              onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void) {
-        host.popUp(rows: rows, at: point, in: view, theme: theme, onChoose: onChoose, onClose: onClose)
+        host.popUp(rows: rows, at: point, in: view, theme: theme, opening: opening, onChoose: onChoose,
+                   onClose: onClose)
     }
 
     /// Closes the open menu without choosing (its `onClose` runs).
@@ -51,6 +56,15 @@ public enum GroveMenuList {
 
     /// Whether a menu is open.
     public static var isOpen: Bool { host.isOpen }
+
+    /// Ticks the row `id` of the open menu, when it has one: for a tick
+    /// known only after the menu opened (the Grove menu's `checked` tests).
+    public static func check(_ id: String) { host.check(id) }
+
+    /// Whether `window` is one of the open menu's panels: for another
+    /// host's monitor (a bar panel's), so a click in the menu isn't a click
+    /// outside that host's window.
+    public static func owns(_ window: NSWindow?) -> Bool { host.owns(window) }
 }
 
 /// What `GroveMenuList` runs on. Its own type so tests can make one whose
@@ -115,6 +129,16 @@ final class GroveMenuListHost {
     private(set) var current: Open?
     var isOpen: Bool { current != nil }
 
+    /// An id no row has ticks nothing.
+    func check(_ id: String) {
+        current?.model.checked.insert(id)
+    }
+
+    func owns(_ window: NSWindow?) -> Bool {
+        guard let window, let open = current else { return false }
+        return open.owns(window)
+    }
+
     /// `opening`: the event that asked for the menu (the right-click), whose
     /// release must not choose a row unless it was held (`MenuPress`).
     func popUp(rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
@@ -166,7 +190,9 @@ final class GroveMenuListHost {
         open.frames = [frame]
         // In the background no key would reach the menu: the app comes
         // forward (its window keeps the keyboard; the panels never take it).
-        if !isActive() { activate() }
+        // Not for a key non-activating panel (a bar panel): its keys reach
+        // the app already, and the app in front keeps its place.
+        if !isActive(), !owner.isKeyWindow { activate() }
         if showsPanels { panel.orderFrontRegardless() }
         watch(open)
         refreshAccessibility()

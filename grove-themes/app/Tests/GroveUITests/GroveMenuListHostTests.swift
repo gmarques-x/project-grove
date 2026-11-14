@@ -355,6 +355,47 @@ import Testing
         front.close()
     }
 
+    /// A window that says it has the keyboard, as a bar panel does while the
+    /// app is in the background (without being put on screen).
+    final class KeyWindow: NSWindow {
+        override var isKeyWindow: Bool { true }
+    }
+
+    @Test func aMenuFromAKeyPanelInTheBackgroundLeavesTheAppWhereItIs() {
+        var asked = 0
+        let panel = KeyWindow(contentRect: NSRect(x: 100, y: 100, width: 300, height: 200), styleMask: [.borderless],
+                              backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        let background = GroveMenuListHost(showsPanels: false, isActive: { false }, activate: { asked += 1 })
+        background.popUp(rows: Self.rows, at: NSPoint(x: 20, y: 150), in: panel.contentView!, theme: .fallback,
+                         opening: nil, onChoose: { _ in }, onClose: {})
+        #expect(background.isOpen)
+        #expect(asked == 0)
+        background.close()
+    }
+
+    @Test func aTickKnownLaterIsAddedToTheOpenMenu() {
+        popUp()
+        #expect(host.current?.model.checked.contains("open") == false)
+        host.check("open")
+        #expect(host.current?.model.checked.contains("open") == true)
+        host.close()
+        // No menu: nothing to tick, nothing breaks.
+        host.check("open")
+        #expect(!host.isOpen)
+    }
+
+    @Test func itKnowsItsOwnPanels() throws {
+        #expect(!host.owns(window))
+        popUp()
+        let panel = try #require(host.current?.panels.first)
+        #expect(host.owns(panel))
+        #expect(!host.owns(window))
+        #expect(!host.owns(nil))
+        host.close()
+        #expect(!host.owns(panel))
+    }
+
     // MARK: Odd cases
 
     @Test func aPopUpFromTheOldMenusOnCloseLeavesOneMenu() {
