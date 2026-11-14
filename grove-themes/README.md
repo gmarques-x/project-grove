@@ -1,6 +1,8 @@
-# grove-themes
+# Grove Themes
 
-Switches the desktop between the six Everforest schemes. The colour-carrying configs in `grove-dotfiles/config/` are tracked as `*.tmpl` templates; `grove-themes` fills in the palette from `grove-dotfiles/theme/` and writes the real (untracked) config files.
+The `grove-themes` command and the Grove Themes app.
+
+`grove-themes` switches the desktop between the six Everforest schemes. The colour-carrying configs in `grove-dotfiles/config/` are tracked as `*.tmpl` templates; `grove-themes` fills in the palette from `grove-dotfiles/theme/` and writes the real (untracked) config files.
 
 To switch from the desktop, click the pine at the left of the Grove bar and choose Appearance: the six schemes are there, and Grove Themes… opens the gallery. The manual's [Themes](../docs/manual/04-themes.md) chapter covers everyday use; this page is the reference.
 
@@ -45,6 +47,11 @@ Tests: `bats tests`.
 
 `app/` is Grove Themes, a SwiftUI app that shows the six schemes, the terminal logo and the wallpaper in a gallery window and switches them by running `grove-themes` (so it needs the CLI installed). It has no Dock icon, and its dropdown in the native menu bar is hidden behind the Grove bar, so it is reached from the pine: Appearance › Grove Themes… opens the gallery through the link `grovethemes://gallery` (also `open grovethemes://gallery` from a terminal). The link only opens the window; it never switches anything.
 
-It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable. Its `GroveUI` library holds what the Grove apps' views share (the theme environment, the fonts, the light-scheme helpers, the focus box, and the radius and spacing scale); Grove Keys builds on it through `grove-keys/deps/grove-themes`.
+It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable. It has two libraries the other Grove apps share:
+
+- `GroveThemesCore`, with no views: the palettes from `grove-themes list --json` and running the CLI, the `grovethemes://` links, the TOML subset the apps' config files use (read and write), the cloud folders' names for Explorer's sidebar and Keys' cloud pill, the rules for Grove menus and the focus grid, and the gallery's thumbnails.
+- `GroveUI`, what the apps' views share: the theme environment and the radius and spacing tokens, the fonts and Grove Icons, the focus ring, Grove menus (`GroveMenuList`), selects and segmented controls, window headers, the bar's panel kit and charts, and the file list's colours.
+
+Grove Keys and Grove Explorer build on both through a `deps/grove-themes` link to `app/`.
 
 `grove install themes-app` (module `97-themes-app`) builds it, assembles and ad hoc signs `~/Applications/Grove Themes.app` (`Resources/Info.plist` sets `LSUIElement`) and starts it at login with the LaunchAgent `~/Library/LaunchAgents/com.projectgrove.themes.plist`. It rebuilds when the tracked files under `app/` change. The first switch from the app triggers macOS's Automation prompt; allow it once.
