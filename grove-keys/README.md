@@ -1,8 +1,26 @@
-# grove-keys
+# Grove Keys
 
-Grove Keys is the keyboard app of Project Grove. It turns Caps Lock into Hyper (Cmd+Ctrl+Option+Shift; tap it alone and it sends Escape), launches apps with Hyper plus a key, shows a keyboard window and a cheat sheet, writes AeroSpace's config from one file, and draws the menus behind the Grove bar: the Grove menu, the Grove Launcher (⌘Space: apps and the menu's rows), and the front app's own menus.
+The keyboard app of Project Grove.
+
+It turns Caps Lock into Hyper (Cmd+Ctrl+Option+Shift; tap it alone and it sends Escape), launches apps with Hyper plus a key, shows a keyboard window and a cheat sheet, writes AeroSpace's config from one file, and draws the menus behind the Grove bar: the Grove menu, the Grove Launcher (⌘Space: apps and the menu's rows), and the front app's own menus.
 
 How to use it is in the manual: [Hotkeys](../docs/manual/05-hotkeys.md) and [The Grove menu](../docs/manual/03-the-grove-menu.md). This page is about how it is put together.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../assets/screenshots/keys-keyboard-dark-medium.png">
+    <img src="../assets/screenshots/keys-keyboard-light-medium.png" width="100%" alt="The Grove Keys window's Keyboard tab: the Hyper layer on a Portuguese ISO keyboard, launchers on their keys">
+  </picture>
+  <br><em>The Keyboard tab: each layer drawn on your own keyboard; click a key to change it.</em>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../assets/screenshots/keys-cheatsheet-dark-medium.png">
+    <img src="../assets/screenshots/keys-cheatsheet-light-medium.png" width="100%" alt="The Hyper cheat sheet: a keyboard with each Hyper binding on its key">
+  </picture>
+  <br><em>The cheat sheet, shown while Caps Lock is held.</em>
+</p>
 
 ## Reaching it
 
@@ -21,6 +39,8 @@ The bar and the hotkeys do this by opening links, which also work from a termina
 | `grovekeys://cheatsheet` | The searchable cheat sheet (Hyper + K) |
 | `grovekeys://menu/<id>` | Runs one row of the Grove menu, or pops that submenu at the pointer |
 | `grovekeys://menu` | Grove Keys' own submenu at the pointer |
+| `grovekeys://panel/<name>` | Shows or puts away one of the bar's panels: `grove` (the Grove menu), `clock`, `battery`, `sound`, `wifi` (Wi-Fi and Bluetooth), `vpn`, `cloud`, `system` or `tray`. Showing one puts away any other |
+| `grovekeys://panel/close` | Puts away whichever panel is open (the bar sends it on a workspace change) |
 
 ## The files
 
@@ -52,7 +72,7 @@ The first `grove install keys-app` makes a self-signed code-signing certificate,
 
 ## Permissions
 
-Grove Keys asks for two permissions in System Settings > Privacy & Security, and `grove install keys-app` opens the panes that are missing:
+Grove Keys needs two permissions in System Settings > Privacy & Security, and `grove install keys-app` opens the panes that are missing:
 
 - Accessibility, to send the Escape tap, to run launchers, and to read and press the front app's menus.
 - Input Monitoring, to see Caps Lock and the keys pressed with it.
@@ -60,6 +80,11 @@ Grove Keys asks for two permissions in System Settings > Privacy & Security, and
 Until both are granted nothing is remapped and Caps Lock stays Caps Lock. The app writes what it has been granted to `$GROVE_STATE/keys.json`, which `grove check` reads. The Caps Lock to F18 mapping is made with `hidutil` and lasts only while the app runs.
 
 Grove Keys also asks once for Location Services. This one is optional and nothing else depends on it: macOS gives a Wi-Fi network's name only to an app allowed Location, and the Grove bar's Wi-Fi popup shows that name. When allowed, the app writes the name to `$GROVE_STATE/wifi-name` (removed when Wi-Fi is off and when the app quits); it is not sent anywhere, and your position is never read. Without the permission the popup says "Wi-Fi".
+
+Two more prompts come from the bar's panels, and each is optional:
+
+- Bluetooth, the first time the network panel opens, to list your connected devices and their batteries and to turn Bluetooth on and off. Refused, the panel says "Grove Keys needs Bluetooth permission" with a Privacy Settings… button, and Grove Keys never asks again.
+- Access to files managed by OneDrive, which macOS may ask for when the cloud pill first reads the OneDrive folder. Grove Keys reads only each file's sync state, never its contents. Refused, the panel says "Grove Keys can't see OneDrive's files" and the pill leaves OneDrive out.
 
 ## Tests
 
