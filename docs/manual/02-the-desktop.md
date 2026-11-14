@@ -51,6 +51,7 @@ The bar replaces the macOS menu bar. From left to right:
 | Workspace numbers | The workspaces in use; the one in front is a green pill | Goes to that workspace |
 | App icons after a number | The apps open on that workspace (up to six) | Goes to that window |
 | App name | The app in front | Opens that app's menus (File, Edit, View …) |
+| Tray | The menu-bar items of other apps (WireGuard, OneDrive…), which the Grove bar covers: a menu bar with an arrow and how many items are in the tray; the symbol alone when there are none or Grove Keys isn't running | Opens the tray |
 | Processor and memory | Two icons with their use in percent | Opens the CPU and memory panel |
 | Cloud | Whether your files in iCloud Drive and OneDrive have finished syncing: green with a tick when everything is up to date, yellow with the number of files still uploading or downloading, red when something is wrong (an upload error, a conflict, a file stuck for 30 minutes, or OneDrive not running), grey while Grove Keys is still checking or isn't running | Opens the cloud panel |
 | Shield | The grove-lab VPN (its own pill, not the Wi-Fi pill's shield): grey when off (or not set up yet), yellow while it connects or disconnects, purple when connected | Opens the VPN panel |
@@ -67,6 +68,7 @@ A click on a pill at the right opens its panel under it; the pine opens the Grov
 
 | Panel | What is in it |
 | --- | --- |
+| Tray | One row per menu-bar item of another app, left to right as in the macOS menu bar: the app's icon and name, and the item's own text when it has one ("Sync issue"). A click opens the item. **Hidden (n)** opens the hidden items; **Menu Bar Settings…** opens Menu Bar in System Settings |
 | CPU and memory | Use now and over the last minute, the load of each core, memory by kind with its pressure, the three busiest apps of each, and a link to Activity Monitor. An orange line divides the CPU half from the memory half |
 | Battery | Charge and time left, power, health, and three rows: **Keep Awake** stops the Mac and its display from sleeping, until you turn it off or for 1, 2 or 4 hours. **Ignore Lid** keeps the Mac running with the lid shut; macOS asks for your password or Touch ID each time it changes, and it is offered only while Keep Awake is on and not under 20% on battery. **Low Power Mode** opens Battery Settings |
 | Network | The network's name with a switch for Wi-Fi, download and upload speed over the last minute, and the IP, router and DNS addresses (a click copies one). **Run speed test** measures the connection in about 15 seconds. **Show apps** lists the three apps using the network most. Under an orange line, Bluetooth: a switch to turn it on and off, and the connected devices with their battery level |
@@ -75,13 +77,19 @@ A click on a pill at the right opens its panel under it; the pine opens the Grov
 | Sound | A volume slider, Mute, the output devices (a click switches), and the input device |
 | Calendar | This month, Monday first, with week numbers; the arrows or ← → change the month, T returns to today |
 
-A panel closes when you press Esc, click its pill again, click anywhere else, or switch app or workspace. Its pill stays lit while it is open. Inside one, Tab moves between the controls; in the sound panel ← → change the volume and M mutes.
+A panel closes when you press Esc, click its pill again, click anywhere else, or switch app or workspace. Its pill stays lit while it is open. Inside one, Tab moves between the controls; in the sound panel ← → change the volume and M mutes; in the tray ↑ ↓ or an app's first letter pick a row and Return opens it.
 
 If Ignore Lid was left on (by Grove after a dismissed password prompt, or by another tool), the battery panel says "Ignore Lid is still on" with a **Turn off** button.
 
 The network panel shows the network's name only if Grove Keys is allowed Location Services (System Settings > Privacy & Security > Location Services); macOS hides the name otherwise, and the panel says "Wi-Fi". Your position is not read.
 
 Bluetooth sits under Wi-Fi in the same panel. Its switch turns Bluetooth on and off; if macOS doesn't let Grove Keys do that, the switch opens Bluetooth Settings instead. Each connected device has a row with its kind (headphones, keyboard, mouse…), its name and its battery level when it reports one; for earphones with a case, the lowest of the two earphones. "No devices connected" and "Bluetooth is off" say the rest. The list is read when the panel opens and every 30 seconds, so a device that just connected can take a moment to show. The first time you open the network panel, macOS asks whether Grove Keys may use Bluetooth. If you say no, the panel says "Grove Keys needs Bluetooth permission" with a **Privacy Settings…** button (System Settings > Privacy & Security > Bluetooth) and has no switch, and Grove Keys doesn't ask again. To pair a new device, use **Bluetooth Settings…** at the bottom of the panel.
+
+### Menu-bar tray
+
+The Grove bar covers the macOS menu bar, and with it the icons other apps put there. The tray pill lists them instead. A click on a row (or Return) closes the tray and clicks that app's icon for you, so its menu or window opens at the top right as if you had clicked it in the menu bar; if nothing opens, the app comes forward instead. Grove Keys does this with its Accessibility permission; without it the tray says "Grove Keys needs Accessibility permission" with a **Privacy Settings…** button. Apple's own items (Wi-Fi, battery, Control Center, the clock and the like) are left out, since the Grove bar has pills for them; "No other menu-bar items" means there is nothing else.
+
+Right-click a row for **Open**, **Hide from tray** (or **Show in tray**) and **Bring <app> forward**. Hidden items move under **Hidden (n)**, aren't counted on the pill, and still open on a click; Grove Keys, Grove Themes and AeroSpace start there. To remove an item for good, quit its app or use **Menu Bar Settings…**. The count follows apps opening and quitting within a few seconds, and is checked again whenever you open the tray.
 
 ### The grove-lab VPN
 

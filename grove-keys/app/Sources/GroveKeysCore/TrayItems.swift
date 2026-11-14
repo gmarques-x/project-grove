@@ -130,6 +130,51 @@ public enum TrayItems {
         return [item.title, item.description, item.help].lazy.compactMap(present).first { $0.lowercased() != name }
     }
 
+    /// The longest row text, "…" included.
+    public static let rowTextLimit = 32
+
+    /// The row's text as the dropdown shows it: title, then description,
+    /// then help, with the app's name taken off its start when a line break
+    /// or a separator (":", "-", "·"…) follows it ("Example Sync\nSync issue"
+    /// is "Sync issue"; "Example Sync is paused" stays), then on one line
+    /// (runs of spaces, tabs and newlines as one space); the first that
+    /// leaves something. Longer than `rowTextLimit`, cut with "…".
+    public static func rowText(_ item: TrayItem) -> String? {
+        let name = oneLine(item.appName)
+        for candidate in [item.title, item.description, item.help] {
+            guard let candidate else { continue }
+            let text = oneLine(withoutName(candidate, name))
+            if !text.isEmpty { return cut(text) }
+        }
+        return nil
+    }
+
+    /// Runs of whitespace (newlines too) as one space, none at the ends.
+    static func oneLine(_ text: String) -> String {
+        text.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).joined(separator: " ")
+    }
+
+    /// `text` without `name` at its start when nothing, a line break or a
+    /// separator follows it, and without what separates them; else `text`.
+    private static func withoutName(_ text: String, _ name: String) -> String {
+        let text = text.drop { $0.isWhitespace || $0.isNewline }
+        guard !name.isEmpty, let range = text.range(of: name, options: [.caseInsensitive, .anchored]) else {
+            return String(text)
+        }
+        let rest = text[range.upperBound...]
+        let separators: Set<Character> = [":", "-", "–", "—", "·", "|", ",", "•"]
+        let spaced = rest.drop { $0 == " " || $0 == "\t" }
+        guard let next = spaced.first else { return "" }
+        guard next.isNewline || separators.contains(next) else { return String(text) }
+        return String(rest.drop { $0.isWhitespace || $0.isNewline || separators.contains($0) })
+    }
+
+    private static func cut(_ text: String) -> String {
+        guard text.count > rowTextLimit else { return text }
+        let kept = text.prefix(rowTextLimit - 1)
+        return String(kept[..<(kept.lastIndex { !$0.isWhitespace }.map { kept.index(after: $0) } ?? kept.startIndex)]) + "…"
+    }
+
     /// Visible and hidden: an item is hidden by its key, or by its bare
     /// bundle id (the defaults are whole apps). Keys are worked out among
     /// all the items.

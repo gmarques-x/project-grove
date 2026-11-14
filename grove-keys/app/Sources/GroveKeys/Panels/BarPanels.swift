@@ -220,6 +220,7 @@ final class BarPanelRegistration {
 enum BarPanels {
     static let all: [BarPanelRegistration] = [
         ClockPanel.registration,
+        TrayPanel.registration,
         SystemPanel.registration,
         CloudPanel.registration,
         BatteryPanel.registration,
