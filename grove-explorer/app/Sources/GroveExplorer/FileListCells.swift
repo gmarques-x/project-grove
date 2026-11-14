@@ -251,8 +251,10 @@ final class FileTableView: NSTableView {
             enumerateAvailableRowViews { view, row in (view as? FileRowView)?.isDropTarget = row == dropRow }
         }
     }
-    /// A right-click on a row (-1: on the list's empty space): the menu to show.
-    var onMenu: ((Int) -> NSMenu?)?
+    /// A right-click or a ⌃-click on a row (-1: on the list's empty
+    /// space), at a point of the table: opens its menu; false when there is
+    /// none to show.
+    var onMenu: ((Int, NSPoint, NSEvent) -> Bool)?
     /// The rename field over a row. It lies beside the table in the clip
     /// view (`RenameEditor`), where VoiceOver would not come by it: it is
     /// counted among the table's own (`ListAccessibility.swift`).
@@ -327,8 +329,23 @@ final class FileTableView: NSTableView {
         chevronRow = row >= 0 && place.map { isOnChevron?(row, $0) ?? false } == true ? row : -1
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? {
-        onMenu?(row(at: convert(event.locationInWindow, from: nil)))
+    /// The menu is a Grove menu, opened by the clicks themselves
+    /// (`rightMouseDown`, a ⌃-click in `mouseDown`): never the system's.
+    override func menu(for event: NSEvent) -> NSMenu? { nil }
+
+    override func rightMouseDown(with event: NSEvent) {
+        if !openMenu(event) { super.rightMouseDown(with: event) }
+    }
+
+    /// A right-click or a ⌃-click (⌃ alone of the modifiers, as the system
+    /// has it): the row's menu at the pointer.
+    private func openMenu(_ event: NSEvent) -> Bool {
+        let place = convert(event.locationInWindow, from: nil)
+        return onMenu?(row(at: place), place, event) ?? false
+    }
+
+    private static func isControlClick(_ event: NSEvent) -> Bool {
+        event.modifierFlags.intersection([.command, .option, .shift, .control]) == .control
     }
 
     /// From macOS 15 the system has a key for "the menu of what is
@@ -343,6 +360,8 @@ final class FileTableView: NSTableView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        // The system asked `menu(for:)` first and was given none.
+        if Self.isControlClick(event), openMenu(event) { return }
         onClick?()
         let place = convert(event.locationInWindow, from: nil)
         if onPress?(event, row(at: place), place) == true {

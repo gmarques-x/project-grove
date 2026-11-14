@@ -53,7 +53,7 @@ struct FileList: NSViewRepresentable {
         table.onActivate = { [weak coordinator] in coordinator?.activate() }
         table.onClick = { [weak coordinator] in coordinator?.clicked() }
         table.onPointerRow = { [weak coordinator] in coordinator?.pointerMoved(to: $0) }
-        table.onMenu = { [weak coordinator] in coordinator?.menu(forRow: $0) }
+        table.onMenu = { [weak coordinator] in coordinator?.popUpMenu(forRow: $0, at: $1, opening: $2) ?? false }
 
         let scroll = NSScrollView()
         scroll.documentView = table

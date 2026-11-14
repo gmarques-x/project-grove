@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import GroveExplorerCore
+import GroveUI
 
 /// The audit's second half: the lists asked as an assistive app asks them,
 /// through the accessibility server, with the tokens such an app holds.
@@ -35,14 +36,18 @@ enum AccessibilityLive {
 
     private static var launched = false
 
-    /// Checks the lists of `window`; `model` is what they show (a sort and
-    /// a filter are put on it to move and to take away rows).
-    @MainActor
-    static func check(_ window: NSWindow, model: AppModel) -> Result {
+    private static func launch() {
         if !launched {
             NSApp.finishLaunching()
             launched = true
         }
+    }
+
+    /// Checks the lists of `window`; `model` is what they show (a sort and
+    /// a filter are put on it to move and to take away rows).
+    @MainActor
+    static func check(_ window: NSWindow, model: AppModel) -> Result {
+        launch()
         window.alphaValue = 0
         window.orderBack(nil)
         defer { window.orderOut(nil) }
@@ -301,5 +306,126 @@ enum AccessibilityLive {
 
     private static func allTables(under view: NSView) -> [NSTableView] {
         (view as? NSTableView).map { [$0] } ?? view.subviews.flatMap(allTables)
+    }
+}
+
+// MARK: The list's menu
+
+extension AccessibilityLive {
+    /// What the menu check found, and how much it saw.
+    struct MenuResult {
+        var problems: [String] = []
+        var items = 0
+        var apps = 0
+    }
+
+    /// The `menu` state's: the active pane's menu, opened as ⌃Return opens
+    /// it (a Grove menu, `GroveMenuList`), its panel where its window is,
+    /// far off every screen, asked through the accessibility server: a
+    /// menu of menu items with the list's rows' titles and enabled states,
+    /// Open With a submenu, which VoiceOver's press opens, with its apps.
+    /// Then it is closed, and nothing of it is left.
+    static func checkMenu(_ window: NSWindow, model: AppModel) -> MenuResult {
+        launch()
+        window.alphaValue = 0
+        window.orderBack(nil)
+        defer {
+            GroveMenuList.close()
+            window.orderOut(nil)
+        }
+        var result = MenuResult()
+        func problem(_ words: String) { result.problems.append(words) }
+
+        let app = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, 10)
+        func value(_ element: AXUIElement, _ attribute: String) -> CFTypeRef? {
+            var value: CFTypeRef?
+            AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+            return value
+        }
+        func list(_ element: AXUIElement, _ attribute: String = "AXChildren") -> [AXUIElement] {
+            (value(element, attribute) as? [AXUIElement]) ?? []
+        }
+        func text(_ element: AXUIElement, _ attribute: String) -> String { (value(element, attribute) as? String) ?? "" }
+        /// The menus the app shows: each the content of a window of its own.
+        func menus() -> [AXUIElement] {
+            list(app).flatMap { list($0) }.filter { text($0, "AXRole") == "AXMenu" }
+        }
+        func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
+
+        // ⌃Return, with the keyboard in the active pane's list.
+        model.showContextMenu()
+        settle()
+        guard GroveMenuList.isOpen, model.reach.menuIsUp else {
+            problem("⌃Return opened no menu")
+            return result
+        }
+        // Where it is: off every screen, as its window is.
+        for shown in NSApp.windows where shown.isVisible && shown !== window {
+            if NSScreen.screens.contains(where: { $0.frame.intersects(shown.frame) }) {
+                problem("the menu's panel is on a screen, at \(shown.frame)")
+            }
+        }
+
+        // The rows it must have: the list's, for what is selected.
+        let expected: [(title: String, enabled: Bool, submenu: Bool)] =
+            GroveExplorerCore.ContextMenu.items(selected: model.chosenItems.count, showsHidden: model.browser.showHidden)
+            .compactMap { item in
+                guard case let .row(row) = item else { return nil }
+                switch row.action {
+                case let .command(id):
+                    return (row.title, row.enabled && (CommandTable.command(id)?.isEnabled(model) ?? false), false)
+                case .openWith: return (row.title, row.enabled, true)
+                case .showInFinder: return (row.title, row.enabled, false)
+                }
+            }
+        let open = menus()
+        guard open.count == 1, let menu = open.first else {
+            problem("the server gives \(open.count) menus, not 1")
+            return result
+        }
+        let items = list(menu)
+        result.items = items.count
+        if items.map({ text($0, "AXTitle") }) != expected.map(\.title) {
+            problem("its items are \(items.map { text($0, "AXTitle") }), not \(expected.map(\.title))")
+        }
+        for (item, row) in zip(items, expected) {
+            let title = text(item, "AXTitle")
+            if text(item, "AXRole") != "AXMenuItem" { problem("“\(title)” is no menu item") }
+            if (value(item, "AXEnabled") as? Bool) != row.enabled {
+                problem("“\(title)” says it is \(row.enabled ? "disabled" : "enabled")")
+            }
+            let submenu = list(item).filter { text($0, "AXRole") == "AXMenu" }
+            if submenu.isEmpty == row.submenu { problem("“\(title)” \(row.submenu ? "has no" : "has a") submenu") }
+        }
+
+        // Open With, pressed as VoiceOver presses it: its apps, the default first.
+        guard let openWith = items.first(where: { text($0, "AXTitle") == "Open With" }) else {
+            problem("there is no Open With")
+            return result
+        }
+        let pressed = AXUIElementPerformAction(openWith, kAXPressAction as CFString)
+        settle()
+        if pressed != .success { problem("Open With can't be pressed (\(pressed.rawValue))") }
+        let apps = list(openWith).first { text($0, "AXRole") == "AXMenu" }.map { list($0) } ?? []
+        result.apps = apps.count
+        let found = model.openWithStandIn ?? (nil, [])
+        let name = { (app: URL) in app.deletingPathExtension().lastPathComponent }
+        let others = found.all.filter { $0 != found.standard }.map(name)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        let appTitles = found.standard.map { [name($0) + " (default)"] + others } ?? others
+        let titles = apps.map { text($0, "AXTitle") }
+        if titles != (appTitles.isEmpty ? ["No Application Opens This"] : appTitles) {
+            problem("Open With's items are \(titles), not \(appTitles)")
+        }
+        if apps.contains(where: { text($0, "AXRole") != "AXMenuItem" }) { problem("an app of Open With is no menu item") }
+        if menus().count != 2 { problem("with Open With open the server gives \(menus().count) menus, not 2") }
+
+        // Closed: nothing of it is left, and a key may open the next.
+        GroveMenuList.close()
+        settle()
+        if GroveMenuList.isOpen || model.reach.menuIsUp { problem("closed, it is still up") }
+        if !menus().isEmpty { problem("closed, the server still gives \(menus().count) menus") }
+        return result
     }
 }

@@ -1,5 +1,7 @@
 import AppKit
 import GroveExplorerCore
+import GroveThemesCore
+import GroveUI
 import SwiftUI
 
 // The whole window by keyboard (spec §7). Tab and ⇧Tab are the lists'
@@ -42,14 +44,24 @@ final class KeyboardReach {
     /// A menu opened from a key is up: a second way the same key arrived
     /// by (the menu bar's row and the system's own key) opens no second one.
     var menuIsUp = false
+    /// Renders only: given the menu a key opens (its rows, where and in
+    /// which view) in place of popping it up.
+    var popUpStandIn: ((_ rows: [GroveMenuListRow], _ point: NSPoint, _ view: NSView) -> Void)?
 
-    /// Opens `menu` at `point` of `view`, unless one opened from a key is
-    /// up already; returns when it has closed.
-    func popUp(_ menu: NSMenu, at point: NSPoint, in view: NSView) {
+    /// Opens a menu of `rows` at `point` of `view` (a Grove menu, which
+    /// returns at once), unless one opened from a key is up already.
+    /// `onClose` runs when it has closed, chosen or not: what came after a
+    /// menu that held the run loop until it closed.
+    func popUp(_ rows: [GroveMenuListRow], at point: NSPoint, in view: NSView, theme: ThemeColors,
+               onChoose: @escaping (String) -> Void, onClose: @escaping () -> Void = {}) {
+        if let popUpStandIn { return popUpStandIn(rows, point, view) }
         guard !menuIsUp else { return }
+        // Set first: a menu that can't open closes at once, inside the call.
         menuIsUp = true
-        defer { menuIsUp = false }
-        menu.popUp(positioning: nil, at: point, in: view)
+        GroveMenuList.popUp(rows: rows, at: point, in: view, theme: theme, onChoose: onChoose) { [weak self] in
+            self?.menuIsUp = false
+            onClose()
+        }
     }
 }
 
@@ -98,21 +110,33 @@ extension AppModel {
         return rows
     }
 
+    /// A sidebar place's menu as a Grove menu's rows (asked by its
+    /// right-click at each body too: nothing is kept here).
+    func placeMenu(for place: Place) -> [GroveMenuListRow] {
+        menuRows(for: place).map { GroveMenuListRow(id: $0.id, title: $0.title) }
+    }
+
+    /// A row of `place`'s right-click menu was chosen: as it is offered now.
+    func choosePlaceMenuRow(_ id: String, of place: Place) {
+        menuRows(for: place).first { $0.id == id }?.run()
+    }
+
     private func showSidebarMenu(at cursor: Int) {
         let places = places
         guard places.indices.contains(cursor) else { return }
-        let rows = menuRows(for: places[cursor])
+        // The rows as the menu opens: what a choice in it runs.
+        let shown = menuRows(for: places[cursor])
+        let rows = shown.map { GroveMenuListRow(id: $0.id, title: $0.title) }
         guard !rows.isEmpty else { return }
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        for row in rows { menu.addItem(ClosureMenuItem(row.title, run: row.run)) }
-        // After the turn: a menu holds the run loop while it is up.
+        // After the turn, as the list's menu (its key may have come by the menu bar).
         DispatchQueue.main.async { [weak self] in
             guard let self, self.sidebarCursor == cursor, let anchor = self.reach.sidebarAnchor, anchor.window != nil
             else { return }
             // Under the row, at its left edge.
-            self.reach.popUp(menu, at: NSPoint(x: 0, y: anchor.isFlipped ? anchor.bounds.maxY : 0), in: anchor)
-            self.keepSidebarCursorOnARow()
+            self.reach.popUp(
+                rows, at: NSPoint(x: 0, y: anchor.isFlipped ? anchor.bounds.maxY : 0), in: anchor, theme: self.colors,
+                onChoose: { id in shown.first { $0.id == id }?.run() },
+                onClose: { [weak self] in self?.keepSidebarCursorOnARow() })
         }
     }
 
@@ -271,22 +295,6 @@ extension AppModel {
     var canOpenPrivacySettings: Bool { live && listing(for: browser.active)?.needsPermission == true }
 }
 
-/// A menu item that runs a closure.
-@MainActor
-private final class ClosureMenuItem: NSMenuItem {
-    private let run: @MainActor () -> Void
-
-    init(_ title: String, run: @escaping @MainActor () -> Void) {
-        self.run = run
-        super.init(title: title, action: #selector(fire(_:)), keyEquivalent: "")
-        target = self
-    }
-
-    required init(coder: NSCoder) { fatalError("not made from a coder") }
-
-    @objc private func fire(_ sender: Any?) { run() }
-}
-
 /// An empty view behind the sidebar row the keyboard is on: where its menu opens.
 struct MenuAnchor: NSViewRepresentable {
     let model: AppModel
@@ -333,14 +341,17 @@ extension FileList.Coordinator {
     func showMenu(atRow row: Int) -> Bool {
         guard let table, table.window != nil else { return false }
         if row >= 0 { table.scrollRowToVisible(row) }
-        guard let menu = menu(forRow: row) else { return false }
+        guard let rows = menu(forRow: row) else { return false }
         let rect = row >= 0 ? table.rect(ofRow: row) : NSRect(origin: table.visibleRect.origin, size: .zero)
         // Under the row, where its name starts.
         let start = ListColumns.edge + IconMetrics.cell + ListMetrics.iconGap
-        // After the turn: a menu holds the run loop while it is up.
+        // After the turn: the key may have come by the menu bar, whose menu
+        // is still closing.
         DispatchQueue.main.async { [weak self, weak table] in
-            guard let table, table.window != nil else { return }
-            self?.model.reach.popUp(menu, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table)
+            guard let self, let table, table.window != nil else { return }
+            self.model.reach.popUp(
+                rows, at: NSPoint(x: rect.minX + start, y: rect.maxY), in: table, theme: self.model.colors,
+                onChoose: { [weak self] in self?.menu.choose($0) })
         }
         return true
     }

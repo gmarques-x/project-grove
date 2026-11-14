@@ -82,7 +82,26 @@ enum Sample {
         var split = 0.5
         /// The Connect to Server sheet is up, saying this, with this sentence under the field.
         var connectSheet: (text: String, problem: String?)?
+        /// The menu ⌃Return opens is drawn open (`MenuStandIn`): the active
+        /// pane's selection's, Open With offering these apps (and open,
+        /// `openWithOpen`); or, with `sidebarMenu`, the menu of the sidebar
+        /// row of that title, the keyboard on it.
+        var listMenu: (standard: URL?, all: [URL])?
+        var openWithOpen = true
+        var sidebarMenu: String?
     }
+
+    /// What Open With offers for a Markdown file in a render: the default
+    /// first, the others after its line, by name.
+    static let markdownApps: (standard: URL?, all: [URL]) = {
+        let textEdit = URL(fileURLWithPath: "/System/Applications/TextEdit.app", isDirectory: true)
+        return (textEdit, [
+            URL(fileURLWithPath: "/Applications/Visual Studio Code.app", isDirectory: true),
+            textEdit,
+            URL(fileURLWithPath: "/Applications/Safari.app", isDirectory: true),
+            URL(fileURLWithPath: "/Applications/Google Chrome.app", isDirectory: true),
+        ])
+    }()
 
     /// The saved shares of a render (the spec's grove-lab, no real address).
     static let shares = [
@@ -207,6 +226,11 @@ enum Sample {
             let entry = pane.entry(name)
         {
             model.dropMark = .row(extras.dropSide, entry.url)
+        }
+        model.openWithStandIn = extras.listMenu
+        if let title = extras.sidebarMenu {
+            guard let row = model.places.firstIndex(where: { $0.title == title }) else { fail("no sidebar row \(title)") }
+            model.sidebarCursor = row
         }
         return model
     }

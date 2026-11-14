@@ -166,10 +166,9 @@ struct Sidebar: View {
             .accessibilityLabel(spoken(place, share))
             .accessibilityAddTraits(lit ? [.isButton, .isSelected] : .isButton)
             .accessibilityAction { model.open(place) }
-            // The same rows a key opens (⌃Return with the keyboard here).
-            .contextMenu {
-                ForEach(model.menuRows(for: place)) { row in Button(row.title) { row.run() } }
-            }
+            // The same rows a key opens (⌃Return with the keyboard here), as
+            // a Grove menu; "Show Menu" for VoiceOver.
+            .groveContextMenu(rows: { model.placeMenu(for: place) }, onChoose: { model.choosePlaceMenuRow($0, of: place) })
             .background { if cursor { MenuAnchor(model: model).allowsHitTesting(false) } }
             .onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, target: dropTarget(place)))
             .draggedOut(favourite(place), model: model)

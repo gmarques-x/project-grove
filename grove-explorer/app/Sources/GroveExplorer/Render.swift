@@ -234,6 +234,20 @@ enum Render {
         ("sidebar-360", Scene(
             size: CGSize(width: 1672, height: 668), panes: [Sample.media(), Sample.downloads(selected: [])],
             extras: Sample.Extras(shares: true, sidebarWidth: 360, split: 0.4))),
+        // The right-click menus, as ⌃Return opens them (`MenuStandIn`):
+        // two items selected (Rename is for one), Open With open with its
+        // apps' icons, the default first; Open With for a file no app
+        // opens; a share's row's menu and a disk's.
+        ("menu", Scene(
+            size: CGSize(width: 948, height: 720), panes: [Sample.grove(selected: ["CHANGELOG.md", "README.md"])],
+            extras: Sample.Extras(listMenu: Sample.markdownApps))),
+        ("menu-no-app", Scene(
+            size: CGSize(width: 948, height: 720), panes: [Sample.grove(selected: ["CHANGELOG.md", "README.md"])],
+            extras: Sample.Extras(listMenu: (nil, [])))),
+        ("menu-share", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
+            extras: Sample.Extras(shares: true, sidebarMenu: "media"))),
+        ("menu-disk", Scene(size: CGSize(width: 948, height: 560), panes: [Sample.media()],
+            extras: Sample.Extras(shares: true, sidebarMenu: Sample.backup.name))),
         ("links-rename", Scene(
             size: CGSize(width: 948, height: 420), panes: [Sample.homeLinks(selected: [".ssh"])], showHidden: true,
             extras: Sample.Extras(rename: ".ssh"))),
@@ -246,7 +260,13 @@ enum Render {
             fail("usage: GroveExplorer --render <state> <out.png> [scheme]\nstates: \(stateNames)")
         }
         let colors = theme(arguments.count == 3 ? arguments[2] : "dark-medium")
-        let (hosting, size, _) = window(showing: arguments[0], colors: colors)
+        let (hosting, size, model) = window(showing: arguments[0], colors: colors)
+        if let extras = scenes.first(where: { $0.name == arguments[0] })?.scene.extras,
+            extras.listMenu != nil || extras.sidebarMenu != nil
+        {
+            MenuStandIn.draw(model, on: hosting, colors: colors,
+                             open: extras.listMenu != nil && extras.openWithOpen ? [ListMenu.openWith, ListMenu.openWith + ".1"] : [])
+        }
         guard let bitmap = NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
@@ -384,5 +404,50 @@ private struct WindowButtonsStandIn: View {
             }
         }
         .padding(.leading, 9).padding(.top, 9)
+    }
+}
+
+/// A render's open menu: the rows and the place the menu ⌃Return opens is
+/// given (`KeyboardReach.popUpStandIn`), drawn by `GroveMenuListPanel` as
+/// `GroveMenuList.popUp`'s panels draw them, where they would be (the
+/// window stands in for the screen): Open With's beside its row.
+@MainActor
+enum MenuStandIn {
+    static func draw(_ model: AppModel, on hosting: NSView, colors: ThemeColors, open path: [String]) {
+        var shown: (rows: [GroveMenuListRow], point: NSPoint, view: NSView)?
+        model.reach.popUpStandIn = { shown = ($0, $1, $2) }
+        model.showContextMenu()
+        // It opens after the turn.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        model.reach.popUpStandIn = nil
+        guard let shown else { fail("the menu ⌃Return opens did not open") }
+
+        let list = GroveMenuListModel(width: nil, icons: false)
+        list.show(shown.rows)
+        // Along `path` (Open With open, its second app under the keys);
+        // with none, the first row, as after ↓.
+        if path.isEmpty { _ = list.key(.down) } else { list.open(path: path) }
+        // Where it is in the window, y down.
+        let point = hosting.convert(shown.point, from: shown.view)
+        let origin = CGPoint(x: point.x, y: hosting.isFlipped ? point.y : hosting.bounds.height - point.y)
+        let bounds = CGRect(origin: .zero, size: hosting.bounds.size)
+        var frames = [MenuPlacement.menu(origin: origin, size: list.levels[0].layout.size, screen: bounds)]
+        for submenu in list.submenus where submenu.depth == frames.count {
+            let parent = frames[submenu.depth - 1]
+            let frame = MenuPlacement.submenu(parent: parent, row: submenu.row, size: submenu.size,
+                                              firstRow: submenu.firstRow, bounds: bounds)
+            list.placed(submenu.depth, onLeft: frame.minX < parent.minX)
+            frames.append(frame)
+        }
+        for (depth, frame) in frames.enumerated() {
+            let panel = NSHostingView(rootView: GroveMenuListPanel(model: list, level: depth)
+                .environment(\.theme, colors))
+            panel.frame = NSRect(x: frame.minX, y: hosting.isFlipped ? frame.minY : bounds.height - frame.maxY,
+                                 width: frame.width, height: frame.height)
+            hosting.addSubview(panel)
+            panel.layoutSubtreeIfNeeded()
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        hosting.displayIfNeeded()
     }
 }

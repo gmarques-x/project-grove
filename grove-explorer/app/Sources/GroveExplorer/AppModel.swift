@@ -116,6 +116,9 @@ final class AppModel: ObservableObject {
     var ejectPointerStandIn: String?
     var copyPointerStandIn: Side?
     var volumeIconStandIn: [String: NSImage] = [:]
+    /// Renders and the audit: the apps Open With offers (the default one
+    /// first), in place of asking NSWorkspace of an item that isn't there.
+    var openWithStandIn: (standard: URL?, all: [URL])?
 
     /// False in a render: nothing is read, watched, measured or saved.
     let live: Bool

@@ -18,8 +18,13 @@ import GroveThemesCore
 /// application finishes launching and the window is ordered in, clear and
 /// far off every screen, and out again. Nothing is ever on a screen.
 ///
-/// What it can't tell: how VoiceOver words an element, what it announces
-/// when something changes, and anything of the menus. Those are by hand.
+/// In the `menu` state the list's menu is opened by ⌃Return, its panel
+/// where the window is, and asked through the server too
+/// (`AccessibilityLive.checkMenu`).
+///
+/// What it can't tell: how VoiceOver words an element and what it
+/// announces when something changes (a menu opening included). Those are
+/// by hand.
 @MainActor
 enum AccessibilityAudit {
     /// What must say what it is.
@@ -81,6 +86,15 @@ enum AccessibilityAudit {
             if !count.unlabelled.isEmpty { failed = true }
             // Then the lists as an assistive app is served them.
             if let window = view.window {
+                // The list's menu, opened offscreen by ⌃Return, through the server too: first,
+                // while the selection is the state's (the lists' check sorts and filters them).
+                if ["menu", "menu-no-app"].contains(state) {
+                    let menu = AccessibilityLive.checkMenu(window, model: model)
+                    print("  the list's menu through the accessibility server: \(menu.items) items, "
+                        + "Open With \(menu.apps) rows, \(menu.problems.count) problems")
+                    for problem in menu.problems { print("  MENU \(problem)") }
+                    if !menu.problems.isEmpty { failed = true }
+                }
                 let live = AccessibilityLive.check(window, model: model)
                 print(
                     "  through the accessibility server: \(live.tables) lists, \(live.asked) questions, "

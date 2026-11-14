@@ -90,6 +90,8 @@ Everything in the window has a key except dragging the line between the panes. T
 
 The same commands are in the app's menus (click the app's name in the bar, or Pine › Global Menu) and in the right-click menu: Open, Open With, Quick Look, Rename, Duplicate, Copy Path, Move to Trash, Show in Finder and Open in Ghostty on an item; New Folder, Paste and Show Hidden Items on empty space.
 
+The right-click menu (or ⌃-click) is drawn like the pine's menu and works like it: ↑ ↓ move, → opens Open With (the apps that open the item, the default first, with their icons), ← goes back, ↩ chooses, a letter jumps to a row, Esc or a click outside closes it. The keyboard stays in the list while it is open. The sidebar's rows have the same kind of menu.
+
 ## Opening folders in place
 
 A folder with something in it has an arrow before its icon. Click the arrow, or select the folder and press →, and its contents are listed beneath it, indented, without leaving the folder you are in; click it again, or press ←, to close it. Folders open inside open folders as deep as you like, and each folder's contents are sorted among themselves by the tab's column.
