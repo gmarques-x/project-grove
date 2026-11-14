@@ -116,7 +116,7 @@ _xa_version() {
 # a folder of that kind is read (spec §11); the Apple events one is for Get
 # Info, which Finder shows. The exported type is the one the app drags a
 # sidebar favourite as (`UTType(exportedAs:)` in DragDrop.swift). The icon is
-# Grove Themes' for now (the pine), until the app has its own.
+# the app's own Resources/AppIcon.png (drawn by assets/app-icons/make.swift).
 _xa_info_plist() {
   local version
   version="$(_xa_version)"
@@ -236,7 +236,7 @@ apply() {
     cp "$src/.build/release/GroveExplorer" "$stage/Contents/MacOS/GroveExplorer" \
       && _xa_info_plist > "$stage/Contents/Info.plist" \
       && cp "$icons/seti.woff" "$icons/grove-icon-theme.json" "$stage/Contents/Resources/" \
-      && _xa_keys_app _ka_iconset "$(_xa_themes_src)/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
+      && _xa_keys_app _ka_iconset "$src/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
       && printf '%s\n' "$hash" > "$stage/Contents/Resources/source.stamp" \
       || rc=1
   fi

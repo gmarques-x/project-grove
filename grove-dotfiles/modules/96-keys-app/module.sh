@@ -297,7 +297,8 @@ _ka_iconset() {
   iconutil -c icns "$set" -o "$out" >/dev/null
 }
 
-# _ka_info_plist: the app bundle's Info.plist. The icon is Grove Themes' for now;
+# _ka_info_plist: the app bundle's Info.plist. The icon is the app's
+# own Resources/AppIcon.png (drawn by assets/app-icons/make.swift);
 # grovekeys:// is how the Grove bar's key glyph opens the menu. The two Location
 # lines are what macOS shows when the app asks to read the Wi-Fi network's name
 # (optional; the bar's Wi-Fi popup shows it); the Bluetooth line, when it first
@@ -372,7 +373,7 @@ apply() {
   if [ "$rc" -eq 0 ]; then
     cp "$src/.build/release/GroveKeys" "$stage/Contents/MacOS/GroveKeys" \
       && _ka_info_plist > "$stage/Contents/Info.plist" \
-      && _ka_iconset "$(_ka_themes_src)/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
+      && _ka_iconset "$src/Resources/AppIcon.png" "$stage/Contents/Resources/AppIcon.icns" "$tmp" \
       || rc=1
   fi
   if [ "$rc" -ne 0 ]; then
