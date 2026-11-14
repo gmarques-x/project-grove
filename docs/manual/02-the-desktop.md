@@ -103,6 +103,6 @@ The cloud pill follows iCloud Drive and every cloud folder in `~/Library/CloudSt
 
 In its panel, **Open in Grove Explorer** opens that cloud's folder and **Settings…** opens iCloud in System Settings, or OneDrive's settings. OneDrive lives in the macOS menu bar, which the Grove bar hides, so Grove Keys clicks its menu-bar icon for you (with its Accessibility permission, as for WireGuard). If that doesn't work, OneDrive comes forward and the panel says "Open OneDrive's settings from its activity window". "OneDrive isn't running" means OneDrive was quit; **Settings…** starts it again. The first time, macOS may ask whether Grove Keys may access files managed by OneDrive; if you say no, the panel says "Grove Keys can't see OneDrive's files" with a **Privacy Settings…** button, and the pill leaves OneDrive out.
 
-The app name is how you reach an app's menus now that the menu bar is hidden. The same menus are in the Grove menu under Global Menu. For what is not reachable yet, see [Coming from stock macOS](08-coming-from-stock-macos.md).
+The app name is how you reach an app's menus now that the menu bar is hidden. The same menus are in the Grove menu under Global Menu. Other apps' menu-bar icons are in the [tray](#menu-bar-tray); for what is not reachable yet, see [Coming from stock macOS](08-coming-from-stock-macos.md#what-you-cannot-reach-yet).
 
 All of these keys can be changed: see [Hotkeys](05-hotkeys.md).

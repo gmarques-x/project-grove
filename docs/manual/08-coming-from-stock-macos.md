@@ -21,6 +21,8 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 | The battery menu | The bolt in the bar; click it for charge, health, Keep Awake and Ignore Lid. See [The desktop](02-the-desktop.md#the-panels) |
 | The Wi-Fi menu | The Wi-Fi icon in the bar; click it for the network's name, a switch for Wi-Fi, your addresses and a speed test. To choose another network, use Wi-Fi Settings… at the bottom of that panel |
 | The volume menu | The speaker in the bar; click it for a volume slider, Mute and the list of outputs |
+| Other apps' menu-bar icons | The tray pill in the bar lists them; click a row to open that app's menu. See [Menu-bar tray](02-the-desktop.md#menu-bar-tray) |
+| The Bluetooth menu | The rune beside the Wi-Fi icon; its panel has a switch and your connected devices with their batteries |
 | Force Quit | ⌥⌘Esc, as before, or Apple menu › Force Quit |
 | Screenshots | ⌘⇧3, ⌘⇧4, ⌘⇧5, as before |
 | Terminal | Ghostty; ⌃` from anywhere. See [The terminal](06-the-terminal.md) |
@@ -30,8 +32,7 @@ Most of macOS is untouched. This is where the things Grove moved have gone.
 
 Said plainly:
 
-- **Third-party menu-bar icons are hidden.** Apps that live in the menu bar (password managers, VPN clients, cloud-storage clients, chat apps' status icons) still run, but their icons are behind the Grove bar and cannot be clicked. Open the app's own window or settings instead, where it has one. A "tray" in the bar that shows these icons is planned and not built.
-- **Control Centre and the system status icons are hidden** for the same reason: Bluetooth, Focus, AirDrop, screen mirroring and the rest. Use System Settings for each. Wi-Fi, sound and the battery have panels in the Grove bar.
+- **Control Centre and the system status icons are hidden** behind the Grove bar: Focus, AirDrop, screen mirroring and the rest. Use System Settings for each. Wi-Fi, Bluetooth, sound, the battery and cloud storage have panels in the Grove bar.
 - **Notification Centre has no button.** Notifications still arrive as banners.
 
 If you need the real menu bar for a moment, macOS's own shortcut ⌃F2 (⌃fn F2 on a laptop keyboard) moves the keyboard focus to it; then use the arrow keys.

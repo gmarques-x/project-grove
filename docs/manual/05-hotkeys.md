@@ -20,7 +20,7 @@ Caps Lock no longer types capitals. To have it back for a while, choose Pine ›
 
 **⌘Space** opens the [Grove Launcher](03-the-grove-menu.md#the-grove-launcher), in Spotlight's place: type to open an app or run a Grove menu row.
 
-Hyper plus a key can also launch an app. Add launchers in the Grove Keys window; for example, Hyper + ↩ for Ghostty.
+Hyper plus a key can also launch an app. Add launchers in the Grove Keys window; for example, Hyper + T for Ghostty.
 
 ## Workspaces and windows (⌥)
 
@@ -77,7 +77,7 @@ More in [The terminal](06-the-terminal.md).
 
 ```toml
 [launch]                       # Hyper + key opens an app, by bundle ID
-enter = "com.mitchellh.ghostty"
+t = "com.mitchellh.ghostty"
 
 [aerospace.main]               # AeroSpace's own syntax
 alt-h = "focus left"

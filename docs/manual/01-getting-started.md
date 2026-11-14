@@ -12,6 +12,7 @@ Grove is a personal setup, not an app you can drag to the Bin. Read this list fi
 - **Two apps are built and start at login:** Grove Keys and Grove Themes, in `~/Applications`. A third, Grove Explorer (the file browser), is built there too and opens only when you open it. A self-signed certificate, "Grove Code Signing", is added to your login keychain to sign Grove Keys and Grove Explorer.
 - **The desktop changes.** The menu bar is set to hide and a Grove bar sits in its place. AeroSpace tiles your windows. "Displays have separate Spaces" is turned off. Caps Lock becomes the Hyper key while Grove Keys runs.
 - **Smaller changes:** Finder settings (list view, path bar, extensions shown), Ghostty takes Terminal's place in the Dock, the wallpaper, macOS's appearance, accent and highlight colours, and VS Code's settings and theme.
+- **Claude Code, if you have it:** the grove mod is installed as a Claude Code plugin: an Agents pane beside the chat, a status line, and colours that follow the scheme. Claude Code records it in `~/.claude/settings.json`. Without Claude Code this step waits until you install it.
 - **Accounts:** it makes an SSH key if you have none, signs you in to GitHub in the browser, and uploads the key to GitHub as a signing key.
 
 Backups go to `~/.local/state/grove/backup/<date-time>/`. To take any of this back, see [Updates and undo](07-updates-and-undo.md).
@@ -32,12 +33,16 @@ It waits for Apple's Command Line Tools (finish the dialog that appears), puts t
 | --- | --- |
 | At the start | Type your name, email and GitHub username |
 | Homebrew's first install | Type your Mac password |
+| A OneDrive folder is found | Choose where `~/.ssh` lives: in OneDrive as `dot-ssh` (`~/.ssh` becomes a link to it) or on this Mac. Asked once |
 | No SSH key yet | Choose a passphrase for the new key |
 | GitHub | Sign in in the browser window that opens |
 | "codesign wants to use a key" | Choose **Always Allow** |
 | Grove Keys | Turn it on under **Accessibility** and **Input Monitoring** (the installer opens both panes in System Settings › Privacy & Security) |
 | AeroSpace | Turn it on under **Accessibility**; the installer waits until you do |
 | "Terminal wants to control System Events" | Allow it: it sets the wallpaper and the light or dark appearance |
+| Grove Keys asks for your location | Optional: it only lets the bar show the Wi-Fi network's name. Your position is never read |
+| Grove Keys asks to use Bluetooth | The first time you open the bar's network panel. Allow it to see your devices and their batteries there |
+| Grove Keys asks to access files managed by OneDrive | When the bar's cloud pill first looks. Allow it, or the pill leaves OneDrive out |
 
 ## Finish by hand
 

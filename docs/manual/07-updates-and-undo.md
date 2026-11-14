@@ -30,11 +30,12 @@ Run `grove install` followed by the part's name without its number, for example 
 | Part | What it is waiting for |
 | --- | --- |
 | `homebrew` | Your Mac password, for Homebrew's first install |
-| `ssh` | A passphrase for a new SSH key |
+| `ssh` | Where `~/.ssh` should live (when there is a OneDrive folder), or a passphrase for a new SSH key |
 | `git` | Your name and email |
 | `github` | A sign-in to GitHub in the browser |
 | `macos-wallpaper` | Permission for the terminal to control System Events (System Settings › Privacy & Security › Automation) |
 | `aerospace` | AeroSpace turned on under Accessibility |
+| `claude-mod` | Claude Code installed; then run `grove install claude-mod` |
 
 Grove Keys reports missing permissions in its own way: `grove check` prints `failed` with a line naming Accessibility or Input Monitoring, and the Grove Keys submenu in the pine menu has a row that opens the right pane.
 
@@ -73,9 +74,9 @@ defaults write NSGlobalDomain _HIHideMenuBar -bool false
 
 Then quit AeroSpace (in a terminal: `killall AeroSpace`). Caps Lock is itself again as soon as Grove Keys stops. Log out and in to get the menu bar back.
 
-**2. Remove the apps and their login items.** Delete `Grove Keys.app`, `Grove Themes.app` and `Grove Explorer.app` from `~/Applications`, and `com.projectgrove.keys.plist` and `com.projectgrove.themes.plist` from `~/Library/LaunchAgents`. In Keychain Access, delete the "Grove Code Signing" certificate and its key from the login keychain. Remove Grove Keys, Grove Explorer and AeroSpace from the lists under System Settings › Privacy & Security. If AeroSpace is listed under System Settings › General › Login Items, remove it there too.
+**2. Remove the apps and their login items.** Delete `Grove Keys.app`, `Grove Themes.app` and `Grove Explorer.app` from `~/Applications`, and `com.projectgrove.keys.plist` and `com.projectgrove.themes.plist` from `~/Library/LaunchAgents`. In Keychain Access, delete the "Grove Code Signing" certificate and its key from the login keychain. Remove Grove Keys, Grove Explorer and AeroSpace from the lists under System Settings › Privacy & Security. If AeroSpace is listed under System Settings › General › Login Items, remove it there too. If you use Claude Code, remove the grove mod: `claude plugin uninstall grove@grove`, then `claude plugin marketplace remove grove` (Claude Code updates `~/.claude/settings.json` itself).
 
-**3. Remove the links.** `rm` on a link removes only the link, never what it points to.
+**3. Remove the links.** `rm` on a link removes only the link, never what it points to. If you chose a OneDrive folder for `~/.ssh`, `~/.ssh` is a link too: `rm ~/.ssh` and put the old folder back from the backup (step 4).
 
 ```sh
 rm ~/.config ~/.zshenv ~/.ssh/config ~/.local/bin/grove ~/.local/bin/grove-themes
