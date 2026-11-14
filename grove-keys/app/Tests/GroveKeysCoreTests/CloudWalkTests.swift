@@ -91,8 +91,9 @@ struct CloudWalkDecisionTests {
         // An online-only folder can't hold local edits waiting to upload:
         // never listed (listing it would download its contents).
         #expect(CloudWalk.decide(name: "Online", CloudStat(kind: .directory, isDataless: true)) == .skip)
-        // An online-only file is never pending.
-        #expect(CloudWalk.decide(name: "online.pdf", CloudStat(kind: .file, isDataless: true)) == .skip)
+        // An online-only file is read (resource values only: the thread's
+        // policy keeps it online-only): a download under way is pending.
+        #expect(CloudWalk.decide(name: "online.pdf", CloudStat(kind: .file, isDataless: true)) == .read)
         // Names never synced, and what's in them.
         for name in [".DS_Store", "._a.txt", "Thing.nosync", "~$lock.docx", "draft.TMP"] {
             #expect(CloudWalk.decide(name: name, CloudStat(kind: .file)) == .skip, "\(name)")
@@ -127,12 +128,13 @@ struct CloudWalkerTests {
         var walker = CloudWalker(root: root)
         let (seen, outcome) = walkAll(&walker, fs)
         #expect(outcome == .done)
-        #expect(seen == [p("Notes/Deep/c.txt"), p("Notes/a.txt"), p("Notes/b.txt"), p("photo.jpg")])
+        #expect(seen == [p("Notes/Deep/c.txt"), p("Notes/a.txt"), p("Notes/b.txt"), p("online.pdf"), p("photo.jpg")])
         #expect(!fs.listed.contains(p("Online")))
         #expect(!fs.statted.contains(p("Online/never.txt")))
         #expect(!fs.listed.contains(p("Thing.nosync")))
-        #expect(walker.skippedDataless == 2)
-        #expect(walker.files == 4)
+        // Folders only.
+        #expect(walker.skippedDataless == 1)
+        #expect(walker.files == 5)
     }
 
     @Test func aSmallBudgetSpreadsTheWalkOverStepsWithTheSameResult() {
@@ -149,7 +151,7 @@ struct CloudWalkerTests {
         }
         #expect(outcome == .done)
         #expect(steps > 5)
-        #expect(seen.sorted() == [p("Notes/Deep/c.txt"), p("Notes/a.txt"), p("Notes/b.txt"), p("photo.jpg")])
+        #expect(seen.sorted() == [p("Notes/Deep/c.txt"), p("Notes/a.txt"), p("Notes/b.txt"), p("online.pdf"), p("photo.jpg")])
         // Every lstat and every listing counts.
         #expect(walker.operations == fs.listed.count + fs.statted.count)
     }
@@ -176,7 +178,7 @@ struct CloudWalkerTests {
         var walker = CloudWalker(root: root)
         let (seen, outcome) = walkAll(&walker, fs)
         #expect(outcome == .done)
-        #expect(seen == [p("Notes/a.txt"), p("Notes/b.txt"), p("photo.jpg")])
+        #expect(seen == [p("Notes/a.txt"), p("Notes/b.txt"), p("online.pdf"), p("photo.jpg")])
     }
 
     @Test func aRootThatIsGoneSaysSo() {
@@ -200,9 +202,12 @@ struct CloudWalkerTests {
         #expect(outcome == .done)
         #expect(seen == [p("Notes/Deep/c.txt"), p("Notes/a.txt"), p("Notes/b.txt")])
         #expect(walker.root == root)
-        // A start that's a file is read; one that's online-only, not.
+        // A start that's a file is read, an online-only one too; an
+        // online-only folder is not listed.
         var one = CloudWalker(root: root, start: URL(fileURLWithPath: p("photo.jpg")))
         #expect(walkAll(&one, fs).0 == [p("photo.jpg")])
+        var onlineFile = CloudWalker(root: root, start: URL(fileURLWithPath: p("online.pdf")))
+        #expect(walkAll(&onlineFile, fs).0 == [p("online.pdf")])
         var online = CloudWalker(root: root, start: URL(fileURLWithPath: p("Online")))
         #expect(walkAll(&online, fs).0.isEmpty)
         #expect(!fs.listed.contains(p("Online")))

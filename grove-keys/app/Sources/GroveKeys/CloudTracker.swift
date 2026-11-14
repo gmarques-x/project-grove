@@ -38,8 +38,17 @@ final class CloudTracker: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        // To the main thread at most twice a second (the dropdown redraws on
+        // each); the latest always lands. The bar's file isn't held back.
+        let throttle = OSAllocatedUnfairLock(
+            initialState: CloudThrottle<CloudSummary>(interval: CloudThrottle<CloudSummary>.summaryInterval))
         engine.onSummary = { summary in
-            DispatchQueue.main.async { MainActor.assumeIsolated { CloudTracker.shared.summary = summary } }
+            guard let delay = throttle.withLock({ $0.offer(summary, at: Date()) }) else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                MainActor.assumeIsolated {
+                    if let latest = throttle.withLock({ $0.flush(at: Date()) }) { CloudTracker.shared.summary = latest }
+                }
+            }
         }
         // OneDrive's process, for "OneDrive isn't running" (iCloud's is always there).
         apps = NSWorkspace.shared.observe(\.runningApplications, options: [.initial]) { _, _ in
@@ -87,12 +96,6 @@ final class CloudEngine: @unchecked Sendable {
 
     /// FSEvents' coalescing: a burst within a second is one callback.
     static let latency: CFTimeInterval = 1
-    /// The longest the thread sleeps (the 30 minutes are checked, the roots re-read).
-    static let tick: TimeInterval = 60
-    /// A provider that refused its files is tried again this rarely.
-    static let refusedRetry: TimeInterval = 600
-    /// A root's re-walk after the cap is not repeated sooner than this.
-    static let rescanGap: TimeInterval = 60
     /// Per turn of the loop: entries a walk looks at, events, re-reads.
     static let walkBudget = 200
     static let eventsPerTurn = 500
@@ -125,6 +128,9 @@ final class CloudEngine: @unchecked Sendable {
         /// An item it found couldn't join (the set was full).
         var dropped = false
         var root: URL { walker.root }
+        var scheduled: CloudSchedule.Walk {
+            CloudSchedule.Walk(root: walker.root, isWholeRoot: isWholeRoot, notBefore: notBefore)
+        }
         var isWholeRoot: Bool { walker.start.standardizedFileURL == walker.root.standardizedFileURL }
     }
 
@@ -150,12 +156,12 @@ final class CloudEngine: @unchecked Sendable {
     private var places: [CloudProviders.CloudPlace] = []
     private var pending = CloudPending()
     private var walks: [Walk] = []
-    private var refused: [String: Date] = [:]
+    /// Refusals, re-walks after the cap, the roots' check: what's due and
+    /// the deadline to sleep until, by one rule.
+    private var schedule = CloudSchedule()
     private var loggedRefused: Set<String> = []
     private var firstPassLeft: Set<String> = []
     private var firstPassDone = false
-    private var lastRescan: [String: Date] = [:]
-    private var nextRootsCheck = Date.distantPast
     private var streams: [String: FSEventStreamRef] = [:]
     private var storageWatch: DispatchSourceFileSystemObject?
     private var published: CloudSummary?
@@ -250,7 +256,7 @@ final class CloudEngine: @unchecked Sendable {
 
             let began = Date()
             var done = 0
-            if rootsChanged || began >= nextRootsCheck { done += refreshRoots(at: began) }
+            if rootsChanged || began >= schedule.nextRootsCheck { done += refreshRoots(at: began) }
             for event in events { done += handle(event, at: began) }
             done += stepWalk(at: began)
             done += reread(at: began)
@@ -267,17 +273,7 @@ final class CloudEngine: @unchecked Sendable {
     }
 
     private func nextDeadline() -> Date {
-        let now = Date()
-        var next = min(now + Self.tick, nextRootsCheck)
-        if let read = pending.nextRead { next = min(next, read) }
-        for walk in walks { next = min(next, walk.notBefore) }
-        for at in refused.values { next = min(next, at + Self.refusedRetry) }
-        if pending.hasRoom {
-            for root in pending.rootsNeedingRescan {
-                next = min(next, (lastRescan[root.path] ?? .distantPast) + Self.rescanGap)
-            }
-        }
-        return next
+        schedule.deadline(at: Date(), pending: pending, walks: walks.map(\.scheduled), roots: places.map(\.url))
     }
 
     /// The places: iCloud Drive's folder when it's there, then each folder
@@ -285,7 +281,7 @@ final class CloudEngine: @unchecked Sendable {
     /// gone takes its items, stream and walks with it.
     @discardableResult
     private func refreshRoots(at now: Date) -> Int {
-        nextRootsCheck = now + Self.tick
+        schedule.nextRootsCheck = now + CloudSchedule.tick
         let iCloud = home.appendingPathComponent(CloudProviders.iCloudDrive, isDirectory: true)
         let iCloudPresent = (try? fs.lstat(iCloud.path).get())?.kind == .directory
         let names = ((try? fs.list(storage.path).get()) ?? []).filter {
@@ -299,9 +295,8 @@ final class CloudEngine: @unchecked Sendable {
             pending.removeRoot(place.url)
             stopStream(place.url.path)
             walks.removeAll { $0.root.path == place.url.path }
-            refused[place.url.path] = nil
+            schedule.forget(place.url)
             firstPassLeft.remove(place.url.path)
-            lastRescan[place.url.path] = nil
         }
         pending.retainRoots(fresh.map(\.url))
         places = fresh
@@ -377,7 +372,7 @@ final class CloudEngine: @unchecked Sendable {
         guard let url = event.url, let root = event.root, places.contains(where: { $0.url.path == root.path })
         else { return 0 }
         // A provider that refused its files isn't asked again until its retry.
-        guard refused[root.path] == nil else { return 0 }
+        guard !schedule.isRefused(root) else { return 0 }
         switch event {
         case .read:
             // A walk of a folder it's in, not begun yet, will read it fresh.
@@ -385,7 +380,7 @@ final class CloudEngine: @unchecked Sendable {
             if walks.contains(where: { $0.walker.operations == 0 && path.hasPrefix($0.walker.start.path + "/") }) {
                 return 0
             }
-            read(url, root: root, at: now, touched: true)
+            read(url, root: root, at: now)
             return 1
         case .expand:
             addWalk(Walk(walker: CloudWalker(root: root, start: url), kind: .expand), at: now)
@@ -431,12 +426,12 @@ final class CloudEngine: @unchecked Sendable {
         let before = walk.walker.operations
         // A retry starts hopeful: a refusal on the way marks it again (and
         // the next try is ten minutes on).
-        if walk.kind == .retry && before == 0 { refused[root.path] = nil }
+        if walk.kind == .retry && before == 0 { schedule.clearRefusal(root) }
         var dropped = false
         var reads = 0
         let outcome = walk.walker.step(budget: Self.walkBudget, fs: fs) { url in
             reads += 1
-            if read(url, root: root, at: now, touched: false) == .dropped { dropped = true }
+            if read(url, root: root, at: now) == .dropped { dropped = true }
         }
         walk.dropped = walk.dropped || dropped
         let used = walk.walker.operations - before + reads
@@ -445,7 +440,7 @@ final class CloudEngine: @unchecked Sendable {
             $0.walked += walked
             if outcome != .more { $0.walksDone += 1 }
         }
-        if refused[root.path] != nil || outcome == .refused {
+        if schedule.isRefused(root) || outcome == .refused {
             // Refused on the way (a file's read, or the folder's listing).
             if outcome == .refused, walk.isWholeRoot { markRefused(root, at: now) }
             finished(walk)
@@ -459,7 +454,7 @@ final class CloudEngine: @unchecked Sendable {
             finished(walk)
         case .gone:
             if walk.isWholeRoot {
-                nextRootsCheck = .distantPast
+                schedule.nextRootsCheck = .distantPast
             } else {
                 settle(under: walk.walker.start)
             }
@@ -475,7 +470,7 @@ final class CloudEngine: @unchecked Sendable {
             if firstPassLeft.isEmpty && !walks.contains(where: { $0.kind == .first }) { firstPassDone = true }
         }
         // A whole re-walk that kept everything it found accounts for the dropped items.
-        if walk.isWholeRoot, !walk.dropped, refused[root.path] == nil, pending.needsRescan(root) {
+        if walk.isWholeRoot, !walk.dropped, !schedule.isRefused(root), pending.needsRescan(root) {
             pending.rescanned(root: root)
         }
     }
@@ -487,29 +482,22 @@ final class CloudEngine: @unchecked Sendable {
         let byPath = Dictionary(pending.entries.map { ($0.url.path, $0.root) }, uniquingKeysWith: { a, _ in a })
         for url in due {
             guard let root = byPath[url.path] else { continue }
-            read(url, root: root, at: now, touched: false)
+            read(url, root: root, at: now)
         }
         return due.count
     }
 
     /// Room again after the cap: re-walk the roots whose items were dropped.
-    /// A refused provider: try again, rarely.
+    /// A refused provider: try again, rarely. (`CloudSchedule` decides, by
+    /// the same rule as the deadline.)
     private func scheduleWalks(at now: Date) {
-        if pending.hasRoom {
-            for root in pending.rootsNeedingRescan where refused[root.path] == nil {
-                guard !walks.contains(where: { $0.root.path == root.path && $0.isWholeRoot }),
-                      now.timeIntervalSince(lastRescan[root.path] ?? .distantPast) >= Self.rescanGap
-                else { continue }
-                lastRescan[root.path] = now
-                walks.append(Walk(walker: CloudWalker(root: root), kind: .rescan))
-            }
+        for root in schedule.rescansDue(at: now, pending: pending, walks: walks.map(\.scheduled)) {
+            schedule.started(rescan: root, at: now)
+            walks.append(Walk(walker: CloudWalker(root: root), kind: .rescan))
         }
-        for (path, at) in refused where now.timeIntervalSince(at) >= Self.refusedRetry {
-            guard let place = places.first(where: { $0.url.path == path }),
-                  !walks.contains(where: { $0.root.path == path })
-            else { continue }
-            refused[path] = now
-            walks.append(Walk(walker: CloudWalker(root: place.url), kind: .retry))
+        for root in schedule.retriesDue(at: now, roots: places.map(\.url), walks: walks.map(\.scheduled)) {
+            schedule.started(retry: root, at: now)
+            walks.append(Walk(walker: CloudWalker(root: root), kind: .retry))
         }
     }
 
@@ -517,12 +505,12 @@ final class CloudEngine: @unchecked Sendable {
 
     /// One item, read fresh (a new URL, no cached values), into the set.
     @discardableResult
-    private func read(_ url: URL, root: URL, at now: Date, touched: Bool) -> ReadOutcome {
+    private func read(_ url: URL, root: URL, at now: Date) -> ReadOutcome {
         counted.withLock { $0.reads += 1 }
         do {
             let state = CloudItemState(try CloudItemValues.read(path: url.path))
             let dropped = state != .settled && !pending.hasRoom && !pending.contains(url)
-            pending.update(url, root: root, state: state, at: now, touched: touched)
+            pending.update(url, root: root, state: state, at: now)
             return dropped ? .dropped : .kept
         } catch {
             switch Self.posixCode(error) {
@@ -560,9 +548,9 @@ final class CloudEngine: @unchecked Sendable {
     /// macOS refused the provider's files: "can't see", the pill ignores
     /// it, its walks stop and it's tried again in ten minutes.
     private func markRefused(_ root: URL, at now: Date) {
-        if refused[root.path] == nil { refused[root.path] = now }
+        schedule.refuse(root, at: now)
         if loggedRefused.insert(root.path).inserted {
-            Self.log.info("macOS refused a cloud folder's files; trying again in \(Int(Self.refusedRetry)) s")
+            Self.log.info("macOS refused a cloud folder's files; trying again in \(Int(CloudSchedule.refusedRetry)) s")
         }
         pending.removeRoot(root)
         walks.removeAll { $0.root.path == root.path && $0.kind != .retry }
@@ -581,7 +569,7 @@ final class CloudEngine: @unchecked Sendable {
 
     private func access(_ place: CloudProviders.CloudPlace, running: Set<String>) -> CloudProviderAccess {
         if let id = CloudProviderSummary.bundleID(for: place), !running.contains(id) { return .notRunning }
-        return refused[place.url.path] == nil ? .ok : .cantSee
+        return schedule.isRefused(place.url) ? .cantSee : .ok
     }
 
     private func publish() {

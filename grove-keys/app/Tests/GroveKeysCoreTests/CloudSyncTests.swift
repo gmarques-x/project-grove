@@ -221,17 +221,20 @@ struct CloudPendingTests {
         #expect(CloudPending.stuckDownloadMessage == "not downloading for 30 min")
     }
 
-    @Test func aFileEventIsAChange() {
+    @Test func aFileEventWithTheSameStateIsNoChange() {
+        // A provider rewriting an item's metadata makes file events while
+        // the upload stays stuck: only a different state is a change.
         var pending = CloudPending()
         let a = file(oneDrive, "a.txt")
         pending.update(a, root: oneDrive.url, state: .uploading, at: t0)
-        pending.update(a, root: oneDrive.url, state: .uploading, at: t0 + 1000, touched: true)
-        #expect(!expired(&pending, t0 + 1800))
-        #expect(expired(&pending, t0 + 2800))
-        // And it reads fast again after an event.
-        pending.update(a, root: oneDrive.url, state: .uploading, at: t0 + 2900, touched: true)
-        #expect(pending.entries.first?.state == .uploading)
-        #expect(pending.nextRead == t0 + 2905)
+        pending.update(a, root: oneDrive.url, state: .uploading, at: t0 + 1000)
+        #expect(expired(&pending, t0 + 1800))
+        pending.update(a, root: oneDrive.url, state: .uploading, at: t0 + 1900)
+        #expect(pending.entries.first?.state == .problem(CloudPending.stuckMessage))
+        // A different state is.
+        pending.update(a, root: oneDrive.url, state: .notUploaded, at: t0 + 2000)
+        #expect(pending.entries.first?.state == .notUploaded)
+        #expect(pending.nextRead == t0 + 2005)
     }
 
     @Test func aProblemFromTheProviderNeverExpires() {
@@ -454,8 +457,7 @@ struct CloudSummaryTests {
         // doesn't move any row, nor does a hidden one changing pull it in.
         pending.update(file(oneDrive, "Docs/e.txt"), root: oneDrive.url, state: .notUploaded, at: t0 + 100)
         pending.update(file(oneDrive, "Docs/a.txt"), root: oneDrive.url, state: .notUploaded, at: t0 + 100)
-        pending.update(file(oneDrive, "Docs/b.txt"), root: oneDrive.url, state: .downloading, at: t0 + 100,
-                       touched: true)
+        pending.update(file(oneDrive, "Docs/b.txt"), root: oneDrive.url, state: .downloading, at: t0 + 100)
         pending.update(file(oneDrive, "z.txt"), root: oneDrive.url, state: .problem("Disk full"), at: t0 + 100)
         let after = summary(pending).providers.last!.rows
         #expect(after.map(\.id) == rows.map(\.id))

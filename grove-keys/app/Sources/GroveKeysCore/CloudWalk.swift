@@ -4,9 +4,9 @@ import Foundation
 
 // How the cloud tracker (Grove Keys) looks at the cloud folders without ever
 // downloading anything (spec 2026-11-14-bar-cloud-design): a walk that reads
-// only lstat and directory listings, skips online-only (dataless) folders and
-// files, and is paced; the file events it gets, sorted into what to do and
-// coalesced so a burst of thousands is a bounded amount of work.
+// only lstat, directory listings and resource values, skips online-only
+// (dataless) folders, and is paced; the file events it gets, sorted into
+// what to do and coalesced so a burst of thousands is a bounded amount of work.
 
 /// What lstat says about one entry.
 public struct CloudStat: Equatable, Sendable {
@@ -87,14 +87,16 @@ public struct CloudPOSIX: CloudFileSystem, Sendable {
 public enum CloudWalk {
     public enum Decision: Equatable, Sendable { case descend, read, skip }
 
-    /// Folders are walked, files read; skipped: names never synced (and
-    /// whatever is in such a folder), online-only folders (listing one would
-    /// download it, and it can't hold local edits waiting to upload),
-    /// online-only files (never pending), links and anything else.
+    /// Folders are walked, files read (an online-only one too: only its
+    /// resource values, which the thread's policy keeps from downloading
+    /// it; a download under way is pending); skipped: names never synced
+    /// (and whatever is in such a folder), online-only folders (listing one
+    /// would download it, and it can't hold local edits waiting to upload),
+    /// links and anything else.
     public static func decide(name: String, _ stat: CloudStat) -> Decision {
-        guard !CloudIgnore.ignores(name: name), !stat.isDataless else { return .skip }
+        guard !CloudIgnore.ignores(name: name) else { return .skip }
         switch stat.kind {
-        case .directory: return .descend
+        case .directory: return stat.isDataless ? .skip : .descend
         case .file: return .read
         case .other: return .skip
         }
@@ -139,7 +141,7 @@ public struct CloudWalker: Sendable {
     public private(set) var operations = 0
     /// Files handed to `visit`.
     public private(set) var files = 0
-    /// Online-only folders and files passed over.
+    /// Online-only folders passed over (never listed).
     public private(set) var skippedDataless = 0
 
     private var begun = false
@@ -163,11 +165,10 @@ public struct CloudWalker: Sendable {
             switch fs.lstat(start.path) {
             case .failure(let error): return error.isRefused ? .refused : .gone
             case .success(let stat):
-                if stat.isDataless {
+                switch stat.kind {
+                case .directory where stat.isDataless:
                     skippedDataless += 1
                     return .done
-                }
-                switch stat.kind {
                 case .directory:
                     // The first listing decides refused / gone for the walk.
                     operations += 1
@@ -192,7 +193,7 @@ public struct CloudWalker: Sendable {
                 left -= 1
                 operations += 1
                 guard case .success(let stat) = fs.lstat(path) else { continue }
-                if stat.isDataless { skippedDataless += 1 }
+                if stat.kind == .directory && stat.isDataless { skippedDataless += 1 }
                 switch CloudWalk.decide(name: (path as NSString).lastPathComponent, stat) {
                 case .descend: folders.append(path)
                 case .read:

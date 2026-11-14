@@ -230,11 +230,13 @@ public struct CloudPending: Sendable {
     /// Items pending (not problems, not stuck).
     public var pendingCount: Int { items.values.count { $0.state.isPending } }
 
-    /// An item was read (`touched`: after a file event on it, a change in
-    /// itself). Settled leaves the set; anything else joins it (unless full)
-    /// or updates it. A changed state, or a touch, restarts the fast reads
-    /// and the 30 minutes, and clears stuck.
-    public mutating func update(_ url: URL, root: URL, state: CloudItemState, at now: Date, touched: Bool = false) {
+    /// An item was read (after a file event on it, or on its re-read).
+    /// Settled leaves the set; anything else joins it (unless full) or
+    /// updates it. Only a different state is a change: it restarts the fast
+    /// reads and the 30 minutes, and clears stuck. A file event that reads
+    /// the same state is no change (a provider rewriting the item's metadata
+    /// mustn't keep a stalled upload from ever being "not uploading").
+    public mutating func update(_ url: URL, root: URL, state: CloudItemState, at now: Date) {
         let key = Self.key(url)
         guard state != .settled else {
             settle(url)
@@ -248,7 +250,7 @@ public struct CloudPending: Sendable {
             items[key] = Entry(url: url, root: root, read: state, added: now, changed: now, lastRead: now, stuck: false)
             return
         }
-        if state != entry.read || touched {
+        if state != entry.read {
             entry.read = state
             entry.changed = now
             entry.stuck = false
