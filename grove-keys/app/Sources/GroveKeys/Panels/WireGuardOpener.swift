@@ -7,7 +7,8 @@ import GroveKeysCore
 /// again shows nothing), and the native menu bar is hidden behind the Grove
 /// bar, so Grove Keys presses its status item's "Manage Tunnels" through
 /// Accessibility (the permission Grove Keys already has for the global
-/// menu). The title match and the outcome are `WireGuardMenu`'s (Core).
+/// menu). The item is `StatusItemLocator`'s (on macOS 27, found through
+/// MenuBarAgent). The title match and the outcome are `WireGuardMenu`'s (Core).
 ///
 /// Everything waits off the main thread with short limits; the panel never
 /// blocks. Never called by a render or a test (the sample model has no
@@ -81,10 +82,9 @@ enum WireGuardOpener {
 
         let app = timed(AXUIElementCreateApplication(pid))
         // A WireGuard that just started may not have its status item yet.
-        let items = wait(launched ? statusItemWait : 0) { () -> [AXUIElement]? in
-            guard let bar = value(app, kAXExtrasMenuBarAttribute) else { return nil }
-            // swiftlint:disable:next force_cast
-            let items = children(timed(bar as! AXUIElement)).map(timed)
+        // On macOS 27 the items are found through MenuBarAgent.
+        let items = wait(launched ? statusItemWait : 0) { () -> [StatusItemLocator.Item]? in
+            let items = StatusItemLocator.items(pid: pid)
             return items.isEmpty ? nil : items
         } ?? []
         steps.statusItems = items.count
@@ -98,16 +98,22 @@ enum WireGuardOpener {
         }
         _ = closed.wait(timeout: .now() + 1)
 
-        for item in items {
+        for found in items {
             // A status item's press can report a time-out while its menu is
             // up (the call returns when the menu tracks): look for the menu
-            // whatever it answers.
-            _ = AXUIElementPerformAction(item, kAXPressAction as CFString)
-            guard let menu = wait(menuWait, { openMenu(of: item) }) else {
-                // One that opened just too late is put away too.
-                if let late = openMenu(of: item) { cancel(late) }
-                continue
+            // whatever it answers. The app's element first, then the
+            // MenuBarAgent group around it.
+            var opened: (item: AXUIElement, menu: AXUIElement)?
+            for item in found.presses where opened == nil {
+                _ = AXUIElementPerformAction(item, kAXPressAction as CFString)
+                if let menu = wait(menuWait, { openMenu(of: item, app: app) }) {
+                    opened = (item, menu)
+                } else if let late = openMenu(of: item, app: app) {
+                    // One that opened just too late is put away too.
+                    cancel(late)
+                }
             }
+            guard let (item, menu) = opened else { continue }
             steps.menuOpened = true
             let entries = children(menu).map(timed)
             guard let index = WireGuardMenu.manageTunnelsIndex(in: entries.map { string($0, kAXTitleAttribute) })
@@ -121,20 +127,21 @@ enum WireGuardOpener {
             // Its answer isn't trusted (see `WireGuardMenu.pressTook`).
             _ = AXUIElementPerformAction(entries[index], kAXPressAction as CFString)
             steps.itemPressed = wait(pressWait) { () -> Bool? in
-                let took = WireGuardMenu.pressTook(menuGone: openMenu(of: item) == nil, windowsBefore: before,
+                let took = WireGuardMenu.pressTook(menuGone: openMenu(of: item, app: app) == nil, windowsBefore: before,
                                                    windowsAfter: windowCount(app))
                 return took ? true : nil
             } ?? false
             // A press that didn't take leaves the menu up: put it away.
-            if !steps.itemPressed, let still = openMenu(of: item) { cancel(still) }
+            if !steps.itemPressed, let still = openMenu(of: item, app: app) { cancel(still) }
             break
         }
         return steps.outcome
     }
 
-    /// The menu under a status item while it is open.
-    private static func openMenu(of item: AXUIElement) -> AXUIElement? {
-        children(item).first { string($0, kAXRoleAttribute) == kAXMenuRole }.map(timed)
+    /// The menu under a status item while it is open: the item's child, or
+    /// (an item reached through MenuBarAgent) the app's.
+    private static func openMenu(of item: AXUIElement, app: AXUIElement) -> AXUIElement? {
+        (children(item) + children(app)).first { string($0, kAXRoleAttribute) == kAXMenuRole }.map(timed)
     }
 
     private static func cancel(_ menu: AXUIElement) {
