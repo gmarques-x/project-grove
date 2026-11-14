@@ -117,6 +117,20 @@ import Testing
         #expect(panel.frame.width >= GroveMenuListMetrics.submenu)
     }
 
+    /// A window off every screen (an audit's, a render's) keeps its menu
+    /// over itself: never pulled onto a screen someone is looking at.
+    @Test func aWindowOffEveryScreenKeepsItsMenuOffThemToo() throws {
+        let away = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 600, height: 500),
+                            styleMask: [.borderless], backing: .buffered, defer: false)
+        away.isReleasedWhenClosed = false
+        defer { away.close() }
+        popUp(at: NSPoint(x: 50, y: 400), in: away.contentView!)
+        let panel = try #require(host.current?.panels.first)
+        #expect(away.frame.contains(panel.frame))
+        #expect(!NSScreen.screens.contains { $0.frame.intersects(panel.frame) })
+        host.close()
+    }
+
     @Test func aMenuWithNoRowsShowsNothingAndClosesAtOnce() {
         popUp([])
         #expect(!host.isOpen)

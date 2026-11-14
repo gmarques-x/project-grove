@@ -173,7 +173,9 @@ final class GroveMenuListHost {
             return
         }
         let onScreen = owner.convertPoint(toScreen: view.convert(point, to: nil))
-        let screen = NSScreen.screens.first { $0.frame.contains(onScreen) } ?? owner.screen ?? NSScreen.main
+        // A window off every screen (an audit's) keeps its menu over itself,
+        // off them too: never pulled onto a screen someone is looking at.
+        let screen = NSScreen.screens.first { $0.frame.contains(onScreen) } ?? owner.screen
         let bounds = screen.map { Self.yDown($0.visibleFrame) } ?? Self.yDown(owner.frame)
 
         let model = GroveMenuListModel(width: nil, icons: false)
