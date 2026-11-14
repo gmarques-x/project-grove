@@ -8,13 +8,15 @@ import GroveKeysCore
 /// its status item through Accessibility (the permission Grove Keys already
 /// has for the global menu), as the VPN's WireGuardOpener does:
 ///
-/// 1. press OneDrive's status item (`StatusItemLocator`: on macOS 27 found
-///    through MenuBarAgent; the app's element, then the group around it);
+/// 1. click OneDrive's status item for real (`StatusItemClicker`: it
+///    ignores Accessibility presses); failing that, press it
+///    (`StatusItemLocator`: on macOS 27 found through MenuBarAgent; the
+///    app's element, then the group around it);
 /// 2. a menu opened: press its Settings item, or open "Help & Settings" and
 ///    press Settings there;
-/// 3. a window opened instead (OneDrive's activity window): find its
-///    settings button by role and words, press it; if that opens a menu,
-///    as 2;
+/// 3. a window opened instead (OneDrive's Activity Center, what a click
+///    opens): find its settings button by role and words ("Help &
+///    Settings"), press it; it opens a menu beside it: as 2;
 /// 4. anything not found, or Accessibility refused: the fallback, OneDrive
 ///    brought forward and a yellow line in the dropdown.
 ///
@@ -107,14 +109,26 @@ enum OneDriveSettingsOpener {
         }
         _ = closed.wait(timeout: .now() + 1)
 
-        for found in items {
-            // The app's element first, then the MenuBarAgent group around it.
-            for item in found.presses {
+        // OneDrive's item opens only on a real click (`StatusItemClick`,
+        // Core): that goes first. The presses stay as the fallback, for a
+        // OneDrive that answers them again, or a click that couldn't be made.
+        // Each group is one item's tries; a menu that isn't the item's ends
+        // its group. The app's element, then the MenuBarAgent group around it.
+        let groups: [[Try]] = (items.first.map { [[.click($0.element)]] } ?? [])
+            + items.map { $0.presses.map(Try.press) }
+        for group in groups {
+            for attempt in group {
+                let item = attempt.item
                 let menuOpen = { statusMenu(of: item, app: app) }
                 let before = AX.windows(app)
-                // A status item's press can report a time-out while its menu
-                // is up: look for what opened whatever it answers.
-                AX.press(item)
+                switch attempt {
+                case .click(let element):
+                    guard StatusItemClicker.click(element) else { continue }
+                case .press(let element):
+                    // A status item's press can report a time-out while its menu
+                    // is up: look for what opened whatever it answers.
+                    AX.press(element)
+                }
                 let opened = AX.wait(openWait) { () -> Opened? in
                     if let menu = menuOpen() { return .menu(menu) }
                     if let window = newWindow(app, before: before) { return .window(window) }
@@ -134,7 +148,7 @@ enum OneDriveSettingsOpener {
                     return steps.outcome
                 case nil:
                     // A menu that opened just too late is put away too; then
-                    // the wrapper is pressed.
+                    // the next try.
                     if let late = menuOpen() { AX.cancel(late) }
                     continue
                 }
@@ -142,6 +156,18 @@ enum OneDriveSettingsOpener {
             }
         }
         return steps.outcome
+    }
+
+    /// One way of opening the item: a real click, or an Accessibility press.
+    private enum Try {
+        case click(AXUIElement)
+        case press(AXUIElement)
+
+        var item: AXUIElement {
+            switch self {
+            case .click(let element), .press(let element): element
+            }
+        }
     }
 
     private enum Opened {
@@ -251,10 +277,12 @@ enum OneDriveSettingsOpener {
         AX.children(element).first { AX.string($0, kAXRoleAttribute) == kAXMenuRole }
     }
 
-    /// The menu an item or button opened: its child, or (an item reached
-    /// through MenuBarAgent, a menu popped up) the app's.
+    /// The menu an item or button opened: its child; beside it, in its
+    /// parent (the Activity Center's "Help & Settings" shows its menu so);
+    /// or (an item reached through MenuBarAgent, a menu popped up) the app's.
     private static func statusMenu(of element: AXUIElement, app: AXUIElement) -> AXUIElement? {
-        openMenu(under: element) ?? openMenu(under: app)
+        openMenu(under: element) ?? AX.element(element, kAXParentAttribute).flatMap(openMenu(under:))
+            ?? openMenu(under: app)
     }
 
     /// A window of OneDrive's that wasn't there before.

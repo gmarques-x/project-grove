@@ -6,7 +6,10 @@ import os
 /// Opens a tray item (spec 2026-11-14-bar-tray-design): `AXPress` on the
 /// app's element; "opened" is a new menu or window of the item's pid within
 /// a second (`TrayItems.opened`, Core); else the MenuBarAgent wrapper is
-/// pressed once, the same test; else the app is brought forward. The order
+/// pressed once, the same test; else the item is clicked for real
+/// (`StatusItemClicker`: OneDrive's item opens only so), the same test;
+/// else the app is brought forward. An app that needed the click is
+/// clicked first next time. The order
 /// is `TrayPress.run`'s (Core); this only does the Accessibility side.
 ///
 /// Never on the main thread: every wait here is up to a second. Never
@@ -18,12 +21,18 @@ enum TrayPresser {
     private static let openWait: TimeInterval = 1
     private static let log = Logger(subsystem: "com.projectgrove.keys", category: "tray")
 
-    /// Presses `item` of `pid`'s app. `.broughtForward` also activates the
+    /// Apps whose items opened only on a real click (`StatusItemClicker`),
+    /// by bundle id, for as long as Grove Keys runs: their next press
+    /// clicks first, without the presses' two seconds of waiting.
+    private static let clickers = OSAllocatedUnfairLock(initialState: Set<String>())
+
+    /// Presses `item` of `pid`'s app (`bundleID`); when neither press opens
+    /// anything, clicks it for real. `.broughtForward` also activates the
     /// app (on the main actor, after this returns); `.gone` touches nothing.
     /// Called on the main thread by mistake: a debug build stops; a
     /// release build logs it and brings the app forward without pressing
     /// (up to two seconds of waits mustn't freeze Grove Keys).
-    static func press(_ item: StatusItemLocator.Item, pid: pid_t) -> Outcome {
+    static func press(_ item: StatusItemLocator.Item, pid: pid_t, bundleID: String) -> Outcome {
         assert(!Thread.isMainThread, "TrayPresser.press on the main thread")
         if Thread.isMainThread {
             log.error("press called on the main thread; brought forward without pressing")
@@ -36,7 +45,12 @@ enum TrayPresser {
             isRunning: { isRunning(pid) },
             snapshot: { opened(app: app, item: item.element, pid: pid) },
             press: { onWrapper in AX.press(onWrapper ? item.wrapper ?? item.element : item.element) },
-            within: { probe in AX.wait(openWait) { probe() ? true : nil } ?? false })
+            within: { probe in AX.wait(openWait) { probe() ? true : nil } ?? false },
+            click: { StatusItemClicker.click(item.element) },
+            clickFirst: clickers.withLock { $0.contains(bundleID) })
+        clickers.withLock { known in
+            if outcome == .clicked { known.insert(bundleID) } else if outcome != .gone { known.remove(bundleID) }
+        }
         if outcome == .broughtForward {
             DispatchQueue.main.async { MainActor.assumeIsolated { bringForward(pid) } }
         }

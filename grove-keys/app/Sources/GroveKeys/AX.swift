@@ -63,6 +63,16 @@ enum AX {
         return AXValueGetValue(v as! AXValue, .cgPoint, &point) ? point : nil
     }
 
+    /// The element's frame on screen (`AXPosition` and `AXSize`), in global
+    /// points, top-left origin.
+    static func frame(_ element: AXUIElement) -> CGRect? {
+        guard let origin = position(element), let v = value(element, kAXSizeAttribute),
+              CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
+        var size = CGSize.zero
+        // swiftlint:disable:next force_cast
+        return AXValueGetValue(v as! AXValue, .cgSize, &size) ? CGRect(origin: origin, size: size) : nil
+    }
+
     /// The element's pid; 0 when it can't be read.
     static func pid(_ element: AXUIElement) -> pid_t {
         var pid: pid_t = 0
