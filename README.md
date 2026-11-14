@@ -24,6 +24,14 @@ A personal macOS overhaul in the [Everforest](https://github.com/sainnhe/everfor
   <br><em>The Hyper cheat sheet from Grove Keys: hold Caps Lock to see what every key does.</em>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/themes-gallery-dark-medium.png">
+    <img src="assets/screenshots/themes-gallery-light-medium.png" width="100%" alt="The Grove Themes gallery: six scheme cards, then the terminal logo and wallpaper choices">
+  </picture>
+  <br><em>Grove Themes: six Everforest schemes, the terminal logo and the wallpaper, one click each.</em>
+</p>
+
 The pictures follow your light or dark setting: Everforest dark medium or light medium.
 
 ## What's inside

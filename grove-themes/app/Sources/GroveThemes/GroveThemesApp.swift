@@ -12,6 +12,9 @@ struct GroveThemesApp: App {
     private let watcher: StateWatcher
 
     init() {
+        // `--render <gallery|dropdown> <out.png> [scheme]`: a picture from
+        // sample data, then exit, before anything of the app starts.
+        Render.runIfAsked(CommandLine.arguments)
         let environment = ProcessInfo.processInfo.environment
         let home = FileManager.default.homeDirectoryForCurrentUser
         let cli = environment["GROVE_THEMES_CLI"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }

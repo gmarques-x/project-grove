@@ -45,9 +45,17 @@ Tests: `bats tests`.
 
 ## The app
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../assets/screenshots/themes-gallery-dark-medium.png">
+    <img src="../assets/screenshots/themes-gallery-light-medium.png" width="100%" alt="The Grove Themes gallery: six scheme cards, then the terminal logo and wallpaper choices">
+  </picture>
+  <br><em>The gallery: the six schemes, the terminal logo and the wallpaper, the current one of each marked on.</em>
+</p>
+
 `app/` is Grove Themes, a SwiftUI app that shows the six schemes, the terminal logo and the wallpaper in a gallery window and switches them by running `grove-themes` (so it needs the CLI installed). It has no Dock icon, and its dropdown in the native menu bar is hidden behind the Grove bar, so it is reached from the pine: Appearance › Grove Themes… opens the gallery through the link `grovethemes://gallery` (also `open grovethemes://gallery` from a terminal). The link only opens the window; it never switches anything.
 
-It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable. It has two libraries the other Grove apps share:
+It is a Swift package: `swift test` in `app/` runs its unit tests, and `swift build -c release` builds the `GroveThemes` executable. `GroveThemes --render <gallery|dropdown> <out.png> [scheme]` draws the gallery or the dropdown from fixed sample data (the checkout's theme files and images) to a PNG at 2x and exits, without starting the app, running `grove-themes` or changing anything; `scheme` is a scheme's name (default `dark-medium`) or a theme file's path. The pictures on this page come from it. It has two libraries the other Grove apps share:
 
 - `GroveThemesCore`, with no views: the palettes from `grove-themes list --json` and running the CLI, the `grovethemes://` links, the TOML subset the apps' config files use (read and write), the cloud folders' names for Explorer's sidebar and Keys' cloud pill, the rules for Grove menus and the focus grid, and the gallery's thumbnails.
 - `GroveUI`, what the apps' views share: the theme environment and the radius and spacing tokens, the fonts and Grove Icons, the focus ring, Grove menus (`GroveMenuList`), selects and segmented controls, window headers, the bar's panel kit and charts, and the file list's colours.
