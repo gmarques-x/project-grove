@@ -18,6 +18,30 @@ import Testing
         #expect(cloud("/Users/me/Documents/../Library/CloudStorage/OneDrive-Personal/c.txt"))
     }
 
+    @Test func theCloudFoldersThemselvesAreNotCloudItems() {
+        #expect(!cloud("/Users/me/Library/Mobile Documents"))
+        #expect(!cloud("/Users/me/Library/CloudStorage"))
+        #expect(!cloud("/Users/me/Library"))
+    }
+
+    @Test func aSymlinkedHomeStillMatches() throws {
+        let fm = FileManager.default
+        let box = fm.temporaryDirectory.appendingPathComponent("CloudTrashTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: box) }
+        let realHome = box.appendingPathComponent("home", isDirectory: true)
+        try fm.createDirectory(at: realHome.appendingPathComponent("Library/CloudStorage"), withIntermediateDirectories: true)
+        let linkedHome = box.appendingPathComponent("link", isDirectory: true)
+        try fm.createSymbolicLink(at: linkedHome, withDestinationURL: realHome)
+
+        let item = realHome.appendingPathComponent("Library/CloudStorage/OneDrive/a.txt")
+        let viaLink = linkedHome.appendingPathComponent("Library/CloudStorage/OneDrive/a.txt")
+        // Home through the link, item by its real path, and the other way round.
+        #expect(CloudTrash.isCloudItem(item, home: linkedHome))
+        #expect(CloudTrash.isCloudItem(viaLink, home: realHome))
+        #expect(CloudTrash.isCloudItem(viaLink, home: linkedHome))
+        #expect(!CloudTrash.isCloudItem(linkedHome.appendingPathComponent("Documents/a.txt"), home: realHome))
+    }
+
     @Test func finderTrashScriptEscapes() {
         let script = CloudTrash.finderScript(for: URL(fileURLWithPath: "/tmp/a \"b\"\\c.txt"))
         #expect(script == [

@@ -6,14 +6,29 @@ import Foundation
 public enum CloudTrash {
     /// Whether `url` lies under `~/Library/Mobile Documents` or
     /// `~/Library/CloudStorage` of `home`. Compared by path components after
-    /// standardising, so `Mobile Documents2` and `CloudStorageX` don't match.
+    /// standardising and resolving symlinks in both (so a symlinked home or
+    /// /var against /private/var still matches); `Mobile Documents2` and
+    /// `CloudStorageX` don't match, nor do the folders themselves.
     public static func isCloudItem(_ url: URL, home: URL) -> Bool {
-        let item = url.standardizedFileURL.pathComponents
-        let base = home.standardizedFileURL.pathComponents
+        let item = real(url)
+        let base = real(home)
         return ["Mobile Documents", "CloudStorage"].contains { folder in
             let root = base + ["Library", folder]
             return item.count > root.count && Array(item.prefix(root.count)) == root
         }
+    }
+
+    /// `url` standardised, with symlinks resolved in its deepest existing
+    /// ancestor (the item itself may be gone already, and
+    /// `resolvingSymlinksInPath` leaves a missing path as it is).
+    private static func real(_ url: URL) -> [String] {
+        var existing = url.standardizedFileURL
+        var rest: [String] = []
+        while !FileManager.default.fileExists(atPath: existing.path), existing.pathComponents.count > 1 {
+            rest.insert(existing.lastPathComponent, at: 0)
+            existing.deleteLastPathComponent()
+        }
+        return existing.resolvingSymlinksInPath().pathComponents + rest
     }
 
     /// The AppleScript that has Finder move `url` to the Trash and answer with
