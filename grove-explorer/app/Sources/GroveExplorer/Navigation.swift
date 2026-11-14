@@ -29,7 +29,7 @@ enum Disk {
         let storage = home.appendingPathComponent(FolderName.cloudStorage, isDirectory: true)
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: storage.path) else { return nil }
         let folders = names.filter { isFolder(storage.appendingPathComponent($0, isDirectory: true)) }
-        return FolderName.providers(in: folders, home: home)
+        return CloudProviders.providers(in: folders, home: home)
     }
 
     /// For each of `folders` and, where it is gone, each folder above it up

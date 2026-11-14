@@ -189,7 +189,7 @@ enum Sample {
         let disk = Volume(url: URL(fileURLWithPath: "/", isDirectory: true), name: "Macintosh HD", ejectable: false)
         model.hasCloud = true
         if extras.clouds {
-            model.cloudProviders = FolderName.providers(in: ["OneDrive-Personal", "OneDrive-Contoso"], home: home)
+            model.cloudProviders = CloudProviders.providers(in: ["OneDrive-Personal", "OneDrive-Contoso"], home: home)
         }
         model.volumes = [disk, backup]
         if extras.shares {

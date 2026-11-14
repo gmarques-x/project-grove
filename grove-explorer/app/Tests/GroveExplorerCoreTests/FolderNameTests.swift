@@ -3,7 +3,8 @@ import Foundation
 import Testing
 
 /// What the window calls a folder (tabs, the path bar, VoiceOver, the status
-/// bar), and the cloud places the sidebar lists under their own headers.
+/// bar), and the cloud place a folder is in. The providers' own names are
+/// CloudProvidersTests' (GroveThemesCore).
 @Suite struct FolderNameTests {
     private let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
 
@@ -44,39 +45,6 @@ import Testing
         #expect(title("/Users/other/Library/CloudStorage/OneDrive-Personal") == "OneDrive-Personal")
     }
 
-    // MARK: Providers
-
-    @Test func oneDriveReadsAsOneHeaderWhateverTheAccount() throws {
-        let personal = try #require(FolderName.provider(folderName: "OneDrive-Personal"))
-        #expect(personal == FolderName.Provider(name: "OneDrive", title: "OneDrive"))
-        let business = try #require(FolderName.provider(folderName: "OneDrive-Contoso"))
-        #expect(business == FolderName.Provider(name: "OneDrive", title: "OneDrive - Contoso"))
-        // The account after the first dash, dashes and all.
-        #expect(FolderName.provider(folderName: "OneDrive-Contoso-Ltd")?.title == "OneDrive - Contoso-Ltd")
-    }
-
-    @Test func otherProvidersHaveTheirOwnNames() {
-        #expect(FolderName.provider(folderName: "GoogleDrive-someone@gmail.com")
-            == FolderName.Provider(name: "Google Drive", title: "Google Drive - someone@gmail.com"))
-        #expect(FolderName.provider(folderName: "Dropbox") == FolderName.Provider(name: "Dropbox", title: "Dropbox"))
-        #expect(FolderName.provider(folderName: "Dropbox-Personal")
-            == FolderName.Provider(name: "Dropbox", title: "Dropbox"))
-        // An account named as the provider is said once.
-        #expect(FolderName.provider(folderName: "Box-Box") == FolderName.Provider(name: "Box", title: "Box"))
-    }
-
-    @Test func anUnknownProviderIsCalledAsItsFolderSays() {
-        #expect(FolderName.provider(folderName: "SyncThing-Work")
-            == FolderName.Provider(name: "SyncThing", title: "SyncThing - Work"))
-        #expect(FolderName.provider(folderName: "Nextcloud") == FolderName.Provider(name: "Nextcloud", title: "Nextcloud"))
-    }
-
-    @Test func hiddenAndEmptyNamesAreNoProvider() {
-        #expect(FolderName.provider(folderName: ".DS_Store") == nil)
-        #expect(FolderName.provider(folderName: "") == nil)
-        #expect(FolderName.provider(folderName: "-Personal") == nil)
-    }
-
     // MARK: The cloud place a folder is in
 
     @Test func theCloudPlaceAFolderIsIn() throws {
@@ -106,14 +74,5 @@ import Testing
     @Test func dotsInThePathAreWorkedOut() {
         #expect(title(iCloud + "/Notes/..") == "iCloud Drive")
         #expect(FolderName.cloudPlace(containing: folder(storage + "/OneDrive-Personal/a/../b"), home: home)?.title == "OneDrive")
-    }
-
-    // MARK: The providers the sidebar lists
-
-    @Test func theSidebarsProvidersAreInTheirFolderOrder() {
-        let places = FolderName.providers(in: ["OneDrive-Personal", ".DS_Store", "Dropbox", "OneDrive-Contoso"], home: home)
-        #expect(places.map(\.title) == ["Dropbox", "OneDrive", "OneDrive - Contoso"])
-        #expect(places.map(\.kind) == [.provider("Dropbox"), .provider("OneDrive"), .provider("OneDrive")])
-        #expect(places.map(\.url.path) == [storage + "/Dropbox", storage + "/OneDrive-Personal", storage + "/OneDrive-Contoso"])
     }
 }
