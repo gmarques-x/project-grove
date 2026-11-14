@@ -48,6 +48,9 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
     private var listing: TrayWatcher.Listing?
     private var icons: [pid_t: NSImage] = [:]
     private var watching: AnyCancellable?
+    /// A press is under way on the press queue: another is dropped, not
+    /// queued (behind a hung app it would fire seconds late).
+    private nonisolated static let pressing = OSAllocatedUnfairLock(initialState: false)
 
     init(_ data: BarPanelData) {
         switch data {
@@ -59,7 +62,7 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
             let sample = Self.sample(name)
             list = TrayList(items: sample.items, hidden: sample.hidden)
             accessible = name != "noaccess"
-            expanded = name == "hidden"
+            expanded = name == "hidden" || list?.opensHiddenAtFirst == true
             // The system's generic app icon: a render reads no other app.
             let generic = NSWorkspace.shared.icon(for: .applicationBundle)
             for item in sample.items { icons[item.pid] = generic }
@@ -72,6 +75,7 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
         lit = nil
         let watcher = TrayWatcher.shared
         if let latest = watcher.latest { take(latest) }
+        if list?.opensHiddenAtFirst == true { expanded = true }
         // `$latest` sends the current value first, then each new one, on the
         // main actor (the watcher sets it there).
         watching = watcher.$latest.dropFirst().sink { [weak self] latest in
@@ -92,6 +96,9 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
         listing = latest
         accessible = latest.accessible
         let fresh = TrayList(items: latest.items.map(\.0), hidden: latest.hidden)
+        // Only the listed apps' icons are kept (a quit app's pid goes).
+        let pids = Set(fresh.items.map(\.pid))
+        icons = icons.filter { pids.contains($0.key) }
         for item in fresh.items where icons[item.pid] == nil {
             icons[item.pid] = NSRunningApplication(processIdentifier: item.pid)?.icon
         }
@@ -110,8 +117,18 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
         let target = Target(item: listing.items[row.index].1, pid: row.item.pid)
         let name = row.item.appName
         link.actions.leave {}
+        let free = Self.pressing.withLock { busy -> Bool in
+            guard !busy else { return false }
+            busy = true
+            return true
+        }
+        guard free else {
+            Self.log.info("\(name, privacy: .public)'s item not pressed: another press is still under way")
+            return
+        }
         Self.pressQueue.async {
             let outcome = TrayPresser.press(target.item, pid: target.pid)
+            Self.pressing.withLock { $0 = false }
             Self.log.info("pressed \(name, privacy: .public)'s item: \(String(describing: outcome), privacy: .public)")
         }
     }
@@ -187,13 +204,18 @@ final class TrayModel: ObservableObject, BarPanelWithSides {
 
     /// GROVE_TRAY_SAMPLE: `items` (the default: five apps, three hidden),
     /// `hidden` (the same with Hidden open), `noaccess` (no Accessibility
-    /// permission), `empty` (nothing in the menu bar). Invented apps only.
+    /// permission), `empty` (nothing in the menu bar), `allhidden` (every
+    /// item hidden: Hidden open at first). Invented apps only.
     private static func sample(_ name: String) -> (items: [TrayItem], hidden: Set<String>) {
         func item(_ id: String, _ app: String, _ pid: pid_t, title: String? = nil) -> TrayItem {
             TrayItem(bundleID: id, appName: app, pid: pid, title: title, x: Double(pid))
         }
         switch name {
         case "empty", "noaccess": return ([], TrayItems.defaultHidden)
+        case "allhidden":
+            return ([item("com.example.tiles", "Tiles", 6, title: "1"), item("com.projectgrove.keys", "Grove Keys", 7),
+                     item("com.projectgrove.themes", "Grove Themes", 8)],
+                    TrayItems.defaultHidden.union(["com.example.tiles#0"]))
         default:
             let items = [
                 item("com.example.vpn", "Example VPN", 1, title: "Example VPN"),
@@ -230,15 +252,15 @@ struct TrayPanel: View {
                     .help("Allow Grove Keys to use Accessibility")
                 }
             } else if let list = model.list {
-                if list.visible.isEmpty {
+                if list.showsNoItems {
                     Text(TrayList.noItems).foregroundStyle(theme.quiet)
-                } else {
+                } else if !list.visible.isEmpty {
                     PanelRows {
                         ForEach(list.visible) { row($0) }
                     }
                 }
                 if !list.hidden.isEmpty {
-                    PanelRule()
+                    if !list.visible.isEmpty { PanelRule() }
                     PanelRows {
                         disclosure(list.hidden.count)
                         if model.expanded {

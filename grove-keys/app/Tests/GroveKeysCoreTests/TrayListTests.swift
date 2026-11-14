@@ -149,4 +149,17 @@ struct TrayListTests {
         #expect(hidden == ["com.projectgrove.themes", "bobko.aerospace", "com.projectgrove.keys#1", "com.projectgrove.keys#0"])
         #expect(again.toggled("nothing") == nil)
     }
+
+    @Test func whatTheEmptyPanelShows() {
+        let a = item("com.example.a", x: 1), h = item("com.projectgrove.keys", x: 2)
+        let none = TrayList(items: [], hidden: [])
+        #expect(none.showsNoItems && !none.opensHiddenAtFirst)
+        let all = TrayList(items: [h], hidden: TrayItems.defaultHidden)
+        #expect(!all.showsNoItems)
+        #expect(all.opensHiddenAtFirst)
+        let some = TrayList(items: [a, h], hidden: TrayItems.defaultHidden)
+        #expect(!some.showsNoItems && !some.opensHiddenAtFirst)
+        let visible = TrayList(items: [a], hidden: [])
+        #expect(!visible.showsNoItems && !visible.opensHiddenAtFirst)
+    }
 }

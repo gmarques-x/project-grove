@@ -46,6 +46,14 @@ public struct TrayList: Equatable, Sendable {
         self.hidden = away
     }
 
+    /// "No other menu-bar items": only when nothing is listed at all, hidden
+    /// items included (all hidden, the Hidden disclosure says it).
+    public var showsNoItems: Bool { visible.isEmpty && hidden.isEmpty }
+
+    /// Every item hidden: the disclosure opens at first, so the panel isn't
+    /// a lone fold.
+    public var opensHiddenAtFirst: Bool { visible.isEmpty && !hidden.isEmpty }
+
     public func row(_ id: String) -> TrayRow? {
         visible.first { $0.id == id } ?? hidden.first { $0.id == id }
     }
